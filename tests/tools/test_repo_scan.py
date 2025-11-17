@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-import sys
+from collections.abc import Callable
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
@@ -12,57 +11,6 @@ import pytest
 from tools import repo_scan
 
 from tests._helpers import assertions
-
-
-def _run_repo_scan_cli(
-    monkeypatch: pytest.MonkeyPatch,
-    scan_root: Path,
-    tmp_path: Path,
-    extra_args: list[str] | None = None,
-    repo_root_override: str | None = None,
-) -> tuple[dict[str, Any], Path, Path | None]:
-    """Invoke repo_scan.main() and capture JSON, DOT, and enriched graph paths.
-
-    Returns
-    -------
-    tuple[dict[str, Any], Path, Path | None]
-        Parsed payload, standard DOT path, and enriched DOT path (if written).
-    """
-    json_path = tmp_path / "metrics.json"
-    dot_path = tmp_path / "graph.dot"
-    extra_args = extra_args or []
-    enriched_path: Path | None = None
-    enriched_specified = False
-    for idx, arg in enumerate(extra_args):
-        if arg == "--enriched-dot" and idx + 1 < len(extra_args):
-            enriched_specified = True
-            enriched_path = Path(extra_args[idx + 1])
-            break
-        if arg == "--no-enriched-dot":
-            enriched_specified = True
-            enriched_path = None
-            break
-    if not enriched_specified:
-        enriched_path = tmp_path / "graph_enriched.dot"
-    repo_root_arg = repo_root_override or str(scan_root)
-    argv = [
-        "repo_scan.py",
-        str(scan_root),
-        "--repo-root",
-        repo_root_arg,
-        "--out-json",
-        str(json_path),
-        "--out-dot",
-        str(dot_path),
-    ]
-    if not enriched_specified and enriched_path is not None:
-        argv.extend(["--enriched-dot", str(enriched_path)])
-    if extra_args:
-        argv.extend(extra_args)
-    monkeypatch.setattr(sys, "argv", argv)
-    repo_scan.main()
-    payload = json.loads(json_path.read_text(encoding="utf-8"))
-    return payload, dot_path, enriched_path
 
 
 def test_iter_py_files_skips_virtual_env_content(tmp_path: Path) -> None:
@@ -121,7 +69,8 @@ def test_is_test_file_heuristics(
 
 
 def test_repo_scan_main_generates_expected_payload(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    repo_scan_invoker: Callable[..., tuple[dict[str, Any], Path, Path]],
 ) -> None:
     """Run the CLI end-to-end on a synthetic repo to validate the payload shape."""
     scan_root = tmp_path / "scan"
@@ -205,11 +154,9 @@ def test_repo_scan_main_generates_expected_payload(
     )
 
     # Disable Griffe here to keep the smoke test independent of optional deps.
-    payload, dot_path, enriched_path = _run_repo_scan_cli(
-        monkeypatch,
-        scan_root,
-        tmp_path,
-        ["--no-griffe"],
+    payload, dot_path, enriched_path = repo_scan_invoker(
+        scan_root=scan_root,
+        argv=["--no-griffe"],
     )
     modules = {entry["module"]: entry for entry in payload["modules"]}
 
@@ -259,7 +206,10 @@ def test_module_name_strips_src_prefix(tmp_path: Path) -> None:
     assertions.expect_equal(name, "pkg.mod")
 
 
-def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_repo_scan_with_libcst_flag(
+    tmp_path: Path,
+    repo_scan_invoker: Callable[..., tuple[dict[str, Any], Path, Path]],
+) -> None:
     """Ensure LibCST enrichment is enabled by default and can be disabled."""
     pytest.importorskip("libcst")
     scan_root = tmp_path / "libcst_scan"
@@ -278,7 +228,7 @@ def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         encoding="utf-8",
     )
 
-    payload, _, _ = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path, ["--no-griffe"])
+    payload, _, _ = repo_scan_invoker(scan_root=scan_root, argv=["--no-griffe"])
     modules = {entry["module"]: entry for entry in payload["modules"]}
     module_report = modules["pkg.mod"]
     assertions.expect_true(
@@ -291,18 +241,19 @@ def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assertions.expect_in("json", payload["external_deps"])
     assertions.expect_in("vendor", payload["external_deps"])
 
-    payload_disabled, _, _ = _run_repo_scan_cli(
-        monkeypatch,
-        scan_root,
-        tmp_path,
-        ["--no-libcst", "--no-griffe"],
+    payload_disabled, _, _ = repo_scan_invoker(
+        scan_root=scan_root,
+        argv=["--no-libcst", "--no-griffe"],
     )
     modules_disabled = {entry["module"]: entry for entry in payload_disabled["modules"]}
     assertions.expect_equal(modules_disabled["pkg.mod"]["imports_cst"], None)
     assertions.expect_sequence_equal(payload_disabled["external_deps"], [])
 
 
-def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_repo_scan_with_griffe_flag(
+    tmp_path: Path,
+    repo_scan_invoker: Callable[..., tuple[dict[str, Any], Path, Path]],
+) -> None:
     """Confirm Griffe-powered API extraction populates api_symbols."""
     pytest.importorskip("griffe")
     scan_root = tmp_path / "griffe_scan"
@@ -339,11 +290,9 @@ def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         encoding="utf-8",
     )
 
-    payload, _, _ = _run_repo_scan_cli(
-        monkeypatch,
-        scan_root,
-        tmp_path,
-        ["--docstyle", "google"],
+    payload, _, _ = repo_scan_invoker(
+        scan_root=scan_root,
+        argv=["--docstyle", "google"],
     )
     assertions.expect_true(
         bool(payload["api_symbols"]), reason="Expected Griffe symbols to be emitted"
@@ -357,28 +306,24 @@ def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         reason="should have prefix parameter",
     )
 
-    payload_disabled, _, _ = _run_repo_scan_cli(
-        monkeypatch,
-        scan_root,
-        tmp_path,
-        ["--no-griffe"],
+    payload_disabled, _, _ = repo_scan_invoker(
+        scan_root=scan_root,
+        argv=["--no-griffe"],
     )
     assertions.expect_sequence_equal(payload_disabled["api_symbols"], [])
 
 
 def test_repo_scan_handles_missing_repo_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    repo_scan_invoker: Callable[..., tuple[dict[str, Any], Path, Path]],
 ) -> None:
     """CLI should fall back gracefully when --repo-root points to nowhere."""
     scan_root = tmp_path / "scan"
     (scan_root / "pkg").mkdir(parents=True, exist_ok=True)
     (scan_root / "pkg" / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
 
-    payload, _, _ = _run_repo_scan_cli(
-        monkeypatch,
-        scan_root,
-        tmp_path,
-        ["--no-griffe"],
-        repo_root_override=str(scan_root / "nonexistent"),
+    payload, _, _ = repo_scan_invoker(
+        scan_root=scan_root,
+        argv=["--no-griffe", "--repo-root", str(scan_root / "nonexistent")],
     )
     assertions.expect_equal(payload["summary"]["files"], 1)

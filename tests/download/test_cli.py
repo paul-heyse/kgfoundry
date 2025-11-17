@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -12,7 +13,10 @@ from download.cli import DownloadCliContext, HarvestRequest
 from tests._helpers import assertions
 
 
-def test_harvest_emits_envelope(tmp_path: Path) -> None:
+def test_harvest_emits_envelope(
+    tmp_path: Path,
+    download_cli_context_builder: Callable[..., DownloadCliContext],
+) -> None:
     """The harvest command should write a structured CLI envelope on success."""
     expected_path = tmp_path / f"{cli.CLI_SETTINGS.bin_name}-{cli.CLI_COMMAND}-harvest.json"
     received: list[HarvestRequest] = []
@@ -21,7 +25,7 @@ def test_harvest_emits_envelope(tmp_path: Path) -> None:
         received.append(request)
         return f"[dry-run] mock harvest {request.topic} years={request.years} max={request.max_works}"
 
-    context = DownloadCliContext(harvest_handler=_handler)
+    context = download_cli_context_builder(harvest_handler=_handler)
 
     runner = CliRunner()
     result = runner.invoke(

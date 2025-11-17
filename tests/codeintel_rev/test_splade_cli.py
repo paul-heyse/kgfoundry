@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
+from click.testing import Result
 from codeintel_rev.cli import app as root_app
-from codeintel_rev.cli import splade as splade_cli
+from codeintel_rev.cli.splade import SpladeCliContext
 from codeintel_rev.io.splade_manager import (
+    SpladeArtifactsManager,
     SpladeBenchmarkOptions,
     SpladeBenchmarkSummary,
     SpladeBuildOptions,
     SpladeEncodeOptions,
+    SpladeEncoderService,
     SpladeEncodingSummary,
     SpladeExportOptions,
     SpladeExportSummary,
+    SpladeIndexManager,
     SpladeIndexMetadata,
 )
-from tools import Paths
 from typer.testing import CliRunner
 
 from tests._helpers import assertions
@@ -127,36 +132,45 @@ class _StubIndexManager:
         )
 
 
-def _patch_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Redirect CLI envelope output artifacts to a temporary directory."""
-    Paths.discover.cache_clear()
-
-    def fake_discover(_start: Path | None = None) -> Paths:
-        return Paths(
-            repo_root=tmp_path,
-            docs_data=tmp_path / "docs",
-            cli_out_root=tmp_path / "cli",
-        )
-
-    monkeypatch.setattr(Paths, "discover", staticmethod(fake_discover))
-
-
-def test_export_onnx_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """export-onnx should drive the artifacts manager and emit metadata."""
-    stub = _StubArtifactsManager(tmp_path)
-    _patch_paths(monkeypatch, tmp_path)
-    monkeypatch.setattr(splade_cli, "_create_artifacts_manager", lambda: stub)
-
-    result = runner.invoke(
+def _invoke_splade(
+    args: list[str],
+    *,
+    context: SpladeCliContext,
+    envelope_dir: Path,
+) -> Result:
+    return runner.invoke(
         root_app,
         [
             "splade",
+            *args,
+        ],
+        obj={
+            "splade_cli_context": context,
+            "cli_run_overrides": {"envelope_dir": envelope_dir},
+        },
+    )
+
+
+def test_export_onnx_cli(
+    tmp_path: Path,
+    splade_cli_context_builder: Callable[..., SpladeCliContext],
+) -> None:
+    """export-onnx should drive the artifacts manager and emit metadata."""
+    stub = _StubArtifactsManager(tmp_path)
+    context = splade_cli_context_builder(
+        artifacts_factory=lambda: cast("SpladeArtifactsManager", stub)
+    )
+
+    result = _invoke_splade(
+        [
             "export-onnx",
             "--model-id",
             "naver/splade-v3",
             "--quantization-config",
             "avx512",
         ],
+        context=context,
+        envelope_dir=tmp_path / "envelopes",
     )
 
     assertions.expect_equal(result.exit_code, 0)
@@ -167,24 +181,28 @@ def test_export_onnx_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     assertions.expect_equal(call.quantization_config, "avx512")
 
 
-def test_encode_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_encode_cli(
+    tmp_path: Path,
+    splade_cli_context_builder: Callable[..., SpladeCliContext],
+) -> None:
     """Encode should invoke the encoder service and persist metadata artifacts."""
     stub = _StubEncoderService(tmp_path)
-    _patch_paths(monkeypatch, tmp_path)
-    monkeypatch.setattr(splade_cli, "_create_encoder_service", lambda: stub)
+    context = splade_cli_context_builder(
+        encoder_factory=lambda: cast("SpladeEncoderService", stub)
+    )
 
     source = tmp_path / "corpus.jsonl"
     source.write_text('{"id": "doc1", "contents": "text"}\n', encoding="utf-8")
 
-    result = runner.invoke(
-        root_app,
+    result = _invoke_splade(
         [
-            "splade",
             "encode",
             str(source),
             "--batch-size",
             "16",
         ],
+        context=context,
+        envelope_dir=tmp_path / "envelopes",
     )
 
     assertions.expect_equal(result.exit_code, 0)
@@ -199,19 +217,21 @@ def test_encode_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assertions.expect_true(metadata_path.exists(), reason="metadata_path should exist")
 
 
-def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_build_index_cli(
+    tmp_path: Path,
+    splade_cli_context_builder: Callable[..., SpladeCliContext],
+) -> None:
     """build-index should dispatch to the index manager with parsed options."""
     stub = _StubIndexManager(tmp_path)
-    _patch_paths(monkeypatch, tmp_path)
-    monkeypatch.setattr(splade_cli, "_create_index_manager", lambda: stub)
+    context = splade_cli_context_builder(
+        index_factory=lambda: cast("SpladeIndexManager", stub)
+    )
 
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
 
-    result = runner.invoke(
-        root_app,
+    result = _invoke_splade(
         [
-            "splade",
             "build-index",
             "--vectors-dir",
             str(vectors_dir),
@@ -221,6 +241,8 @@ def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
             "8192",
             "--no-overwrite",
         ],
+        context=context,
+        envelope_dir=tmp_path / "envelopes",
     )
 
     assertions.expect_equal(result.exit_code, 0)
@@ -238,16 +260,18 @@ def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     assertions.expect_false(options.overwrite, reason="overwrite should be False")
 
 
-def test_bench_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_bench_cli(
+    tmp_path: Path,
+    splade_cli_context_builder: Callable[..., SpladeCliContext],
+) -> None:
     """Bench should invoke the encoder service benchmark workflow."""
     stub = _StubEncoderService(tmp_path)
-    _patch_paths(monkeypatch, tmp_path)
-    monkeypatch.setattr(splade_cli, "_create_encoder_service", lambda: stub)
+    context = splade_cli_context_builder(
+        encoder_factory=lambda: cast("SpladeEncoderService", stub)
+    )
 
-    result = runner.invoke(
-        root_app,
+    result = _invoke_splade(
         [
-            "splade",
             "bench",
             "--query",
             "solar incentives",
@@ -256,6 +280,8 @@ def test_bench_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
             "--warmup",
             "2",
         ],
+        context=context,
+        envelope_dir=tmp_path / "envelopes",
     )
 
     assertions.expect_equal(result.exit_code, 0)

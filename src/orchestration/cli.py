@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Protocol, cast
 from uuid import uuid4
 
+import click
 import typer
 from tools import (
     CliEnvelope,
@@ -101,6 +102,41 @@ class _CommandContext:
         return payload
 
 
+@dataclass(slots=True, frozen=True)
+class OrchestrationCliContext:
+    """Dependency injection context for orchestration CLI commands."""
+
+    uuid_factory: Callable[[], str]
+    bm25_builder: Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]]
+    faiss_runner: Callable[[IndexCliConfig], dict[str, object]]
+
+    @classmethod
+    def production(cls) -> OrchestrationCliContext:
+        """Return the production orchestration CLI context.
+
+        Returns
+        -------
+        OrchestrationCliContext
+            Context configured with production factories.
+        """
+        return cls(
+            uuid_factory=lambda: uuid4().hex,
+            bm25_builder=_default_bm25_builder,
+            faiss_runner=_default_faiss_runner,
+        )
+
+
+def _default_bm25_builder(
+    config: BM25BuildConfig,
+    logger: logging.Logger,
+) -> tuple[str, int]:
+    return _build_bm25_index(config, logger=logger)
+
+
+def _default_faiss_runner(config: IndexCliConfig) -> dict[str, object]:
+    return run_index_faiss(config=config)
+
+
 CLI_COMMAND = cli_context.CLI_COMMAND
 CLI_OPERATION_IDS = cli_context.CLI_OPERATION_IDS
 CLI_INTERFACE_ID = cli_context.CLI_INTERFACE_ID
@@ -137,6 +173,7 @@ def _resolve_cli_help() -> str:
 
 
 app = typer.Typer(help=_resolve_cli_help(), no_args_is_help=True, add_completion=False)
+_DEFAULT_CONTEXT = OrchestrationCliContext.production()
 
 
 def _store_cli_state(ctx: typer.Context, envelope_dir: Path) -> None:
@@ -154,6 +191,18 @@ def _resolve_envelope_dir(ctx: typer.Context | None) -> Path:
     return Path(directory)
 
 
+def _cli_context(ctx: typer.Context | None = None) -> OrchestrationCliContext:
+    active = ctx or click.get_current_context(silent=True)
+    if active is None:
+        return _DEFAULT_CONTEXT
+    state = active.ensure_object(dict)
+    context = state.get("orchestration_cli_context")
+    if isinstance(context, OrchestrationCliContext):
+        return context
+    state["orchestration_cli_context"] = _DEFAULT_CONTEXT
+    return _DEFAULT_CONTEXT
+
+
 @app.callback()
 def orchestration_callback(
     ctx: typer.Context,
@@ -161,6 +210,8 @@ def orchestration_callback(
 ) -> None:
     """Configure shared orchestration CLI options."""
     _store_cli_state(ctx, envelope_dir)
+    state = ctx.ensure_object(dict)
+    state.setdefault("orchestration_cli_context", _DEFAULT_CONTEXT)
 
 
 def _coerce_extension_value(value: object) -> JsonValue:
@@ -196,8 +247,9 @@ def _start_command(
     subcommand: str,
     **log_fields: object,
 ) -> tuple[_CommandContext, CliEnvelopeBuilder]:
+    orchestration_context = _cli_context(ctx)
     operation_id = CLI_OPERATION_IDS.get(subcommand, subcommand)
-    correlation_id = uuid4().hex
+    correlation_id = orchestration_context.uuid_factory()
     filtered_fields = {key: value for key, value in log_fields.items() if value is not None}
     if filtered_fields:
         typer.echo(
@@ -588,9 +640,10 @@ def index_bm25(
         index_dir=index_dir,
         chunks_path=chunks_parquet,
     )
+    orchestration_cli_context = _cli_context(ctx)
     try:
         _prepare_index_directory(config.index_dir)
-        backend_used, doc_count = _build_bm25_index(config, logger=LOGGER)
+        backend_used, doc_count = orchestration_cli_context.bm25_builder(config, LOGGER)
         index_path = _get_bm25_index_path(Path(index_dir), backend_used)
         builder = builder.add_file(
             path=str(index_path),
@@ -757,8 +810,9 @@ def index_faiss(
         index_path=index_path,
         dense_vectors=dense_vectors,
     )
+    orchestration_cli_context = _cli_context(ctx)
     try:
-        metadata = run_index_faiss(config=config)
+        metadata = orchestration_cli_context.faiss_runner(config)
         builder = builder.add_file(
             path=str(Path(index_path)),
             status="success",

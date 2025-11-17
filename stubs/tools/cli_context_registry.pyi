@@ -23,6 +23,7 @@ class CLIContextDefinition:
         version_resolver: Callable[[], str] | None = ...,
         augment_path: Path | None = ...,
         registry_path: Path | None = ...,
+        context_factory: Callable[[CLIToolSettings], CLIToolingContext] | None = ...,
     ) -> None: ...
 
     command: str
@@ -33,6 +34,7 @@ class CLIContextDefinition:
     version_resolver: Callable[[], str] | None
     augment_path: Path | None
     registry_path: Path | None
+    context_factory: Callable[[CLIToolSettings], CLIToolingContext] | None
 
     @property
     def bin_label(self) -> str: ...

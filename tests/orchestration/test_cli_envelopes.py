@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
@@ -11,6 +13,7 @@ from typer.testing import CliRunner
 
 from kgfoundry_common.vector_types import VectorValidationError
 from orchestration import cli as orchestration_cli
+from orchestration.cli import OrchestrationCliContext
 from tests._helpers import assertions
 
 
@@ -25,13 +28,14 @@ def _read_envelope(path: Path) -> dict[str, object]:
 
 
 def test_index_bm25_emits_success_envelope(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    tmp_path: Path,
+    runner: CliRunner,
+    orchestration_cli_context_builder: Callable[..., OrchestrationCliContext],
 ) -> None:
     """Test that index-bm25 command emits a success envelope with file artifacts."""
     def fake_build(
         config: orchestration_cli.BM25BuildConfig,
-        *,
-        logger: object,
+        logger: logging.Logger,
     ) -> tuple[str, int]:
         assertions.expect_true(
             isinstance(config, orchestration_cli.BM25BuildConfig),
@@ -42,8 +46,6 @@ def test_index_bm25_emits_success_envelope(
             reason="logger should expose logging methods",
         )
         return "lucene", 3
-
-    monkeypatch.setattr(orchestration_cli, "_build_bm25_index", fake_build)
 
     chunks_file = tmp_path / "chunks.jsonl"
     chunks_file.write_text("{}\n", encoding="utf-8")
@@ -60,6 +62,7 @@ def test_index_bm25_emits_success_envelope(
             "--index-dir",
             str(tmp_path / "_indices" / "bm25"),
         ],
+        obj={"orchestration_cli_context": orchestration_cli_context_builder(bm25_builder=fake_build)},
     )
 
     assertions.expect_equal(result.exit_code, 0)
@@ -74,7 +77,9 @@ def test_index_bm25_emits_success_envelope(
 
 
 def test_index_faiss_records_validation_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner
+    tmp_path: Path,
+    runner: CliRunner,
+    orchestration_cli_context_builder: Callable[..., OrchestrationCliContext],
 ) -> None:
     """Test that index-faiss command records validation failures in error envelope."""
     error = VectorValidationError("invalid payload", errors=["row 1: missing vector"])
@@ -85,8 +90,6 @@ def test_index_faiss_records_validation_failure(
             reason="config should be orchestration_cli.IndexCliConfig",
         )
         raise error
-
-    monkeypatch.setattr(orchestration_cli, "run_index_faiss", fake_run)
 
     vectors_file = tmp_path / "vectors.json"
     vectors_file.write_text("[]", encoding="utf-8")
@@ -101,6 +104,11 @@ def test_index_faiss_records_validation_failure(
             "--index-path",
             str(tmp_path / "out.idx"),
         ],
+        obj={
+            "orchestration_cli_context": orchestration_cli_context_builder(
+                faiss_runner=lambda config: fake_run(config=config)
+            )
+        },
     )
 
     assertions.expect_equal(result.exit_code, 1)

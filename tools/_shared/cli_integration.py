@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import os
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Concatenate, ParamSpec, TypeVar
 
 import click
@@ -44,6 +45,19 @@ def current_route(*, include_root: bool = False) -> list[str]:
     if not include_root and route:
         route = route[1:] if len(route) > 1 else route
     return route
+
+
+_CFG_OVERRIDE_FIELDS = {
+    "envelope_dir",
+    "correlation_id",
+    "write_envelope_on",
+    "stdout_format",
+    "exit_on_error",
+    "error_code_map",
+    "extra_context",
+    "args_summary",
+    "env_summary",
+}
 
 
 def cli_operation(
@@ -108,6 +122,7 @@ def cli_operation(
                 ),
                 env_summary=_collect_env_summary() if echo_env else None,
             )
+            cfg = _apply_overrides(cfg)
             with cli_run(cfg) as (ctx, env):
                 return fn(ctx, env, *args, **kwargs)
 
@@ -125,6 +140,21 @@ def _collect_env_summary() -> dict[str, str]:
         Mapping of environment variable names to their redacted values.
     """
     return {key: os.environ.get(key, "") for key in _SUMMARY_ENV_KEYS}
+
+
+def _apply_overrides(cfg: CliRunConfig) -> CliRunConfig:
+    ctx = click.get_current_context(silent=True)
+    if ctx is None or not isinstance(ctx.obj, dict):
+        return cfg
+    overrides = ctx.obj.get("cli_run_overrides")
+    if not isinstance(overrides, dict):
+        return cfg
+    filtered: dict[str, object] = {
+        key: overrides[key] for key in _CFG_OVERRIDE_FIELDS if key in overrides
+    }
+    if not filtered:
+        return cfg
+    return replace(cfg, **filtered)
 
 
 __all__ = ["cli_operation", "current_route"]

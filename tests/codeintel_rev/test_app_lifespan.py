@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from http import HTTPStatus
 from pathlib import Path
+from typing import cast
 
 import duckdb
 import pytest
@@ -13,24 +15,37 @@ from fastapi.testclient import TestClient
 
 from kgfoundry_common.errors import ConfigurationError
 from tests._helpers import assertions
+from tests._helpers.settings import build_settings_for_repo
 from tests.conftest import HAS_FAISS_SUPPORT
 
 
-@pytest.fixture
-def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Set up a minimal test repository environment.
+class RepoHandle:
+    """Expose repo path and configuration hook to tests."""
 
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory path provided by pytest fixture.
-    monkeypatch : pytest.MonkeyPatch
-        Pytest monkeypatch fixture for modifying environment variables.
+    def __init__(
+        self,
+        repo_root: Path,
+        reconfigure: Callable[[dict[str, object] | None], None],
+    ) -> None:
+        self.repo_root = repo_root
+        self._reconfigure = reconfigure
+
+    def configure(self, *, faiss_preload: bool | None = None) -> None:
+        """Rebuild the cached context with optional FAISS overrides."""
+        overrides: dict[str, object] | None = None
+        if faiss_preload is not None:
+            overrides = cast("dict[str, object]", {"faiss_preload": faiss_preload})
+        self._reconfigure(overrides)
+
+
+@pytest.fixture
+def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> RepoHandle:
+    """Set up a minimal test repository environment and inject context.
 
     Returns
     -------
-    Path
-        Path to the test repository root directory.
+    RepoHandle
+        Helper exposing the repo path and configuration hook.
     """
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -48,10 +63,21 @@ def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     conn = duckdb.connect(str(duckdb_path))
     conn.close()
 
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
+    original_create = ApplicationContext.create
+    state: dict[str, ApplicationContext] = {}
 
-    return repo_root
+    def rebuild_context(index_overrides: dict[str, object] | None = None) -> None:
+        new_settings = build_settings_for_repo(repo_root, index_overrides=index_overrides)
+        state["context"] = original_create(settings=new_settings)
+
+    rebuild_context()
+
+    def patched_create(*_args: object, **_kwargs: object) -> ApplicationContext:
+        return state["context"]
+
+    monkeypatch.setattr("codeintel_rev.app.main.ApplicationContext.create", patched_create)
+
+    return RepoHandle(repo_root, rebuild_context)
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -85,31 +111,24 @@ def test_app_readyz_endpoint_healthy() -> None:
         # The important thing is that the endpoint works and returns structured data
 
 
-def test_app_startup_fails_invalid_repo_root(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_app_startup_fails_invalid_repo_root(tmp_path: Path) -> None:
     """Test that ApplicationContext.create() raises ConfigurationError for invalid repo root.
 
     Note: TestClient may handle lifespan exceptions differently, but the core
     behavior is that ApplicationContext.create() should fail fast.
     """
-    monkeypatch.setenv("REPO_ROOT", "/nonexistent/path")
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
-
+    invalid_path = tmp_path / "nonexistent"
+    settings = build_settings_for_repo(invalid_path)
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
-        ApplicationContext.create()
+        ApplicationContext.create(settings=settings)
 
 
-def test_app_readyz_shows_unhealthy_resources(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_app_readyz_shows_unhealthy_resources(test_repo: RepoHandle) -> None:
     """Test that /readyz endpoint shows failures when resources are missing."""
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-    (repo_root / "data").mkdir()
-
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
+    repo_root = test_repo.repo_root
+    faiss_path = repo_root / "data" / "faiss" / "code.ivfpq.faiss"
+    if faiss_path.exists():
+        faiss_path.unlink()
 
     # App should start (missing FAISS is not fatal unless pre-loading enabled)
     with TestClient(app) as client:
@@ -137,11 +156,9 @@ def test_app_startup_with_preload_disabled() -> None:
 
 @pytest.mark.usefixtures("test_repo")
 @pytest.mark.skipif(not HAS_FAISS_SUPPORT, reason="FAISS bindings unavailable on this host")
-def test_app_startup_with_preload_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_app_startup_with_preload_enabled(test_repo: RepoHandle) -> None:
     """Test that FAISS pre-loading works when FAISS_PRELOAD=1."""
-    monkeypatch.setenv("FAISS_PRELOAD", "1")
+    test_repo.configure(faiss_preload=True)
 
     # App should start and attempt to pre-load FAISS
     # Note: This may fail if FAISS index is invalid, but startup should still succeed

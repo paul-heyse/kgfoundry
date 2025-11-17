@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
+import click
 import msgspec
 import typer
 from tools import CliContext, EnvelopeBuilder, cli_operation, sha256_file
@@ -45,11 +48,95 @@ OverwriteFlag = Annotated[
     ),
 ]
 
+@dataclass(slots=True, frozen=True)
+class SpladeCliContext:
+    """Dependency injection context for SPLADE CLI operations."""
+
+    artifacts_factory: Callable[[], SpladeArtifactsManager]
+    encoder_factory: Callable[[], SpladeEncoderService]
+    index_factory: Callable[[], SpladeIndexManager]
+
+    @classmethod
+    def production(cls) -> SpladeCliContext:
+        """Return the production CLI context.
+
+        Returns
+        -------
+        SpladeCliContext
+            Context configured with production factories.
+        """
+        return cls(
+            artifacts_factory=_default_artifacts_manager_factory,
+            encoder_factory=_default_encoder_service_factory,
+            index_factory=_default_index_manager_factory,
+        )
+
+
+def _default_artifacts_manager_factory() -> SpladeArtifactsManager:
+    """Construct the default artifacts manager.
+
+    Returns
+    -------
+    SpladeArtifactsManager
+        Manager configured with production settings.
+    """
+    return SpladeArtifactsManager(load_settings())
+
+
+def _default_encoder_service_factory() -> SpladeEncoderService:
+    """Construct the default encoder service.
+
+    Returns
+    -------
+    SpladeEncoderService
+        Encoder service configured with production settings.
+    """
+    return SpladeEncoderService(load_settings())
+
+
+def _default_index_manager_factory() -> SpladeIndexManager:
+    """Construct the default index manager.
+
+    Returns
+    -------
+    SpladeIndexManager
+        Index manager configured with production settings.
+    """
+    return SpladeIndexManager(load_settings())
+
+
 app = typer.Typer(
     help="SPLADE maintenance commands (artifacts, encoding, and impact indexes).",
     no_args_is_help=True,
     add_completion=False,
 )
+_DEFAULT_CONTEXT = SpladeCliContext.production()
+
+
+def _cli_context(ctx: typer.Context | None = None) -> SpladeCliContext:
+    """Return the active CLI context.
+
+    Returns
+    -------
+    SpladeCliContext
+        Context attached to the Typer state or the default context.
+    """
+    active = ctx or click.get_current_context(silent=True)
+    if active is None:
+        return _DEFAULT_CONTEXT
+    state = active.ensure_object(dict)
+    context = state.get("splade_cli_context")
+    if isinstance(context, SpladeCliContext):
+        return context
+    state["splade_cli_context"] = _DEFAULT_CONTEXT
+    return _DEFAULT_CONTEXT
+
+
+@app.callback()
+def splade_callback(ctx: typer.Context) -> None:
+    """Ensure CLI context defaults are configured."""
+    state = ctx.ensure_object(dict)
+    state.setdefault("splade_cli_context", _DEFAULT_CONTEXT)
 
 
 def _create_artifacts_manager() -> SpladeArtifactsManager:
@@ -58,9 +145,9 @@ def _create_artifacts_manager() -> SpladeArtifactsManager:
     Returns
     -------
     SpladeArtifactsManager
-        Manager initialized with the current environment configuration.
+        Artifacts manager obtained from the active CLI context.
     """
-    return SpladeArtifactsManager(load_settings())
+    return _cli_context().artifacts_factory()
 
 
 def _create_encoder_service() -> SpladeEncoderService:
@@ -69,9 +156,9 @@ def _create_encoder_service() -> SpladeEncoderService:
     Returns
     -------
     SpladeEncoderService
-        Encoder service initialized with the current environment configuration.
+        Encoder service obtained from the active CLI context.
     """
-    return SpladeEncoderService(load_settings())
+    return _cli_context().encoder_factory()
 
 
 def _create_index_manager() -> SpladeIndexManager:
@@ -80,9 +167,9 @@ def _create_index_manager() -> SpladeIndexManager:
     Returns
     -------
     SpladeIndexManager
-        Index manager initialized with the current environment configuration.
+        Index manager obtained from the active CLI context.
     """
-    return SpladeIndexManager(load_settings())
+    return _cli_context().index_factory()
 
 
 def _add_metadata_artifact(env: EnvelopeBuilder, path: Path) -> None:

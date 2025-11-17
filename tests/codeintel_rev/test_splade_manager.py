@@ -9,7 +9,7 @@ from pathlib import Path
 import msgspec
 import numpy as np
 import pytest
-from codeintel_rev.config.settings import load_settings
+from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.splade_manager import (
     SpladeArtifactMetadata,
     SpladeArtifactsManager,
@@ -25,22 +25,16 @@ from codeintel_rev.io.splade_manager import (
 
 from kgfoundry_common.subprocess_utils import SubprocessError
 from tests._helpers import assertions
+from tests._helpers.settings import build_settings_for_repo
 
 
-def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Prepare a synthetic repository layout with SPLADE environment variables.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory for creating the repository structure.
-    monkeypatch : pytest.MonkeyPatch
-        Pytest fixture for patching environment variables.
+def _bootstrap_repo(tmp_path: Path) -> tuple[Path, Settings]:
+    """Prepare a synthetic repository layout and corresponding settings.
 
     Returns
     -------
-    Path
-        Absolute path to the synthetic repository root.
+    tuple[Path, Settings]
+        Tuple containing repo root path and configured Settings.
     """
     repo_root = tmp_path / "repo"
     models_dir = repo_root / "models" / "splade-v3" / "onnx"
@@ -59,29 +53,22 @@ def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (repo_root / "data" / "catalog.duckdb").touch()
     (repo_root / "index.scip").write_text("{}", encoding="utf-8")
 
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("DATA_DIR", str(repo_root / "data"))
-    monkeypatch.setenv("FAISS_INDEX", str(faiss_dir / "code.ivfpq.faiss"))
-    monkeypatch.setenv("DUCKDB_PATH", str(repo_root / "data" / "catalog.duckdb"))
-    monkeypatch.setenv("SCIP_INDEX", str(repo_root / "index.scip"))
-    monkeypatch.setenv("BM25_JSONL_DIR", str(repo_root / "data" / "jsonl"))
-    monkeypatch.setenv("BM25_INDEX_DIR", str(bm25_dir))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
-
-    monkeypatch.setenv("SPLADE_MODEL_ID", "naver/splade-v3")
-    monkeypatch.setenv("SPLADE_MODEL_DIR", str(repo_root / "models" / "splade-v3"))
-    monkeypatch.setenv("SPLADE_ONNX_DIR", str(models_dir))
-    monkeypatch.setenv("SPLADE_ONNX_FILE", "model_qint8.onnx")
-    monkeypatch.setenv("SPLADE_VECTORS_DIR", str(vectors_dir))
-    monkeypatch.setenv("SPLADE_INDEX_DIR", str(splade_index_dir))
-    monkeypatch.setenv("SPLADE_PROVIDER", "CPUExecutionProvider")
-    monkeypatch.setenv("SPLADE_QUANTIZATION", "100")
-    monkeypatch.setenv("SPLADE_MAX_TERMS", "3000")
-    monkeypatch.setenv("SPLADE_MAX_CLAUSE", "4096")
-    monkeypatch.setenv("SPLADE_BATCH_SIZE", "8")
-    monkeypatch.setenv("SPLADE_THREADS", "4")
-
-    return repo_root
+    settings = build_settings_for_repo(
+        repo_root,
+        splade_overrides={
+            "threads": 4,
+            "batch_size": 8,
+            "model_dir": str(repo_root / "models" / "splade-v3"),
+            "onnx_dir": str(models_dir),
+            "vectors_dir": str(vectors_dir),
+            "index_dir": str(splade_index_dir),
+        },
+        bm25_overrides={
+            "corpus_json_dir": str(repo_root / "data" / "jsonl"),
+            "index_dir": str(bm25_dir),
+        },
+    )
+    return repo_root, settings
 
 
 def _stub_save_pretrained(path: str) -> None:
@@ -181,8 +168,7 @@ class _StubEncoder:
 
 def test_export_onnx_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Exporting ONNX artifacts should persist metadata and respect configuration overrides."""
-    _bootstrap_repo(tmp_path, monkeypatch)
-    settings = load_settings()
+    _, settings = _bootstrap_repo(tmp_path)
     manager = SpladeArtifactsManager(settings)
 
     monkeypatch.setattr(
@@ -232,7 +218,7 @@ def test_encode_corpus_writes_vectors(
     tmp_path: Path,
 ) -> None:
     """Encoding should emit JsonVectorCollection shards and metadata."""
-    repo_root = _bootstrap_repo(tmp_path, monkeypatch)
+    repo_root, settings = _bootstrap_repo(tmp_path)
     source = repo_root / "datasets" / "corpus.jsonl"
     source.parent.mkdir(parents=True, exist_ok=True)
     rows = [
@@ -246,7 +232,6 @@ def test_encode_corpus_writes_vectors(
     quantized_file = Path(repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx")
     quantized_file.write_text("quantized", encoding="utf-8")
 
-    settings = load_settings()
     service = SpladeEncoderService(settings)
 
     monkeypatch.setattr(
@@ -275,11 +260,10 @@ def test_encode_corpus_writes_vectors(
 
 def test_benchmark_queries_reports_latency(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Benchmarking should report latency percentiles for SPLADE query encoding."""
-    repo_root = _bootstrap_repo(tmp_path, monkeypatch)
+    repo_root, settings = _bootstrap_repo(tmp_path)
     quantized_file = Path(repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx")
     quantized_file.write_text("quantized", encoding="utf-8")
 
-    settings = load_settings()
     service = SpladeEncoderService(settings)
 
     monkeypatch.setattr(
@@ -310,8 +294,7 @@ def test_benchmark_queries_reports_latency(monkeypatch: pytest.MonkeyPatch, tmp_
 
 def test_build_index_persists_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Index builds should invoke Pyserini via subprocess and record metadata."""
-    _bootstrap_repo(tmp_path, monkeypatch)
-    settings = load_settings()
+    _, settings = _bootstrap_repo(tmp_path)
     manager = SpladeIndexManager(settings)
 
     vectors_dir = Path(settings.splade.vectors_dir)
@@ -368,8 +351,7 @@ def test_build_index_raises_when_subprocess_fails(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Pyserini failures should surface as SubprocessError."""
-    _bootstrap_repo(tmp_path, monkeypatch)
-    settings = load_settings()
+    _, settings = _bootstrap_repo(tmp_path)
     manager = SpladeIndexManager(settings)
 
     def fake_run(cmd: list[str], *, env: dict[str, str] | None = None) -> None:

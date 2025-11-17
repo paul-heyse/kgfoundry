@@ -7,9 +7,11 @@ and MCP tool endpoints with real configuration.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import FrozenInstanceError
 from http import HTTPStatus
 from pathlib import Path
+from typing import cast
 
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
@@ -19,7 +21,27 @@ from fastapi.testclient import TestClient
 
 from kgfoundry_common.errors import ConfigurationError
 from tests._helpers import assertions
+from tests._helpers.settings import build_settings_for_repo
 from tests.conftest import HAS_FAISS_SUPPORT
+
+
+class RepoHandle:
+    """Expose repo path and configuration hook to tests."""
+
+    def __init__(
+        self,
+        repo_root: Path,
+        reconfigure: Callable[[dict[str, object] | None], None],
+    ) -> None:
+        self.repo_root = repo_root
+        self._reconfigure = reconfigure
+
+    def configure(self, *, faiss_preload: bool | None = None) -> None:
+        """Rebuild the cached context with optional FAISS preload override."""
+        overrides: dict[str, object] | None = None
+        if faiss_preload is not None:
+            overrides = cast("dict[str, object]", {"faiss_preload": faiss_preload})
+        self._reconfigure(overrides)
 
 # Test constants for startup time assertions
 _EXPECTED_STARTUP_TIME_WITHOUT_PRELOAD_SECONDS = 20.0
@@ -27,20 +49,13 @@ _EXPECTED_STARTUP_TIME_WITH_PRELOAD_SECONDS = 40.0
 
 
 @pytest.fixture
-def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Set up a minimal test repository environment.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory path provided by pytest fixture.
-    monkeypatch : pytest.MonkeyPatch
-        Pytest monkeypatch fixture for modifying environment variables.
+def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> RepoHandle:
+    """Set up a minimal test repository environment and inject context.
 
     Returns
     -------
-    Path
-        Path to the test repository root directory.
+    RepoHandle
+        Helper exposing the repo path and a configuration hook.
     """
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -59,12 +74,21 @@ def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     test_file = repo_root / "test.py"
     test_file.write_text('print("hello world")\n')
 
-    # Set environment variables
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("VLLM_URL", "http://127.0.0.1:8001/v1")
-    monkeypatch.setenv("FAISS_PRELOAD", "0")  # Lazy loading for faster tests
+    original_create = ApplicationContext.create
+    state: dict[str, ApplicationContext] = {}
 
-    return repo_root
+    def rebuild_context(index_overrides: dict[str, object] | None = None) -> None:
+        new_settings = build_settings_for_repo(repo_root, index_overrides=index_overrides)
+        state["context"] = original_create(settings=new_settings)
+
+    rebuild_context()
+
+    def patched_create(*_args: object, **_kwargs: object) -> ApplicationContext:
+        return state["context"]
+
+    monkeypatch.setattr("codeintel_rev.app.main.ApplicationContext.create", patched_create)
+
+    return RepoHandle(repo_root, rebuild_context)
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -109,25 +133,18 @@ def test_app_readyz_endpoint_healthy() -> None:
         )
 
 
-def test_app_startup_fails_invalid_repo_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_app_startup_fails_invalid_repo_root(tmp_path: Path) -> None:
     """Test that FastAPI app fails to start with invalid REPO_ROOT."""
     invalid_path = tmp_path / "nonexistent"
-    monkeypatch.setenv("REPO_ROOT", str(invalid_path))
-    monkeypatch.setenv("VLLM_URL", "http://127.0.0.1:8001/v1")
-
-    # ApplicationContext.create() should raise ConfigurationError
+    settings = build_settings_for_repo(invalid_path)
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
-        ApplicationContext.create()
+        ApplicationContext.create(settings=settings)
 
 
 @pytest.mark.usefixtures("test_repo")
-def test_app_startup_with_preload_disabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_app_startup_with_preload_disabled(test_repo: RepoHandle) -> None:
     """Test that FAISS is lazy-loaded when FAISS_PRELOAD=0."""
-    monkeypatch.setenv("FAISS_PRELOAD", "0")
+    test_repo.configure(faiss_preload=False)
 
     start_time = time.monotonic()
     with TestClient(app) as client:
@@ -148,11 +165,9 @@ def test_app_startup_with_preload_disabled(
 
 @pytest.mark.usefixtures("test_repo")
 @pytest.mark.skipif(not HAS_FAISS_SUPPORT, reason="FAISS bindings unavailable on this host")
-def test_app_startup_with_preload_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_app_startup_with_preload_enabled(test_repo: RepoHandle) -> None:
     """Test that FAISS pre-loading works when FAISS_PRELOAD=1."""
-    monkeypatch.setenv("FAISS_PRELOAD", "1")
+    test_repo.configure(faiss_preload=True)
 
     start_time = time.monotonic()
     with TestClient(app) as client:
@@ -171,7 +186,7 @@ def test_app_startup_with_preload_enabled(
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
 
-def test_context_stored_in_app_state(test_repo: Path) -> None:
+def test_context_stored_in_app_state(test_repo: RepoHandle) -> None:
     """Test that ApplicationContext is stored in app.state."""
     with TestClient(app):
         # Access app state through lifespan context
@@ -183,7 +198,7 @@ def test_context_stored_in_app_state(test_repo: Path) -> None:
         assertions.expect_true(
             isinstance(context, ApplicationContext), reason="context should be ApplicationContext"
         )
-        assertions.expect_equal(context.paths.repo_root, test_repo.resolve())
+        assertions.expect_equal(context.paths.repo_root, test_repo.repo_root.resolve())
 
 
 @pytest.mark.usefixtures("test_repo")

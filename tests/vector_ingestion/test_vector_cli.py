@@ -16,8 +16,9 @@ if TYPE_CHECKING:
     from pathlib import Path
     from uuid import UUID
 
-    import pytest
     from _pytest.logging import LogCaptureFixture
+
+    from orchestration.cli import OrchestrationCliContext
 
 
 def _filter_index_records(
@@ -88,6 +89,7 @@ def test_index_faiss_cli_success(
     tmp_path: Path,
     canonical_vector_payload: list[dict[str, object]],
     caplog: LogCaptureFixture,
+    orchestration_cli_context_builder: Callable[..., OrchestrationCliContext],
 ) -> None:
     """Running the CLI with valid payloads should succeed and emit metrics."""
     runner = CliRunner()
@@ -105,6 +107,7 @@ def test_index_faiss_cli_success(
                 "--index-path",
                 str(index_path),
             ],
+            obj={"orchestration_cli_context": orchestration_cli_context_builder()},
         )
 
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
@@ -128,11 +131,9 @@ def test_index_faiss_cli_problem_details(
     tmp_path: Path,
     deterministic_uuid_factory: Callable[[], UUID],
     caplog: LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
+    orchestration_cli_context_builder: Callable[..., OrchestrationCliContext],
 ) -> None:
     """Invalid payloads should return RFC 9457 Problem Details envelopes."""
-    monkeypatch.setattr("orchestration.cli.uuid4", deterministic_uuid_factory)
-
     vectors_path = tmp_path / "invalid_vectors.json"
     invalid_vectors: list[dict[str, object]] = [{"key": "", "vector": [0.1, 0.2]}]
     vectors_path.write_text(json.dumps(invalid_vectors), encoding="utf-8")
@@ -148,6 +149,11 @@ def test_index_faiss_cli_problem_details(
                 "--index-path",
                 str(index_path),
             ],
+            obj={
+                "orchestration_cli_context": orchestration_cli_context_builder(
+                    uuid_factory=lambda: deterministic_uuid_factory().hex
+                )
+            },
         )
 
     assertions.expect_equal(result.exit_code, 1)

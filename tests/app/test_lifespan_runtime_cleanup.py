@@ -92,8 +92,11 @@ async def test_lifespan_preload_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> 
     )
     monkeypatch.setattr("codeintel_rev.app.main.check_faiss_health", _fake_health)
     monkeypatch.setattr("codeintel_rev.app.main.ReadinessProbe", _probe_factory)
-    monkeypatch.setenv("XTR_PRELOAD", "1")
-    monkeypatch.setenv("HYBRID_PRELOAD", "1")
+
+    def _flag(name: str) -> bool:
+        return name in {"XTR_PRELOAD", "HYBRID_PRELOAD"}
+
+    monkeypatch.setattr("codeintel_rev.app.main._env_flag", _flag)
 
     app = FastAPI()
     async with lifespan(app):

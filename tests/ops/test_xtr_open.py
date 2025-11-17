@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
-import pytest
-from codeintel_rev.ops.runtime.xtr_open import APP
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.io.xtr_manager import XTRIndex
+from codeintel_rev.ops.runtime.xtr_open import APP, XtrOpenContext
 from typer.testing import CliRunner
 
 from tests._helpers import assertions
@@ -15,97 +18,109 @@ from tests._helpers import assertions
 RUNNER = CliRunner(mix_stderr=False)
 
 
-def _settings(*, enabled: bool = True) -> SimpleNamespace:
-    """Create mock settings with XTR enabled/disabled.
+class _PathsWrapper:
+    def __init__(self, root: Path) -> None:
+        self._root = root
 
-    Returns
-    -------
-    SimpleNamespace
-        Mock settings object.
-    """
-    return SimpleNamespace(xtr=SimpleNamespace(enable=enabled, dtype="float32"))
+    @property
+    def xtr_dir(self) -> Path:
+        return self._root
 
 
-def _paths(root: Path) -> SimpleNamespace:
-    """Create mock paths with XTR directory.
+def _settings_factory(*, enabled: bool) -> Callable[[], Settings]:
+    settings_ns = SimpleNamespace(xtr=SimpleNamespace(enable=enabled, dtype="float32"))
+    settings = cast("Settings", settings_ns)
 
-    Returns
-    -------
-    SimpleNamespace
-        Mock paths object.
-    """
-    return SimpleNamespace(xtr_dir=root)
+    def _factory() -> Settings:
+        return settings
+
+    return _factory
 
 
-def test_xtr_open_disabled_feature(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+class _ReadyIndex:
+    def __init__(self, *_: object, **__: object) -> None:
+        self.ready = True
+
+    @staticmethod
+    def open() -> None:
+        """No-op open."""
+
+    @staticmethod
+    def metadata() -> dict[str, object]:
+        return {"doc_count": 1, "total_tokens": 4, "dim": 8, "dtype": "float16"}
+
+
+class _ExplodingIndex:
+    def __init__(self, *_: object, **__: object) -> None:
+        self.ready = False
+
+    @staticmethod
+    def open() -> None:
+        message = "boom"
+        raise RuntimeError(message)
+
+    @staticmethod
+    def metadata() -> dict[str, object]:
+        return {}
+
+
+def test_xtr_open_disabled_feature(
+    tmp_path: Path,
+    xtr_cli_context_builder: Callable[..., XtrOpenContext],
+) -> None:
     """Verify XTR open returns ready=False when feature is disabled."""
-    monkeypatch.setattr(
-        "codeintel_rev.ops.runtime.xtr_open.load_settings",
-        lambda: _settings(enabled=False),
+    context = xtr_cli_context_builder(
+        settings_factory=_settings_factory(enabled=False),
+        paths_resolver=lambda _settings: _PathsWrapper(tmp_path),
     )
-    monkeypatch.setattr(
-        "codeintel_rev.ops.runtime.xtr_open.resolve_application_paths",
-        lambda _settings: _paths(tmp_path),
+    result = RUNNER.invoke(
+        APP,
+        [],
+        obj={"xtr_cli_context": context},
     )
-    result = RUNNER.invoke(APP, [])
     assertions.expect_equal(result.exit_code, 0, reason=result.stderr or result.stdout)
     payload = json.loads(result.stdout.strip())
     assertions.expect_equal(payload, {"ready": False, "limits": ["xtr disabled"]})
 
 
-def test_xtr_open_missing_artifacts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_xtr_open_missing_artifacts(
+    tmp_path: Path,
+    xtr_cli_context_builder: Callable[..., XtrOpenContext],
+) -> None:
     """Verify XTR open returns 503 when artifacts are missing."""
     missing_root = tmp_path / "nope"
-    monkeypatch.setattr(
-        "codeintel_rev.ops.runtime.xtr_open.load_settings",
-        lambda: _settings(enabled=True),
+    context = xtr_cli_context_builder(
+        settings_factory=_settings_factory(enabled=True),
+        paths_resolver=lambda _settings: _PathsWrapper(missing_root),
     )
-    monkeypatch.setattr(
-        "codeintel_rev.ops.runtime.xtr_open.resolve_application_paths",
-        lambda _settings: _paths(missing_root),
+    result = RUNNER.invoke(
+        APP,
+        [],
+        obj={"xtr_cli_context": context},
     )
-    result = RUNNER.invoke(APP, [])
     assertions.expect_equal(result.exit_code, 1, reason=result.stderr or result.stdout)
     problem = json.loads(result.stderr.strip())
     assertions.expect_equal(problem["status"], 503)
     assertions.expect_equal(problem["title"], "XTR artifacts unavailable")
 
 
-def test_xtr_open_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_xtr_open_success(
+    tmp_path: Path,
+    xtr_cli_context_builder: Callable[..., XtrOpenContext],
+) -> None:
     """Verify XTR open succeeds when artifacts are present."""
     root = tmp_path / "xtr"
     root.mkdir()
-    monkeypatch.setattr(
-        "codeintel_rev.ops.runtime.xtr_open.load_settings",
-        lambda: _settings(enabled=True),
+    context = xtr_cli_context_builder(
+        settings_factory=_settings_factory(enabled=True),
+        paths_resolver=lambda _settings: _PathsWrapper(root),
+        index_factory=lambda *_args, **_kwargs: cast("XTRIndex", _ReadyIndex()),
     )
-    monkeypatch.setattr(
-        "codeintel_rev.ops.runtime.xtr_open.resolve_application_paths",
-        lambda _settings: _paths(root),
+    result = RUNNER.invoke(
+        APP,
+        ["--root", str(root)],
+        obj={"xtr_cli_context": context},
     )
-
-    class _StubIndex:
-        def __init__(self, *_: object, **__: object) -> None:
-            self.ready = True
-
-        @staticmethod
-        def open() -> None:
-            """Stub open method."""
-            return
-
-        @staticmethod
-        def metadata() -> dict[str, object]:
-            """Stub metadata method.
-
-            Returns
-            -------
-            dict[str, object]
-                Mock metadata dict.
-            """
-            return {"doc_count": 1, "total_tokens": 4, "dim": 8, "dtype": "float16"}
-
-    monkeypatch.setattr("codeintel_rev.ops.runtime.xtr_open.XTRIndex", _StubIndex)
-    result = RUNNER.invoke(APP, ["--root", str(root)])
     assertions.expect_equal(result.exit_code, 0, reason=result.stderr or result.stdout)
     payload = json.loads(result.stdout.strip())
     assertions.expect_true(payload["ready"], reason="ready should be True")
@@ -113,48 +128,23 @@ def test_xtr_open_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     assertions.expect_equal(payload["metadata"]["chunks"], 1)
 
 
-def test_xtr_open_reports_corruption(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_xtr_open_reports_corruption(
+    tmp_path: Path,
+    xtr_cli_context_builder: Callable[..., XtrOpenContext],
+) -> None:
     """Verify XTR open reports corruption errors correctly."""
     root = tmp_path / "xtr"
     root.mkdir()
-    monkeypatch.setattr(
-        "codeintel_rev.ops.runtime.xtr_open.load_settings",
-        lambda: _settings(enabled=True),
+    context = xtr_cli_context_builder(
+        settings_factory=_settings_factory(enabled=True),
+        paths_resolver=lambda _settings: _PathsWrapper(root),
+        index_factory=lambda *_args, **_kwargs: cast("XTRIndex", _ExplodingIndex()),
     )
-    monkeypatch.setattr(
-        "codeintel_rev.ops.runtime.xtr_open.resolve_application_paths",
-        lambda _settings: _paths(root),
+    result = RUNNER.invoke(
+        APP,
+        [],
+        obj={"xtr_cli_context": context},
     )
-
-    class _ExplodingIndex:
-        def __init__(self, *_: object, **__: object) -> None:
-            self.ready = False
-
-        @staticmethod
-        def open() -> None:
-            """Stub open method that raises RuntimeError.
-
-            Raises
-            ------
-            RuntimeError
-                Always raised to simulate corruption.
-            """
-            message = "boom"
-            raise RuntimeError(message)
-
-        @staticmethod
-        def metadata() -> dict[str, object]:
-            """Stub metadata method.
-
-            Returns
-            -------
-            dict[str, object]
-                Empty metadata dict.
-            """
-            return {}
-
-    monkeypatch.setattr("codeintel_rev.ops.runtime.xtr_open.XTRIndex", _ExplodingIndex)
-    result = RUNNER.invoke(APP, [])
     assertions.expect_equal(result.exit_code, 1, reason=result.stderr or result.stdout)
     problem = json.loads(result.stderr.strip())
     assertions.expect_equal(problem["title"], "Failed to open XTR artifacts")

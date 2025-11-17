@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import cast
 
@@ -13,11 +12,11 @@ from codeintel_rev.app.config_context import (
     ResolvedPaths,
     resolve_application_paths,
 )
-from codeintel_rev.config.settings import load_settings
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 
 from kgfoundry_common.errors import ConfigurationError
 from tests._helpers import assertions
+from tests._helpers.settings import build_settings_for_repo
 
 
 def _noop_load_cpu_index(*_: object, **__: object) -> None:
@@ -32,8 +31,7 @@ def test_resolve_application_paths_success(tmp_path: Path) -> None:
     repo_root.mkdir()
     (repo_root / "data").mkdir()
 
-    os.environ["REPO_ROOT"] = str(repo_root)
-    settings = load_settings()
+    settings = build_settings_for_repo(repo_root)
 
     # Act
     paths = resolve_application_paths(settings)
@@ -50,8 +48,7 @@ def test_resolve_application_paths_success(tmp_path: Path) -> None:
 def test_resolve_application_paths_missing_repo_root() -> None:
     """Test that missing repo root raises ConfigurationError."""
     # Arrange
-    os.environ["REPO_ROOT"] = "/nonexistent/path"
-    settings = load_settings()
+    settings = build_settings_for_repo(Path("/nonexistent/path"))
 
     # Act & Assert
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
@@ -64,8 +61,7 @@ def test_resolve_application_paths_not_directory(tmp_path: Path) -> None:
     repo_file = tmp_path / "not_a_dir"
     repo_file.touch()
 
-    os.environ["REPO_ROOT"] = str(repo_file)
-    settings = load_settings()
+    settings = build_settings_for_repo(repo_file)
 
     # Act & Assert
     with pytest.raises(ConfigurationError, match="Repository root is not a directory"):
@@ -79,8 +75,7 @@ def test_resolve_application_paths_relative_conversion(tmp_path: Path) -> None:
     repo_root.mkdir()
     (repo_root / "data").mkdir()
 
-    os.environ["REPO_ROOT"] = str(repo_root)
-    settings = load_settings()
+    settings = build_settings_for_repo(repo_root)
 
     # Act
     paths = resolve_application_paths(settings)
@@ -92,7 +87,7 @@ def test_resolve_application_paths_relative_conversion(tmp_path: Path) -> None:
     assertions.expect_true(paths.scip_index.is_absolute())
 
 
-def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_application_context_create(tmp_path: Path) -> None:
     """Test ApplicationContext.create() initializes all clients."""
     # Arrange
     repo_root = tmp_path / "repo"
@@ -103,16 +98,11 @@ def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     (repo_root / "data" / "faiss" / "code.ivfpq.faiss").touch()
     (repo_root / "data" / "catalog.duckdb").touch()
 
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
+    settings = build_settings_for_repo(repo_root)
 
     # Act
-    context = ApplicationContext.create()
-    monkeypatch.setattr(
-        context.faiss_manager,
-        "load_cpu_index",
-        _noop_load_cpu_index,
-    )
+    context = ApplicationContext.create(settings=settings)
+    context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Assert
     assertions.expect_true(context.settings is not None)
@@ -122,21 +112,18 @@ def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assertions.expect_true(isinstance(context.paths, ResolvedPaths))
 
 
-def test_application_context_create_invalid_config(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_application_context_create_invalid_config() -> None:
     """Test that ApplicationContext.create() raises ConfigurationError for invalid config."""
     # Arrange
-    monkeypatch.setenv("REPO_ROOT", "/nonexistent/path")
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
+    settings = build_settings_for_repo(Path("/nonexistent/path"))
 
     # Act & Assert
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
-        ApplicationContext.create()
+        ApplicationContext.create(settings=settings)
 
 
 def test_application_context_ensure_faiss_ready(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     """Test ensure_faiss_ready() lazy loading."""
     # Arrange
@@ -149,15 +136,10 @@ def test_application_context_ensure_faiss_ready(
     faiss_index.touch()
     (repo_root / "data" / "catalog.duckdb").touch()
 
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
+    settings = build_settings_for_repo(repo_root)
 
-    context = ApplicationContext.create()
-    monkeypatch.setattr(
-        context.faiss_manager,
-        "load_cpu_index",
-        _noop_load_cpu_index,
-    )
+    context = ApplicationContext.create(settings=settings)
+    context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Act - ensure_faiss_ready should handle missing index gracefully
     ready, limits, error = context.ensure_faiss_ready()
@@ -170,7 +152,7 @@ def test_application_context_ensure_faiss_ready(
 
 
 def test_application_context_ensure_faiss_ready_cached(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     """Test that ensure_faiss_ready() caching works."""
     # Arrange
@@ -183,15 +165,10 @@ def test_application_context_ensure_faiss_ready_cached(
     faiss_index.touch()
     (repo_root / "data" / "catalog.duckdb").touch()
 
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
+    settings = build_settings_for_repo(repo_root)
 
-    context = ApplicationContext.create()
-    monkeypatch.setattr(
-        context.faiss_manager,
-        "load_cpu_index",
-        _noop_load_cpu_index,
-    )
+    context = ApplicationContext.create(settings=settings)
+    context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Act - call twice
     ready1, limits1, error1 = context.ensure_faiss_ready()
@@ -203,7 +180,7 @@ def test_application_context_ensure_faiss_ready_cached(
     assertions.expect_equal(error1, error2)
 
 
-def test_application_context_open_catalog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_application_context_open_catalog(tmp_path: Path) -> None:
     """Test open_catalog() context manager."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -216,10 +193,8 @@ def test_application_context_open_catalog(tmp_path: Path, monkeypatch: pytest.Mo
     conn = duckdb.connect(str(duckdb_path))
     conn.close()
 
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
-
-    context = ApplicationContext.create()
+    settings = build_settings_for_repo(repo_root)
+    context = ApplicationContext.create(settings=settings)
 
     # Act
     with context.open_catalog() as catalog:
@@ -230,7 +205,7 @@ def test_application_context_open_catalog(tmp_path: Path, monkeypatch: pytest.Mo
 
 
 def test_build_factory_adjuster_from_settings(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     """Verify the default factory adjuster mirrors index settings."""
     repo_root = tmp_path / "repo"
@@ -243,8 +218,8 @@ def test_build_factory_adjuster_from_settings(
     faiss_dir.mkdir()
     (faiss_dir / "code.ivfpq.faiss").touch()
     (data_dir / "catalog.duckdb").touch()
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    context = ApplicationContext.create()
+    settings = build_settings_for_repo(repo_root)
+    context = ApplicationContext.create(settings=settings)
     assertions.expect_true(isinstance(context.factory_adjuster, DefaultFactoryAdjuster))
     expected = getattr(context.settings.index, "faiss_nprobe", None)
     adjuster = cast("DefaultFactoryAdjuster", context.factory_adjuster)

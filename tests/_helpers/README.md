@@ -39,6 +39,21 @@ code. The helper modules under `tests/_helpers/` keep that work ergonomic:
    If a test class only exists to share helpers, move the helpers into a fixture
    instead; this resolves `PLR6301` warnings.
 
+## Configuration & CLI fixtures
+
+Most suites now rely on typed fixtures instead of modifying environment variables.
+Reach for these helpers before writing new `monkeypatch` logic:
+
+| Fixture / Helper | Location | Purpose |
+| --- | --- | --- |
+| `build_settings_for_repo` | `tests/_helpers/settings.py` | Returns a `Settings` copy whose paths point at a temporary repo. Accepts overrides for `paths`, `bm25`, and `splade` to emulate different configurations. |
+| `RepoHandle` fixtures | `tests/codeintel_rev/test_integration_full.py`, `tests/codeintel_rev/test_app_lifespan.py`, etc. | Wrap the repo + `ApplicationContext.create` patch so tests can call `handle.configure(faiss_preload=True)` instead of tweaking env vars. |
+| `repo_scan_invoker` | `tests/conftest.py` | Executes `tools.repo_scan` with explicit argv and returns the parsed payload + DOT paths—no need to mutate `sys.argv`. |
+| CLI context builders | `tests/conftest.py` | Builders for orchestration, download, BM25, SPLADE, XTR CLIs. Pass them into Typer `obj` to inject stub managers/providers during tests. |
+
+When adding a new CLI or configuration test, prefer cloning one of these fixtures
+instead of introducing new env-based scaffolding.
+
 ## Rollout checklist
 
 - [ ] Imports sorted with Ruff (`uv run ruff check path/to/test.py --fix`)

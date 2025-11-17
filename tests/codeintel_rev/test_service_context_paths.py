@@ -11,6 +11,7 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server import service_context
 
 from tests._helpers import assertions
+from tests._helpers.settings import build_settings_for_repo
 
 
 class RecordingFAISSManager:
@@ -86,11 +87,6 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
     duckdb_rel = "catalog/catalog.duckdb"
     vectors_rel = "artifacts/vectors"
 
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("FAISS_INDEX", faiss_rel)
-    monkeypatch.setenv("DUCKDB_PATH", duckdb_rel)
-    monkeypatch.setenv("VECTORS_DIR", vectors_rel)
-
     expected_faiss_path = (repo_root / faiss_rel).resolve()
     expected_duckdb_path = (repo_root / duckdb_rel).resolve()
     expected_vectors_dir = (repo_root / vectors_rel).resolve()
@@ -99,12 +95,22 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
     expected_faiss_path.touch()
     expected_vectors_dir.mkdir(parents=True, exist_ok=True)
 
+    settings = build_settings_for_repo(
+        repo_root,
+        paths_overrides={
+            "faiss_index": faiss_rel,
+            "duckdb_path": duckdb_rel,
+            "vectors_dir": vectors_rel,
+        },
+    )
+
     monkeypatch.setattr(config_context, "_import_faiss_manager_cls", lambda: RecordingFAISSManager)
     monkeypatch.setattr(config_context, "DuckDBCatalog", RecordingDuckDBCatalog)
     monkeypatch.setattr(config_context, "VLLMClient", DummyVLLMClient)
 
     service_context.reset_service_context()
-
+    custom_context = ApplicationContext.create(settings=settings)
+    service_context.set_service_context(custom_context)
     context = service_context.get_service_context()
 
     _assert_faiss_manager(context.faiss_manager, expected_faiss_path)

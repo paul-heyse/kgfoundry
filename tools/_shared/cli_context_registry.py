@@ -34,6 +34,7 @@ class CLIContextDefinition:
     version_resolver: Callable[[], str] | None = None
     augment_path: Path | None = None
     registry_path: Path | None = None
+    context_factory: Callable[[CLIToolSettings], CLIToolingContext] | None = None
     _operation_map: Mapping[str, str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -191,7 +192,9 @@ class CLIContextRegistry:
         try:
             return self._context_cache[key]
         except KeyError:
-            context = load_cli_tooling_context(self.settings_for(key))
+            definition = self.definition_for(key)
+            loader = definition.context_factory or load_cli_tooling_context
+            context = loader(self.settings_for(key))
             self._context_cache[key] = context
             return context
 

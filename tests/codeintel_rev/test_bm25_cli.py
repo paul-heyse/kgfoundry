@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
+from click.testing import Result
 from codeintel_rev.cli import app as root_app
-from codeintel_rev.cli import bm25 as bm25_cli
+from codeintel_rev.cli.bm25 import BM25CliContext
 from codeintel_rev.io.bm25_manager import (
     BM25BuildOptions,
     BM25CorpusSummary,
+    BM25IndexManager,
     BM25IndexMetadata,
 )
-from tools import Paths
 from typer.testing import CliRunner
 
 from tests._helpers import assertions, constants
@@ -80,30 +83,44 @@ class _StubBM25Manager:
         )
 
 
-def _patch_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Redirect CLI envelope output to a temporary path."""
-    Paths.discover.cache_clear()
+def _invoke_bm25(
+    args: list[str],
+    *,
+    context: BM25CliContext,
+    envelope_dir: Path,
+) -> Result:
+    return runner.invoke(
+        root_app,
+        [
+            "bm25",
+            *args,
+        ],
+        obj={
+            "bm25_cli_context": context,
+            "cli_run_overrides": {"envelope_dir": envelope_dir},
+        },
+    )
 
-    def fake_discover(_start: Path | None = None) -> Paths:
-        return Paths(
-            repo_root=tmp_path,
-            docs_data=tmp_path / "docs",
-            cli_out_root=tmp_path / "cli",
-        )
 
-    monkeypatch.setattr(Paths, "discover", staticmethod(fake_discover))
-
-
-def test_prepare_corpus_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_prepare_corpus_cli(
+    tmp_path: Path,
+    bm25_cli_context_builder: Callable[..., BM25CliContext],
+) -> None:
     """prepare-corpus should invoke the manager and emit user-facing output."""
     stub = _StubBM25Manager(tmp_path)
-    _patch_paths(monkeypatch, tmp_path)
-    monkeypatch.setattr(bm25_cli, "_create_bm25_manager", lambda: stub)
+    context = bm25_cli_context_builder(manager_factory=lambda: cast("BM25IndexManager", stub))
 
     source = tmp_path / "corpus.jsonl"
     source.write_text('{"id": "doc1", "contents": "text"}\n', encoding="utf-8")
 
-    result = runner.invoke(root_app, ["bm25", "prepare-corpus", str(source)])
+    result = _invoke_bm25(
+        [
+            "prepare-corpus",
+            str(source),
+        ],
+        context=context,
+        envelope_dir=tmp_path / "envelopes",
+    )
 
     assertions.expect_equal(result.exit_code, 0)
     assertions.expect_in("Prepared 2 documents", result.stdout)
@@ -113,25 +130,27 @@ def test_prepare_corpus_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
         assertions.expect_true(stub.last_corpus_metadata_path.exists())
 
 
-def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_build_index_cli(
+    tmp_path: Path,
+    bm25_cli_context_builder: Callable[..., BM25CliContext],
+) -> None:
     """build-index should interpret CLI flags and dispatch to the manager."""
     stub = _StubBM25Manager(tmp_path)
-    _patch_paths(monkeypatch, tmp_path)
-    monkeypatch.setattr(bm25_cli, "_create_bm25_manager", lambda: stub)
+    context = bm25_cli_context_builder(manager_factory=lambda: cast("BM25IndexManager", stub))
 
     json_dir = tmp_path / "prepared"
     json_dir.mkdir()
 
-    result = runner.invoke(
-        root_app,
+    result = _invoke_bm25(
         [
-            "bm25",
             "build-index",
             "--json-dir",
             str(json_dir),
             "--threads",
             str(THREAD_OVERRIDE),
         ],
+        context=context,
+        envelope_dir=tmp_path / "envelopes",
     )
 
     assertions.expect_equal(result.exit_code, 0)

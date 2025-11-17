@@ -14,18 +14,38 @@ import asyncio
 import json
 import logging
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast
 
 import pytest
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
 from codeintel_rev.app.server_settings import get_server_settings
+from codeintel_rev.cli.bm25 import BM25CliContext
+from codeintel_rev.cli.enrich_pipeline import OverlayContext, ScanInputs, ScipContext
+from codeintel_rev.cli.splade import SpladeCliContext
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
+from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
+from codeintel_rev.io.bm25_manager import BM25IndexManager
+from codeintel_rev.io.splade_manager import (
+    SpladeArtifactsManager,
+    SpladeEncoderService,
+    SpladeIndexManager,
+)
+from codeintel_rev.io.xtr_manager import XTRIndex
+from codeintel_rev.ops.runtime.xtr_open import XtrOpenContext
+from codeintel_rev.typedness import FileTypeSignals
 from fastapi import FastAPI
+from tools import repo_scan
 
+from download.cli import DownloadCliContext, HarvestHandler
+from orchestration.cli import BM25BuildConfig, OrchestrationCliContext
+from orchestration.config import IndexCliConfig
+from tests._helpers.repo import SampleRepo, bootstrap_sample_repo
 from tests.app._context_factory import build_application_context
 
 if TYPE_CHECKING:
@@ -67,6 +87,14 @@ else:
 
 pytest_plugins: tuple[str, ...] = ()
 # Pytest plugin modules auto-loaded for the test suite.
+
+
+class _XtrPathsProtocol(Protocol):
+    """Protocol describing the subset of XTR paths used in tests."""
+
+    @property
+    def xtr_dir(self) -> Path:  # pragma: no cover - structural hook only
+        ...
 
 if TYPE_CHECKING:  # pragma: no cover - typing support only
 
@@ -345,6 +373,290 @@ def structured_log_asserter() -> Callable[[logging.LogRecord, set[str]], None]:
             raise AssertionError(msg)
 
     return assert_log_has_fields
+
+
+@pytest.fixture(name="scan_inputs_builder")
+def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
+    """Return a factory for constructing ``ScanInputs`` instances.
+
+    Returns
+    -------
+    Callable[..., ScanInputs]
+        Builder function that accepts override keyword arguments and yields
+        populated ``ScanInputs`` objects.
+    """
+
+    def build(  # noqa: PLR0913 - explicit override knobs keep tests readable
+        *,
+        repo_root: Path | None = None,
+        scip_index: SCIPIndex | None = None,
+        scip_by_file: Mapping[str, Document] | None = None,
+        type_signals: Mapping[str, FileTypeSignals] | None = None,
+        coverage_map: Mapping[str, Mapping[str, float]] | None = None,
+        tagging_rules: Mapping[str, object] | None = None,
+        max_file_bytes: int = 10_000,
+        package_prefix: str | None = None,
+    ) -> ScanInputs:
+        root = repo_root or (tmp_path / "repo")
+        root.mkdir(parents=True, exist_ok=True)
+        scip = scip_index or SCIPIndex()
+        context = ScipContext(index=scip, by_file=scip_by_file or {})
+        return ScanInputs(
+            scip_ctx=context,
+            type_signals=type_signals or {},
+            coverage_map=coverage_map or {},
+            tagging_rules=tagging_rules or {},
+            repo_root=root,
+            max_file_bytes=max_file_bytes,
+            package_prefix=package_prefix or root.name,
+        )
+
+    return build
+
+
+@pytest.fixture(name="overlay_context_builder")
+def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., OverlayContext]:
+    """Provide a factory for building ``OverlayContext`` instances.
+
+    Returns
+    -------
+    Callable[..., OverlayContext]
+        Builder for ``OverlayContext`` objects rooted in temporary directories.
+    """
+
+    def build(  # noqa: PLR0913 - explicit override knobs keep tests readable
+        *,
+        repo_root: Path | None = None,
+        overlays_root: Path | None = None,
+        stubs_root: Path | None = None,
+        type_counts: Mapping[str, int] | None = None,
+        policy: OverlayPolicy | None = None,
+        scip_index: SCIPIndex | None = None,
+        overlay_paths: frozenset[str] | None = None,
+    ) -> OverlayContext:
+        root = repo_root or (tmp_path / "overlay_repo")
+        overlays = overlays_root or (tmp_path / "overlays")
+        stubs = stubs_root or (tmp_path / "stubs")
+        for path in (root, overlays, stubs):
+            path.mkdir(parents=True, exist_ok=True)
+        scip = scip_index or SCIPIndex()
+        resolved_policy = policy or OverlayPolicy(
+            overlays_root=overlays,
+            include_public_defs=True,
+            inject_module_getattr_any=False,
+            when_type_errors=False,
+            min_type_errors=0,
+            max_overlays=32,
+            export_hub_threshold=10,
+            overlay_tag="overlay-needed",
+        )
+        return OverlayContext(
+            root=root,
+            package_name=root.name,
+            overlays_root=overlays,
+            stubs_root=stubs,
+            scip_index=scip,
+            type_counts=dict(type_counts or {}),
+            policy=resolved_policy,
+            inputs=OverlayInputs(
+                scip=scip,
+                type_error_counts=dict(type_counts or {}),
+                overlay_tagged_paths=overlay_paths or frozenset(),
+            ),
+        )
+
+    return build
+
+
+@pytest.fixture(name="orchestration_cli_context_builder")
+def fixture_orchestration_cli_context_builder() -> Callable[..., OrchestrationCliContext]:
+    """Return a builder for orchestration CLI contexts used across tests.
+
+    Returns
+    -------
+    Callable[..., OrchestrationCliContext]
+        Factory that accepts dependency overrides for CLI invocations.
+    """
+    base = OrchestrationCliContext.production()
+
+    def build(
+        *,
+        uuid_factory: Callable[[], str] | None = None,
+        bm25_builder: Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]] | None = None,
+        faiss_runner: Callable[[IndexCliConfig], dict[str, object]] | None = None,
+    ) -> OrchestrationCliContext:
+        return OrchestrationCliContext(
+            uuid_factory=uuid_factory or base.uuid_factory,
+            bm25_builder=bm25_builder or base.bm25_builder,
+            faiss_runner=faiss_runner or base.faiss_runner,
+        )
+
+    return build
+
+
+@pytest.fixture(name="xtr_cli_context_builder")
+def fixture_xtr_cli_context_builder() -> Callable[..., XtrOpenContext]:
+    """Return a builder for XTR CLI contexts used in runtime ops tests.
+
+    Returns
+    -------
+    Callable[..., XtrOpenContext]
+        Factory accepting dependency overrides for settings, paths, and indexes.
+    """
+    base = XtrOpenContext.production()
+
+    def build(
+        *,
+        settings_factory: Callable[[], Settings] | None = None,
+        paths_resolver: Callable[[Settings], _XtrPathsProtocol] | None = None,
+        index_factory: Callable[[Path, Settings], XTRIndex] | None = None,
+    ) -> XtrOpenContext:
+        return XtrOpenContext(
+            settings_factory=settings_factory or base.settings_factory,
+            paths_resolver=paths_resolver or base.paths_resolver,
+            index_factory=index_factory or base.index_factory,
+        )
+
+    return build
+
+
+@pytest.fixture(name="bm25_cli_context_builder")
+def fixture_bm25_cli_context_builder() -> Callable[..., BM25CliContext]:
+    """Return a builder for BM25 CLI contexts used in search/index tests.
+
+    Returns
+    -------
+    Callable[..., BM25CliContext]
+        Factory accepting a custom manager factory override.
+    """
+    base = BM25CliContext.production()
+
+    def build(
+        *,
+        manager_factory: Callable[[], BM25IndexManager] | None = None,
+    ) -> BM25CliContext:
+        return BM25CliContext(manager_factory=manager_factory or base.manager_factory)
+
+    return build
+
+
+@pytest.fixture(name="splade_cli_context_builder")
+def fixture_splade_cli_context_builder() -> Callable[..., SpladeCliContext]:
+    """Return a builder for SPLADE CLI contexts.
+
+    Returns
+    -------
+    Callable[..., SpladeCliContext]
+        Factory accepting overrides for artifacts/encoder/index factories.
+    """
+    base = SpladeCliContext.production()
+
+    def build(
+        *,
+        artifacts_factory: Callable[[], SpladeArtifactsManager] | None = None,
+        encoder_factory: Callable[[], SpladeEncoderService] | None = None,
+        index_factory: Callable[[], SpladeIndexManager] | None = None,
+    ) -> SpladeCliContext:
+        return SpladeCliContext(
+            artifacts_factory=artifacts_factory or base.artifacts_factory,
+            encoder_factory=encoder_factory or base.encoder_factory,
+            index_factory=index_factory or base.index_factory,
+        )
+
+    return build
+
+
+@pytest.fixture(name="download_cli_context_builder")
+def fixture_download_cli_context_builder() -> Callable[..., DownloadCliContext]:
+    """Return a builder for download CLI contexts.
+
+    Returns
+    -------
+    Callable[..., DownloadCliContext]
+        Factory accepting a harvest handler override.
+    """
+    base = DownloadCliContext.production()
+
+    def build(*, harvest_handler: HarvestHandler | None = None) -> DownloadCliContext:
+        return DownloadCliContext(harvest_handler=harvest_handler or base.harvest_handler)
+
+    return build
+
+
+@pytest.fixture(name="sample_repo_builder")
+def fixture_sample_repo_builder(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Callable[[str | None], SampleRepo]:
+    """Return a builder that bootstraps sample repositories for CLI tests.
+
+    Returns
+    -------
+    Callable[[str | None], SampleRepo]
+        Factory that materializes deterministic repositories under tmp dirs.
+    """
+
+    def build(subdir: str | None = None) -> SampleRepo:
+        base_dir = tmp_path_factory.mktemp(subdir or "sample_repo")
+        return bootstrap_sample_repo(base_dir)
+
+    return build
+
+
+@pytest.fixture(name="sample_repo")
+def fixture_sample_repo(
+    sample_repo_builder: Callable[[str | None], SampleRepo],
+) -> SampleRepo:
+    """Provide a ready-to-use sample repository rooted in a temporary directory.
+
+    Returns
+    -------
+    SampleRepo
+        Bootstrapped repository with SCIP index and git metadata.
+    """
+    return sample_repo_builder(None)
+
+
+@pytest.fixture(name="repo_scan_invoker")
+def fixture_repo_scan_invoker(tmp_path: Path) -> Callable[..., tuple[dict[str, Any], Path, Path]]:
+    """Return a helper that runs repo_scan with explicit arguments.
+
+    Returns
+    -------
+    Callable[..., tuple[dict[str, Any], Path, Path]]
+        Function that executes repo_scan and yields payload + artifact paths.
+    """
+
+    def run(
+        *,
+        scan_root: Path,
+        out_dir: Path | None = None,
+        argv: list[str] | None = None,
+    ) -> tuple[dict[str, Any], Path, Path]:
+        out_root = out_dir or (tmp_path / "repo_scan_out")
+        out_root.mkdir(parents=True, exist_ok=True)
+        json_path = out_root / "metrics.json"
+        dot_path = out_root / "graph.dot"
+        enriched_path = out_root / "graph_enriched.dot"
+        args = [
+            str(scan_root),
+            "--repo-root",
+            str(scan_root),
+            "--out-json",
+            str(json_path),
+            "--out-dot",
+            str(dot_path),
+            "--enriched-dot",
+            str(enriched_path),
+        ]
+        if argv:
+            args.extend(argv)
+        payload, edges = repo_scan.run_with_args(args)
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        repo_scan.write_dot(edges, dot_path)
+        repo_scan.write_enriched_dot(edges, enriched_path, payload.get("graph_summary", {}))
+        return payload, dot_path, enriched_path
+
+    return run
 
 
 __all__ = [

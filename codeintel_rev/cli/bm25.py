@@ -2,19 +2,72 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
+import click
 import typer
 from tools import CliContext, EnvelopeBuilder, cli_operation, sha256_file
 
 from codeintel_rev.config.settings import load_settings
 from codeintel_rev.io.bm25_manager import BM25BuildOptions, BM25IndexManager
 
+
+@dataclass(slots=True, frozen=True)
+class BM25CliContext:
+    """Dependency injection context for BM25 CLI operations."""
+
+    manager_factory: Callable[[], BM25IndexManager]
+
+    @classmethod
+    def production(cls) -> BM25CliContext:
+        """Return the production CLI context.
+
+        Returns
+        -------
+        BM25CliContext
+            Context configured with the default manager factory.
+        """
+        return cls(manager_factory=_default_bm25_manager_factory)
+
+
+def _default_bm25_manager_factory() -> BM25IndexManager:
+    """Return the default BM25 manager.
+
+    Returns
+    -------
+    BM25IndexManager
+        Manager configured from the active settings.
+    """
+    return BM25IndexManager(load_settings())
+
+
 app = typer.Typer(
     help="BM25 maintenance commands (corpus preparation and index builds).",
     no_args_is_help=True,
     add_completion=False,
 )
+_DEFAULT_CONTEXT = BM25CliContext.production()
+
+
+def _cli_context(ctx: typer.Context | None = None) -> BM25CliContext:
+    active = ctx or click.get_current_context(silent=True)
+    if active is None:
+        return _DEFAULT_CONTEXT
+    state = active.ensure_object(dict)
+    context = state.get("bm25_cli_context")
+    if isinstance(context, BM25CliContext):
+        return context
+    state["bm25_cli_context"] = _DEFAULT_CONTEXT
+    return _DEFAULT_CONTEXT
+
+
+@app.callback()
+def bm25_callback(ctx: typer.Context) -> None:
+    """Ensure CLI context defaults are configured."""
+    state = ctx.ensure_object(dict)
+    state.setdefault("bm25_cli_context", _DEFAULT_CONTEXT)
 
 
 def _create_bm25_manager() -> BM25IndexManager:
@@ -23,9 +76,9 @@ def _create_bm25_manager() -> BM25IndexManager:
     Returns
     -------
     BM25IndexManager
-        Manager using the active environment configuration.
+        Index manager built from the active CLI context.
     """
-    return BM25IndexManager(load_settings())
+    return _cli_context().manager_factory()
 
 
 def _add_metadata_artifact(env: EnvelopeBuilder, path: Path) -> None:

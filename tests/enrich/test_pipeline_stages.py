@@ -4,35 +4,26 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
-from codeintel_rev.cli import enrich_pipeline
-from codeintel_rev.cli.enrich_pipeline import ScanInputs, ScipContext
+from codeintel_rev.cli.enrich_pipeline import ScanInputs
 from codeintel_rev.enrich.duckdb_store import DuckConn, ingest_modules_jsonl
 from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.output_writers import write_markdown_module
+from codeintel_rev.enrich.pipeline_helpers import (
+    apply_tagging,
+    build_module_row,
+    outline_nodes_for,
+    type_error_count,
+)
 from codeintel_rev.enrich.scip_reader import Document, Occurrence, SCIPIndex, SymbolInfo
 from codeintel_rev.enrich.validators import ModuleRecordModel
 from codeintel_rev.typedness import FileTypeSignals
 
 from tests._helpers import assertions
-
-
-def _scan_inputs(
-    tmp_path: Path, *, signals: dict[str, FileTypeSignals] | None = None
-) -> ScanInputs:
-    repo_root = tmp_path
-    return ScanInputs(
-        scip_ctx=ScipContext(index=SCIPIndex(), by_file={}),
-        type_signals=signals or {},
-        coverage_map={},
-        tagging_rules={},
-        repo_root=repo_root,
-        max_file_bytes=10_000,
-        package_prefix=repo_root.name,
-    )
 
 
 def test_module_record_behaves_like_mapping() -> None:
@@ -51,7 +42,9 @@ def test_module_record_behaves_like_mapping() -> None:
     assertions.expect_sequence_equal(payload["tags"], ["alpha", "cli"])
 
 
-def test_build_module_row_captures_docstring_and_types(tmp_path: Path) -> None:
+def test_build_module_row_captures_docstring_and_types(
+    tmp_path: Path, scan_inputs_builder: Callable[..., ScanInputs]
+) -> None:
     """Verify module row building captures docstrings and type error counts."""
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -59,10 +52,11 @@ def test_build_module_row_captures_docstring_and_types(tmp_path: Path) -> None:
     module.mkdir()
     file_path = module / "alpha.py"
     file_path.write_text('"""Alpha."""\nfrom pkg import beta\n', encoding="utf-8")
-    inputs = _scan_inputs(
-        repo, signals={"pkg/alpha.py": FileTypeSignals(pyrefly_errors=1, pyright_errors=3)}
+    inputs = scan_inputs_builder(
+        repo_root=repo,
+        type_signals={"pkg/alpha.py": FileTypeSignals(pyrefly_errors=1, pyright_errors=3)},
     )
-    record, edges = _BUILD_MODULE_ROW(file_path, repo, inputs)
+    record, edges = build_module_row(file_path, repo, inputs)
     assertions.expect_true(isinstance(record, ModuleRecord), reason="record should be ModuleRecord")
     assertions.expect_equal(record["docstring"], "Alpha.")
     assertions.expect_equal(record["type_error_count"], 3)
@@ -73,7 +67,7 @@ def test_outline_nodes_for_python() -> None:
     """Verify outline node extraction works for Python code."""
     pytest.importorskip("tree_sitter_python")
     code = "class Foo:\n    def bar(self):\n        return 1\n"
-    nodes = _OUTLINE_NODES_FOR("pkg/foo.py", code)
+    nodes = outline_nodes_for("pkg/foo.py", code)
     if not nodes:
         pytest.skip("Tree-sitter outline unavailable")
     assertions.expect_true(
@@ -98,13 +92,15 @@ def test_scip_index_groupings() -> None:
     assertions.expect_equal(index.file_symbol_kinds()["pkg/demo.py"]["sym::demo"], "function")
 
 
-def test_type_error_count_prefers_max(tmp_path: Path) -> None:
+def test_type_error_count_prefers_max(
+    tmp_path: Path, scan_inputs_builder: Callable[..., ScanInputs]
+) -> None:
     """Verify type error count prefers maximum of pyrefly and pyright errors."""
-    inputs = _scan_inputs(
-        tmp_path,
-        signals={"pkg/demo.py": FileTypeSignals(pyrefly_errors=1, pyright_errors=4)},
+    inputs = scan_inputs_builder(
+        repo_root=tmp_path,
+        type_signals={"pkg/demo.py": FileTypeSignals(pyrefly_errors=1, pyright_errors=4)},
     )
-    assertions.expect_equal(_TYPE_ERROR_COUNT("pkg/demo.py", inputs), 4)
+    assertions.expect_equal(type_error_count("pkg/demo.py", inputs), 4)
 
 
 def test_apply_tagging_assigns_cli_tag() -> None:
@@ -118,7 +114,7 @@ def test_apply_tagging_assigns_cli_tag() -> None:
     record["imports"] = [
         {"module": "typer", "names": ["Typer"], "aliases": {}, "is_star": False, "level": 0}
     ]
-    _APPLY_TAGGING([record], {"cli": {"any_import": ["typer"], "reason": "cli detected"}})
+    apply_tagging([record], {"cli": {"any_import": ["typer"], "reason": "cli detected"}})
     tags = record.get("tags")
     assertions.expect_true(isinstance(tags, list), reason="tags should be list")
     if not isinstance(tags, list):  # pragma: no cover - defensive
@@ -168,14 +164,3 @@ def test_duckdb_store_ingest_roundtrip(tmp_path: Path) -> None:
     conn = DuckConn(db_path=tmp_path / "enrich.duckdb")
     count = ingest_modules_jsonl(conn, jsonl_path)
     assertions.expect_equal(count, 1)
-
-
-_BUILD_MODULE_ROW_ATTR = "_build_module_row"
-_OUTLINE_NODES_ATTR = "_outline_nodes_for"
-_TYPE_ERROR_COUNT_ATTR = "_type_error_count"
-_APPLY_TAGGING_ATTR = "_apply_tagging"
-
-_BUILD_MODULE_ROW = getattr(enrich_pipeline, _BUILD_MODULE_ROW_ATTR)
-_OUTLINE_NODES_FOR = getattr(enrich_pipeline, _OUTLINE_NODES_ATTR)
-_TYPE_ERROR_COUNT = getattr(enrich_pipeline, _TYPE_ERROR_COUNT_ATTR)
-_APPLY_TAGGING = getattr(enrich_pipeline, _APPLY_TAGGING_ATTR)

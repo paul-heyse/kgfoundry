@@ -26,19 +26,16 @@ from codeintel_rev.enrich.ast_indexer import (
     collect_ast_nodes_from_tree,
     compute_ast_metrics,
     empty_metrics_row,
-    stable_module_path,
     write_ast_parquet,
 )
 from codeintel_rev.enrich.duckdb_store import DuckConn, ingest_modules_jsonl
 from codeintel_rev.enrich.errors import (
-    IndexingError,
     IngestError,
     StageError,
     TaggingError,
     TypeSignalError,
 )
 from codeintel_rev.enrich.graph_builder import ImportGraph, build_import_graph, write_import_graph
-from codeintel_rev.enrich.libcst_bridge import ModuleIndex, index_module
 from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.output_writers import (
     write_json,
@@ -48,10 +45,21 @@ from codeintel_rev.enrich.output_writers import (
     write_parquet_dataset,
 )
 from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
-from codeintel_rev.enrich.pathnorm import (
-    detect_repo_root,
-    module_name_from_path,
-    stable_id_for_path,
+from codeintel_rev.enrich.pathnorm import detect_repo_root
+from codeintel_rev.enrich.pipeline_helpers import (
+    apply_tagging as _apply_tagging,
+)
+from codeintel_rev.enrich.pipeline_helpers import (
+    build_module_row as _build_module_row,
+)
+from codeintel_rev.enrich.pipeline_helpers import (
+    normalized_rel_path as _normalized_rel_path,
+)
+from codeintel_rev.enrich.pipeline_helpers import (
+    outline_nodes_for as _outline_nodes_for,
+)
+from codeintel_rev.enrich.pipeline_helpers import (
+    type_error_count as _type_error_count,
 )
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
@@ -60,8 +68,7 @@ from codeintel_rev.enrich.stubs_overlay import (
     OverlayPolicy,
     generate_overlay_for_file,
 )
-from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags, load_rules
-from codeintel_rev.enrich.tree_sitter_bridge import build_outline
+from codeintel_rev.enrich.tagging import load_rules
 from codeintel_rev.enrich.validators import ModuleRecordModel
 from codeintel_rev.export_resolver import build_module_name_map, resolve_exports
 from codeintel_rev.risk_hotspots import compute_hotspot_score
@@ -1258,268 +1265,6 @@ def _build_overlay_context(
     )
 
 
-def _build_module_row(
-    fp: Path,
-    root: Path,
-    inputs: ScanInputs,
-) -> tuple[ModuleRecord, list[tuple[str, str]]]:
-    rel = _normalized_rel_path(fp, root)
-    repo_path = _normalized_rel_path(fp, inputs.repo_root)
-    module_name = module_name_from_path(inputs.repo_root, fp, inputs.package_prefix)
-    stable_id = stable_id_for_path(repo_path)
-    scip_symbols, symbol_edges = _scip_symbols_and_edges(rel, inputs)
-    type_errors = _type_error_count(rel, inputs)
-    record = ModuleRecord(
-        path=rel,
-        repo_path=repo_path,
-        module_name=module_name,
-        stable_id=stable_id,
-        scip_symbols=scip_symbols,
-        type_errors=type_errors,
-        type_error_count=type_errors,
-        doc_metrics={
-            "has_summary": False,
-            "param_parity": True,
-            "examples_present": False,
-        },
-        annotation_ratio={"params": 1.0, "returns": 1.0},
-        side_effects={
-            "filesystem": False,
-            "network": False,
-            "subprocess": False,
-            "database": False,
-        },
-        complexity={"branches": 0, "cyclomatic": 1, "loc": 0},
-        covered_lines_ratio=_coverage_value(rel, inputs, "covered_lines_ratio"),
-        covered_defs_ratio=_coverage_value(rel, inputs, "covered_defs_ratio"),
-    )
-
-    code = _read_module_source(fp, rel, record, inputs.max_file_bytes)
-    if code is None:
-        return record, symbol_edges
-
-    try:
-        idx = _index_module_safe(rel, code)
-    except IndexingError as exc:
-        LOGGER.exception("LibCST index failed for %s", rel, extra=exc.log_extra())
-        record.add_error(exc)
-        return record, symbol_edges
-
-    outline_nodes = _collect_outline_nodes(rel, code, record)
-    _apply_index_results(record, idx, outline_nodes)
-    record.config_refs = []
-    return record, symbol_edges
-
-
-def _scip_symbols_and_edges(
-    rel_path: str,
-    inputs: ScanInputs,
-) -> tuple[list[str], list[tuple[str, str]]]:
-    document = inputs.scip_ctx.by_file.get(rel_path)
-    symbols = sorted(
-        {symbol.symbol for symbol in (document.symbols if document else []) if symbol.symbol}
-    )
-    return symbols, [(symbol, rel_path) for symbol in symbols]
-
-
-def _index_module_safe(rel_path: str, code: str) -> ModuleIndex:
-    """Run LibCST indexing with structured error reporting.
-
-    Parameters
-    ----------
-    rel_path : str
-        Relative path to the module being indexed. Used for error reporting and
-        context in the returned ModuleIndex.
-    code : str
-        Source code content of the module to parse. Must be valid Python syntax
-        for LibCST to successfully parse.
-
-    Returns
-    -------
-    ModuleIndex
-        Parsed LibCST metadata for the module.
-
-    Raises
-    ------
-    IndexingError
-        Raised when LibCST fails to parse the module.
-    """
-    try:
-        return index_module(rel_path, code)
-    except Exception as exc:  # pragma: no cover - defensive
-        reason = "libcst"
-        raise IndexingError(reason, path=rel_path, detail=str(exc)) from exc
-
-
-def _read_module_source(
-    fp: Path,
-    rel_path: str,
-    record: ModuleRecord,
-    max_file_bytes: int,
-) -> str | None:
-    """Return module source or record a structured error.
-
-    Parameters
-    ----------
-    fp : Path
-        File path to read source from. The file must exist and be readable.
-    rel_path : str
-        Relative path to the module, used for error reporting when read fails.
-    record : ModuleRecord
-        Module record to update with errors if reading fails. Errors are added
-        via ``record.add_error()`` and ``parse_ok`` is set to False.
-    max_file_bytes : int
-        Maximum file size in bytes. Files exceeding this limit are skipped and
-        an error is recorded.
-
-    Returns
-    -------
-    str | None
-        Source text when available, otherwise ``None`` after recording an error.
-    """
-    try:
-        file_size = fp.stat().st_size
-    except OSError as exc:
-        error = IndexingError("stat", path=rel_path, detail=str(exc))
-        LOGGER.warning("Failed to stat %s", rel_path, exc_info=True)
-        record.add_error(error)
-        return None
-    if file_size > max_file_bytes:
-        detail = f"{file_size}>{max_file_bytes}"
-        error = IndexingError("file-too-large", path=rel_path, detail=detail)
-        record.add_error(error)
-        return None
-    try:
-        return fp.read_text(encoding="utf-8", errors="ignore")
-    except OSError as exc:
-        error = IndexingError("read", path=rel_path, detail=str(exc))
-        LOGGER.warning("Failed to read %s", rel_path, exc_info=True)
-        record.add_error(error)
-        return None
-
-
-def _collect_outline_nodes(
-    rel_path: str,
-    code: str,
-    record: ModuleRecord,
-) -> list[dict[str, Any]]:
-    """Return Tree-sitter outline nodes while capturing failures.
-
-    Parameters
-    ----------
-    rel_path : str
-        Relative path to the module being processed. Used for error reporting
-        when Tree-sitter parsing fails.
-    code : str
-        Source code content to parse with Tree-sitter. Must be valid Python
-        syntax for successful parsing.
-    record : ModuleRecord
-        Module record to update with errors if Tree-sitter parsing fails. Errors
-        are added via ``record.add_error()``.
-
-    Returns
-    -------
-    list[dict[str, Any]]
-        Outline nodes; empty list when extraction fails.
-    """
-    try:
-        return _outline_nodes_for(rel_path, code)
-    except IndexingError as exc:
-        LOGGER.warning("Tree-sitter outline failed for %s", rel_path, extra=exc.log_extra())
-        record.add_error(exc)
-        return []
-
-
-def _apply_index_results(
-    record: ModuleRecord,
-    idx: ModuleIndex,
-    outline_nodes: list[dict[str, Any]],
-) -> None:
-    """Populate ``record`` with data derived from LibCST/Tree-sitter."""
-    doc_metrics = dict(idx.doc_metrics)
-    record.doc_metrics = doc_metrics
-    has_summary = doc_metrics.get("has_summary")
-    record.docstring = idx.docstring
-    record.doc_summary = idx.doc_summary
-    record.doc_has_summary = bool(has_summary)
-    param_parity = doc_metrics.get("param_parity")
-    record.doc_param_parity = bool(param_parity) if param_parity is not None else True
-    record.doc_examples_present = bool(doc_metrics.get("examples_present"))
-    record.imports = [
-        {
-            "module": entry.module,
-            "names": list(entry.names),
-            "aliases": dict(entry.aliases),
-            "is_star": entry.is_star,
-            "level": entry.level,
-        }
-        for entry in idx.imports
-    ]
-    record.defs = [{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in idx.defs]
-    record.exports = sorted(idx.exports)
-    record.exports_declared = sorted(idx.exports)
-    record.outline_nodes = outline_nodes
-    record.parse_ok = idx.parse_ok
-    if idx.errors:
-        record.errors.extend(idx.errors)
-    record.doc_items = idx.doc_items
-    record.annotation_ratio = dict(idx.annotation_ratio)
-    record.untyped_defs = idx.untyped_defs
-    record.side_effects = dict(idx.side_effects)
-    record.raises = list(idx.raises)
-    record.complexity = dict(idx.complexity)
-
-
-def _outline_nodes_for(rel_path: str, code: str) -> list[dict[str, Any]]:
-    """Build Tree-sitter outline nodes for ``rel_path``.
-
-    Parameters
-    ----------
-    rel_path : str
-        Relative path to the module being processed. Used for error reporting
-        when Tree-sitter parsing fails.
-    code : str
-        Source code content to parse with Tree-sitter. Must be valid Python
-        syntax for successful parsing.
-
-    Returns
-    -------
-    list[dict[str, Any]]
-        Outline node structures capturing names and byte offsets.
-
-    Raises
-    ------
-    IndexingError
-        Raised when Tree-sitter parsing fails.
-    """
-    try:
-        outline = build_outline(rel_path, code.encode("utf-8"))
-    except Exception as exc:  # pragma: no cover - defensive
-        reason = "tree-sitter"
-        raise IndexingError(reason, path=rel_path, detail=str(exc)) from exc
-    if outline is None:
-        return []
-    return [
-        {
-            "kind": node.kind,
-            "name": node.name,
-            "start": node.start_byte,
-            "end": node.end_byte,
-        }
-        for node in outline.nodes
-    ]
-
-
-def _type_error_count(rel_path: str, inputs: ScanInputs) -> int:
-    signal = inputs.type_signals.get(rel_path)
-    return signal.total if signal else 0
-
-
-def _coverage_value(rel_path: str, inputs: ScanInputs, key: str) -> float:
-    entry = inputs.coverage_map.get(rel_path, {})
-    return float(entry.get(key, 0.0))
-
-
 def _prepare_config_state(
     records: list[dict[str, Any]] | None,
 ) -> ConfigReferenceState:
@@ -1620,88 +1365,6 @@ def _infer_tags(rows: list[ModuleRecord], rules: Mapping[str, Any]) -> None:
     with _stage(StageMeta("tagging", {"rules": len(rules)})) as meta:
         _apply_tagging(rows, rules)
         meta["tagged"] = sum(1 for row in rows if row.get("tags"))
-
-
-def _apply_tagging(rows: list[ModuleRecord], rules: Mapping[str, Any]) -> None:
-    """Apply tagging rules to module rows and update their tags in-place.
-
-    Parameters
-    ----------
-    rows : list[ModuleRecord]
-        Module metadata rows to tag. Modified in-place.
-    rules : Mapping[str, Any]
-        Tagging rules dictionary for inferring tags from module traits.
-    """
-    for row in rows:
-        path = row.get("path")
-        if not isinstance(path, str):
-            continue
-        traits = _traits_from_row(row)
-        result = infer_tags(path=path, traits=traits, rules=rules)
-        tag_set = set(row.get("tags") or [])
-        tag_set.update(result.tags)
-        row["tags"] = sorted(tag_set)
-
-
-def _traits_from_row(row: Mapping[str, Any]) -> ModuleTraits:
-    """Extract ModuleTraits from a module metadata row.
-
-    Parameters
-    ----------
-    row : Mapping[str, Any]
-        Module metadata row containing imports, exports, metrics, etc.
-
-    Returns
-    -------
-    ModuleTraits
-        Extracted traits object for tag inference.
-    """
-    imports_field = row.get("imports") or []
-    imported_modules: list[str] = []
-    if isinstance(imports_field, list):
-        for entry in imports_field:
-            if not isinstance(entry, Mapping):
-                continue
-            module = entry.get("module")
-            if isinstance(module, str):
-                imported_modules.append(module)
-    exports = row.get("exports") or []
-    has_all = bool(isinstance(exports, list) and exports)
-    has_star = False
-    if isinstance(imports_field, list):
-        has_star = any(
-            isinstance(entry, Mapping) and bool(entry.get("is_star")) for entry in imports_field
-        )
-    is_reexport_hub = has_star or (
-        isinstance(exports, list) and len(exports) >= EXPORT_HUB_THRESHOLD
-    )
-
-    coverage_value = row.get("covered_lines_ratio")
-    coverage_ratio = float(coverage_value) if isinstance(coverage_value, (int, float)) else 1.0
-
-    fan_in_value = row.get("fan_in")
-    fan_out_value = row.get("fan_out")
-    hotspot_value = row.get("hotspot_score")
-
-    type_error_value = row.get("type_error_count")
-    if not isinstance(type_error_value, int):
-        type_error_value = int(row.get("type_errors") or 0)
-
-    doc_summary_flag = row.get("doc_has_summary")
-    doc_parity_flag = row.get("doc_param_parity")
-
-    return ModuleTraits(
-        imported_modules=imported_modules,
-        has_all=has_all,
-        is_reexport_hub=is_reexport_hub,
-        type_error_count=type_error_value,
-        fan_in=int(fan_in_value) if isinstance(fan_in_value, int) else 0,
-        fan_out=int(fan_out_value) if isinstance(fan_out_value, int) else 0,
-        hotspot_score=float(hotspot_value) if isinstance(hotspot_value, (int, float)) else 0.0,
-        covered_lines_ratio=coverage_ratio,
-        doc_has_summary=bool(doc_summary_flag if doc_summary_flag is not None else True),
-        doc_param_parity=bool(doc_parity_flag if doc_parity_flag is not None else True),
-    )
 
 
 def _build_coverage_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -2180,10 +1843,6 @@ def _ensure_package_overlays(  # noqa: PLR0913
                 return True
         current = current.parent
     return False
-
-
-def _normalized_rel_path(path: Path, root: Path) -> str:
-    return stable_module_path(root, path)
 
 
 def _write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> None:

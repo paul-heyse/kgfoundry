@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from codeintel_rev.enrich import output_writers
 from codeintel_rev.enrich.output_writers import write_jsonl, write_parquet_dataset
 
 from tests._helpers import assertions
@@ -13,7 +14,15 @@ from tests._helpers import assertions
 
 def test_jsonl_writer_is_deterministic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure the orjson-backed JSONL writer emits stable bytes."""
-    monkeypatch.setenv("ENRICH_JSONL_WRITER", "v2")
+    writer_env = output_writers._JSONL_WRITER_ENV  # noqa: SLF001
+    original_getenv = output_writers.os.getenv
+
+    def _mock_getenv(key: str, default: str | None = None) -> str | None:
+        if key == writer_env:
+            return "v2"
+        return original_getenv(key, default)
+
+    monkeypatch.setattr(output_writers.os, "getenv", _mock_getenv)
     path = tmp_path / "modules.jsonl"
     rows = [{"b": 2, "a": 1}, {"d": 4, "c": 3}]
     write_jsonl(path, rows)

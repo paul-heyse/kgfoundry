@@ -20,7 +20,7 @@ from threading import Lock
 
 from codeintel_rev.app.config_context import ApplicationContext
 
-__all__ = ["get_service_context", "reset_service_context"]
+__all__ = ["get_service_context", "reset_service_context", "set_service_context"]
 
 _CONTEXT_CACHE: dict[str, ApplicationContext | None] = {"value": None}
 # Protect lazy initialization so concurrent callers do not instantiate the
@@ -77,3 +77,15 @@ def reset_service_context() -> None:
     """
     with _CONTEXT_LOCK:
         _set_cached_context(None)
+
+
+def set_service_context(context: ApplicationContext | None) -> None:
+    """Explicitly set the cached context (intended for tests).
+
+    Parameters
+    ----------
+    context : ApplicationContext | None
+        Context to cache; ``None`` clears the cache.
+    """
+    with _CONTEXT_LOCK:
+        _set_cached_context(context)

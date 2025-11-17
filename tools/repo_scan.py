@@ -32,7 +32,7 @@ import shutil
 import sys
 import time
 import tokenize
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from importlib import util as importlib_util
 from pathlib import Path
@@ -1683,6 +1683,22 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return ap
 
 
+def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
+    """Return the parsed CLI arguments for ``argv``.
+
+    Parameters
+    ----------
+    argv : Sequence[str]
+        Command-line arguments excluding the program name.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed CLI configuration.
+    """
+    return _build_arg_parser().parse_args(list(argv))
+
+
 def _collect_module_reports(
     scan_root: Path,
     *,
@@ -2080,24 +2096,50 @@ def _execute_scan(args: argparse.Namespace) -> tuple[dict[str, Any], list[tuple[
     return payload, edges
 
 
-def main() -> None:
-    """Entrypoint for the CLI invocation defined in the module docstring.
+def run_with_args(argv: Sequence[str]) -> tuple[dict[str, Any], list[tuple[str, str]]]:
+    """Execute the scan with explicit CLI arguments.
 
-    The function exits the process with ``sys.exit`` codes on failure.
+    Parameters
+    ----------
+    argv : Sequence[str]
+        Command-line arguments excluding the program name.
+
+    Returns
+    -------
+    tuple[dict[str, Any], list[tuple[str, str]]]
+        Generated payload and import edge list.
     """
-    args = _build_arg_parser().parse_args()
-    payload, edges = _execute_scan(args)
+    args = _parse_args(argv)
+    return _execute_scan(args)
 
-    Path(args.out_json).write_text(json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8")
-    write_dot(edges, Path(args.out_dot))
+
+def _write_cli_outputs(
+    args: argparse.Namespace,
+    payload: dict[str, Any],
+    edges: list[tuple[str, str]],
+) -> None:
+    """Persist CLI artifacts declared by ``args``."""
+    out_json = Path(args.out_json)
+    out_dot = Path(args.out_dot)
+    out_json.write_text(json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8")
+    write_dot(edges, out_dot)
     if getattr(args, "write_enriched_dot", False):
         write_enriched_dot(
             edges,
             Path(args.enriched_dot),
             payload.get("graph_summary", {}),
         )
+    logger.info("Wrote %s and %s", out_json, out_dot)
 
-    logger.info("Wrote %s and %s", args.out_json, args.out_dot)
+
+def main() -> None:
+    """Entrypoint for the CLI invocation defined in the module docstring.
+
+    The function exits the process with ``sys.exit`` codes on failure.
+    """
+    args = _parse_args(sys.argv[1:])
+    payload, edges = _execute_scan(args)
+    _write_cli_outputs(args, payload, edges)
 
 
 if __name__ == "__main__":

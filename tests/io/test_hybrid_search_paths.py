@@ -61,7 +61,16 @@ def test_resolve_path_expands_user_home(monkeypatch: pytest.MonkeyPatch, tmp_pat
     repo_root = Path("/repository-root")
     engine = _make_engine(repo_root)
     fake_home = tmp_path / "fake-home"
-    monkeypatch.setenv("HOME", str(fake_home))
+    fake_home.mkdir(parents=True, exist_ok=True)
+    original_expanduser = Path.expanduser
+
+    def _expanduser(self: Path) -> Path:
+        text = str(self)
+        if text.startswith("~"):
+            return Path(text.replace("~", str(fake_home), 1))
+        return original_expanduser(self)
+
+    monkeypatch.setattr(Path, "expanduser", _expanduser)
 
     resolved = engine.resolve_path("~/.cache/splade")
 

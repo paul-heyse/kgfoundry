@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
-import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 from uuid import uuid4
 
 import pytest
-from tools import AugmentMetadataModel, CLIToolingContext, OperationOverrideModel
+from tools import (
+    AugmentMetadataModel,
+    CLIToolingContext,
+    CLIToolSettings,
+    OperationOverrideModel,
+    RegistryMetadataModel,
+    load_cli_tooling_context,
+)
 from tools import cli_context_registry as registry_module
 from tools.cli_context_registry import (
     CLIContextDefinition,
@@ -33,13 +40,14 @@ def _default_paths() -> tuple[Path, Path]:
     return augment_path, registry_path
 
 
-def _register_test_cli(
+def _register_test_cli(  # noqa: PLR0913 - explicit override knobs keep tests readable
     *,
     command: str,
     title: str = "Test CLI",
     interface_id: str | None = None,
     operation_ids: dict[str, str] | None = None,
     packages: Sequence[str] = ("kgfoundry",),
+    context_factory: Callable[[CLIToolSettings], CLIToolingContext] | None = None,
 ) -> str:
     key = command
     augment_path, registry_path = _default_paths()
@@ -52,6 +60,7 @@ def _register_test_cli(
         augment_path=augment_path,
         registry_path=registry_path,
         version_resolver=default_version_resolver(*packages),
+        context_factory=context_factory,
     )
     register_cli(key, definition)
     return key
@@ -79,25 +88,19 @@ def test_settings_for_returns_expected_fields() -> None:
 def test_context_for_is_cached() -> None:
     """Verify context_for caches contexts to avoid repeated loading."""
     command = _unique_key("cached-cli")
-    key = _register_test_cli(command=command)
-
-    shared_registry = sys.modules["tools._shared.cli_context_registry"]
-    original_loader = shared_registry.load_cli_tooling_context
     call_count = {"value": 0}
 
-    def _fake_loader(*args: object, **kwargs: object) -> CLIToolingContext:
+    def tracking_loader(settings: CLIToolSettings) -> CLIToolingContext:
         call_count["value"] += 1
-        return original_loader(*args, **kwargs)
+        return load_cli_tooling_context(settings)
 
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(shared_registry, "load_cli_tooling_context", _fake_loader)
+    key = _register_test_cli(command=command, context_factory=tracking_loader)
 
     ctx_one = context_for(key)
     ctx_two = context_for(key)
 
     assertions.expect_true(ctx_one is ctx_two, reason="context should be cached")
     assertions.expect_equal(call_count["value"], 1)
-    monkeypatch.undo()
 
 
 def test_duplicate_registration_raises() -> None:
@@ -133,11 +136,9 @@ def test_version_resolver_fallback() -> None:
     assertions.expect_true(settings.version != "0.0.0", reason="version should be resolved")
 
 
-def test_operation_override_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_operation_override_dispatch() -> None:
     """Verify operation override dispatch calls augment correctly."""
     command = _unique_key("override-cli")
-    key = _register_test_cli(command=command, operation_ids={"run": "override.run"})
-
     class DummyAugment:
         def __init__(self) -> None:
             self.calls: list[tuple[str, Sequence[str] | None]] = []
@@ -151,14 +152,20 @@ def test_operation_override_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
             return OperationOverrideModel(summary="override-result")
 
     dummy = DummyAugment()
-    original_augment_for = registry_module.REGISTRY.augment_for
 
-    def fake_augment_for(target: str) -> AugmentMetadataModel:
-        if target == key:
-            return cast("AugmentMetadataModel", dummy)
-        return original_augment_for(target)
+    def context_factory(_settings: CLIToolSettings) -> CLIToolingContext:
+        registry = SimpleNamespace(interface=lambda *_args, **_kwargs: None)
+        return CLIToolingContext(
+            augment=cast("AugmentMetadataModel", dummy),
+            registry=cast("RegistryMetadataModel", registry),
+            cli_config={},
+        )
 
-    monkeypatch.setattr(registry_module.REGISTRY, "augment_for", fake_augment_for)
+    key = _register_test_cli(
+        command=command,
+        operation_ids={"run": "override.run"},
+        context_factory=context_factory,
+    )
 
     result = registry_module.operation_override_for(key, subcommand="run")
     assertions.expect_true(isinstance(result, OperationOverrideModel))

@@ -4,8 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -14,100 +12,8 @@ import pytest
 from codeintel_rev.cli_enrich import app
 from typer.testing import CliRunner
 
-from tests._helpers import assertions, run_process
-
-
-def _git_env() -> dict[str, str]:
-    env = os.environ.copy()
-    env.update(
-        {
-            "GIT_AUTHOR_NAME": "Smoke Tester",
-            "GIT_AUTHOR_EMAIL": "smoke@example.com",
-            "GIT_COMMITTER_NAME": "Smoke Tester",
-            "GIT_COMMITTER_EMAIL": "smoke@example.com",
-        }
-    )
-    return env
-
-
-def _init_repo(repo_root: Path) -> None:
-    env = _git_env()
-    git_bin = _git_executable()
-    run_process([git_bin, "init"], cwd=repo_root, env=env)
-    run_process([git_bin, "config", "user.name", "Smoke Tester"], cwd=repo_root, env=env)
-    run_process(
-        [git_bin, "config", "user.email", "smoke@example.com"],
-        cwd=repo_root,
-        env=env,
-    )
-
-
-def _write_repo(repo_root: Path) -> None:
-    pkg = repo_root / "pkg"
-    pkg.mkdir(parents=True, exist_ok=True)
-    (pkg / "__init__.py").write_text(
-        '"""Pkg root for smoke tests."""\n__all__ = ["alpha"]\n', encoding="utf-8"
-    )
-    (pkg / "alpha.py").write_text(
-        '''
-"""Alpha module."""
-__all__ = ["alpha_fn"]
-from pkg import beta
-
-def alpha_fn() -> str:
-    return beta.beta_fn()
-'''.strip(),
-        encoding="utf-8",
-    )
-    (pkg / "beta.py").write_text(
-        '''
-"""Beta module."""
-
-def beta_fn() -> str:
-    return "beta"
-'''.strip(),
-        encoding="utf-8",
-    )
-    (repo_root / "CODEOWNERS").write_text("pkg/alpha.py @alpha-owner\n", encoding="utf-8")
-
-
-def _seed_initial_commit(repo_root: Path) -> None:
-    env = _git_env()
-    git_bin = _git_executable()
-    run_process([git_bin, "add", "."], cwd=repo_root, env=env)
-    run_process([git_bin, "commit", "-m", "initial"], cwd=repo_root, env=env)
-
-
-def _write_scip(repo_root: Path) -> Path:
-    scip_data = {
-        "documents": [
-            {
-                "relativePath": "pkg/alpha.py",
-                "occurrences": [
-                    {"symbol": "pkg.alpha.alpha_fn", "roles": ["definition"]},
-                    {"symbol": "pkg.beta.beta_fn", "roles": ["reference"]},
-                ],
-                "symbols": [{"symbol": "pkg.alpha.alpha_fn", "kind": "function"}],
-            },
-            {
-                "relativePath": "pkg/beta.py",
-                "occurrences": [
-                    {"symbol": "pkg.beta.beta_fn", "roles": ["definition"]},
-                    {"symbol": "pkg.alpha.alpha_fn", "roles": ["reference"]},
-                ],
-                "symbols": [
-                    {"symbol": "pkg.beta.beta_fn", "kind": "function"},
-                ],
-            },
-        ]
-    }
-    scip_path = repo_root / "index.scip.json"
-    scip_path.write_text(json.dumps(scip_data), encoding="utf-8")
-    return scip_path
-
-
-def _git_executable() -> str:
-    return shutil.which("git") or "git"
+from tests._helpers import assertions
+from tests._helpers.repo import SampleRepo
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -205,14 +111,10 @@ def _assert_artifacts(out_dir: Path, module_rows: list[dict[str, object]]) -> No
     )
 
 
-def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
+def test_cli_enrich_emits_extended_artifacts(tmp_path: Path, sample_repo: SampleRepo) -> None:
     """Test that CLI enrich command emits extended artifacts (graphs, imports, uses)."""
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-    _init_repo(repo_root)
-    _write_repo(repo_root)
-    _seed_initial_commit(repo_root)
-    scip_path = _write_scip(repo_root)
+    repo_root = sample_repo.root
+    scip_path = sample_repo.scip_path
     out_dir = tmp_path / "out"
 
     runner = CliRunner()

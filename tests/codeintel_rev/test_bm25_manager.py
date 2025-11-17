@@ -7,7 +7,7 @@ from pathlib import Path
 
 import msgspec
 import pytest
-from codeintel_rev.config.settings import load_settings
+from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.bm25_manager import (
     BM25CorpusMetadata,
     BM25IndexManager,
@@ -15,24 +15,18 @@ from codeintel_rev.io.bm25_manager import (
 )
 
 from tests._helpers import assertions, constants
+from tests._helpers.settings import build_settings_for_repo
 
 DOC_COUNT = constants.BATCH_SIZES.minimal
 
 
-def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Initialize a fake repository layout and configure environment variables.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory for creating the repository structure.
-    monkeypatch : pytest.MonkeyPatch
-        Pytest fixture for patching environment variables.
+def _bootstrap_repo(tmp_path: Path, *, bm25_threads: int | None = None) -> tuple[Path, Settings]:
+    """Initialize a fake repository layout and return configured settings.
 
     Returns
     -------
-    Path
-        The absolute path to the synthetic repository root.
+    tuple[Path, Settings]
+        Tuple containing the repo root path and tailored Settings instance.
     """
     repo_root = tmp_path / "repo"
     data_dir = repo_root / "data"
@@ -47,16 +41,9 @@ def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (repo_root / "data" / "catalog.duckdb").touch()
     (repo_root / "index.scip").write_text("{}", encoding="utf-8")
 
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("DATA_DIR", str(data_dir))
-    monkeypatch.setenv("FAISS_INDEX", str(repo_root / "data" / "faiss" / "code.ivfpq.faiss"))
-    monkeypatch.setenv("DUCKDB_PATH", str(repo_root / "data" / "catalog.duckdb"))
-    monkeypatch.setenv("SCIP_INDEX", str(repo_root / "index.scip"))
-    monkeypatch.setenv("BM25_JSONL_DIR", str(bm25_json_dir))
-    monkeypatch.setenv("BM25_INDEX_DIR", str(lucene_dir / "bm25"))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
-
-    return repo_root
+    bm25_overrides = {"threads": bm25_threads} if bm25_threads is not None else None
+    settings = build_settings_for_repo(repo_root, bm25_overrides=bm25_overrides)
+    return repo_root, settings
 
 
 def _write_corpus(source_path: Path) -> None:
@@ -71,16 +58,12 @@ def _write_corpus(source_path: Path) -> None:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def test_prepare_corpus_creates_json_collection(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_prepare_corpus_creates_json_collection(tmp_path: Path) -> None:
     """Preparing a corpus should emit per-document JSON and metadata."""
-    repo_root = _bootstrap_repo(tmp_path, monkeypatch)
+    repo_root, settings = _bootstrap_repo(tmp_path)
     source_path = repo_root / "datasets" / "corpus.jsonl"
     _write_corpus(source_path)
 
-    settings = load_settings()
     manager = BM25IndexManager(settings)
 
     summary = manager.prepare_corpus(source_path)
@@ -98,12 +81,9 @@ def test_prepare_corpus_creates_json_collection(
     assertions.expect_equal(metadata.digest, summary.digest)
 
 
-def test_prepare_corpus_detects_duplicate_ids(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_prepare_corpus_detects_duplicate_ids(tmp_path: Path) -> None:
     """Duplicate document identifiers should cause preparation to fail."""
-    repo_root = _bootstrap_repo(tmp_path, monkeypatch)
+    repo_root, settings = _bootstrap_repo(tmp_path)
     source_path = repo_root / "datasets" / "corpus.jsonl"
     rows = [
         {"id": "dup", "contents": "first"},
@@ -114,20 +94,21 @@ def test_prepare_corpus_detects_duplicate_ids(
         for row in rows:
             handle.write(json.dumps(row) + "\n")
 
-    settings = load_settings()
     manager = BM25IndexManager(settings)
 
     with pytest.raises(ValueError, match="Duplicate document id"):
         manager.prepare_corpus(source_path)
 
 
-def test_build_index_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_build_index_writes_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """Index builds should invoke Pyserini and persist index metadata."""
-    repo_root = _bootstrap_repo(tmp_path, monkeypatch)
+    repo_root, settings = _bootstrap_repo(tmp_path, bm25_threads=2)
     source_path = repo_root / "datasets" / "corpus.jsonl"
     _write_corpus(source_path)
 
-    settings = load_settings()
     manager = BM25IndexManager(settings)
     summary = manager.prepare_corpus(source_path)
 
@@ -138,7 +119,6 @@ def test_build_index_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         resolved = manager.index_dir
         (resolved / "segments_1").write_text("stub", encoding="utf-8")
 
-    monkeypatch.setenv("BM25_THREADS", "2")
     monkeypatch.setattr("codeintel_rev.io.bm25_manager._run_pyserini_index", fake_run)
     monkeypatch.setattr("codeintel_rev.io.bm25_manager._detect_pyserini_version", lambda: "test")
 

@@ -53,7 +53,17 @@ DEFAULT_MAX_WORKS = 20_000
 
 @dataclass(slots=True, frozen=True)
 class HarvestRequest:
-    """Structured request describing a harvest invocation."""
+    """Structured request describing a harvest invocation.
+
+    Attributes
+    ----------
+    topic : str
+        Topic query string to harvest from OpenAlex.
+    years : str
+        Year filter expression (e.g., '>=2018').
+    max_works : int
+        Maximum number of works to harvest.
+    """
 
     topic: str
     years: str
@@ -75,7 +85,13 @@ def _default_harvest_handler(request: HarvestRequest) -> str:
 
 @dataclass(slots=True, frozen=True)
 class DownloadCliContext:
-    """Dependency injection context for download CLI operations."""
+    """Dependency injection context for download CLI operations.
+
+    Attributes
+    ----------
+    harvest_handler : HarvestHandler
+        Callable handler function for executing harvest operations.
+    """
 
     harvest_handler: HarvestHandler
 

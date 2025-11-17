@@ -15,13 +15,16 @@ Example failure payload::
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Protocol, cast
 
+import click
 import typer
 
 from codeintel_rev.app.config_context import resolve_application_paths
-from codeintel_rev.config.settings import load_settings
+from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.xtr_manager import XTRIndex
 
@@ -47,6 +50,48 @@ _VerboseOption = Annotated[
 ]
 
 
+@dataclass(slots=True, frozen=True)
+class XtrOpenContext:
+    """Dependency injection context for the xtr-open CLI."""
+
+    settings_factory: Callable[[], Settings]
+    paths_resolver: Callable[[Settings], _XtrPaths]
+    index_factory: Callable[[Path, Settings], XTRIndex]
+
+    @classmethod
+    def production(cls) -> XtrOpenContext:
+        """Return the production CLI context.
+
+        Returns
+        -------
+        XtrOpenContext
+            Context configured with production factories.
+        """
+        return cls(
+            settings_factory=load_settings,
+            paths_resolver=resolve_application_paths,
+            index_factory=lambda root, settings: XTRIndex(root, settings.xtr),
+        )
+
+
+_DEFAULT_CONTEXT = XtrOpenContext.production()
+
+
+class _XtrPaths(Protocol):
+    @property
+    def xtr_dir(self) -> Path: ...
+
+
+def _cli_context(ctx: typer.Context | None = None) -> XtrOpenContext:
+    active = ctx or click.get_current_context(silent=True)
+    if active is None:
+        return _DEFAULT_CONTEXT
+    state = active.ensure_object(dict)
+    context = state.get("xtr_cli_context")
+    if isinstance(context, XtrOpenContext):
+        return context
+    state["xtr_cli_context"] = _DEFAULT_CONTEXT
+    return _DEFAULT_CONTEXT
 @APP.command("xtr-open")
 def xtr_open(
     root: _RootOption = None,
@@ -111,8 +156,9 @@ def xtr_open(
       }
     }
     """
-    settings = load_settings()
-    paths = resolve_application_paths(settings)
+    context = _cli_context()
+    settings = context.settings_factory()
+    paths = cast("_XtrPaths", context.paths_resolver(settings))
     xtr_root = root or paths.xtr_dir
     if root is not None and not root.is_dir():
         _exit_with_problem(
@@ -131,7 +177,7 @@ def xtr_open(
             detail=f"Directory does not exist: {xtr_root}",
         )
 
-    index = XTRIndex(xtr_root, settings.xtr)
+    index = context.index_factory(xtr_root, settings)
     try:
         index.open()
     except (OSError, RuntimeError, ValueError) as exc:

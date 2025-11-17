@@ -817,8 +817,15 @@ class ApplicationContext:
     def create(
         cls,
         *,
+        settings: Settings | None = None,
         runtime_observer: RuntimeCellObserver | None = None,
         factory_adjuster: FactoryAdjuster | None = None,
+        vllm_client: VLLMClient | None = None,
+        faiss_manager: FAISSManager | None = None,
+        scope_store: ScopeStore | None = None,
+        duckdb_manager: DuckDBManager | None = None,
+        git_client: GitClient | None = None,
+        async_git_client: AsyncGitClient | None = None,
     ) -> ApplicationContext:
         """Create application context from environment variables.
 
@@ -835,6 +842,9 @@ class ApplicationContext:
 
         Parameters
         ----------
+        settings : Settings | None, optional
+            Preconstructed settings object. When None (default), settings are
+            loaded via ``load_settings()``.
         runtime_observer : RuntimeCellObserver | None, optional
             Observer instance that receives lifecycle callbacks from runtime cells
             (hybrid engine, FAISS manager, XTR index). Used for instrumentation,
@@ -882,16 +892,18 @@ class ApplicationContext:
         load_settings : Loads Settings from environment variables
         resolve_application_paths : Validates and resolves paths
         """
-        settings = load_settings()
+        settings = settings or load_settings()
         # resolve_application_paths() raises ConfigurationError if paths are invalid
         # This exception propagates to the caller, causing application startup to fail
         paths = resolve_application_paths(settings)
 
-        vllm_client = build_vllm_client(settings.vllm)
-        faiss_manager = _build_faiss_manager(settings, paths)
-        scope_store = _build_scope_store(settings)
-        git_client, async_git_client = _build_git_clients(paths)
-        duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
+        vllm_client = vllm_client or build_vllm_client(settings.vllm)
+        faiss_manager = faiss_manager or _build_faiss_manager(settings, paths)
+        scope_store = scope_store or _build_scope_store(settings)
+        duckdb_manager = duckdb_manager or DuckDBManager(paths.duckdb_path, settings.duckdb)
+        primary_git_client, primary_async_client = _build_git_clients(paths)
+        git_client = git_client or primary_git_client
+        async_git_client = async_git_client or primary_async_client
 
         observer = runtime_observer or NullRuntimeCellObserver()
 

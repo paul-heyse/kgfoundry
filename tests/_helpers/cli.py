@@ -47,8 +47,11 @@ def invoke(
         Whether to catch exceptions during invocation (default: False). When True,
         exceptions are captured in the result object instead of propagating.
     obj : object | None, optional
-        Optional Click ``obj`` passed to the CLI context. Defaults to None,
-        allowing callers to inject dependency contexts for testing.
+        Optional Click ``obj`` passed to the CLI context. Defaults to None.
+        Pass dictionaries containing CLI-specific contexts (e.g.,
+        ``{"splade_cli_context": ctx}``) and ``cli_run_overrides`` entries such as
+        ``{"envelope_dir": tmp_path}`` to redirect envelope output without
+        touching module globals.
 
     Returns
     -------
@@ -58,10 +61,23 @@ def invoke(
 
     Notes
     -----
-    Performance & Side Effects:
-        Time complexity O(1) for setup; actual execution time depends on the CLI
-        command. Uses a shared CliRunner instance for efficiency. Thread-safe for
-        concurrent test invocations (Typer runner handles isolation).
+        Performance & Side Effects:
+            Time complexity O(1) for setup; actual execution time depends on the CLI
+            command. Uses a shared CliRunner instance for efficiency. Thread-safe for
+            concurrent test invocations (Typer runner handles isolation).
+        CLI injection:
+            Preferred pattern is to pass dependency contexts and overrides via ``obj``.
+            Example::
+
+                context = MyCliContext(...)
+                invoke(
+                    app,
+                    args,
+                    obj={
+                        "my_cli_context": context,
+                        "cli_run_overrides": {"envelope_dir": tmp_path},
+                    },
+                )
     """
     arg_list = list(args)
     normalizer_obj = getattr(app, "argv_normalizer", None)
