@@ -48,6 +48,7 @@ OverwriteFlag = Annotated[
     ),
 ]
 
+
 @dataclass(slots=True, frozen=True)
 class SpladeCliContext:
     """Dependency injection context for SPLADE CLI operations."""

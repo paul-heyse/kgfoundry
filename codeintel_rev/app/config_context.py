@@ -47,8 +47,9 @@ from __future__ import annotations
 
 import importlib
 import os
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from threading import Lock
 from types import ModuleType
@@ -66,11 +67,13 @@ from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
+from codeintel_rev.io.hybrid_search import HybridSearchContext
 from codeintel_rev.io.vllm_client import VLLMClient, build_vllm_client
 from codeintel_rev.runtime import (
     NullRuntimeCellObserver,
     RuntimeCell,
     RuntimeCellObserver,
+    allow_runtime_cell_seeding,
 )
 from codeintel_rev.runtime.factory_adjustment import (
     DefaultFactoryAdjuster,
@@ -95,7 +98,92 @@ _AUTOTUNE_SAMPLE_LIMIT = 128
 _MIN_AUTOTUNE_SAMPLES = 4
 
 
-__all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
+__all__ = [
+    "ApplicationContext",
+    "ApplicationContextOverrides",
+    "GateConfig",
+    "ResolvedPaths",
+    "override_gate_config",
+    "resolve_application_paths",
+]
+
+
+@dataclass(slots=True, frozen=True)
+class ApplicationContextOverrides:
+    """Optional dependency overrides for :meth:`ApplicationContext.create`.
+
+    Attributes
+    ----------
+    runtime_observer : RuntimeCellObserver | None
+        Observer installed on runtime cells for instrumentation. When ``None``,
+        :class:`NullRuntimeCellObserver` is used.
+    factory_adjuster : FactoryAdjuster | None
+        Override for the runtime factory adjuster. Defaults to an instance built
+        from :class:`Settings`.
+    vllm_client : VLLMClient | None
+        Preconstructed vLLM client. When omitted, :func:`build_vllm_client`
+        constructs one using ``settings.vllm``.
+    faiss_manager : FAISSManager | None
+        FAISS manager override. The default is constructed from ``settings`` and
+        the resolved paths.
+    scope_store : ScopeStore | None
+        Scope store implementation (Redis-backed). Defaults to the production
+        implementation configured via settings.
+    duckdb_manager : DuckDBManager | None
+        Manager responsible for DuckDB catalog lifecycle. Defaults to
+        :class:`DuckDBManager`.
+    git_client : GitClient | None
+        Synchronous Git client override. When omitted, the default builder loads
+        a GitPython-backed client rooted at ``settings.paths.repo_root``.
+    async_git_client : AsyncGitClient | None
+        Async Git client override that wraps the synchronous client.
+    faiss_manager_factory : Callable[[Settings, ResolvedPaths], FAISSManager] | None
+        Factory for constructing the FAISS manager. When provided, overrides the
+        default import/path resolution.
+    duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] | None
+        Factory for creating DuckDB catalog instances inside :meth:`open_catalog`.
+    """
+
+    runtime_observer: RuntimeCellObserver | None = None
+    factory_adjuster: FactoryAdjuster | None = None
+    vllm_client: VLLMClient | None = None
+    faiss_manager: FAISSManager | None = None
+    scope_store: ScopeStore | None = None
+    duckdb_manager: DuckDBManager | None = None
+    git_client: GitClient | None = None
+    async_git_client: AsyncGitClient | None = None
+    faiss_manager_factory: Callable[[Settings, ResolvedPaths], FAISSManager] | None = None
+    duckdb_catalog_factory: (
+        Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] | None
+    ) = None
+
+
+@dataclass(slots=True, frozen=True)
+class GateConfig:
+    """Overrides for runtime dependency gates."""
+
+    gate_import: Callable[[str, str], object] | None = None
+
+
+_GATE_CONFIG_STACK: list[GateConfig] = [GateConfig()]
+
+
+@contextmanager
+def override_gate_config(**kwargs: object) -> Iterator[None]:
+    """Temporarily override dependency gate configuration."""
+    config = replace(_GATE_CONFIG_STACK[-1], **kwargs)
+    _GATE_CONFIG_STACK.append(config)
+    try:
+        yield
+    finally:
+        _GATE_CONFIG_STACK.pop()
+
+
+def _call_gate_import(module: str, purpose: str) -> object:
+    override = _GATE_CONFIG_STACK[-1].gate_import
+    if override is not None:
+        return override(module, purpose)
+    return gate_import(module, purpose)
 
 
 def _infer_index_root(paths: ResolvedPaths) -> Path:
@@ -161,7 +249,12 @@ def _build_factory_adjuster(settings: Settings) -> FactoryAdjuster:
         return NoopFactoryAdjuster()
 
 
-def _build_faiss_manager(settings: Settings, paths: ResolvedPaths) -> FAISSManager:
+def _build_faiss_manager(
+    settings: Settings,
+    paths: ResolvedPaths,
+    *,
+    factory: Callable[[Settings, ResolvedPaths], FAISSManager] | None = None,
+) -> FAISSManager:
     """Construct and log the FAISS manager for the main index.
 
     Parameters
@@ -170,6 +263,9 @@ def _build_faiss_manager(settings: Settings, paths: ResolvedPaths) -> FAISSManag
         Application settings containing index configuration.
     paths : ResolvedPaths
         Resolved filesystem paths including FAISS index path.
+    factory : Callable[[Settings, ResolvedPaths], FAISSManager] | None, optional
+        Optional override factory. When provided, takes precedence over the default
+        FAISS manager construction logic.
 
     Returns
     -------
@@ -181,6 +277,8 @@ def _build_faiss_manager(settings: Settings, paths: ResolvedPaths) -> FAISSManag
     ConfigurationError
         If IndexConfig.nlist is None during context creation.
     """
+    if factory is not None:
+        return factory(settings, paths)
     faiss_manager_cls = _import_faiss_manager_cls()
     runtime_opts = _faiss_runtime_options_from_index(settings.index)
     nlist_value = settings.index.nlist
@@ -193,6 +291,23 @@ def _build_faiss_manager(settings: Settings, paths: ResolvedPaths) -> FAISSManag
         nlist=nlist_value,
         runtime=runtime_opts,
     )
+
+
+def _default_duckdb_catalog_factory(
+    paths: ResolvedPaths,
+    settings: Settings,
+    manager: DuckDBManager,
+) -> DuckDBCatalog:
+    catalog = DuckDBCatalog(
+        paths.duckdb_path,
+        paths.vectors_dir,
+        materialize=settings.index.duckdb_materialize,
+        manager=manager,
+        log_queries=settings.duckdb.log_queries,
+        repo_root=paths.repo_root,
+    )
+    catalog.set_idmap_path(paths.faiss_idmap_path)
+    return catalog
 
 
 def _build_scope_store(settings: Settings) -> ScopeStore:
@@ -210,7 +325,7 @@ def _build_scope_store(settings: Settings) -> ScopeStore:
     """
     redis_asyncio = cast(
         "ModuleType",
-        gate_import("redis.asyncio", "Session scope store requires redis extra"),
+        _call_gate_import("redis.asyncio", "Session scope store requires redis extra"),
     )
     redis_client = redis_asyncio.from_url(settings.redis.url)
     return ScopeStore(
@@ -408,7 +523,7 @@ def _require_dependency(module: str, *, runtime: str, purpose: str) -> None:
     RuntimeUnavailableError: ...test runtime unavailable: demo...
     """
     try:
-        gate_import(module, purpose)
+        _call_gate_import(module, purpose)
     except ImportError as exc:  # pragma: no cover - exercised via unit tests
         detail = str(exc)
         message = f"{runtime} runtime unavailable: {purpose}"
@@ -753,6 +868,8 @@ class ApplicationContext:
         Manager for versioned index lifecycle operations (stage, publish, rollback).
         Initialized during context setup with index root inferred from paths.
         Provides APIs for managing index versions and manifests.
+    duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog]
+        Factory used to construct catalog instances when :meth:`open_catalog` is invoked.
 
     Examples
     --------
@@ -796,6 +913,9 @@ class ApplicationContext:
     duckdb_manager: DuckDBManager
     git_client: GitClient
     async_git_client: AsyncGitClient
+    duckdb_catalog_factory: Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] = (
+        field(default=_default_duckdb_catalog_factory, repr=False)
+    )
     runtime_observer: RuntimeCellObserver = field(
         default_factory=NullRuntimeCellObserver, repr=False
     )
@@ -818,14 +938,7 @@ class ApplicationContext:
         cls,
         *,
         settings: Settings | None = None,
-        runtime_observer: RuntimeCellObserver | None = None,
-        factory_adjuster: FactoryAdjuster | None = None,
-        vllm_client: VLLMClient | None = None,
-        faiss_manager: FAISSManager | None = None,
-        scope_store: ScopeStore | None = None,
-        duckdb_manager: DuckDBManager | None = None,
-        git_client: GitClient | None = None,
-        async_git_client: AsyncGitClient | None = None,
+        overrides: ApplicationContextOverrides | None = None,
     ) -> ApplicationContext:
         """Create application context from environment variables.
 
@@ -845,14 +958,11 @@ class ApplicationContext:
         settings : Settings | None, optional
             Preconstructed settings object. When None (default), settings are
             loaded via ``load_settings()``.
-        runtime_observer : RuntimeCellObserver | None, optional
-            Observer instance that receives lifecycle callbacks from runtime cells
-            (hybrid engine, FAISS manager, XTR index). Used for instrumentation,
-            monitoring, and diagnostics. If None (default), uses NullRuntimeCellObserver
-            which suppresses all callbacks. Defaults to None.
-        factory_adjuster : FactoryAdjuster | None, optional
-            Optional adjuster applied to runtime factories. When ``None``, a default
-            adjuster derived from ``settings.index`` is used.
+        overrides : ApplicationContextOverrides | None, optional
+            Optional dependency overrides. Useful for injecting fakes in tests
+            or for swapping runtime observers, factory adjusters, and storage
+            adapters. When ``None`` (default) the method constructs all components
+            using production builders.
 
         Returns
         -------
@@ -870,8 +980,10 @@ class ApplicationContext:
         ...     yield
 
         >>> # With custom observer for instrumentation
+        >>> from codeintel_rev.app.config_context import ApplicationContextOverrides
         >>> observer = MyCustomObserver()
-        >>> context = ApplicationContext.create(runtime_observer=observer)
+        >>> overrides = ApplicationContextOverrides(runtime_observer=observer)
+        >>> context = ApplicationContext.create(overrides=overrides)
 
         Notes
         -----
@@ -893,21 +1005,31 @@ class ApplicationContext:
         resolve_application_paths : Validates and resolves paths
         """
         settings = settings or load_settings()
+        effective_overrides = overrides or ApplicationContextOverrides()
         # resolve_application_paths() raises ConfigurationError if paths are invalid
         # This exception propagates to the caller, causing application startup to fail
         paths = resolve_application_paths(settings)
 
-        vllm_client = vllm_client or build_vllm_client(settings.vllm)
-        faiss_manager = faiss_manager or _build_faiss_manager(settings, paths)
-        scope_store = scope_store or _build_scope_store(settings)
-        duckdb_manager = duckdb_manager or DuckDBManager(paths.duckdb_path, settings.duckdb)
+        vllm_client = effective_overrides.vllm_client or build_vllm_client(settings.vllm)
+        faiss_manager = effective_overrides.faiss_manager or _build_faiss_manager(
+            settings,
+            paths,
+            factory=effective_overrides.faiss_manager_factory,
+        )
+        scope_store = effective_overrides.scope_store or _build_scope_store(settings)
+        duckdb_manager = effective_overrides.duckdb_manager or DuckDBManager(
+            paths.duckdb_path, settings.duckdb
+        )
+        duckdb_catalog_factory = (
+            effective_overrides.duckdb_catalog_factory or _default_duckdb_catalog_factory
+        )
         primary_git_client, primary_async_client = _build_git_clients(paths)
-        git_client = git_client or primary_git_client
-        async_git_client = async_git_client or primary_async_client
+        git_client = effective_overrides.git_client or primary_git_client
+        async_git_client = effective_overrides.async_git_client or primary_async_client
 
-        observer = runtime_observer or NullRuntimeCellObserver()
+        observer = effective_overrides.runtime_observer or NullRuntimeCellObserver()
 
-        adjuster = factory_adjuster or _build_factory_adjuster(settings)
+        adjuster = effective_overrides.factory_adjuster or _build_factory_adjuster(settings)
         return cls(
             settings=settings,
             paths=paths,
@@ -915,6 +1037,7 @@ class ApplicationContext:
             faiss_manager=faiss_manager,
             scope_store=scope_store,
             duckdb_manager=duckdb_manager,
+            duckdb_catalog_factory=duckdb_catalog_factory,
             git_client=git_client,
             async_git_client=async_git_client,
             runtime_observer=observer,
@@ -1235,11 +1358,14 @@ class ApplicationContext:
             capabilities = Capabilities.from_context(self)
         except RuntimeLifecycleError:  # pragma: no cover - defensive logging
             capabilities = None
+        context = HybridSearchContext(
+            capabilities=capabilities,
+            duckdb_manager=self.duckdb_manager,
+        )
         return engine_cls(
             self.settings,
             self.paths,
-            capabilities=capabilities,
-            duckdb_manager=self.duckdb_manager,
+            context=context,
         )
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
@@ -1336,15 +1462,7 @@ class ApplicationContext:
         --------
         codeintel_rev.io.duckdb_catalog.DuckDBCatalog : Catalog implementation
         """
-        catalog = DuckDBCatalog(
-            self.paths.duckdb_path,
-            self.paths.vectors_dir,
-            materialize=self.settings.index.duckdb_materialize,
-            manager=self.duckdb_manager,
-            log_queries=self.settings.duckdb.log_queries,
-            repo_root=self.paths.repo_root,
-        )
-        catalog.set_idmap_path(self.paths.faiss_idmap_path)
+        catalog = self.duckdb_catalog_factory(self.paths, self.settings, self.duckdb_manager)
         try:
             catalog.open()
             yield catalog
@@ -1381,7 +1499,7 @@ class ApplicationContext:
         **components : object
             Keyword arguments for component overrides. Accepted keys are:
             ``vllm_client``, ``faiss_manager``, ``scope_store``, ``duckdb_manager``,
-            ``git_client``, ``async_git_client``. Each override replaces the corresponding
+            ``git_client``, ``async_git_client``, ``factory_adjuster``. Each override replaces the corresponding
             component in the new context. Unsupported keys raise ValueError.
 
         Returns
@@ -1412,6 +1530,7 @@ class ApplicationContext:
             "duckdb_manager",
             "git_client",
             "async_git_client",
+            "factory_adjuster",
         }
         unknown = set(components) - allowed
         if unknown:
@@ -1428,9 +1547,11 @@ class ApplicationContext:
             faiss_manager=_component_value("faiss_manager", self.faiss_manager),
             scope_store=_component_value("scope_store", self.scope_store),
             duckdb_manager=_component_value("duckdb_manager", self.duckdb_manager),
+            duckdb_catalog_factory=self.duckdb_catalog_factory,
             git_client=_component_value("git_client", self.git_client),
             async_git_client=_component_value("async_git_client", self.async_git_client),
             runtime_observer=self.runtime_observer,
+            factory_adjuster=_component_value("factory_adjuster", self.factory_adjuster),
         )
 
     def close_all_runtimes(self) -> None:
@@ -1446,3 +1567,29 @@ class ApplicationContext:
         with suppress(Exception):
             self.faiss_manager.cpu_index = None
             runtime.faiss.loaded = False
+
+    def seed_runtime_cells_for_tests(
+        self,
+        *,
+        coderank_faiss: FAISSManager | None = None,
+        hybrid_engine: HybridSearchEngine | None = None,
+        xtr_index: XTRIndex | None = None,
+    ) -> None:
+        """Seed runtime cells with test doubles.
+
+        Parameters
+        ----------
+        coderank_faiss : FAISSManager | None, optional
+            Stub FAISS manager to cache for ``get_coderank_faiss_manager`` calls.
+        hybrid_engine : HybridSearchEngine | None, optional
+            Stub hybrid search engine injected into the hybrid runtime cell.
+        xtr_index : XTRIndex | None, optional
+            Stub XTR index injected into the XTR runtime cell.
+        """
+        with allow_runtime_cell_seeding():
+            if coderank_faiss is not None:
+                self._runtime.coderank_faiss.seed(coderank_faiss)
+            if hybrid_engine is not None:
+                self._runtime.hybrid.seed(hybrid_engine)
+            if xtr_index is not None:
+                self._runtime.xtr.seed(xtr_index)

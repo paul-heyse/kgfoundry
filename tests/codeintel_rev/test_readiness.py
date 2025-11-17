@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -10,11 +11,14 @@ import duckdb
 import httpx
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.app.main import readyz
 from codeintel_rev.app.readiness import CheckResult, ReadinessProbe
 from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, VLLMRunMode
 from codeintel_rev.config.utils import replace_settings, replace_struct
+from fastapi import FastAPI
 
 from tests._helpers import assertions
+from tests._helpers.http import build_test_app
 
 
 def _materialized_index_config(index: IndexConfig, *, enabled: bool) -> IndexConfig:
@@ -48,6 +52,40 @@ def _context_with_settings(
     settings: Settings,
 ) -> ApplicationContext:
     return context.with_overrides(settings=settings)
+
+
+@pytest.mark.asyncio
+async def test_readyz_endpoint_reports_checks(readiness_test_app: FastAPI) -> None:
+    """End-to-end /readyz call should report healthy checks via helper app."""
+    transport = httpx.ASGITransport(app=readiness_test_app)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/readyz")
+            assertions.expect_equal(response.status_code, HTTPStatus.OK)
+            payload = response.json()
+            assertions.expect_true(payload["ready"], reason="ready flag should be true")
+            assertions.expect_in("checks", payload)
+            assertions.expect_in("repo_root", payload["checks"])
+    finally:
+        await transport.aclose()
+
+
+@pytest.mark.asyncio
+async def test_readyz_endpoint_detects_missing_faiss(readiness_test_app: FastAPI) -> None:
+    """/readyz should surface unhealthy status when FAISS index is missing."""
+    context: ApplicationContext = readiness_test_app.state.context
+    context.paths.faiss_index.unlink(missing_ok=True)
+    transport = httpx.ASGITransport(app=readiness_test_app)
+    try:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/readyz")
+            assertions.expect_equal(response.status_code, HTTPStatus.OK)
+            payload = response.json()
+            assertions.expect_false(payload["ready"], reason="ready should be false")
+            faiss_check = payload["checks"].get("faiss_index", {})
+            assertions.expect_false(faiss_check.get("healthy"), reason="FAISS check should fail")
+    finally:
+        await transport.aclose()
 
 
 def test_check_result_as_payload_healthy() -> None:
@@ -412,3 +450,21 @@ def test_readiness_probe_check_vllm_http_error(
     assertions.expect_true(result.detail is not None, reason="vllm should have detail")
     if result.detail is not None:
         assertions.expect_in("unreachable", result.detail.lower())
+
+
+@pytest.fixture
+def readiness_test_app(mock_application_context: ApplicationContext) -> FastAPI:
+    """Provide a FastAPI app exposing the /readyz endpoint via test helpers.
+
+    Returns
+    -------
+    FastAPI
+        Application bound to a helper-built context with `/readyz` registered.
+    """
+    context = mock_application_context
+    readiness = ReadinessProbe(context)
+    app = build_test_app(context)
+    app.state.context = context
+    app.state.readiness = readiness
+    app.add_api_route("/readyz", readyz)
+    return app

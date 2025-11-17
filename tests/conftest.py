@@ -42,9 +42,10 @@ from codeintel_rev.typedness import FileTypeSignals
 from fastapi import FastAPI
 from tools import repo_scan
 
-from download.cli import DownloadCliContext, HarvestHandler
+from download.cli import ArtifactFS, DownloadCliContext, HarvestHandler
 from orchestration.cli import BM25BuildConfig, OrchestrationCliContext
 from orchestration.config import IndexCliConfig
+from tests._helpers.http import build_test_app
 from tests._helpers.repo import SampleRepo, bootstrap_sample_repo
 from tests.app._context_factory import build_application_context
 
@@ -96,6 +97,7 @@ class _XtrPathsProtocol(Protocol):
     def xtr_dir(self) -> Path:  # pragma: no cover - structural hook only
         ...
 
+
 if TYPE_CHECKING:  # pragma: no cover - typing support only
 
     def fixture(*args: object, **kwargs: object) -> Callable[[Callable[P, R]], Callable[P, R]]:
@@ -140,7 +142,7 @@ else:
 
 
 @fixture(name="networking_test_app")
-def _networking_test_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
+def _networking_test_app(tmp_path: Path) -> FastAPI:
     """Return a FastAPI app exposing readiness, capability, and SSE routes.
 
     The fixture mirrors the production routes but swaps heavy dependencies for
@@ -171,44 +173,13 @@ def _networking_test_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Fas
             return {"faiss": _FakeReadinessResult()}
 
     ctx = build_application_context(tmp_path)
-    app = FastAPI()
+    app = build_test_app(ctx)
     app.state.server_settings = get_server_settings().model_copy(deep=True)
-    app.state.context = ctx
     app.state.readiness = _FakeReadinessProbe()
 
-    initial_caps = Capabilities(
-        faiss_index=True,
-        duckdb=True,
-        scip_index=True,
-        vllm_client=True,
-    )
-    app.state.capabilities = initial_caps
-    app.state.capability_stamp = initial_caps.stamp()
-
-    refreshed_caps = Capabilities(
-        faiss_index=False,
-        duckdb=False,
-        scip_index=False,
-        vllm_client=False,
-        faiss_importable=False,
-        duckdb_importable=False,
-        torch_importable=False,
-        onnxruntime_importable=False,
-        versions_available=2,
-        active_index_version="v2",
-    )
-
-    def _fake_from_context(
-        _cls: type[Capabilities],
-        _context: object,
-    ) -> Capabilities:
-        return refreshed_caps
-
-    monkeypatch.setattr(
-        Capabilities,
-        "from_context",
-        classmethod(_fake_from_context),
-    )
+    capabilities = Capabilities.from_context(ctx)
+    app.state.capabilities = capabilities
+    app.state.capability_stamp = capabilities.stamp()
 
     app.add_api_route("/readyz", readyz)
     app.add_api_route("/capz", capz)
@@ -484,11 +455,13 @@ def fixture_orchestration_cli_context_builder() -> Callable[..., OrchestrationCl
         uuid_factory: Callable[[], str] | None = None,
         bm25_builder: Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]] | None = None,
         faiss_runner: Callable[[IndexCliConfig], dict[str, object]] | None = None,
+        artifact_fs: ArtifactFS | None = None,
     ) -> OrchestrationCliContext:
         return OrchestrationCliContext(
             uuid_factory=uuid_factory or base.uuid_factory,
             bm25_builder=bm25_builder or base.bm25_builder,
             faiss_runner=faiss_runner or base.faiss_runner,
+            artifact_fs=artifact_fs or base.artifact_fs,
         )
 
     return build
@@ -577,8 +550,17 @@ def fixture_download_cli_context_builder() -> Callable[..., DownloadCliContext]:
     """
     base = DownloadCliContext.production()
 
-    def build(*, harvest_handler: HarvestHandler | None = None) -> DownloadCliContext:
-        return DownloadCliContext(harvest_handler=harvest_handler or base.harvest_handler)
+    def build(
+        *,
+        harvest_handler: HarvestHandler | None = None,
+        artifact_dir: Path | None = None,
+        artifact_fs: ArtifactFS | None = None,
+    ) -> DownloadCliContext:
+        return DownloadCliContext(
+            harvest_handler=harvest_handler or base.harvest_handler,
+            artifact_dir=artifact_dir or base.artifact_dir,
+            artifact_fs=artifact_fs or base.artifact_fs,
+        )
 
     return build
 

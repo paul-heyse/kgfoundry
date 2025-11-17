@@ -10,7 +10,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.mcp_server.schemas import Match, ScopeIn
@@ -33,6 +33,19 @@ SEARCH_MAX_RESULTS = 500
 MAX_PREVIEW_CHARS = 200
 GREP_SPLIT_PARTS = 3
 COMMAND_NOT_FOUND_RETURN_CODE = 127
+
+
+class SubprocessRunner(Protocol):
+    """Protocol describing the subprocess runner used by text search."""
+
+    def __call__(
+        self,
+        cmd: list[str],
+        *,
+        cwd: Path | None,
+        timeout: int,
+        env: Mapping[str, str] | None = None,
+    ) -> str: ...
 
 
 @dataclass(frozen=True)
@@ -212,6 +225,7 @@ async def search_text(
     query: str,
     *,
     options: TextSearchOptions | None = None,
+    runner: SubprocessRunner = run_subprocess,
     **overrides: object,
 ) -> dict:
     """Fast text search using ripgrep (async wrapper).
@@ -227,6 +241,9 @@ async def search_text(
         Search query string (regex pattern if ``regex=True``).
     options : TextSearchOptions | None, optional
         Explicit search configuration. When ``None``, keyword overrides are permitted.
+    runner : SubprocessRunner, optional
+        Callable used to execute subprocess commands. Defaults to
+        :func:`kgfoundry_common.subprocess_utils.run_subprocess`.
     **overrides : object
         Backward-compatible keyword overrides corresponding to
         ``TextSearchOptions`` fields (``regex``, ``case_sensitive``, ``paths``,
@@ -263,6 +280,7 @@ async def search_text(
             context=context,
             scope=scope,
             options=options,
+            runner=runner,
         )
 
     return await asyncio.to_thread(_run_sync)
@@ -301,6 +319,7 @@ def _search_text_sync(
     context: ApplicationContext,
     scope: ScopeIn | None,
     options: TextSearchOptions,
+    runner: SubprocessRunner = run_subprocess,
 ) -> dict:
     repo_root = context.paths.repo_root
 
@@ -324,7 +343,7 @@ def _search_text_sync(
     cmd = _build_ripgrep_command(params)
 
     try:
-        stdout = run_subprocess(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
+        stdout = runner(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS, env=None)
     except SubprocessTimeoutError as exc:
         error_msg = "Search timeout"
         raise VectorSearchError(
@@ -339,6 +358,7 @@ def _search_text_sync(
                 repo_root=repo_root,
                 query=query,
                 options=options,
+                runner=runner,
             )
         else:
             error_message = (exc.stderr or "").strip() or str(exc)
@@ -368,6 +388,7 @@ def _fallback_grep(
     repo_root: Path,
     query: str,
     options: TextSearchOptions,
+    runner: SubprocessRunner = run_subprocess,
 ) -> dict:
     """Fallback to basic grep if ripgrep unavailable.
 
@@ -379,6 +400,8 @@ def _fallback_grep(
         Search query.
     options : TextSearchOptions
         Search configuration controlling case sensitivity and limits.
+    runner : SubprocessRunner, optional
+        Subprocess execution helper. Defaults to :func:`run_subprocess`.
 
     Returns
     -------
@@ -398,7 +421,7 @@ def _fallback_grep(
     command.extend(["--", query, "."])
 
     try:
-        stdout = run_subprocess(command, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
+        stdout = runner(command, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS, env=None)
     except SubprocessTimeoutError as exc:
         error_msg = "Search tool unavailable"
         raise VectorSearchError(

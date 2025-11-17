@@ -18,10 +18,15 @@ def _stub_paths(tmp_path: Path) -> Paths:
     )
 
 
-def test_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_success(tmp_path: Path) -> None:
     """Test that successful CLI run generates success envelope."""
-    monkeypatch.setattr(Paths, "discover", staticmethod(lambda: _stub_paths(tmp_path)))
-    cfg = CliRunConfig.from_route("demo", "ok", write_envelope_on="always", exit_on_error=False)
+    cfg = CliRunConfig.from_route(
+        "demo",
+        "ok",
+        write_envelope_on="always",
+        exit_on_error=False,
+        paths_provider=lambda: _stub_paths(tmp_path),
+    )
     with cli_run(cfg) as (context, envelope):
         assertions.expect_equal(context.operation, "demo.ok")
         envelope.set_result(summary="ok")
@@ -35,10 +40,15 @@ def test_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assertions.expect_in('"operation": "demo.ok"', data)
 
 
-def test_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_error(tmp_path: Path) -> None:
     """Test that failed CLI run generates error envelope."""
-    monkeypatch.setattr(Paths, "discover", staticmethod(lambda: _stub_paths(tmp_path)))
-    cfg = CliRunConfig.from_route("demo", "fail", write_envelope_on="always", exit_on_error=False)
+    cfg = CliRunConfig.from_route(
+        "demo",
+        "fail",
+        write_envelope_on="always",
+        exit_on_error=False,
+        paths_provider=lambda: _stub_paths(tmp_path),
+    )
 
     def _invoke_failure() -> None:
         with cli_run(cfg) as (context, _):

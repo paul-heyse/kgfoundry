@@ -10,6 +10,7 @@ from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import load_settings
 from codeintel_rev.config.utils import replace_settings, replace_struct
 from codeintel_rev.io.hybrid_search import (
+    HybridSearchContext,
     HybridSearchEngine,
     HybridSearchOptions,
     HybridSearchTuning,
@@ -50,11 +51,14 @@ def _build_engine(tmp_path: Path) -> HybridSearchEngine:
     )
     paths = resolve_application_paths(settings)
     registry = ChannelRegistry.from_channels([])
+    context = HybridSearchContext(
+        capabilities=Capabilities(),
+        registry=registry,
+    )
     return HybridSearchEngine(
         settings=settings,
         paths=paths,
-        capabilities=Capabilities(),
-        registry=registry,
+        context=context,
     )
 
 

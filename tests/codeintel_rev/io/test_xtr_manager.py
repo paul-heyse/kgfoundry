@@ -62,10 +62,7 @@ def test_xtr_index_not_ready_without_artifacts(tmp_path: Path) -> None:
     assertions.expect_false(index.ready)
 
 
-def test_xtr_search_and_rescore(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_xtr_search_and_rescore(tmp_path: Path) -> None:
     """Search returns k hits and rescoring narrows the result set."""
     _write_token_artifacts(tmp_path)
     config = XTRConfig(enable=True, dim=2, dtype="float16")
@@ -73,11 +70,9 @@ def test_xtr_search_and_rescore(
     index.open()
     assertions.expect_true(index.ready)
 
-    def _encode_query(self: XTRIndex, text: str) -> np.ndarray:
-        del text, self
-        return np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    vectors = np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+    index.seed_runtime_for_tests(vectors)
 
-    monkeypatch.setattr(XTRIndex, "encode_query_tokens", _encode_query)
     wide_hits = index.search("query", k=2, explain=True)
     assertions.expect_equal(len(wide_hits), 2)
     assertions.expect_true(wide_hits[0][0] in {1, 2})

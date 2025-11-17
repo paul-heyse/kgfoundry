@@ -139,6 +139,7 @@ def test_version_resolver_fallback() -> None:
 def test_operation_override_dispatch() -> None:
     """Verify operation override dispatch calls augment correctly."""
     command = _unique_key("override-cli")
+
     class DummyAugment:
         def __init__(self) -> None:
             self.calls: list[tuple[str, Sequence[str] | None]] = []

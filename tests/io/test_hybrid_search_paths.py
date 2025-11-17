@@ -6,7 +6,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
-import pytest
 from codeintel_rev.app.config_context import ResolvedPaths
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.hybrid_search import HybridSearchEngine
@@ -56,22 +55,19 @@ def test_resolve_path_relative() -> None:
     assertions.expect_equal(resolved, (repo_root / relative).resolve())
 
 
-def test_resolve_path_expands_user_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_resolve_path_expands_user_home(tmp_path: Path) -> None:
     """Verify user home expansion (~) works correctly."""
     repo_root = Path("/repository-root")
     engine = _make_engine(repo_root)
     fake_home = tmp_path / "fake-home"
     fake_home.mkdir(parents=True, exist_ok=True)
-    original_expanduser = Path.expanduser
 
-    def _expanduser(self: Path) -> Path:
-        text = str(self)
+    def _expander(path: Path) -> Path:
+        text = str(path)
         if text.startswith("~"):
             return Path(text.replace("~", str(fake_home), 1))
-        return original_expanduser(self)
+        return path
 
-    monkeypatch.setattr(Path, "expanduser", _expanduser)
-
-    resolved = engine.resolve_path("~/.cache/splade")
+    resolved = engine.resolve_path("~/.cache/splade", path_expander=_expander)
 
     assertions.expect_equal(resolved, fake_home / ".cache/splade")

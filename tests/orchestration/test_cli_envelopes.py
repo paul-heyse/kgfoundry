@@ -33,6 +33,7 @@ def test_index_bm25_emits_success_envelope(
     orchestration_cli_context_builder: Callable[..., OrchestrationCliContext],
 ) -> None:
     """Test that index-bm25 command emits a success envelope with file artifacts."""
+
     def fake_build(
         config: orchestration_cli.BM25BuildConfig,
         logger: logging.Logger,
@@ -62,7 +63,9 @@ def test_index_bm25_emits_success_envelope(
             "--index-dir",
             str(tmp_path / "_indices" / "bm25"),
         ],
-        obj={"orchestration_cli_context": orchestration_cli_context_builder(bm25_builder=fake_build)},
+        obj={
+            "orchestration_cli_context": orchestration_cli_context_builder(bm25_builder=fake_build)
+        },
     )
 
     assertions.expect_equal(result.exit_code, 0)

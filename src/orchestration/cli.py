@@ -46,6 +46,10 @@ if TYPE_CHECKING:
     )
 
 
+REPO_ROOT = cli_context.REPO_ROOT
+"""Repository root used for locating CLI envelopes and artifacts."""
+
+
 class _UvicornRun(Protocol):
     def __call__(
         self, app: str, *, host: str, port: int, reload: bool = False
@@ -58,6 +62,14 @@ class _BM25Builder(Protocol):
         self, docs: Iterable[tuple[str, dict[str, str]]]
     ) -> None:  # pragma: no cover - provided by get_bm25
         """Protocol describing lucene/pure BM25 builders."""
+
+
+class ArtifactFS(Protocol):
+    """Protocol describing filesystem interactions for CLI artifacts."""
+
+    def ensure_dir(self, directory: Path) -> None: ...
+
+    def write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None: ...
 
 
 @dataclass(frozen=True)
@@ -109,6 +121,7 @@ class OrchestrationCliContext:
     uuid_factory: Callable[[], str]
     bm25_builder: Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]]
     faiss_runner: Callable[[IndexCliConfig], dict[str, object]]
+    artifact_fs: ArtifactFS
 
     @classmethod
     def production(cls) -> OrchestrationCliContext:
@@ -123,7 +136,21 @@ class OrchestrationCliContext:
             uuid_factory=lambda: uuid4().hex,
             bm25_builder=_default_bm25_builder,
             faiss_runner=_default_faiss_runner,
+            artifact_fs=_LocalArtifactFS(),
         )
+
+
+class _LocalArtifactFS:
+    """Filesystem implementation backed by the local OS."""
+
+    def ensure_dir(self, directory: Path) -> None:
+        _ = self
+        directory.mkdir(parents=True, exist_ok=True)
+
+    def write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None:
+        _ = self
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding=encoding)
 
 
 def _default_bm25_builder(
@@ -143,7 +170,11 @@ CLI_INTERFACE_ID = cli_context.CLI_INTERFACE_ID
 CLI_CONFIG = cli_context.get_cli_config()
 CLI_SETTINGS = cli_context.get_cli_settings()
 CLI_TITLE = cli_context.CLI_TITLE
-CLI_ENVELOPE_DIR = cli_context.REPO_ROOT / "site" / "_build" / "cli"
+
+
+def _default_envelope_dir() -> Path:
+    return cli_context.REPO_ROOT / "site" / "_build" / "cli"
+
 
 SUBCOMMAND_INDEX_BM25 = "index-bm25"
 SUBCOMMAND_INDEX_FAISS = "index-faiss"
@@ -176,18 +207,39 @@ app = typer.Typer(help=_resolve_cli_help(), no_args_is_help=True, add_completion
 _DEFAULT_CONTEXT = OrchestrationCliContext.production()
 
 
-def _store_cli_state(ctx: typer.Context, envelope_dir: Path) -> None:
+def _default_artifact_dir() -> Path:
+    return Path("./_indices")
+
+
+def _store_cli_state(
+    ctx: typer.Context,
+    envelope_dir: Path | None,
+    artifact_dir: Path | None,
+) -> None:
     state = ctx.ensure_object(dict)
     state["envelope_dir"] = envelope_dir
+    state["artifact_dir"] = artifact_dir
 
 
 def _resolve_envelope_dir(ctx: typer.Context | None) -> Path:
+    default_dir = _default_envelope_dir()
     if ctx is None or ctx.obj is None:
-        return CLI_ENVELOPE_DIR
+        return default_dir
     state = ctx.ensure_object(dict)
     directory = state.get("envelope_dir")
     if directory is None:
-        return CLI_ENVELOPE_DIR
+        return default_dir
+    return Path(directory)
+
+
+def _resolve_artifact_dir(ctx: typer.Context | None) -> Path:
+    default_dir = _default_artifact_dir()
+    if ctx is None or ctx.obj is None:
+        return default_dir
+    state = ctx.ensure_object(dict)
+    directory = state.get("artifact_dir")
+    if directory is None:
+        return default_dir
     return Path(directory)
 
 
@@ -206,10 +258,11 @@ def _cli_context(ctx: typer.Context | None = None) -> OrchestrationCliContext:
 @app.callback()
 def orchestration_callback(
     ctx: typer.Context,
-    envelope_dir: _EnvelopeDirOption = CLI_ENVELOPE_DIR,
+    envelope_dir: _EnvelopeDirOption = None,
+    artifact_dir: _ArtifactDirOption = None,
 ) -> None:
     """Configure shared orchestration CLI options."""
-    _store_cli_state(ctx, envelope_dir)
+    _store_cli_state(ctx, envelope_dir, artifact_dir)
     state = ctx.ensure_object(dict)
     state.setdefault("orchestration_cli_context", _DEFAULT_CONTEXT)
 
@@ -572,21 +625,42 @@ def _prepare_index_directory(index_path: str) -> None:
 # Type aliases for CLI parameters to help pydoclint parse Annotated types correctly
 _ChunksParquetArg = Annotated[str, typer.Argument(..., help="Path to Parquet/JSONL with chunks")]
 _BackendOption = Annotated[str, typer.Option(help="lucene|pure", show_default=True)]
-_IndexDirOption = Annotated[str, typer.Option(help="Output index directory", show_default=True)]
+_IndexDirOption = Annotated[
+    str | None,
+    typer.Option(
+        help="Output index directory",
+        show_default="./_indices/bm25",
+    ),
+]
 _DenseVectorsArg = Annotated[str, typer.Argument(..., help="Path to dense vectors JSON (skeleton)")]
-_IndexPathOption = Annotated[str, typer.Option(help="Output FAISS index path", show_default=True)]
+_IndexPathOption = Annotated[
+    str | None,
+    typer.Option(
+        help="Output FAISS index path",
+        show_default="./_indices/faiss/shard_000.idx",
+    ),
+]
 _FactoryOption = Annotated[str, typer.Option(help="FAISS factory string", show_default=True)]
 _MetricOption = Annotated[
     str, typer.Option(help="Similarity metric ('ip' or 'l2')", show_default=True)
 ]
 _EnvelopeDirOption = Annotated[
-    Path,
+    Path | None,
     typer.Option(
         "--envelope-dir",
         help="Directory where CLI envelopes are written.",
         dir_okay=True,
         file_okay=False,
-        show_default=True,
+    ),
+]
+
+_ArtifactDirOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--artifact-dir",
+        help="Base directory for CLI-generated artifacts (indexes, vectors).",
+        dir_okay=True,
+        file_okay=False,
     ),
 ]
 
@@ -596,7 +670,7 @@ def index_bm25(
     ctx: typer.Context,
     chunks_parquet: _ChunksParquetArg,
     backend: _BackendOption = "lucene",
-    index_dir: _IndexDirOption = "./_indices/bm25",
+    index_dir: _IndexDirOption = None,
 ) -> None:
     """Build a BM25 index from chunk metadata and emit a CLI envelope.
 
@@ -620,37 +694,46 @@ def index_bm25(
         Raised with a non-zero exit code when index construction fails. The
         generated envelope captures the associated Problem Details payload.
     """
+    resolved_index_dir = (
+        index_dir if index_dir is not None else str(_resolve_artifact_dir(ctx) / "bm25")
+    )
     context, builder = _start_command(
         ctx,
         SUBCOMMAND_INDEX_BM25,
         backend=backend,
         chunks_path=chunks_parquet,
-        index_dir=index_dir,
+        index_dir=resolved_index_dir,
     )
     builder = builder.add_file(
         path=str(Path(chunks_parquet)), status="success", message="Input dataset"
     )
 
-    config = BM25BuildConfig(chunks_path=chunks_parquet, backend=backend, index_dir=index_dir)
+    config = BM25BuildConfig(
+        chunks_path=chunks_parquet,
+        backend=backend,
+        index_dir=resolved_index_dir,
+    )
     _log_cli_event(
         logging.INFO,
         "Building BM25 index",
         context,
         backend=backend,
-        index_dir=index_dir,
+        index_dir=resolved_index_dir,
         chunks_path=chunks_parquet,
     )
     orchestration_cli_context = _cli_context(ctx)
+    artifact_fs = orchestration_cli_context.artifact_fs
+    artifact_fs.ensure_dir(Path(resolved_index_dir))
     try:
         _prepare_index_directory(config.index_dir)
         backend_used, doc_count = orchestration_cli_context.bm25_builder(config, LOGGER)
-        index_path = _get_bm25_index_path(Path(index_dir), backend_used)
+        index_path = _get_bm25_index_path(Path(resolved_index_dir), backend_used)
         builder = builder.add_file(
             path=str(index_path),
             status="success",
             message=f"Indexed {doc_count} documents using backend={backend_used}",
         )
-        typer.echo(f"BM25 index built at {index_dir} using backend={backend_used}")
+        typer.echo(f"BM25 index built at {resolved_index_dir} using backend={backend_used}")
         _log_cli_event(
             logging.INFO,
             "BM25 index built",
@@ -743,7 +826,7 @@ def run_index_faiss(*, config: IndexCliConfig) -> dict[str, object]:
 def index_faiss(
     ctx: typer.Context,
     dense_vectors: _DenseVectorsArg,
-    index_path: _IndexPathOption = "./_indices/faiss/shard_000.idx",
+    index_path: _IndexPathOption = None,
     factory: _FactoryOption = "Flat",
     metric: _MetricOption = "ip",
 ) -> None:
@@ -783,13 +866,18 @@ def index_faiss(
     ...     metric="ip",
     ... )
     """
+    resolved_index_path = (
+        index_path
+        if index_path is not None
+        else str(_resolve_artifact_dir(ctx) / "faiss" / "shard_000.idx")
+    )
     context, builder = _start_command(
         ctx,
         SUBCOMMAND_INDEX_FAISS,
         factory=factory,
         metric=metric,
         dense_vectors=dense_vectors,
-        index_path=index_path,
+        index_path=resolved_index_path,
     )
     builder = builder.add_file(
         path=str(Path(dense_vectors)), status="success", message="Dense vectors source"
@@ -797,7 +885,7 @@ def index_faiss(
 
     config = IndexCliConfig(
         dense_vectors=dense_vectors,
-        index_path=index_path,
+        index_path=resolved_index_path,
         factory=factory,
         metric=metric,
     )
@@ -807,14 +895,16 @@ def index_faiss(
         context,
         factory=factory,
         metric=metric,
-        index_path=index_path,
+        index_path=resolved_index_path,
         dense_vectors=dense_vectors,
     )
     orchestration_cli_context = _cli_context(ctx)
+    artifact_fs = orchestration_cli_context.artifact_fs
+    artifact_fs.ensure_dir(Path(resolved_index_path).parent)
     try:
         metadata = orchestration_cli_context.faiss_runner(config)
         builder = builder.add_file(
-            path=str(Path(index_path)),
+            path=str(Path(resolved_index_path)),
             status="success",
             message=(
                 f"Stored {metadata['vector_count']} vectors (dimension={metadata['dimension']})"
@@ -825,7 +915,7 @@ def index_faiss(
             status="success",
             message=json.dumps({"factory": factory, "metric": metric}, sort_keys=True),
         )
-        typer.echo(f"FAISS index vectors stored at {index_path}")
+        typer.echo(f"FAISS index vectors stored at {resolved_index_path}")
         _log_cli_event(
             logging.INFO,
             "Building FAISS index",

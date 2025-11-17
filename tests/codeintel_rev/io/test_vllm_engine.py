@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
-import pytest
 from codeintel_rev.config.settings import VLLMConfig, VLLMRunMode
-from codeintel_rev.io import vllm_engine as engine_module
-from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
+from codeintel_rev.io.vllm_engine import InprocessVLLMContext, InprocessVLLMEmbedder
 
 from tests._helpers import assertions
+
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizerBase
+    from vllm import LLM
+    from vllm.inputs import TokensPrompt
+else:  # pragma: no cover - runtime fallbacks for heavy deps
+    class PreTrainedTokenizerBase:
+        """Runtime stub for tokenizer protocol."""
+
+    class LLM:
+        """Runtime stub for vLLM model."""
+
+    class TokensPrompt:
+        """Runtime stub for vLLM tokens prompt."""
 
 
 class _StubTokenizer:
@@ -46,40 +58,22 @@ class _StubLLM:
         return [_result(ids) for ids in token_ids]
 
 
-@pytest.fixture(autouse=True)
-def _patch_vllm(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake_vllm = ModuleType("vllm")
-    fake_config = ModuleType("vllm.config")
-    fake_inputs = ModuleType("vllm.inputs")
-    fake_vllm.__dict__["LLM"] = _StubLLM
-    fake_config.__dict__["PoolerConfig"] = _StubPooler
-    fake_inputs.__dict__["TokensPrompt"] = _StubTokensPrompt
-    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
-    monkeypatch.setitem(sys.modules, "vllm.config", fake_config)
-    monkeypatch.setitem(sys.modules, "vllm.inputs", fake_inputs)
 
-    def _tokenizer_factory(*_: object, **__: object) -> _StubTokenizer:
-        return _StubTokenizer()
+def _build_context() -> InprocessVLLMContext:
+    def _tokenizer_factory(_model_id: str) -> PreTrainedTokenizerBase:
+        return cast("PreTrainedTokenizerBase", _StubTokenizer())
 
-    monkeypatch.setattr(
-        engine_module,
-        "transformers",
-        SimpleNamespace(AutoTokenizer=SimpleNamespace(from_pretrained=_tokenizer_factory)),
-        raising=False,
+    def _llm_factory(_config: VLLMConfig) -> LLM:
+        return cast("LLM", _StubLLM())
+
+    def _tokens_prompt_factory(token_ids: Sequence[int]) -> TokensPrompt:
+        return cast("TokensPrompt", _StubTokensPrompt(prompt_token_ids=list(token_ids)))
+
+    return InprocessVLLMContext(
+        tokenizer_factory=_tokenizer_factory,
+        llm_factory=_llm_factory,
+        tokens_prompt_factory=_tokens_prompt_factory,
     )
-    monkeypatch.setattr(
-        engine_module,
-        "vllm_inputs",
-        SimpleNamespace(TokensPrompt=_StubTokensPrompt),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        engine_module,
-        "vllm_config",
-        SimpleNamespace(PoolerConfig=_StubPooler),
-        raising=False,
-    )
-    monkeypatch.setattr(engine_module, "vllm", SimpleNamespace(LLM=_StubLLM), raising=False)
 
 
 def test_embed_batch_returns_expected_shape() -> None:
@@ -90,7 +84,7 @@ def test_embed_batch_returns_expected_shape() -> None:
         run=VLLMRunMode(mode="inprocess"),
     )
 
-    embedder = InprocessVLLMEmbedder(config)
+    embedder = InprocessVLLMEmbedder(config, context=_build_context())
     vectors = embedder.embed_batch(["alpha", "beta"])
     assertions.expect_equal(vectors.shape, (2, config.embedding_dim))
     assertions.expect_equal(vectors.dtype, np.dtype(np.float32))
@@ -104,7 +98,7 @@ def test_embed_batch_handles_empty_input() -> None:
         run=VLLMRunMode(mode="inprocess"),
     )
 
-    embedder = InprocessVLLMEmbedder(config)
+    embedder = InprocessVLLMEmbedder(config, context=_build_context())
     vectors = embedder.embed_batch([])
     assertions.expect_equal(vectors.shape, (0, config.embedding_dim))
     assertions.expect_true(np.allclose(vectors, 0.0))

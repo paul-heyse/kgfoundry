@@ -3,27 +3,35 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import msgspec
-import numpy as np
 import pytest
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.splade_manager import (
     SpladeArtifactMetadata,
+    SpladeArtifactsContext,
     SpladeArtifactsManager,
     SpladeBenchmarkOptions,
     SpladeBuildOptions,
     SpladeEncodeOptions,
+    SpladeEncoderContext,
     SpladeEncoderService,
     SpladeEncodingMetadata,
     SpladeExportOptions,
+    SpladeIndexContext,
     SpladeIndexManager,
     SpladeIndexMetadata,
 )
 
 from kgfoundry_common.subprocess_utils import SubprocessError
+
+if TYPE_CHECKING:
+    from codeintel_rev.io.splade_manager import _SparseEncoderProtocol
 from tests._helpers import assertions
 from tests._helpers.settings import build_settings_for_repo
 
@@ -93,15 +101,14 @@ class _StubEncoder:
         model_dir: str,
         *,
         backend: str,
-        model_kwargs: dict[str, object] | None = None,
+        model_kwargs: Mapping[str, object] | None = None,
     ) -> None:
         self.model_dir = model_dir
         self.backend = backend
-        self.model_kwargs = model_kwargs or {}
+        self.model_kwargs = dict(model_kwargs or {})
         self._last_texts: list[str] = []
 
-    @staticmethod
-    def save_pretrained(path: str) -> None:
+    def save_pretrained(self, path: str) -> None:
         """Save pretrained model stub.
 
         Parameters
@@ -111,12 +118,12 @@ class _StubEncoder:
         """
         _stub_save_pretrained(path)
 
-    def encode_document(self, texts: list[str]) -> list[int]:
+    def encode_document(self, sentences: Sequence[str]) -> Sequence[int]:
         """Encode document texts stub.
 
         Parameters
         ----------
-        texts : list[str]
+        sentences : Sequence[str]
             Texts to encode.
 
         Returns
@@ -124,15 +131,15 @@ class _StubEncoder:
         list[int]
             Encoded token IDs.
         """
-        self._last_texts = list(texts)
-        return list(range(len(texts)))
+        self._last_texts = list(sentences)
+        return list(range(len(sentences)))
 
-    def encode_query(self, texts: list[str]) -> list[int]:
+    def encode_query(self, texts: Sequence[str]) -> Sequence[int]:
         """Encode query texts stub.
 
         Parameters
         ----------
-        texts : list[str]
+        texts : Sequence[str]
             Texts to encode.
 
         Returns
@@ -145,35 +152,48 @@ class _StubEncoder:
 
     def decode(
         self,
-        embeddings: np.ndarray,
+        embeddings: object,
         top_k: int | None = None,
-    ) -> list[list[tuple[str, float]]]:
+    ) -> Sequence[Sequence[tuple[str, float]]]:
         """Decode embeddings stub.
 
         Parameters
         ----------
-        embeddings : np.ndarray
+        embeddings : object
             Embedding vectors to decode.
         top_k : int | None, optional
             Number of top tokens to return, by default None.
 
         Returns
         -------
-        list[list[tuple[str, float]]]
+        Sequence[Sequence[tuple[str, float]]]
             Decoded token scores.
         """
         _ = embeddings, top_k
         return [[("solar", 0.4), ("energy", 0.2)] for _ in self._last_texts]
 
 
-def test_export_onnx_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def _build_stub_encoder_factory() -> Callable[[], Callable[..., _SparseEncoderProtocol]]:
+    def _factory(
+        model_id: str,
+        *,
+        backend: str,
+        model_kwargs: Mapping[str, object] | None = None,
+    ) -> _SparseEncoderProtocol:
+        encoder = _StubEncoder(
+            model_id,
+            backend=backend,
+            model_kwargs=dict(model_kwargs or {}),
+        )
+        return cast("_SparseEncoderProtocol", encoder)
+
+    return lambda: _factory
+
+
+def test_export_onnx_writes_metadata(tmp_path: Path) -> None:
     """Exporting ONNX artifacts should persist metadata and respect configuration overrides."""
     _, settings = _bootstrap_repo(tmp_path)
-    manager = SpladeArtifactsManager(settings)
-
-    monkeypatch.setattr(
-        "codeintel_rev.io.splade_manager._require_sparse_encoder", lambda: _StubEncoder
-    )
+    encoder_context = SpladeEncoderContext(encoder_factory=_build_stub_encoder_factory())
 
     def fake_export_helpers() -> tuple[Callable[..., None], Callable[..., None]]:
         onnx_dir = Path(settings.splade.onnx_dir)
@@ -186,9 +206,12 @@ def test_export_onnx_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
         return optimizer, quantizer
 
-    monkeypatch.setattr(
-        "codeintel_rev.io.splade_manager._require_export_helpers", fake_export_helpers
+    artifacts_context = SpladeArtifactsContext(
+        encoder_context=encoder_context,
+        export_helpers_factory=fake_export_helpers,
+        clock=lambda: datetime(2024, 1, 1, tzinfo=UTC),
     )
+    manager = SpladeArtifactsManager(settings, artifacts_context=artifacts_context)
 
     summary = manager.export_onnx(
         SpladeExportOptions(
@@ -214,7 +237,6 @@ def test_export_onnx_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
 
 def test_encode_corpus_writes_vectors(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     """Encoding should emit JsonVectorCollection shards and metadata."""
@@ -232,11 +254,8 @@ def test_encode_corpus_writes_vectors(
     quantized_file = Path(repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx")
     quantized_file.write_text("quantized", encoding="utf-8")
 
-    service = SpladeEncoderService(settings)
-
-    monkeypatch.setattr(
-        "codeintel_rev.io.splade_manager._require_sparse_encoder", lambda: _StubEncoder
-    )
+    encoder_context = SpladeEncoderContext(encoder_factory=_build_stub_encoder_factory())
+    service = SpladeEncoderService(settings, encoder_context=encoder_context)
 
     summary = service.encode_corpus(
         source,
@@ -258,22 +277,18 @@ def test_encode_corpus_writes_vectors(
     )
 
 
-def test_benchmark_queries_reports_latency(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_benchmark_queries_reports_latency(tmp_path: Path) -> None:
     """Benchmarking should report latency percentiles for SPLADE query encoding."""
     repo_root, settings = _bootstrap_repo(tmp_path)
     quantized_file = Path(repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx")
     quantized_file.write_text("quantized", encoding="utf-8")
 
-    service = SpladeEncoderService(settings)
-
-    monkeypatch.setattr(
-        "codeintel_rev.io.splade_manager._require_sparse_encoder", lambda: _StubEncoder
-    )
-
+    encoder_context = SpladeEncoderContext(encoder_factory=_build_stub_encoder_factory())
     timings = iter([0.0, 0.005, 0.100, 0.120, 0.200, 0.240])
-    monkeypatch.setattr(
-        "codeintel_rev.io.splade_manager.perf_counter",
-        lambda: next(timings),
+    service = SpladeEncoderService(
+        settings,
+        encoder_context=encoder_context,
+        timer=lambda: next(timings),
     )
 
     summary = service.benchmark_queries(
@@ -292,11 +307,9 @@ def test_benchmark_queries_reports_latency(monkeypatch: pytest.MonkeyPatch, tmp_
     assertions.expect_equal(summary.onnx_file, "onnx/model_qint8.onnx")
 
 
-def test_build_index_persists_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_build_index_persists_metadata(tmp_path: Path) -> None:
     """Index builds should invoke Pyserini via subprocess and record metadata."""
     _, settings = _bootstrap_repo(tmp_path)
-    manager = SpladeIndexManager(settings)
-
     vectors_dir = Path(settings.splade.vectors_dir)
     metadata_struct = SpladeEncodingMetadata(
         doc_count=3,
@@ -316,15 +329,21 @@ def test_build_index_persists_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     captured_commands: list[list[str]] = []
 
-    def fake_run(cmd: list[str], *, env: dict[str, str] | None = None) -> None:
+    def fake_run(cmd: list[str], env: dict[str, str] | None = None) -> str:
         captured_commands.append(cmd)
         _ = env
         index_dir = Path(settings.splade.index_dir)
         index_dir.mkdir(parents=True, exist_ok=True)
         (index_dir / "segments_1").write_text("stub", encoding="utf-8")
+        return ""
 
-    monkeypatch.setattr("codeintel_rev.io.splade_manager.run_subprocess", fake_run)
-    monkeypatch.setattr("codeintel_rev.io.splade_manager._detect_pyserini_version", lambda: "test")
+    index_context = replace(
+        SpladeIndexContext.production(),
+        subprocess_runner=fake_run,
+        version_provider=lambda: "test",
+        clock=lambda: datetime(2024, 1, 1, tzinfo=UTC),
+    )
+    manager = SpladeIndexManager(settings, index_context=index_context)
 
     metadata = manager.build_index(
         SpladeBuildOptions(
@@ -347,19 +366,20 @@ def test_build_index_persists_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path
     assertions.expect_equal(disk_metadata, metadata)
 
 
-def test_build_index_raises_when_subprocess_fails(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_build_index_raises_when_subprocess_fails(tmp_path: Path) -> None:
     """Pyserini failures should surface as SubprocessError."""
     _, settings = _bootstrap_repo(tmp_path)
-    manager = SpladeIndexManager(settings)
 
-    def fake_run(cmd: list[str], *, env: dict[str, str] | None = None) -> None:
+    def fake_run(cmd: list[str], env: dict[str, str] | None = None) -> str:
         _ = cmd, env
         message = "fail"
         raise SubprocessError(message, returncode=1)
 
-    monkeypatch.setattr("codeintel_rev.io.splade_manager.run_subprocess", fake_run)
+    index_context = replace(
+        SpladeIndexContext.production(),
+        subprocess_runner=fake_run,
+    )
+    manager = SpladeIndexManager(settings, index_context=index_context)
 
     with pytest.raises(SubprocessError):
         manager.build_index()

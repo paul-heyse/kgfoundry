@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
@@ -51,6 +52,55 @@ class SupportsCodeRankSettings(Protocol):
         ...
 
 
+class SentenceEncoderProtocol(Protocol):
+    """Minimal interface required from embedding backends."""
+
+    def encode(
+        self,
+        texts: Iterable[str],
+        *,
+        normalize_embeddings: bool,
+        batch_size: int,
+    ) -> NDArrayF32 | Sequence[Sequence[float]]:
+        """Return embeddings for ``texts``."""
+        ...
+
+
+@dataclass(slots=True, frozen=True)
+class CodeRankEmbedderContext:
+    """Dependency providers for the CodeRank embedder."""
+
+    model_provider: Callable[[SupportsCodeRankSettings], SentenceEncoderProtocol]
+
+    @classmethod
+    def production(cls) -> CodeRankEmbedderContext:
+        """Return the default production context.
+
+        Returns
+        -------
+        CodeRankEmbedderContext
+            Context configured to load SentenceTransformer via ``gate_import``.
+        """
+
+        def _provider(settings: SupportsCodeRankSettings) -> SentenceEncoderProtocol:
+            module = gate_import(
+                "sentence_transformers",
+                "CodeRank embeddings (install `sentence-transformers`)",
+            )
+            sentence_transformer_cls = getattr(module, "SentenceTransformer", None)
+            if sentence_transformer_cls is None:
+                msg = "sentence_transformers does not expose SentenceTransformer"
+                raise RuntimeError(msg)
+            instance = sentence_transformer_cls(
+                settings.model_id,
+                trust_remote_code=settings.trust_remote_code,
+                device=settings.device,
+            )
+            return cast("SentenceEncoderProtocol", instance)
+
+        return cls(model_provider=_provider)
+
+
 class CodeRankEmbedder:
     """Encode queries or code snippets with the CodeRank bi-encoder.
 
@@ -59,16 +109,23 @@ class CodeRankEmbedder:
     device)`` tuple to avoid repeated initialization overhead.
     """
 
-    _MODEL_CACHE: ClassVar[dict[tuple[str, str], SentenceTransformer]] = {}
+    _MODEL_CACHE: ClassVar[dict[tuple[str, str], SentenceEncoderProtocol]] = {}
     _CACHE_LOCK: ClassVar[threading.Lock] = threading.Lock()
 
-    def __init__(self, *, settings: SupportsCodeRankSettings) -> None:
+    def __init__(
+        self,
+        *,
+        settings: SupportsCodeRankSettings,
+        context: CodeRankEmbedderContext | None = None,
+    ) -> None:
         self.model_id = settings.model_id
         self.device = settings.device
         self.trust_remote_code = settings.trust_remote_code
         self.query_prefix = settings.query_prefix
         self.normalize = settings.normalize
         self.batch_size = settings.batch_size
+        self._settings = settings
+        self._context = context or CodeRankEmbedderContext.production()
 
     def encode_queries(self, queries: Iterable[str]) -> NDArrayF32:
         """Return CodeRank embeddings for queries with prefix applied.
@@ -132,7 +189,7 @@ class CodeRankEmbedder:
         )
         return np.asarray(vectors, dtype=np.float32).reshape(len(snippet_list), -1)
 
-    def _ensure_model(self) -> SentenceTransformer:
+    def _ensure_model(self) -> SentenceEncoderProtocol:
         """Load the underlying SentenceTransformer lazily.
 
         Returns
@@ -140,29 +197,12 @@ class CodeRankEmbedder:
         SentenceTransformer
             Cached or newly loaded SentenceTransformer model instance.
 
-        Raises
-        ------
-        RuntimeError
-            If model loading fails or the model cannot be initialized.
         """
         cache_key = (self.model_id, self.device)
         with self._CACHE_LOCK:
             cached = self._MODEL_CACHE.get(cache_key)
             if cached is not None:
                 return cached
-            module = gate_import(
-                "sentence_transformers",
-                "CodeRank embeddings (install `sentence-transformers`)",
-            )
-            sentence_transformer_cls = getattr(module, "SentenceTransformer", None)
-            if sentence_transformer_cls is None:
-                msg = "sentence_transformers does not expose SentenceTransformer"
-                raise RuntimeError(msg)
-            model_instance = sentence_transformer_cls(
-                self.model_id,
-                trust_remote_code=self.trust_remote_code,
-                device=self.device,
-            )
-            model = cast("SentenceTransformer", model_instance)
+            model = self._context.model_provider(self._settings)
             self._MODEL_CACHE[cache_key] = model
             return model

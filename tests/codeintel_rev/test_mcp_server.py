@@ -3,63 +3,32 @@
 from __future__ import annotations
 
 from http import HTTPStatus
-from pathlib import Path
 
-import duckdb
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
-from codeintel_rev.app.main import app
 from codeintel_rev.mcp_server.server import app_context, get_context
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests._helpers import assertions
+from tests._helpers.http import build_test_app
 
 
 @pytest.fixture
-def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Set up a minimal test repository environment.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory path provided by pytest fixture.
-    monkeypatch : pytest.MonkeyPatch
-        Pytest monkeypatch fixture for modifying environment variables.
+def mcp_test_app(mock_application_context: ApplicationContext) -> FastAPI:
+    """Return a FastAPI instance wired to the mock context and MCP router.
 
     Returns
     -------
-    Path
-        Path to the test repository root directory.
+    FastAPI
+        Fully-initialized application ready for TestClient usage.
     """
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-
-    # Create required directory structure
-    data_dir = repo_root / "data"
-    data_dir.mkdir()
-    (data_dir / "vectors").mkdir()
-    (data_dir / "faiss").mkdir()
-
-    # Create test file
-    (repo_root / "test.py").write_text("print('hello')")
-
-    # Create empty index files
-    (data_dir / "faiss" / "code.ivfpq.faiss").touch()
-    duckdb_path = data_dir / "catalog.duckdb"
-    # Create a valid DuckDB database
-    conn = duckdb.connect(str(duckdb_path))
-    conn.close()
-
-    monkeypatch.setenv("REPO_ROOT", str(repo_root))
-    monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
-
-    return repo_root
+    return build_test_app(mock_application_context)
 
 
-@pytest.mark.usefixtures("test_repo")
-def test_set_scope_endpoint() -> None:
+def test_set_scope_endpoint(mcp_test_app: FastAPI) -> None:
     """Test that set_scope endpoint calls adapter with context."""
-    with TestClient(app) as client:
+    with TestClient(mcp_test_app) as client:
         # Note: FastMCP endpoints are mounted at /mcp
         # This is a basic smoke test - actual MCP protocol testing would require MCP client
         # For now, we verify the app starts and context is available
@@ -67,89 +36,88 @@ def test_set_scope_endpoint() -> None:
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
 
-@pytest.mark.usefixtures("test_repo")
-def test_list_paths_endpoint() -> None:
+def test_list_paths_endpoint(
+    mcp_test_app: FastAPI,
+    mock_application_context: ApplicationContext,
+) -> None:
     """Test that list_paths endpoint calls adapter with context."""
-    with TestClient(app) as client:
+    with TestClient(mcp_test_app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
         # Context should be available in app.state
         assertions.expect_true(
-            hasattr(app.state, "context"), reason="app.state should have context"
+            hasattr(mcp_test_app.state, "context"), reason="app.state should have context"
         )
-        assertions.expect_true(app.state.context is not None, reason="context should not be None")
+        assertions.expect_true(
+            mcp_test_app.state.context is mock_application_context,
+            reason="context should not be None",
+        )
 
 
-@pytest.mark.usefixtures("test_repo")
-def test_open_file_endpoint() -> None:
+def test_open_file_endpoint(mcp_test_app: FastAPI) -> None:
     """Test that open_file endpoint calls adapter with context."""
-    with TestClient(app) as client:
+    with TestClient(mcp_test_app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
         assertions.expect_true(
-            hasattr(app.state, "context"), reason="app.state should have context"
+            hasattr(mcp_test_app.state, "context"), reason="app.state should have context"
         )
 
 
-@pytest.mark.usefixtures("test_repo")
-def test_search_text_endpoint() -> None:
+def test_search_text_endpoint(mcp_test_app: FastAPI) -> None:
     """Test that search_text endpoint calls adapter with context."""
-    with TestClient(app) as client:
+    with TestClient(mcp_test_app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
         assertions.expect_true(
-            hasattr(app.state, "context"), reason="app.state should have context"
+            hasattr(mcp_test_app.state, "context"), reason="app.state should have context"
         )
 
 
-@pytest.mark.usefixtures("test_repo")
-def test_semantic_search_endpoint() -> None:
+def test_semantic_search_endpoint(mcp_test_app: FastAPI) -> None:
     """Test that semantic_search endpoint calls adapter with context."""
-    with TestClient(app) as client:
+    with TestClient(mcp_test_app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
         assertions.expect_true(
-            hasattr(app.state, "context"), reason="app.state should have context"
+            hasattr(mcp_test_app.state, "context"), reason="app.state should have context"
         )
 
 
-@pytest.mark.usefixtures("test_repo")
-def test_blame_range_endpoint() -> None:
+def test_blame_range_endpoint(mcp_test_app: FastAPI) -> None:
     """Test that blame_range endpoint calls adapter with context."""
-    with TestClient(app) as client:
+    with TestClient(mcp_test_app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
         assertions.expect_true(
-            hasattr(app.state, "context"), reason="app.state should have context"
+            hasattr(mcp_test_app.state, "context"), reason="app.state should have context"
         )
 
 
-@pytest.mark.usefixtures("test_repo")
-def test_file_history_endpoint() -> None:
+def test_file_history_endpoint(mcp_test_app: FastAPI) -> None:
     """Test that file_history endpoint calls adapter with context."""
-    with TestClient(app) as client:
+    with TestClient(mcp_test_app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
         assertions.expect_true(
-            hasattr(app.state, "context"), reason="app.state should have context"
+            hasattr(mcp_test_app.state, "context"), reason="app.state should have context"
         )
 
 
-@pytest.mark.usefixtures("test_repo")
-def test_file_resource_endpoint() -> None:
+def test_file_resource_endpoint(mcp_test_app: FastAPI) -> None:
     """Test that file_resource endpoint calls adapter with context."""
-    with TestClient(app) as client:
+    with TestClient(mcp_test_app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
         assertions.expect_equal(response.status_code, HTTPStatus.OK)
         assertions.expect_true(
-            hasattr(app.state, "context"), reason="app.state should have context"
+            hasattr(mcp_test_app.state, "context"), reason="app.state should have context"
         )
 
 

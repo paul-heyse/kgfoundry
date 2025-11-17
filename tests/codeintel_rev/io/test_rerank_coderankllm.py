@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
-import pytest
-from codeintel_rev.io import rerank_coderankllm as rerank_module
-from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
+from codeintel_rev.io.rerank_coderankllm import (
+    CodeRankGenerationSettings,
+    CodeRankListwiseReranker,
+    CoderankLLMRerankerContext,
+)
 
 from tests._helpers import assertions
+
+if TYPE_CHECKING:
+    from transformers import AutoModelForCausalLM, PreTrainedTokenizerBase
+else:  # pragma: no cover - tests avoid importing heavy deps at runtime
+    class PreTrainedTokenizerBase:
+        """Runtime stub matching the tokenizer protocol."""
+
+    class AutoModelForCausalLM:
+        """Runtime stub matching the model protocol."""
 
 
 class _FakeTensor:
@@ -47,43 +58,33 @@ class _FakeModel:
         return [[0]]
 
 
-def _patch_gate(
-    monkeypatch: pytest.MonkeyPatch, tokenizer: _FakeTokenizer, model: _FakeModel
-) -> None:
-    class _Factory:
-        def __init__(self, instance: object) -> None:
-            self._instance = instance
+def _build_context(tokenizer: _FakeTokenizer, model: _FakeModel) -> CoderankLLMRerankerContext:
+    def _tokenizer_factory(_model_id: str) -> PreTrainedTokenizerBase:
+        return cast("PreTrainedTokenizerBase", tokenizer)
 
-        def from_pretrained(self, *_args: object, **kwargs: object) -> object:
-            del kwargs
-            return self._instance
+    def _model_factory(_model_id: str) -> AutoModelForCausalLM:
+        return cast("AutoModelForCausalLM", model)
 
-    module = SimpleNamespace(
-        AutoTokenizer=_Factory(tokenizer),
-        AutoModelForCausalLM=_Factory(model),
-    )
-
-    def _gate_import(*_: object, **__: object) -> SimpleNamespace:
-        return module
-
-    monkeypatch.setattr(
-        rerank_module,
-        "gate_import",
-        _gate_import,
+    return CoderankLLMRerankerContext(
+        tokenizer_factory=_tokenizer_factory,
+        model_factory=_model_factory,
     )
 
 
-def test_reranker_reorders_when_json_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reranker_reorders_when_json_valid() -> None:
     """Valid JSON output produces reordered identifiers."""
     tokenizer = _FakeTokenizer("[2, 1]")
     model = _FakeModel()
-    _patch_gate(monkeypatch, tokenizer, model)
+    reranker_context = _build_context(tokenizer, model)
     reranker = CodeRankListwiseReranker(
         model_id="stub_valid",
         device="cpu",
-        max_new_tokens=16,
-        temperature=0.0,
-        top_p=1.0,
+        settings=CodeRankGenerationSettings(
+            max_new_tokens=16,
+            temperature=0.0,
+            top_p=1.0,
+        ),
+        context=reranker_context,
     )
 
     result = reranker.rerank("query", [(1, "code1"), (2, "code2")])
@@ -93,17 +94,20 @@ def test_reranker_reorders_when_json_valid(monkeypatch: pytest.MonkeyPatch) -> N
     assertions.expect_equal(model.generate_calls, 1)
 
 
-def test_reranker_falls_back_on_invalid_output(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reranker_falls_back_on_invalid_output() -> None:
     """Invalid JSON preserves the original ordering."""
     tokenizer = _FakeTokenizer("no json")
     model = _FakeModel()
-    _patch_gate(monkeypatch, tokenizer, model)
+    reranker_context = _build_context(tokenizer, model)
     reranker = CodeRankListwiseReranker(
         model_id="stub_invalid",
         device="cpu",
-        max_new_tokens=16,
-        temperature=0.0,
-        top_p=1.0,
+        settings=CodeRankGenerationSettings(
+            max_new_tokens=16,
+            temperature=0.0,
+            top_p=1.0,
+        ),
+        context=reranker_context,
     )
 
     result = reranker.rerank("query", [(1, "code1"), (2, "code2")])

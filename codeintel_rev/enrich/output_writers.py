@@ -134,12 +134,19 @@ def write_json(path: str | Path, obj: object) -> None:
     target.write_text(_dump_json(obj), encoding="utf-8")
 
 
-def write_jsonl(path: str | Path, rows: Iterable[RowMapping]) -> None:
+def write_jsonl(
+    path: str | Path,
+    rows: Iterable[RowMapping],
+    *,
+    writer_version: str | None = None,
+) -> None:
     """Write newline-delimited JSON records."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    writer_version = (os.getenv(_JSONL_WRITER_ENV) or _JSONL_DEFAULT_VERSION).lower()
-    if writer_version == _JSONL_V2 and _ORJSON_JSONL_OPTS is not None:
+    resolved_version = (
+        writer_version or os.getenv(_JSONL_WRITER_ENV) or _JSONL_DEFAULT_VERSION
+    ).lower()
+    if resolved_version == _JSONL_V2 and _ORJSON_JSONL_OPTS is not None:
         with target.open("wb") as handle:
             for row in rows:
                 payload = dict(row)
@@ -148,7 +155,7 @@ def write_jsonl(path: str | Path, rows: Iterable[RowMapping]) -> None:
     with target.open("w", encoding="utf-8") as handle:
         for row in rows:
             payload = dict(row)
-            if writer_version == _JSONL_V2:
+            if resolved_version == _JSONL_V2:
                 handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True))
             else:
                 handle.write(_dump_json(payload))

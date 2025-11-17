@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from codeintel_rev.typing import gate_import
 
-__all__ = ["DuckConn", "ensure_schema", "ingest_modules_jsonl"]
+__all__ = ["DuckConn", "DuckDBIngestContext", "ensure_schema", "ingest_modules_jsonl"]
 
 _USE_NATIVE_JSON = os.getenv("USE_DUCKDB_JSON", "1") not in {"0", "false", "False"}
 _DUCKDB_PRAGMAS = os.getenv("DUCKDB_PRAGMAS", "")
@@ -57,6 +57,24 @@ _INSERT_SQL = (
 )
 _MODULE_COLUMN_NAMES: Sequence[str] = tuple(name for name, _ in _MODULE_COLUMNS)
 
+
+def _parse_pragmas(spec: str) -> tuple[tuple[str, str], ...]:
+    settings: list[tuple[str, str]] = []
+    if not spec:
+        return ()
+    for entry in spec.split(","):
+        if "=" not in entry:
+            continue
+        key, value = (token.strip() for token in entry.split("=", 1))
+        if not key or not value or not _PRAGMA_KEY_PATTERN.fullmatch(key):
+            continue
+        literal = value if value.replace(".", "", 1).isdigit() else f"'{value}'"
+        settings.append((key, literal))
+    return tuple(settings)
+
+
+_PRAGMA_SETTINGS = _parse_pragmas(_DUCKDB_PRAGMAS)
+
 if TYPE_CHECKING:
     import duckdb as duckdb_module
 
@@ -97,6 +115,26 @@ class DuckConn:
     db_path: Path
 
 
+@dataclass(slots=True, frozen=True)
+class DuckDBIngestContext:
+    """Dependency providers and options for DuckDB ingestion routines."""
+
+    duckdb_module: _DuckDBModule
+    use_native_json: bool = True
+    pragmas: tuple[tuple[str, str], ...] = ()
+
+    @classmethod
+    def from_env(cls) -> DuckDBIngestContext:
+        """Build a context using module defaults and environment toggles.
+
+        Returns
+        -------
+        DuckDBIngestContext
+            Context configured with the project-wide DuckDB module and env toggles.
+        """
+        return cls(duckdb_module=_duckdb(), use_native_json=_USE_NATIVE_JSON, pragmas=_PRAGMA_SETTINGS)
+
+
 def _duckdb() -> _DuckDBModule:
     """Import duckdb on demand to keep it optional at runtime.
 
@@ -109,9 +147,10 @@ def _duckdb() -> _DuckDBModule:
     return cast("_DuckDBModule", module)
 
 
-def ensure_schema(conn: DuckConn) -> None:
+def ensure_schema(conn: DuckConn, *, context: DuckDBIngestContext | None = None) -> None:
     """Create the ``modules`` table if it does not already exist."""
-    duckdb_module = _duckdb()
+    ctx = context or DuckDBIngestContext.from_env()
+    duckdb_module = ctx.duckdb_module
     conn.db_path.parent.mkdir(parents=True, exist_ok=True)
     with duckdb_module.connect(str(conn.db_path)) as con:
         con.execute(
@@ -153,7 +192,12 @@ def ensure_schema(conn: DuckConn) -> None:
         )
 
 
-def ingest_modules_jsonl(conn: DuckConn, modules_jsonl: Path) -> int:
+def ingest_modules_jsonl(
+    conn: DuckConn,
+    modules_jsonl: Path,
+    *,
+    context: DuckDBIngestContext | None = None,
+) -> int:
     """Load modules.jsonl rows into DuckDB, replacing existing paths.
 
     Parameters
@@ -165,17 +209,22 @@ def ingest_modules_jsonl(conn: DuckConn, modules_jsonl: Path) -> int:
         Path to the JSONL file containing module records. Each line must be a
         valid JSON object representing a ModuleRecord. Existing records with
         matching paths are deleted before insertion.
+    context : DuckDBIngestContext | None, optional
+        Dependency overrides controlling which DuckDB module to use, whether to
+        leverage DuckDB's native JSON ingestion, and any pragmas to apply. When
+        ``None``, defaults to :meth:`DuckDBIngestContext.from_env`.
 
     Returns
     -------
     int
         Total number of rows now present in the ``modules`` table.
     """
-    duckdb_module = _duckdb()
-    ensure_schema(conn)
+    ctx = context or DuckDBIngestContext.from_env()
+    duckdb_module = ctx.duckdb_module
+    ensure_schema(conn, context=ctx)
     with duckdb_module.connect(str(conn.db_path)) as con:
-        _apply_pragmas(con)
-        if _USE_NATIVE_JSON:
+        _apply_pragmas(con, ctx.pragmas)
+        if ctx.use_native_json:
             _ingest_via_native_json(con, modules_jsonl)
         else:
             _ingest_via_python(con, modules_jsonl)
@@ -210,16 +259,10 @@ def _coerce_value(value: object, col_type: str | None) -> object:
     return value
 
 
-def _apply_pragmas(con: DuckDBConnection) -> None:
-    if not _DUCKDB_PRAGMAS:
+def _apply_pragmas(con: DuckDBConnection, pragmas: tuple[tuple[str, str], ...]) -> None:
+    if not pragmas:
         return
-    for entry in _DUCKDB_PRAGMAS.split(","):
-        if "=" not in entry:
-            continue
-        key, value = (token.strip() for token in entry.split("=", 1))
-        if not key or not value or not _PRAGMA_KEY_PATTERN.fullmatch(key):
-            continue
-        literal = value if value.replace(".", "", 1).isdigit() else f"'{value}'"
+    for key, literal in pragmas:
         con.execute(f"PRAGMA {key}={literal}")
 
 

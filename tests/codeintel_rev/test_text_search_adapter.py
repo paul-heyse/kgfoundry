@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 from codeintel_rev.app.config_context import ResolvedPaths
-from codeintel_rev.mcp_server.adapters.text_search import TextSearchOptions, search_text
+from codeintel_rev.mcp_server.adapters.text_search import (
+    SubprocessRunner,
+    TextSearchOptions,
+    search_text,
+)
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import VectorSearchError
@@ -74,7 +79,12 @@ def _build_match(path: Path) -> str:
     )
 
 
-def _run_search(context: Mock, options: TextSearchOptions) -> dict:
+def _run_search(
+    context: Mock,
+    options: TextSearchOptions,
+    *,
+    runner: SubprocessRunner,
+) -> dict:
     """Execute :func:`search_text` synchronously for the provided options.
 
     Parameters
@@ -84,12 +94,15 @@ def _run_search(context: Mock, options: TextSearchOptions) -> dict:
     options : TextSearchOptions
         Search configuration options (query, filters, etc.).
 
+    runner : SubprocessRunner
+        Subprocess runner used to simulate ripgrep/grep output.
+
     Returns
     -------
     dict
         Search result payload.
     """
-    return asyncio.run(search_text(context, options.query, options=options))
+    return asyncio.run(search_text(context, options.query, options=options, runner=runner))
 
 
 def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
@@ -100,6 +113,19 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
         "exclude_globs": ["src/**/tests/**"],
     }
 
+    captured_commands: list[list[str]] = []
+
+    def runner(
+        cmd: list[str],
+        *,
+        cwd: Path | None,
+        timeout: int,
+        env: Mapping[str, str] | None = None,
+    ) -> str:
+        _ = cwd, timeout, env
+        captured_commands.append(list(cmd))
+        return _build_match(repo_root / "src" / "main.py")
+
     with (
         patch(
             "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
@@ -109,14 +135,11 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
             "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
             return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
     ):
-        mock_run.return_value = _build_match(repo_root / "src" / "main.py")
-
         options = TextSearchOptions(query="main", max_results=5)
-        result = _run_search(mock_context, options)
+        result = _run_search(mock_context, options, runner=runner)
 
-        cmd = mock_run.call_args.args[0]
+        cmd = captured_commands[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
         assertions.expect_in("src/**/*.py", iglob_values)
         assertions.expect_in("!src/**/tests/**", iglob_values)
@@ -137,6 +160,19 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
         "exclude_globs": ["**/*.pyc"],
     }
 
+    captured_commands: list[list[str]] = []
+
+    def runner(
+        cmd: list[str],
+        *,
+        cwd: Path | None,
+        timeout: int,
+        env: Mapping[str, str] | None = None,
+    ) -> str:
+        _ = cwd, timeout, env
+        captured_commands.append(list(cmd))
+        return _build_match(repo_root / "tests" / "test_main.py")
+
     with (
         patch(
             "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
@@ -146,18 +182,15 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
             "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
             return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
     ):
-        mock_run.return_value = _build_match(repo_root / "tests" / "test_main.py")
-
         options = TextSearchOptions(
             query="test",
             paths=["tests/"],
             max_results=5,
         )
-        result = _run_search(mock_context, options)
+        result = _run_search(mock_context, options, runner=runner)
 
-        cmd = mock_run.call_args.args[0]
+        cmd = captured_commands[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
         assertions.expect_false(
             "src/**" in iglob_values, reason="scope include should be suppressed"
@@ -180,6 +213,19 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
         "exclude_globs": ["**/*.pyc"],
     }
 
+    captured_commands: list[list[str]] = []
+
+    def runner(
+        cmd: list[str],
+        *,
+        cwd: Path | None,
+        timeout: int,
+        env: Mapping[str, str] | None = None,
+    ) -> str:
+        _ = cwd, timeout, env
+        captured_commands.append(list(cmd))
+        return _build_match(repo_root / "tests" / "integration" / "case.py")
+
     with (
         patch(
             "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
@@ -189,19 +235,16 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
             "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
             return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
     ):
-        mock_run.return_value = _build_match(repo_root / "tests" / "integration" / "case.py")
-
         options = TextSearchOptions(
             query="case",
             include_globs=["tests/**/*.py"],
             exclude_globs=["tests/**/fixtures/**"],
             max_results=5,
         )
-        result = _run_search(mock_context, options)
+        result = _run_search(mock_context, options, runner=runner)
 
-        cmd = mock_run.call_args.args[0]
+        cmd = captured_commands[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
         assertions.expect_in("tests/**/*.py", iglob_values)
         assertions.expect_in("!tests/**/fixtures/**", iglob_values)
@@ -224,6 +267,17 @@ def test_search_text_timeout_error(mock_context: Mock) -> None:
     """Test search_text raises VectorSearchError on timeout."""
     scope: ScopeIn = {}
 
+    def runner(
+        cmd: list[str],
+        *,
+        cwd: Path | None,
+        timeout: int,
+        env: Mapping[str, str] | None = None,
+    ) -> str:
+        _ = cmd, cwd, timeout, env
+        message = "Search timeout"
+        raise SubprocessTimeoutError(message, command=["rg"], timeout_seconds=30)
+
     with (
         patch(
             "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
@@ -233,20 +287,26 @@ def test_search_text_timeout_error(mock_context: Mock) -> None:
             "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
             return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
     ):
-        mock_run.side_effect = SubprocessTimeoutError(
-            "Search timeout", command=["rg"], timeout_seconds=30
-        )
-
         options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Search timeout"):
-            _run_search(mock_context, options)
+            _run_search(mock_context, options, runner=runner)
 
 
 def test_search_text_subprocess_error(mock_context: Mock) -> None:
     """Test search_text raises VectorSearchError on subprocess error."""
     scope: ScopeIn = {}
+
+    def runner(
+        cmd: list[str],
+        *,
+        cwd: Path | None,
+        timeout: int,
+        env: Mapping[str, str] | None = None,
+    ) -> str:
+        _ = cmd, cwd, timeout, env
+        message = "Command failed"
+        raise SubprocessError(message, returncode=2, stderr="Error message")
 
     with (
         patch(
@@ -257,20 +317,26 @@ def test_search_text_subprocess_error(mock_context: Mock) -> None:
             "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
             return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
     ):
-        mock_run.side_effect = SubprocessError(
-            "Command failed", returncode=2, stderr="Error message"
-        )
-
         options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Error message"):
-            _run_search(mock_context, options)
+            _run_search(mock_context, options, runner=runner)
 
 
 def test_search_text_value_error(mock_context: Mock) -> None:
     """Test search_text raises VectorSearchError on ValueError."""
     scope: ScopeIn = {}
+
+    def runner(
+        cmd: list[str],
+        *,
+        cwd: Path | None,
+        timeout: int,
+        env: Mapping[str, str] | None = None,
+    ) -> str:
+        _ = cmd, cwd, timeout, env
+        message = "Invalid query"
+        raise ValueError(message)
 
     with (
         patch(
@@ -281,10 +347,7 @@ def test_search_text_value_error(mock_context: Mock) -> None:
             "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
             return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
     ):
-        mock_run.side_effect = ValueError("Invalid query")
-
         options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Invalid query"):
-            _run_search(mock_context, options)
+            _run_search(mock_context, options, runner=runner)

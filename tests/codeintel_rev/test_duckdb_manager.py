@@ -11,6 +11,7 @@ import pytest
 from codeintel_rev.io.duckdb_manager import (
     DuckDBConfig,
     DuckDBManager,
+    DuckDBManagerContext,
     DuckDBQueryBuilder,
     DuckDBQueryOptions,
 )
@@ -131,36 +132,22 @@ def test_query_builder_join_flags() -> None:
     assertions.expect_in("LEFT JOIN cst_nodes", sql)
 
 
-def test_connection_pool_reuses_connections(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_connection_pool_reuses_connections(tmp_path: Path) -> None:
     """Connection pool limits concurrent connections and reuses them."""
     db_path = tmp_path / "pooled.duckdb"
     with duckdb.connect(str(db_path)) as conn:
         conn.execute("CREATE TABLE numbers(value INTEGER)")
         conn.execute("INSERT INTO numbers VALUES (1)")
 
-    real_connect = duckdb.connect
     created: int = 0
 
-    def _instrumented_connect(
-        database: str,
-        *,
-        read_only: bool = False,
-        config: dict[str, str] | None = None,
-    ) -> duckdb.DuckDBPyConnection:
+    def _instrumented_connect(database: str, *, read_only: bool) -> duckdb.DuckDBPyConnection:
         nonlocal created
         created += 1
-        if config is None:
-            return real_connect(database, read_only=read_only)
-        return real_connect(database, read_only=read_only, config=config)
+        return duckdb.connect(database, read_only=read_only)
 
-    monkeypatch.setattr(
-        "codeintel_rev.io.duckdb_manager.duckdb.connect",
-        _instrumented_connect,
-    )
-
-    manager = DuckDBManager(db_path, DuckDBConfig(pool_size=2))
+    context = DuckDBManagerContext(connector=_instrumented_connect)
+    manager = DuckDBManager(db_path, DuckDBConfig(pool_size=2), context=context)
 
     for _ in range(10):
         with cast(

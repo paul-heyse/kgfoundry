@@ -75,11 +75,7 @@ def write_sample_modules(repo_root: Path) -> None:
         encoding="utf-8",
     )
     (pkg / "beta.py").write_text(
-        (
-            '"""Beta module."""\n\n'
-            "def beta_fn() -> str:\n"
-            "    return \"beta\"\n"
-        ),
+        ('"""Beta module."""\n\ndef beta_fn() -> str:\n    return "beta"\n'),
         encoding="utf-8",
     )
     (repo_root / "CODEOWNERS").write_text("pkg/alpha.py @alpha-owner\n", encoding="utf-8")

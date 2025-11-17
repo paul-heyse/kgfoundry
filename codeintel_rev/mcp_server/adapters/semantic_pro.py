@@ -14,7 +14,7 @@ from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.duckdb_catalog import StructureAnnotations
 from codeintel_rev.io.hybrid_search import HybridSearchOptions, HybridSearchTuning
-from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
+from codeintel_rev.io.rerank_coderankllm import CodeRankGenerationSettings, CodeRankListwiseReranker
 from codeintel_rev.io.warp_engine import WarpEngine, WarpUnavailableError
 from codeintel_rev.mcp_server.schemas import (
     AnswerEnvelope,
@@ -134,6 +134,14 @@ class HydrationOutcome:
     records: list[dict]
     annotations: Mapping[int, StructureAnnotations]
     notes: tuple[str, ...] = ()
+
+
+@dataclass(slots=True, frozen=True)
+class SemanticRequestContext:
+    """Session context shared between middleware and semantic_pro adapter."""
+
+    session_id: str | None = None
+    scope: ScopeIn | None = None
 
 
 @dataclass(slots=True)
@@ -261,6 +269,7 @@ async def semantic_search_pro(
     query: str,
     limit: int,
     options: SemanticProOptions | None = None,
+    request_context: SemanticRequestContext | None = None,
 ) -> AnswerEnvelope:
     """Execute the two-stage semantic search pipeline (CodeRank → optional WARP → optional reranker).
 
@@ -291,6 +300,9 @@ async def semantic_search_pro(
         User-supplied pipeline options. Controls which stages run (use_coderank,
         use_warp, use_reranker), fusion weights (stage_weights), and whether to
         include explanations (explain). Defaults to None (all defaults applied).
+    request_context : SemanticRequestContext | None, optional
+        Optional session metadata (session ID and pre-resolved scope). When omitted,
+        the adapter resolves both via middleware helpers.
 
     Returns
     -------
@@ -336,14 +348,17 @@ async def semantic_search_pro(
         msg = f"limit must be positive, got {limit}"
         raise VectorSearchError(msg)
     runtime_options = build_runtime_options(options)
-    session_id = get_session_id()
-    scope = await get_effective_scope(context, session_id)
+    session = request_context.session_id if request_context else None
+    session = session or get_session_id()
+    effective_scope = request_context.scope if request_context else None
+    if effective_scope is None:
+        effective_scope = await get_effective_scope(context, session)
     return await asyncio.to_thread(
         _semantic_search_pro_sync,
         context,
         query,
         limit,
-        scope,
+        effective_scope,
         runtime_options,
     )
 
@@ -1176,9 +1191,11 @@ def _maybe_rerank(
     reranker = CodeRankListwiseReranker(
         model_id=cfg.model_id,
         device=cfg.device,
-        max_new_tokens=cfg.max_new_tokens,
-        temperature=cfg.temperature,
-        top_p=cfg.top_p,
+        settings=CodeRankGenerationSettings(
+            max_new_tokens=cfg.max_new_tokens,
+            temperature=cfg.temperature,
+            top_p=cfg.top_p,
+        ),
     )
 
     payload = [

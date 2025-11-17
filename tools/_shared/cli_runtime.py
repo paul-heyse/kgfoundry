@@ -8,7 +8,7 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -129,6 +129,7 @@ class _CliRunConfigParams(TypedDict, total=False):
     extra_context: Mapping[str, object] | None
     args_summary: Sequence[str] | None
     env_summary: Mapping[str, str] | None
+    paths_provider: Callable[[], Paths] | Paths | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +146,7 @@ class CliRunConfig:
     extra_context: Mapping[str, object] | None = None
     args_summary: Sequence[str] | None = None
     env_summary: Mapping[str, str] | None = None
+    paths_provider: Callable[[], Paths] | Paths | None = None
 
     @classmethod
     def from_route(cls, *segments: str, **kwargs: Unpack[_CliRunConfigParams]) -> CliRunConfig:
@@ -391,7 +393,12 @@ def _prepare_execution_metadata(cfg: CliRunConfig) -> _ExecutionMetadata:
     correlation_id = cfg.correlation_id or _now_id()
     run_id = _now_id()
     operation = ".".join(route)
-    paths = Paths.discover()
+    if isinstance(cfg.paths_provider, Paths):
+        paths = cfg.paths_provider
+    elif cfg.paths_provider is not None:
+        paths = cfg.paths_provider()
+    else:
+        paths = Paths.discover()
     logger = _prepare_logger(
         operation=operation,
         route=route,

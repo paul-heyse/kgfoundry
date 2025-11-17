@@ -10,8 +10,9 @@ import os
 import signal
 import threading
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager, suppress
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager, suppress
+from dataclasses import dataclass, replace
 from importlib.metadata import PackageNotFoundError, version
 from time import perf_counter
 from types import FrameType
@@ -27,7 +28,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from codeintel_rev.app.capabilities import Capabilities
-from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.app.config_context import ApplicationContext, ApplicationContextOverrides
 from codeintel_rev.app.faiss_health import check_faiss_health
 from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
@@ -45,6 +46,30 @@ try:
     _DIST_VERSION = version("kgfoundry")
 except PackageNotFoundError:
     _DIST_VERSION = None
+
+
+@dataclass(slots=True, frozen=True)
+class AppLifecycleHooks:
+    """Override hooks for application startup/shutdown behavior."""
+
+    context_factory: Callable[[ApplicationContextOverrides | None], ApplicationContext] | None = None
+    faiss_health_check: Callable[[], object] | None = None
+    readiness_probe_factory: Callable[[ApplicationContext], ReadinessProbe] | None = None
+    env_flag_resolver: Callable[[str], bool] | None = None
+
+
+_APP_HOOKS_STACK: list[AppLifecycleHooks] = [AppLifecycleHooks()]
+
+
+@contextmanager
+def override_app_hooks(**kwargs: object) -> Iterator[None]:
+    """Temporarily override application lifecycle hooks (tests only)."""
+    hooks = replace(_APP_HOOKS_STACK[-1], **kwargs)
+    _APP_HOOKS_STACK.append(hooks)
+    try:
+        yield
+    finally:
+        _APP_HOOKS_STACK.pop()
 
 
 def request_identity(request: Request) -> dict[str, str | None]:
@@ -230,6 +255,9 @@ def _env_flag(name: str) -> bool:
     bool
         ``True`` if the variable is set to a truthy value.
     """
+    resolver = _APP_HOOKS_STACK[-1].env_flag_resolver
+    if resolver is not None:
+        return resolver(name)
     value = os.getenv(name, "")
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
@@ -283,6 +311,17 @@ def _preload_hybrid_if_configured(context: ApplicationContext) -> None:
         return
 
 
+def _create_application_context(
+    overrides: ApplicationContextOverrides | None,
+) -> ApplicationContext:
+    try:
+        return ApplicationContext.create(overrides=overrides)
+    except TypeError as exc:  # pragma: no cover - defensive compatibility
+        if "overrides" in str(exc):
+            return ApplicationContext.create()
+        raise
+
+
 async def _initialize_context(
     app: FastAPI,
     *,
@@ -315,12 +354,6 @@ async def _initialize_context(
         contains all configuration and long-lived clients. The readiness probe
         monitors the health of dependent services and resources.
 
-    Raises
-    ------
-    TypeError
-        Raised when `ApplicationContext.create` does not accept the
-        ``runtime_observer`` parameter (older interface).
-
     Notes
     -----
     Time complexity depends on runtime pre-loading configuration. The FAISS health check and
@@ -341,16 +374,17 @@ async def _initialize_context(
     >>> assert context is not None
     >>> assert readiness is not None
     """
-    try:
-        context = ApplicationContext.create(runtime_observer=runtime_observer)
-    except TypeError as exc:
-        if "runtime_observer" in str(exc):
-            context = ApplicationContext.create()
-        else:  # pragma: no cover - defensive
-            raise
+    overrides = None
+    if runtime_observer is not None:
+        overrides = ApplicationContextOverrides(runtime_observer=runtime_observer)
+    hooks = _APP_HOOKS_STACK[-1]
+    factory = hooks.context_factory or _create_application_context
+    context = factory(overrides)
     app.state.context = context
-    check_faiss_health()
-    readiness = ReadinessProbe(context)
+    health_check = hooks.faiss_health_check or check_faiss_health
+    health_check()
+    readiness_factory = hooks.readiness_probe_factory or ReadinessProbe
+    readiness = readiness_factory(context)
     await readiness.initialize()
     app.state.readiness = readiness
     await _preload_faiss_if_configured(context)

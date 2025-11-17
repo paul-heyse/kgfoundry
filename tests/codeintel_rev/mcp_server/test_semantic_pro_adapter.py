@@ -15,6 +15,7 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.io.duckdb_catalog import StructureAnnotations
 from codeintel_rev.io.hybrid_search import HybridSearchOptions
 from codeintel_rev.mcp_server.adapters import semantic_pro
+from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 
 from kgfoundry_common.errors import VectorSearchError
@@ -225,13 +226,7 @@ class _FakeContext:
         return self._xtr_index
 
 
-@pytest.fixture(autouse=True)
-def _stub_scope(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _fake_scope(*_: object, **__: object) -> None:
-        await asyncio.sleep(0)
-
-    monkeypatch.setattr(semantic_pro, "get_session_id", lambda: "test-session")
-    monkeypatch.setattr(semantic_pro, "get_effective_scope", _fake_scope)
+TEST_SCOPE: ScopeIn = {}
 
 
 def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
@@ -248,6 +243,9 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
                 "stage_weights": {},
                 "explain": True,
             },
+            request_context=semantic_pro.SemanticRequestContext(
+                session_id="test-session", scope=TEST_SCOPE
+            ),
         )
     )
 
@@ -275,6 +273,9 @@ def test_semantic_pro_rerank_skips_without_capability(tmp_path: Path) -> None:
             query="gateway",
             limit=constants.BATCH_SIZES.minimal,
             options={"use_reranker": True, "rerank": {"enabled": True}},
+            request_context=semantic_pro.SemanticRequestContext(
+                session_id="test-session", scope=TEST_SCOPE
+            ),
         )
     )
     method = envelope.get("method")
@@ -300,6 +301,9 @@ def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
                 "use_reranker": True,
                 "rerank": {"enabled": True, "top_k": constants.BATCH_SIZES.minimal},
             },
+            request_context=semantic_pro.SemanticRequestContext(
+                session_id="test-session", scope=TEST_SCOPE
+            ),
         )
     )
     method = envelope.get("method")
@@ -343,6 +347,9 @@ def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:
                 query="noop",
                 limit=1,
                 options={"use_coderank": False},
+                request_context=semantic_pro.SemanticRequestContext(
+                    session_id="test-session", scope=TEST_SCOPE
+                ),
             )
         )
 

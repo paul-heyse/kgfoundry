@@ -22,12 +22,18 @@ from tests._helpers import cli as cli_helpers
 _MIN_DOCSTRING_LENGTH = 50
 
 
-def _invoke_index_faiss_cli(envelope_dir: Path, args: Sequence[str]) -> None:
+def _invoke_index_faiss_cli(
+    envelope_dir: Path,
+    args: Sequence[str],
+    *,
+    artifact_dir: Path | None = None,
+) -> None:
     result = cli_helpers.invoke(
         cli_module.app,
         [
             "--envelope-dir",
             str(envelope_dir),
+            *(["--artifact-dir", str(artifact_dir)] if artifact_dir is not None else []),
             "index-faiss",
             *args,
         ],
@@ -119,13 +125,17 @@ def test_index_faiss_uses_defaults() -> None:
                 [
                     str(vectors_file),
                 ],
+                artifact_dir=Path(tmpdir) / "artifacts",
             )
             call_kwargs = cast("dict[str, object]", mock_run.call_args[1])
             config = cast("IndexCliConfig", call_kwargs["config"])
             assertions.expect_true(
                 isinstance(config, IndexCliConfig), reason="config should be IndexCliConfig"
             )
-            assertions.expect_equal(config.index_path, "./_indices/faiss/shard_000.idx")
+            assertions.expect_equal(
+                config.index_path,
+                str(Path(tmpdir) / "artifacts" / "faiss" / "shard_000.idx"),
+            )
             assertions.expect_equal(config.factory, "Flat")
             assertions.expect_equal(config.metric, "ip")
 

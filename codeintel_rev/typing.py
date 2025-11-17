@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from os import PathLike
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
+from kgfoundry_common.typing import EXTRAS_HINT
 from kgfoundry_common.typing import HEAVY_DEPS as _BASE_HEAVY_DEPS
 from kgfoundry_common.typing import gate_import as _base_gate_import
 
@@ -50,6 +51,7 @@ def gate_import(
     purpose: str,
     *,
     min_version: str | None = None,
+    import_func: Callable[[str], object] | None = None,
 ) -> object:
     """Resolve ``module_name`` lazily using the heavy dependency policy.
 
@@ -72,6 +74,9 @@ def gate_import(
     min_version : str | None, optional
         Optional minimum version requirement (e.g., "1.24.0"). If provided, the
         module version is validated against this requirement.
+    import_func : Callable[[str], object] | None, optional
+        Optional import callable to use for resolving modules. Primarily for
+        tests to inject fake import behavior. Defaults to the shared gate helper.
 
     Returns
     -------
@@ -79,12 +84,37 @@ def gate_import(
         Imported module or attribute returned by the shared gate helper. The return
         type depends on the module structure.
 
+    Raises
+    ------
+    ImportError
+        If the module cannot be imported or fails minimum version checks. The error
+        message includes installation guidance referencing the configured extras.
+
     Notes
     -----
     This function delegates to the base gate helper from kgfoundry_common.typing.
     It provides a consistent API for lazy imports across the codebase. Time
     complexity: O(1) for cached imports, O(import_time) for first-time imports.
     """
+    if import_func is not None:
+        try:
+            return import_func(module_name)
+        except ImportError as exc:
+            module_root = module_name.split(".", maxsplit=1)[0]
+            hint = EXTRAS_HINT.get(module_root)
+            msg = f"Cannot proceed with {purpose}: '{module_name}' is not installed."
+            if hint:
+                if " or " in hint:
+                    options = " or ".join(
+                        f"pip install codeintel-rev[{option.strip()}]"
+                        for option in hint.split(" or ")
+                    )
+                    msg = f"{msg} Install with: {options}"
+                else:
+                    msg = f"{msg} Install with: pip install codeintel-rev[{hint}]"
+            else:
+                msg = f"{msg} Install via: pip install {module_root}"
+            raise ImportError(msg) from exc
     return _base_gate_import(module_name, purpose, min_version=min_version)
 
 

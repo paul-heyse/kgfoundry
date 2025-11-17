@@ -44,7 +44,8 @@ cross-package use; see `kgfoundry_common.jsonschema_utils` for validators.
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, NoReturn, Protocol, cast
 
 from kgfoundry_common.navmap_loader import load_nav_metadata
@@ -110,6 +111,7 @@ __all__ = [
     "ProblemDetails",
     "SymbolID",
     "gate_import",
+    "override_gate_import",
     "resolve_faiss",
     "resolve_fastapi",
     "resolve_numpy",
@@ -219,6 +221,39 @@ def gate_import(
             raise ImportError(msg)
 
     return module
+
+
+@contextmanager
+def override_gate_import(overrides: Mapping[str, object]) -> Iterator[None]:
+    """Temporarily override ``gate_import`` for specific modules.
+
+    Parameters
+    ----------
+    overrides : Mapping[str, object]
+        Mapping of module names to the objects that should be returned when
+        those modules are requested. Used primarily in tests to avoid monkeypatching.
+
+    Yields
+    ------
+    Iterator[None]
+        Context where ``gate_import`` uses the overrides.
+    """
+    original_gate = gate_import
+
+    def _patched_gate_import(
+        module_name: str,
+        purpose: str,
+        min_version: str | None = None,
+    ) -> object:
+        if module_name in overrides:
+            return overrides[module_name]
+        return original_gate(module_name, purpose, min_version)
+
+    globals()["gate_import"] = _patched_gate_import
+    try:
+        yield
+    finally:
+        globals()["gate_import"] = original_gate
 
 
 # [nav:anchor safe_get_type]

@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from importlib.metadata import EntryPoint, entry_points
 from typing import cast
 
 from codeintel_rev.plugins.channels import Channel, ChannelContext
 
-__all__ = ["ChannelRegistry"]
+__all__ = ["ChannelRegistry", "override_channel_entry_points"]
 
 _FACTORY_ERRORS = (ImportError, AttributeError, RuntimeError, ValueError)
+_ENTRY_POINT_PROVIDER_STACK: list[Callable[[], Iterable[EntryPoint]]] = []
 
 
 class ChannelRegistry:
@@ -50,7 +52,8 @@ class ChannelRegistry:
         n is the number of entry points in the channel group.
         """
         discovered: list[Channel] = []
-        for entry_point in _iter_entry_points():
+        provider = _entry_point_provider()
+        for entry_point in provider():
             factory = _load_factory(entry_point)
             if factory is None:
                 continue
@@ -130,6 +133,16 @@ def _iter_entry_points() -> Iterable[EntryPoint]:
         return tuple(eps)
 
 
+def _entry_point_provider() -> Callable[[], Iterable[EntryPoint]]:
+    if _ENTRY_POINT_PROVIDER_STACK:
+        return _ENTRY_POINT_PROVIDER_STACK[-1]
+
+    def _provider() -> Iterable[EntryPoint]:
+        return _iter_entry_points()
+
+    return _provider
+
+
 def _load_factory(entry_point: EntryPoint) -> Callable[[ChannelContext], Channel] | None:
     """Return a callable factory if the entry point loads successfully.
 
@@ -164,3 +177,23 @@ def _load_factory(entry_point: EntryPoint) -> Callable[[ChannelContext], Channel
     except _FACTORY_ERRORS:  # pragma: no cover - defensive logging
         return None
     return factory
+
+
+@contextmanager
+def override_channel_entry_points(
+    overrides: Iterable[EntryPoint] | Callable[[], Iterable[EntryPoint]]
+) -> Iterator[None]:
+    """Temporarily override channel entry points for discovery."""
+    if callable(overrides):
+        _ENTRY_POINT_PROVIDER_STACK.append(overrides)
+    else:
+        entries = tuple(overrides)
+
+        def _provider() -> Iterable[EntryPoint]:
+            return entries
+
+        _ENTRY_POINT_PROVIDER_STACK.append(_provider)
+    try:
+        yield
+    finally:
+        _ENTRY_POINT_PROVIDER_STACK.pop()

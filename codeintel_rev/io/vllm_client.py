@@ -9,7 +9,8 @@ import asyncio
 import importlib.util
 import logging
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from functools import lru_cache
 from importlib import import_module
 from types import ModuleType
@@ -92,6 +93,56 @@ def _get_numpy() -> ModuleType:
             "Embedding batching operations in VLLMClient",
         ),
     )
+
+
+def _default_http_client_factory(config: VLLMConfig) -> httpx.Client:
+    return httpx.Client(
+        timeout=config.timeout_s,
+        limits=httpx.Limits(
+            max_connections=100,
+            max_keepalive_connections=20,
+        ),
+    )
+
+
+def _default_async_http_client_factory(config: VLLMConfig) -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        timeout=config.timeout_s,
+        limits=httpx.Limits(
+            max_connections=100,
+            max_keepalive_connections=20,
+        ),
+    )
+
+
+def _default_inprocess_embedder_factory(config: VLLMConfig) -> InprocessVLLMEmbedder:
+    engine_module = import_module("codeintel_rev.io.vllm_engine")
+    engine_cls = engine_module.InprocessVLLMEmbedder
+    return engine_cls(config)
+
+
+@dataclass(frozen=True)
+class VLLMTransportContext:
+    """Dependencies for constructing VLLM transport clients."""
+
+    http_client_factory: Callable[[VLLMConfig], httpx.Client]
+    async_client_factory: Callable[[VLLMConfig], httpx.AsyncClient]
+    inprocess_embedder_factory: Callable[[VLLMConfig], InprocessVLLMEmbedder]
+
+    @classmethod
+    def production(cls) -> VLLMTransportContext:
+        """Return the default transport context.
+
+        Returns
+        -------
+        VLLMTransportContext
+            Context configured with production HTTP, async, and in-process factories.
+        """
+        return cls(
+            http_client_factory=_default_http_client_factory,
+            async_client_factory=_default_async_http_client_factory,
+            inprocess_embedder_factory=_default_inprocess_embedder_factory,
+        )
 
 
 class EmbeddingRequest(msgspec.Struct):
@@ -229,7 +280,12 @@ class VLLMClient:
     - ``_decoder``: Fast JSON decoder for response deserialization
     """
 
-    def __init__(self, config: VLLMConfig) -> None:
+    def __init__(
+        self,
+        config: VLLMConfig,
+        *,
+        transport_context: VLLMTransportContext | None = None,
+    ) -> None:
         self.config = config
         self._encoder = msgspec.json.Encoder()
         self._decoder = msgspec.json.Decoder(EmbeddingResponse)
@@ -238,6 +294,7 @@ class VLLMClient:
         self._async_client: httpx.AsyncClient | None = None
         self._local_engine: InprocessVLLMEmbedder | None = None
         self._local_semaphore: asyncio.Semaphore | None = None
+        self._transport_context = transport_context or VLLMTransportContext.production()
 
         if self._mode == "inprocess":
             self._initialize_local_engine()
@@ -245,18 +302,10 @@ class VLLMClient:
             self._initialize_http_client()
 
     def _initialize_local_engine(self) -> None:
-        engine_module = import_module("codeintel_rev.io.vllm_engine")
-        engine_cls = engine_module.InprocessVLLMEmbedder
-        self._local_engine = engine_cls(self.config)
+        self._local_engine = self._transport_context.inprocess_embedder_factory(self.config)
 
     def _initialize_http_client(self) -> None:
-        self._client = httpx.Client(
-            timeout=self.config.timeout_s,
-            limits=httpx.Limits(
-                max_connections=100,
-                max_keepalive_connections=20,
-            ),
-        )
+        self._client = self._transport_context.http_client_factory(self.config)
 
     def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
         """Embed texts using the configured transport (HTTP or local).
@@ -513,13 +562,7 @@ class VLLMClient:
 
     def _ensure_async_http_client(self) -> httpx.AsyncClient:
         if self._async_client is None:
-            self._async_client = httpx.AsyncClient(
-                timeout=self.config.timeout_s,
-                limits=httpx.Limits(
-                    max_connections=100,
-                    max_keepalive_connections=20,
-                ),
-            )
+            self._async_client = self._transport_context.async_client_factory(self.config)
         return self._async_client
 
     def _require_http_client(self) -> httpx.Client:

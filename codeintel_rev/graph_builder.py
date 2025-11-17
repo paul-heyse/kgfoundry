@@ -82,8 +82,24 @@ def build_import_graph(
     return ImportGraph(edges=edges, fan_in=fan_in, fan_out=fan_out, cycle_group=cycle_group)
 
 
-def write_import_graph(graph: ImportGraph, path: str | Path) -> None:
-    """Write import edges to Parquet (or JSONL fallback)."""
+def write_import_graph(
+    graph: ImportGraph,
+    path: str | Path,
+    *,
+    polars_module: PolarsModule | None = None,
+) -> None:
+    """Write import edges to Parquet (or JSONL fallback).
+
+    Parameters
+    ----------
+    graph : ImportGraph
+        Graph to serialise.
+    path : str | Path
+        Destination file path.
+    polars_module : PolarsModule | None, optional
+        Explicit polars module to use when writing Parquet. When ``None`` (default)
+        the helper attempts to import polars lazily.
+    """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     records = [
@@ -92,7 +108,7 @@ def write_import_graph(graph: ImportGraph, path: str | Path) -> None:
     if not records:
         target.write_text("", encoding="utf-8")
         return
-    if _write_parquet(records, target):  # pragma: no cover - exercised in integration
+    if _write_parquet(records, target, polars_module=polars_module):  # pragma: no cover
         return
     with target.open("w", encoding="utf-8") as handle:
         for record in records:
@@ -161,7 +177,12 @@ def _tarjan_scc(edges: dict[str, set[str]]) -> dict[str, int]:
     return assignment
 
 
-def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
+def _write_parquet(
+    records: list[dict[str, str]],
+    target: Path,
+    *,
+    polars_module: PolarsModule | None = None,
+) -> bool:
     """Persist records to Parquet via polars when available.
 
     Parameters
@@ -170,16 +191,21 @@ def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
         List of dictionary records to write.
     target : Path
         File system path for the output Parquet file.
+    polars_module : PolarsModule | None, optional
+        Injected polars module; when ``None`` an import is attempted.
 
     Returns
     -------
     bool
         True if polars is available and write succeeded, False otherwise.
     """
-    try:
-        polars = cast("PolarsModule", gate_import("polars", "import graph export"))
-    except ImportError:
-        return False
+    if polars_module is None:
+        try:
+            polars = cast("PolarsModule", gate_import("polars", "import graph export"))
+        except ImportError:
+            return False
+    else:
+        polars = polars_module
     frame_factory = resolve_polars_frame_factory(polars)
     if frame_factory is None:
         return False

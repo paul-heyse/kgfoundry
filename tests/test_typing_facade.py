@@ -13,13 +13,13 @@ from types import ModuleType
 
 import pytest
 
-import kgfoundry_common.typing as typing_module
 from kgfoundry_common.typing import (
     JSONValue,
     NavMap,
     ProblemDetails,
     SymbolID,
     gate_import,
+    override_gate_import,
     resolve_faiss,
     resolve_fastapi,
     resolve_numpy,
@@ -28,32 +28,15 @@ from kgfoundry_common.typing import (
 from tests._helpers import assertions
 
 
-def _install_fake_faiss(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
-    """Patch gate_import to return a synthetic faiss module during a test.
-
-    Parameters
-    ----------
-    monkeypatch : pytest.MonkeyPatch
-        Pytest monkeypatch fixture.
+def _fake_faiss_module() -> ModuleType:
+    """Return a lightweight FAISS stub.
 
     Returns
     -------
     ModuleType
-        Fake faiss module.
+        Synthetic faiss module placeholder.
     """
-    fake_module = ModuleType("faiss")
-
-    def _patched_gate_import(module_name: str, purpose: str) -> ModuleType:
-        if module_name == "faiss":
-            return fake_module
-        result = gate_import(module_name, purpose)
-        if isinstance(result, ModuleType):
-            return result
-        message = "gate_import returned non-module result"
-        raise AssertionError(message)
-
-    monkeypatch.setattr(typing_module, "gate_import", _patched_gate_import)
-    return fake_module
+    return ModuleType("faiss")
 
 
 def test_gate_import_available_module() -> None:
@@ -131,10 +114,12 @@ def test_resolve_fastapi_emits_deprecation_warning() -> None:
         resolve_fastapi()
 
 
-def test_resolve_faiss_emits_deprecation_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_faiss_emits_deprecation_warning() -> None:
     """resolve_faiss() emits a DeprecationWarning."""
-    _install_fake_faiss(monkeypatch)
-    with pytest.warns(DeprecationWarning, match=r"resolve_faiss.*deprecated"):
+    fake_module = _fake_faiss_module()
+    with override_gate_import({"faiss": fake_module}), pytest.warns(
+        DeprecationWarning, match=r"resolve_faiss.*deprecated"
+    ):
         resolve_faiss()
 
 
@@ -165,10 +150,12 @@ def test_resolve_fastapi_returns_module() -> None:
     )
 
 
-def test_resolve_faiss_returns_module(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_faiss_returns_module() -> None:
     """resolve_faiss() returns the faiss module (despite deprecation)."""
-    _install_fake_faiss(monkeypatch)
-    with pytest.warns(DeprecationWarning, match=r"deprecated"):
+    fake_module = _fake_faiss_module()
+    with override_gate_import({"faiss": fake_module}), pytest.warns(
+        DeprecationWarning, match=r"deprecated"
+    ):
         faiss = resolve_faiss()
     # Just verify we got something that looks like a module
     assertions.expect_true(

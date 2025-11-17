@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import importlib.machinery
-import importlib.util
 import sys
 from types import ModuleType
 
@@ -13,6 +11,7 @@ from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.mcp_server.server import build_http_app
 
 from tests._helpers import assertions
+from tests._helpers.imports import with_module_presence
 
 
 @pytest.mark.parametrize(
@@ -22,19 +21,10 @@ from tests._helpers import assertions
     ],
 )
 def test_import_package_in_minimal_env(
-    monkeypatch: pytest.MonkeyPatch, missing_modules: set[str]
+    missing_modules: set[str]
 ) -> None:
     """Simulate a minimal environment where heavy deps are unavailable."""
-    original_specs = importlib.util.find_spec
-
-    def fake_find_spec(
-        name: str, package: str | None = None
-    ) -> importlib.machinery.ModuleSpec | None:
-        if name in missing_modules:
-            return None
-        return original_specs(name, package)
-
-    monkeypatch.setattr(importlib.util, "find_spec", fake_find_spec)
+    modules_override = dict.fromkeys(missing_modules, None)
 
     cached: dict[str, ModuleType] = {
         key: module for key, module in list(sys.modules.items()) if key.startswith("codeintel_rev")
@@ -45,13 +35,14 @@ def test_import_package_in_minimal_env(
 
     importlib.invalidate_caches()
 
-    try:
-        __import__("codeintel_rev")
-    finally:
-        for key in list(sys.modules):
-            if key.startswith("codeintel_rev"):
-                sys.modules.pop(key)
-        sys.modules.update(cached)
+    with with_module_presence(modules_override):
+        try:
+            __import__("codeintel_rev")
+        finally:
+            for key in list(sys.modules):
+                if key.startswith("codeintel_rev"):
+                    sys.modules.pop(key)
+            sys.modules.update(cached)
 
 
 def test_server_factory_omits_semantic_modules() -> None:

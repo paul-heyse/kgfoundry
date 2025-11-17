@@ -24,8 +24,15 @@ def build_settings_for_repo(
     ----------
     repo_root : Path
         Synthetic repository root used for the test scenario.
-    paths_overrides, bm25_overrides, splade_overrides : Mapping[str, Any] | None
-        Optional dictionaries that override the computed defaults for each section.
+    paths_overrides : Mapping[str, Any] | None, optional
+        Optional dictionary overriding computed defaults for the ``paths`` section.
+    bm25_overrides : Mapping[str, Any] | None, optional
+        Optional overrides applied to the BM25 settings subsection.
+    splade_overrides : Mapping[str, Any] | None, optional
+        Optional overrides applied to the SPLADE settings subsection.
+    index_overrides : Mapping[str, Any] | None, optional
+        Optional overrides for ``Settings.index`` used by tests to toggle
+        behaviors such as FAISS preload.
 
     Returns
     -------

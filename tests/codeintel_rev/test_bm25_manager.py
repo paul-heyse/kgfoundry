@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import msgspec
 import pytest
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.bm25_manager import (
+    BM25BuildContext,
     BM25CorpusMetadata,
     BM25IndexManager,
     BM25IndexMetadata,
@@ -100,32 +103,33 @@ def test_prepare_corpus_detects_duplicate_ids(tmp_path: Path) -> None:
         manager.prepare_corpus(source_path)
 
 
-def test_build_index_writes_metadata(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
+def test_build_index_writes_metadata(tmp_path: Path) -> None:
     """Index builds should invoke Pyserini and persist index metadata."""
     repo_root, settings = _bootstrap_repo(tmp_path, bm25_threads=2)
     source_path = repo_root / "datasets" / "corpus.jsonl"
     _write_corpus(source_path)
 
-    manager = BM25IndexManager(settings)
+    commands: list[list[str]] = []
+    index_dir = Path(settings.bm25.index_dir)
+
+    def fake_runner(cmd: list[str]) -> None:
+        commands.append(list(cmd))
+        (index_dir / "segments_1").write_text("stub", encoding="utf-8")
+
+    context = replace(
+        BM25BuildContext.production(),
+        pyserini_runner=fake_runner,
+        version_provider=lambda: "test",
+        clock=lambda: datetime(2024, 1, 1, tzinfo=UTC),
+    )
+
+    manager = BM25IndexManager(settings, build_context=context)
     summary = manager.prepare_corpus(source_path)
-
-    created_command: list[list[str]] = []
-
-    def fake_run(cmd: list[str]) -> None:
-        created_command.append(cmd)
-        resolved = manager.index_dir
-        (resolved / "segments_1").write_text("stub", encoding="utf-8")
-
-    monkeypatch.setattr("codeintel_rev.io.bm25_manager._run_pyserini_index", fake_run)
-    monkeypatch.setattr("codeintel_rev.io.bm25_manager._detect_pyserini_version", lambda: "test")
 
     metadata = manager.build_index()
 
-    assertions.expect_true(created_command, reason="Expected Pyserini command to be executed")
-    command = created_command[0]
+    assertions.expect_true(commands, reason="Expected Pyserini command to be executed")
+    command = commands[0]
     for token in ("--collection", "JsonCollection", "--input", summary.output_dir):
         assertions.expect_in(token, command)
 

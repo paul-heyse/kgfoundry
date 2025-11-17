@@ -11,4 +11,5 @@ enrich_pipeline: ModuleType
 enrich_analytics: ModuleType
 enrich_overlays: ModuleType
 app: Typer
+
 def main() -> None: ...

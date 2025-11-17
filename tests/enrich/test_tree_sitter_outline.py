@@ -9,7 +9,7 @@ from codeintel_rev.enrich import tree_sitter_bridge as tsb
 from tests._helpers import assertions
 
 
-def test_outline_query_matches_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_outline_query_matches_fallback() -> None:
     """Test that Tree-sitter outline query matches fallback behavior."""
     pytest.importorskip("tree_sitter_python")
 
@@ -22,15 +22,15 @@ def helper(value: int) -> int:
     return value
 """
 
-    monkeypatch.setattr(tsb, "_USE_TS_QUERY", True)
-    query_outline = tsb.build_outline("demo.py", source)
+    with tsb.override_outline_config(use_ts_query=True):
+        query_outline = tsb.build_outline("demo.py", source)
     if query_outline is None:
         pytest.skip("Tree-sitter python language unavailable")
     query_symbols = {(node.kind, node.name) for node in query_outline.nodes}
     assertions.expect_true(bool(query_symbols), reason="query_outline should have symbols")
 
-    monkeypatch.setattr(tsb, "_USE_TS_QUERY", False)
-    dfs_outline = tsb.build_outline("demo.py", source)
+    with tsb.override_outline_config(use_ts_query=False):
+        dfs_outline = tsb.build_outline("demo.py", source)
     if dfs_outline is None:
         pytest.skip("Tree-sitter python language unavailable")
     dfs_symbols = {(node.kind, node.name) for node in dfs_outline.nodes}

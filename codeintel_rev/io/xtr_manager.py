@@ -34,7 +34,7 @@ class XTRMetadata(TypedDict):
 class _XTRIndexRuntime:
     """Mutable runtime artifacts for XTRIndex."""
 
-    __slots__ = ("chunk_lookup", "device", "meta", "model", "tokenizer", "tokens")
+    __slots__ = ("chunk_lookup", "device", "meta", "model", "test_vectors", "tokenizer", "tokens")
 
     def __init__(self) -> None:
         self.meta: XTRMetadata | None = None
@@ -43,6 +43,7 @@ class _XTRIndexRuntime:
         self.model: Any | None = None
         self.device: str | None = None
         self.chunk_lookup: dict[int, tuple[int, int]] | None = None
+        self.test_vectors: NDArrayF32 | None = None
 
     def close(self) -> None:
         """Release loaded tokenizer/model/memmaps."""
@@ -52,6 +53,7 @@ class _XTRIndexRuntime:
         self.model = None
         self.device = None
         self.chunk_lookup = None
+        self.test_vectors = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -65,6 +67,11 @@ class XTRIndex:
         init=False,
         repr=False,
     )
+
+    def seed_runtime_for_tests(self, encoder_vectors: NDArrayF32 | None = None) -> None:
+        """Seed runtime state with explicit encoder vectors for testing."""
+        state = self._runtime()
+        state.test_vectors = encoder_vectors
 
     def open(self) -> None:
         """Open metadata and memory-map the token matrix if artifacts exist.
@@ -140,6 +147,9 @@ class XTRIndex:
             Array shaped [tokens, dim] with L2-normalized token vectors.
             Each row is a token embedding normalized to unit length.
         """
+        state = self._runtime()
+        if state.test_vectors is not None:
+            return state.test_vectors
         tokenizer, model = self._ensure_encoder()
         torch_module = gate_import("torch", "XTR query encoding")
         device = self._resolve_device(cast("TorchModule", torch_module))
@@ -388,6 +398,27 @@ class XTRIndex:
         if limit is not None and limit > 0:
             return results[:limit]
         return results
+
+    @staticmethod
+    def _initialize_runtime() -> _XTRIndexRuntime:
+        """Create an empty runtime container.
+
+        Returns
+        -------
+        _XTRIndexRuntime
+            Fresh runtime container for the index.
+        """
+        return _XTRIndexRuntime()
+
+    def _runtime(self) -> _XTRIndexRuntime:
+        """Return the cached runtime structure, initializing if necessary.
+
+        Returns
+        -------
+        _XTRIndexRuntime
+            Runtime state managed by the internal RuntimeCell.
+        """
+        return self._cell.get_or_initialize(self._initialize_runtime)
 
     def _ensure_encoder(self) -> tuple[Any, Any]:
         """Instantiate and cache tokenizer/model pair.

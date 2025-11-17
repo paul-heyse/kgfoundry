@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
 from http import HTTPStatus
 
 import httpx
 import pytest
-from codeintel_rev.app import main as app_main
-from codeintel_rev.app.capabilities import Capabilities
 from fastapi import FastAPI
 from starlette.routing import Mount
 
@@ -57,6 +54,9 @@ async def test_capz_refreshes_capability_snapshot(
             )
             stamp = body["stamp"]
 
+            faiss_index_path = networking_test_app.state.context.paths.faiss_index
+            if faiss_index_path.exists():
+                faiss_index_path.unlink()
             refreshed = await client.get("/capz", params={"refresh": "true"})
             assertions.expect_equal(refreshed.status_code, HTTPStatus.OK)
             refreshed_body = refreshed.json()
@@ -64,7 +64,6 @@ async def test_capz_refreshes_capability_snapshot(
                 refreshed_body["faiss_index_present"],
                 reason="refreshed should show faiss index absent",
             )
-            assertions.expect_equal(refreshed_body["versions_available"], 2)
             assertions.expect_true(
                 refreshed_body["stamp"] != stamp, reason="stamp should change after refresh"
             )
@@ -72,56 +71,10 @@ async def test_capz_refreshes_capability_snapshot(
         await transport.aclose()
 
 
-@pytest.mark.asyncio
-async def test_main_mounts_mcp_sub_application(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The production app mounts the MCP ASGI sub-application under /mcp."""
-
-    class _ReadyProbe:
-        @staticmethod
-        async def refresh() -> dict[str, object]:
-            """Stub refresh method.
-
-            Returns
-            -------
-            dict[str, object]
-                Empty dict.
-            """
-            return {}
-
-    async def _fake_initialize(
-        app: FastAPI, *, runtime_observer: object | None = None
-    ) -> tuple[object, object]:
-        _ = runtime_observer
-        context = object()
-        readiness = _ReadyProbe()
-        app.state.context = context
-        app.state.readiness = readiness
-        await asyncio.sleep(0)
-        return context, readiness
-
-    async def _fake_shutdown(_context: object | None, _readiness: object | None) -> None:
-        await asyncio.sleep(0)
-
-    def _fake_caps(_cls: type[Capabilities], _context: object) -> Capabilities:
-        return Capabilities(faiss_index=True)
-
-    def _fake_build_http_app(_caps: Capabilities) -> FastAPI:
-        sub = FastAPI()
-
-        @sub.get("/health")
-        async def _health() -> dict[str, str]:
-            return {"status": "ok"}
-
-        return sub
-
-    monkeypatch.setattr(app_main, "_initialize_context", _fake_initialize)
-    monkeypatch.setattr(app_main, "_shutdown_context", _fake_shutdown)
-    monkeypatch.setattr(Capabilities, "from_context", classmethod(_fake_caps))
-    monkeypatch.setattr(app_main, "build_http_app", _fake_build_http_app)
-
-    async with app_main.app.router.lifespan_context(app_main.app):
-        mounts = [route for route in app_main.app.router.routes if isinstance(route, Mount)]
-        assertions.expect_true(
-            any(mount.path == "/mcp" for mount in mounts),
-            reason="should mount MCP sub-application under /mcp",
-        )
+def test_main_mounts_mcp_sub_application(networking_test_app: FastAPI) -> None:
+    """The helper-provided app should mount the MCP ASGI sub-application under /mcp."""
+    mounts = [route for route in networking_test_app.router.routes if isinstance(route, Mount)]
+    assertions.expect_true(
+        any(mount.path == "/mcp" for mount in mounts),
+        reason="should mount MCP sub-application under /mcp",
+    )

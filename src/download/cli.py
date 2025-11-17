@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,8 +40,6 @@ CLI_SETTINGS = cli_context.get_cli_settings()
 CLI_CONFIG = cli_context.get_cli_config()
 
 REPO_ROOT = cli_context.REPO_ROOT
-CLI_ENVELOPE_DIR = REPO_ROOT / "site" / "_build" / "cli"
-
 HARVEST_OVERRIDE = cli_context.get_operation_override("harvest")
 if HARVEST_OVERRIDE and HARVEST_OVERRIDE.description:
     HARVEST_DESCRIPTION = HARVEST_OVERRIDE.description
@@ -76,7 +75,27 @@ class HarvestHandler(Protocol):
     def __call__(self, request: HarvestRequest) -> str: ...
 
 
+class ArtifactFS(Protocol):
+    """Protocol describing filesystem interactions for CLI artifacts."""
+
+    def ensure_dir(self, directory: Path) -> None: ...
+
+    def write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None: ...
+
+
 def _default_harvest_handler(request: HarvestRequest) -> str:
+    """Return a dry-run message describing the harvest request.
+
+    Parameters
+    ----------
+    request : HarvestRequest
+        Harvest request parameters.
+
+    Returns
+    -------
+    str
+        Dry-run message describing what would be harvested.
+    """
     return (
         "[dry-run] would harvest "
         f"topic={request.topic!r} years={request.years!r} max_works={request.max_works}"
@@ -91,9 +110,15 @@ class DownloadCliContext:
     ----------
     harvest_handler : HarvestHandler
         Callable handler function for executing harvest operations.
+    artifact_dir : Path
+        Directory path where harvested artifacts are written.
+    artifact_fs : ArtifactFS
+        Filesystem interface for writing artifact files.
     """
 
     harvest_handler: HarvestHandler
+    artifact_dir: Path
+    artifact_fs: ArtifactFS
 
     @classmethod
     def production(cls) -> DownloadCliContext:
@@ -104,10 +129,60 @@ class DownloadCliContext:
         DownloadCliContext
             Context configured with the default harvest handler.
         """
-        return cls(harvest_handler=_default_harvest_handler)
+        return cls(
+            harvest_handler=_default_harvest_handler,
+            artifact_dir=REPO_ROOT / "data" / "download_artifacts",
+            artifact_fs=_LocalArtifactFS(),
+        )
+
+
+class _LocalArtifactFS:
+    """Filesystem implementation that writes to disk.
+
+    Methods
+    -------
+    ensure_dir(directory)
+        Create the directory and all parent directories if they don't exist.
+    write_text(path, content, *, encoding)
+        Write text content to a file, creating parent directories if needed.
+    """
+
+    def ensure_dir(self, directory: Path) -> None:
+        """Ensure the specified directory exists.
+
+        Parameters
+        ----------
+        directory : Path
+            Directory path to create.
+        """
+        _ = self
+        directory.mkdir(parents=True, exist_ok=True)
+
+    def write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None:
+        """Write text content to a file.
+
+        Parameters
+        ----------
+        path : Path
+            File path where content will be written.
+        content : str
+            Text content to write.
+        encoding : str, optional
+            Text encoding to use (default: "utf-8").
+        """
+        _ = self
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding=encoding)
 
 
 def _resolve_cli_help() -> str:
+    """Resolve the CLI help text from configuration.
+
+    Returns
+    -------
+    str
+        Formatted help text combining title and version.
+    """
     title = CLI_CONFIG.title or CLI_TITLE
     version = CLI_CONFIG.version
     return f"{title} ({version})"
@@ -120,34 +195,97 @@ app.add_typer(download_app, name=CLI_COMMAND, help=HARVEST_DESCRIPTION)
 _DEFAULT_CONTEXT = DownloadCliContext.production()
 
 
+def _default_envelope_dir() -> Path:
+    """Return the default directory for CLI envelope files.
+
+    Returns
+    -------
+    Path
+        Default envelope directory path.
+    """
+    return REPO_ROOT / "site" / "_build" / "cli"
+
+
 EnvelopeDirOption = Annotated[
-    Path,
+    Path | None,
     typer.Option(
         "--envelope-dir",
         help="Directory where CLI envelopes are written.",
         dir_okay=True,
         file_okay=False,
-        show_default=True,
     ),
 ]
 
 
-def _store_cli_state(ctx: typer.Context, envelope_dir: Path) -> None:
+ArtifactDirOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--artifact-dir",
+        help="Directory where harvested artifacts are written.",
+        dir_okay=True,
+        file_okay=False,
+    ),
+]
+
+
+def _store_cli_state(
+    ctx: typer.Context,
+    *,
+    envelope_dir: Path | None,
+    artifact_dir: Path | None,
+) -> None:
+    """Store CLI state in the Typer context.
+
+    Parameters
+    ----------
+    ctx : typer.Context
+        Typer context object.
+    envelope_dir : Path | None
+        Optional directory path for envelope files.
+    artifact_dir : Path | None
+        Optional directory path for artifact files.
+    """
     state = ctx.ensure_object(dict)
     state["envelope_dir"] = envelope_dir
+    state["artifact_dir"] = artifact_dir
 
 
 def _resolve_envelope_dir(ctx: typer.Context | None) -> Path:
+    """Resolve the envelope directory from context or return default.
+
+    Parameters
+    ----------
+    ctx : typer.Context | None
+        Optional Typer context object.
+
+    Returns
+    -------
+    Path
+        Envelope directory path from context or default.
+    """
+    default_dir = _default_envelope_dir()
     if ctx is None or ctx.obj is None:
-        return CLI_ENVELOPE_DIR
+        return default_dir
     state = ctx.ensure_object(dict)
     directory = state.get("envelope_dir")
     if directory is None:
-        return CLI_ENVELOPE_DIR
+        return default_dir
     return Path(directory)
 
 
 def _cli_context(ctx: typer.Context | None = None) -> DownloadCliContext:
+    """Resolve the CLI context from Typer or Click context.
+
+    Parameters
+    ----------
+    ctx : typer.Context | None, optional
+        Optional Typer context object. If None, attempts to get Click context.
+
+    Returns
+    -------
+    DownloadCliContext
+        CLI context instance, either from context state or default.
+    """
     active = ctx or click.get_current_context(silent=True)
     if active is None:
         return _DEFAULT_CONTEXT
@@ -162,15 +300,36 @@ def _cli_context(ctx: typer.Context | None = None) -> DownloadCliContext:
 @app.callback()
 def main_callback(
     ctx: typer.Context,
-    envelope_dir: EnvelopeDirOption = CLI_ENVELOPE_DIR,
+    envelope_dir: EnvelopeDirOption = None,
+    artifact_dir: ArtifactDirOption = None,
 ) -> None:
     """Configure shared CLI options applicable to all subcommands."""
-    _store_cli_state(ctx, envelope_dir)
+    _store_cli_state(ctx, envelope_dir=envelope_dir, artifact_dir=artifact_dir)
     state = ctx.ensure_object(dict)
-    state.setdefault("cli_context", _DEFAULT_CONTEXT)
+    context = state.setdefault("cli_context", _DEFAULT_CONTEXT)
+    if artifact_dir is not None and isinstance(context, DownloadCliContext):
+        state["cli_context"] = DownloadCliContext(
+            harvest_handler=context.harvest_handler,
+            artifact_dir=artifact_dir,
+            artifact_fs=context.artifact_fs,
+        )
 
 
 def _envelope_path(subcommand: str, *, envelope_dir: Path) -> Path:
+    """Generate the file path for a CLI envelope.
+
+    Parameters
+    ----------
+    subcommand : str
+        Subcommand name (e.g., "harvest").
+    envelope_dir : Path
+        Directory where envelope files are stored.
+
+    Returns
+    -------
+    Path
+        Full path to the envelope JSON file.
+    """
     safe_subcommand = subcommand or "root"
     filename = f"{CLI_SETTINGS.bin_name}-{CLI_COMMAND}-{safe_subcommand.replace('/', '-')}.json"
     return envelope_dir / filename
@@ -182,6 +341,22 @@ def _emit_envelope(
     subcommand: str,
     envelope_dir: Path,
 ) -> Path:
+    """Write a CLI envelope to disk.
+
+    Parameters
+    ----------
+    envelope : CliEnvelope
+        Envelope object to serialize and write.
+    subcommand : str
+        Subcommand name for filename generation.
+    envelope_dir : Path
+        Directory where envelope files are stored.
+
+    Returns
+    -------
+    Path
+        Path to the written envelope file.
+    """
     path = _envelope_path(subcommand, envelope_dir=envelope_dir)
     envelope_dir.mkdir(parents=True, exist_ok=True)
     rendered = render_cli_envelope(envelope)
@@ -192,6 +367,22 @@ def _emit_envelope(
 def _harvest_problem(
     detail: str, *, status: int = 500, extras: dict[str, Any] | None = None
 ) -> ProblemDetailsDict:
+    """Build a Problem Details dictionary for harvest command errors.
+
+    Parameters
+    ----------
+    detail : str
+        Human-readable error detail message.
+    status : int, optional
+        HTTP status code (default: 500).
+    extras : dict[str, Any] | None, optional
+        Optional additional error context.
+
+    Returns
+    -------
+    ProblemDetailsDict
+        RFC 9457 Problem Details dictionary.
+    """
     return build_problem_details(
         ProblemDetailsParams(
             type="https://kgfoundry.dev/problems/download/harvest-error",
@@ -202,6 +393,24 @@ def _harvest_problem(
             extensions=extras,
         )
     )
+
+
+def _artifact_filename(topic: str) -> str:
+    """Generate a safe filename from a topic string.
+
+    Parameters
+    ----------
+    topic : str
+        Topic query string to convert to filename.
+
+    Returns
+    -------
+    str
+        Safe filename with topic slug and "-artifacts.txt" suffix.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")
+    safe = slug or "harvest"
+    return f"{safe}-artifacts.txt"
 
 
 @download_app.command(help=HARVEST_DESCRIPTION)
@@ -255,7 +464,6 @@ def harvest(
         message = download_context.harvest_handler(
             HarvestRequest(topic=topic, years=years, max_works=max_works)
         )
-        builder = builder.add_file(path="openalex", status="success", message=message)
         typer.echo(message)
     except Exception as exc:  # pragma: no cover - defensive catch for future integrations
         problem = _harvest_problem(str(exc))
@@ -278,8 +486,18 @@ def harvest(
         )
         raise typer.Exit(code=1) from exc
 
+    artifact_dir = download_context.artifact_dir
+    artifact_fs = download_context.artifact_fs
+    artifact_fs.ensure_dir(artifact_dir)
+    artifact_path = artifact_dir / _artifact_filename(topic)
+    artifact_fs.write_text(artifact_path, message + "\n", encoding="utf-8")
+    builder = builder.add_file(path=str(artifact_path), status="success", message=message)
     envelope = builder.finish(duration_seconds=time.monotonic() - start)
-    path = _emit_envelope(envelope, subcommand="harvest", envelope_dir=envelope_dir)
+    path = _emit_envelope(
+        envelope,
+        subcommand="harvest",
+        envelope_dir=envelope_dir,
+    )
     typer.echo(f"Harvest command completed; envelope saved to {path}")
 
 

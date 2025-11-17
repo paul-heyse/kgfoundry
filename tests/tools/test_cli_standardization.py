@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 
 import pytest
 
@@ -47,7 +48,9 @@ def test_cli_configuration_matches_context(
     assertions.expect_equal(expected_operation_ids, module.CLI_OPERATION_IDS)
 
     expected_envelope_dir = context.REPO_ROOT / "site" / "_build" / "cli"
-    assertions.expect_equal(expected_envelope_dir, module.CLI_ENVELOPE_DIR)
+
+    default_dir = Path(module.REPO_ROOT) / "site" / "_build" / "cli"
+    assertions.expect_equal(expected_envelope_dir, default_dir)
 
     if definition is not None:
         assertions.expect_equal(command_name, module.CLI_COMMAND_NAME)

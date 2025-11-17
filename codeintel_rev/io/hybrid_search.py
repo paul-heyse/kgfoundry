@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -353,6 +353,25 @@ class HybridSearchOptions:
 
 
 @dataclass(slots=True, frozen=True)
+class HybridSearchProviders:
+    """Optional channel provider overrides for hybrid search."""
+
+    bm25: Callable[[str, int], Sequence[SearchHit]] | None = None
+    splade: Callable[[str, int], Sequence[SearchHit]] | None = None
+    semantic: Callable[[Sequence[tuple[int, float]], int | None], Sequence[SearchHit]] | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class HybridSearchContext:
+    """Dependency overrides for :class:`HybridSearchEngine`."""
+
+    capabilities: Capabilities | None = None
+    registry: ChannelRegistry | None = None
+    duckdb_manager: DuckDBManager | None = None
+    providers: HybridSearchProviders | None = None
+
+
+@dataclass(slots=True, frozen=True)
 class _MethodStats:
     fused_count: int
     limit: int
@@ -396,23 +415,23 @@ class HybridSearchEngine:
         settings: Settings,
         paths: ResolvedPaths,
         *,
-        capabilities: Capabilities | None = None,
-        registry: ChannelRegistry | None = None,
-        duckdb_manager: DuckDBManager | None = None,
+        context: HybridSearchContext | None = None,
     ) -> None:
+        ctx = context or HybridSearchContext()
         self._settings = settings
         self._paths = paths
-        self._capabilities = capabilities
-        self._duckdb_manager = duckdb_manager
-        if registry is None:
+        self._capabilities = ctx.capabilities
+        self._duckdb_manager = ctx.duckdb_manager
+        self._providers = ctx.providers or HybridSearchProviders()
+        if ctx.registry is None:
             channel_context = ChannelContext(
                 settings=settings,
                 paths=paths,
-                capabilities=capabilities,
+                capabilities=ctx.capabilities,
             )
             self._registry = ChannelRegistry.discover(channel_context)
         else:
-            self._registry = registry
+            self._registry = ctx.registry
         self._pool_weights = self._compute_pool_weights()
         self._pooler = self._make_pooler()
         self._explain_last: dict[str, object] = {}
@@ -793,6 +812,16 @@ class HybridSearchEngine:
                 missing.add(requirement)
         return missing
 
+    def _channel_override(
+        self,
+        name: str,
+    ) -> Callable[[str, int], Sequence[SearchHit]] | None:
+        if name == "bm25":
+            return self._providers.bm25
+        if name == "splade":
+            return self._providers.splade
+        return None
+
     def _collect_channel_hits(
         self,
         channel: Channel,
@@ -805,6 +834,10 @@ class HybridSearchEngine:
         missing = self._missing_capabilities(channel)
         if missing:
             return [], None
+        override = self._channel_override(channel.name)
+        if override is not None:
+            hits = list(override(query, limit))
+            return hits, None
         try:
             hits = list(channel.search(query, limit))
         except ChannelError as exc:
@@ -826,13 +859,20 @@ class HybridSearchEngine:
         merged["stages"] = list(stages)
         return merged
 
-    def resolve_path(self, value: str) -> Path:
+    def resolve_path(
+        self,
+        value: str,
+        *,
+        path_expander: Callable[[Path], Path] | None = None,
+    ) -> Path:
         """Resolve a path string to an absolute Path.
 
         Parameters
         ----------
         value : str
             Path string that may be absolute, relative, or use ~ expansion.
+        path_expander : Callable[[Path], Path] | None, optional
+            Custom path expander applied before resolution. Defaults to ``Path.expanduser``.
 
         Returns
         -------
@@ -840,7 +880,8 @@ class HybridSearchEngine:
             Absolute resolved path. If input is absolute, returns as-is.
             If relative, resolves relative to repository root.
         """
-        candidate = Path(value).expanduser()
+        expander = path_expander or (lambda candidate: candidate.expanduser())
+        candidate = expander(Path(value))
         if candidate.is_absolute():
             return candidate
         return (self._paths.repo_root / candidate).resolve()
@@ -851,6 +892,10 @@ class HybridSearchEngine:
         *,
         limit: int | None = None,
     ) -> list[SearchHit]:
+        provider = self._providers.semantic
+        if provider is not None:
+            provided = provider(hits, limit)
+            return list(provided)
         limit = limit or self._settings.index.hybrid_top_k_per_channel
         top_k = min(len(hits), limit) or len(hits)
         semantic_hits: list[SearchHit] = []
@@ -1041,8 +1086,10 @@ class HybridSearchEngine:
 __all__ = [
     "BM25SearchProvider",
     "HybridResultDoc",
+    "HybridSearchContext",
     "HybridSearchEngine",
     "HybridSearchOptions",
+    "HybridSearchProviders",
     "HybridSearchResult",
     "HybridSearchTuning",
     "SpladeSearchProvider",

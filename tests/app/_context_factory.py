@@ -180,6 +180,7 @@ def build_application_context(
 
     index_cfg = SimpleNamespace(
         faiss_nlist=64,
+        faiss_preload=False,
         enable_bm25_channel=enable_bm25,
         enable_splade_channel=enable_splade,
         vec_dim=2,
@@ -187,6 +188,7 @@ def build_application_context(
         default_nprobe=32,
         hnsw_ef_search=64,
         refine_k_factor=1.0,
+        duckdb_materialize=False,
     )
     xtr_cfg = SimpleNamespace(
         enable=xtr_enabled,

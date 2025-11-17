@@ -8,7 +8,7 @@ from typing import Any, cast
 
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
-from codeintel_rev.app.main import lifespan
+from codeintel_rev.app.main import lifespan, override_app_hooks
 from fastapi import FastAPI
 
 from tests._helpers import assertions
@@ -56,7 +56,7 @@ class _FakeContext:
 
 
 class _FakeReadinessProbe:
-    def __init__(self, context: _FakeContext) -> None:
+    def __init__(self, context: ApplicationContext | _FakeContext) -> None:
         self.context = context
         self.initialize_calls = 0
         self.shutdown_calls = 0
@@ -69,38 +69,28 @@ class _FakeReadinessProbe:
 
 
 @pytest.mark.asyncio
-async def test_lifespan_preload_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_lifespan_preload_and_cleanup() -> None:
     """Verify optional runtimes preload and cleanup during lifespan."""
     fake_context = _FakeContext()
     probes: list[_FakeReadinessProbe] = []
-
-    def _fake_create(_cls: type[ApplicationContext]) -> _FakeContext:
-        return fake_context
-
-    def _fake_health() -> dict[str, object]:
-        return {"overall_status": "ready", "details": {}}
 
     def _probe_factory(context: _FakeContext) -> _FakeReadinessProbe:
         probe = _FakeReadinessProbe(context)
         probes.append(probe)
         return probe
 
-    monkeypatch.setattr(
-        ApplicationContext,
-        "create",
-        classmethod(_fake_create),
-    )
-    monkeypatch.setattr("codeintel_rev.app.main.check_faiss_health", _fake_health)
-    monkeypatch.setattr("codeintel_rev.app.main.ReadinessProbe", _probe_factory)
-
     def _flag(name: str) -> bool:
         return name in {"XTR_PRELOAD", "HYBRID_PRELOAD"}
 
-    monkeypatch.setattr("codeintel_rev.app.main._env_flag", _flag)
-
-    app = FastAPI()
-    async with lifespan(app):
-        pass
+    with override_app_hooks(
+        context_factory=lambda _overrides: fake_context,
+        readiness_probe_factory=_probe_factory,
+        env_flag_resolver=_flag,
+        faiss_health_check=lambda: {"overall_status": "ready"},
+    ):
+        app = FastAPI()
+        async with lifespan(app):
+            pass
 
     assertions.expect_equal(fake_context.xtr_calls, 1)
     assertions.expect_equal(fake_context.hybrid_calls, 1)
@@ -182,3 +172,33 @@ def application_context(_base_application_context: ApplicationContext) -> Applic
         The shared application context instance.
     """
     return _base_application_context
+
+
+@pytest.mark.asyncio
+async def test_lifespan_closes_resources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The production lifespan helper should close runtimes and scope stores."""
+    base_context = build_application_context(tmp_path)
+    tracker = _FakeScopeStore()
+    context = base_context.with_overrides(scope_store=tracker)
+    readiness = _FakeReadinessProbe(context)
+
+    close_calls = {"count": 0}
+    original_close = ApplicationContext.close_all_runtimes
+
+    def _tracked_close_all_runtimes(self: ApplicationContext) -> None:
+        close_calls["count"] += 1
+        original_close(self)
+
+    monkeypatch.setattr(ApplicationContext, "close_all_runtimes", _tracked_close_all_runtimes)
+
+    with override_app_hooks(
+        context_factory=lambda _overrides: context,
+        readiness_probe_factory=lambda _: readiness,
+        faiss_health_check=lambda: {"status": "ok"},
+    ):
+        app = FastAPI(lifespan=lifespan)
+        async with app.router.lifespan_context(app):
+            pass
+
+    assertions.expect_equal(close_calls["count"], 1)
+    assertions.expect_equal(tracker.close_calls, 1)

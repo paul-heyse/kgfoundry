@@ -206,7 +206,7 @@ _STRUCT_MATERIALIZATION_PLANS: dict[str, _StructMaterializationPlan] = {
 }
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class DuckDBCatalogOptions:
     """Optional configuration bundle for DuckDB catalog instantiation."""
 
@@ -214,6 +214,7 @@ class DuckDBCatalogOptions:
     manager: DuckDBManager | None = None
     log_queries: bool | None = None
     repo_root: Path | None = None
+    query_builder_factory: Callable[[], DuckDBQueryBuilder] | None = None
 
 
 class _DuckDBQueryMixin:
@@ -497,7 +498,13 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - catalog exposes many 
             raise ValueError(msg)
         if options is None:
             if legacy_kwargs:
-                allowed = {"materialize", "manager", "log_queries", "repo_root"}
+                allowed = {
+                    "materialize",
+                    "manager",
+                    "log_queries",
+                    "repo_root",
+                    "query_builder_factory",
+                }
                 unknown = set(legacy_kwargs) - allowed
                 if unknown:
                     msg = f"Unsupported DuckDBCatalog keyword(s): {', '.join(sorted(unknown))}"
@@ -510,7 +517,8 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - catalog exposes many 
         self.materialize = options.materialize
         manager = options.manager or DuckDBManager(db_path)
         self._manager = manager
-        self._query_builder = DuckDBQueryBuilder()
+        builder_factory = options.query_builder_factory or DuckDBQueryBuilder
+        self._query_builder = builder_factory()
         self._embedding_dim_cache: int | None = None
         self._init_lock = Lock()
         self._views_ready = False

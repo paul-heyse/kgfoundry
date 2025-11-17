@@ -6,6 +6,8 @@ import hashlib
 import importlib
 import importlib.util
 import json
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -18,7 +20,7 @@ if TYPE_CHECKING:
 
 from codeintel_rev.errors import RuntimeLifecycleError
 
-__all__ = ["Capabilities"]
+__all__ = ["Capabilities", "override_capability_imports"]
 
 
 _CAPABILITY_HINT_ATTRS: Final[dict[str, str]] = {
@@ -58,6 +60,37 @@ def _import_optional(module_name: str) -> ModuleType | None:
         return importlib.import_module(module_name)
     except ImportError:  # pragma: no cover - import errors are expected
         return None
+
+
+_OPTIONAL_IMPORTER_STACK: list[Callable[[str], ModuleType | None]] = [_import_optional]
+
+
+@contextmanager
+def override_capability_imports(
+    overrides: Mapping[str, ModuleType | None] | Callable[[str], ModuleType | None]
+) -> Iterator[None]:
+    """Temporarily override optional imports used for capability detection."""
+
+    def _from_mapping(
+        mapping: Mapping[str, ModuleType | None],
+        fallback: Callable[[str], ModuleType | None],
+    ) -> Callable[[str], ModuleType | None]:
+        def _patched(name: str) -> ModuleType | None:
+            if name in mapping:
+                return mapping[name]
+            return fallback(name)
+
+        return _patched
+
+    previous = _OPTIONAL_IMPORTER_STACK[-1]
+    if callable(overrides):
+        _OPTIONAL_IMPORTER_STACK.append(overrides)
+    else:
+        _OPTIONAL_IMPORTER_STACK.append(_from_mapping(overrides, previous))
+    try:
+        yield
+    finally:
+        _OPTIONAL_IMPORTER_STACK.pop()
 
 
 def _path_exists(path: Path | None) -> bool:
@@ -217,12 +250,13 @@ class Capabilities:
         complexity: O(1) for most checks, O(module_load_time) for optional imports.
         """
         paths = getattr(context, "paths", None)
-        faiss_module = _import_optional("faiss")
-        duckdb_module = _import_optional("duckdb")
-        httpx_module = _import_optional("httpx")
-        torch_module = _import_optional("torch")
-        lucene_module = _import_optional("pyserini.search.lucene")
-        onnxruntime_module = _import_optional("onnxruntime")
+        importer = _OPTIONAL_IMPORTER_STACK[-1]
+        faiss_module = importer("faiss")
+        duckdb_module = importer("duckdb")
+        httpx_module = importer("httpx")
+        torch_module = importer("torch")
+        lucene_module = importer("pyserini.search.lucene")
+        onnxruntime_module = importer("onnxruntime")
         active_version: str | None = None
         version_count = 0
         index_manager = getattr(context, "index_manager", None)

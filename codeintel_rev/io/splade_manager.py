@@ -10,7 +10,7 @@ import os
 import shutil
 import statistics
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -198,6 +198,15 @@ if TYPE_CHECKING:
             """
             _ = (self, output_path)
             raise NotImplementedError
+
+    class _SparseEncoderFactory(Protocol):
+        def __call__(
+            self,
+            model_id: str,
+            *,
+            backend: str,
+            model_kwargs: Mapping[str, object] | None = None,
+        ) -> _SparseEncoderProtocol: ...
 
     class _OptimizerKwargs(TypedDict):
         optimization_config: str
@@ -398,14 +407,14 @@ class _ExportContext:
     options: SpladeExportOptions
 
 
-def _require_sparse_encoder() -> type:
+def _require_sparse_encoder() -> _SparseEncoderFactory:
     if _SparseEncoderClass is None:  # pragma: no cover - defensive
         msg = (
             "sentence-transformers with SparseEncoder support is required for SPLADE "
             "operations. Install the 'sentence-transformers[onnx]' extra."
         )
         raise RuntimeError(msg)
-    return _SparseEncoderClass
+    return cast("_SparseEncoderFactory", _SparseEncoderClass)
 
 
 def _require_export_helpers() -> tuple[_OptimizerFunction, _QuantizerFunction]:
@@ -464,6 +473,74 @@ def _detect_pyserini_version() -> str:
         return "unknown"
     version = getattr(module, "__version__", None)
     return str(version) if version is not None else "unknown"
+
+
+@dataclass(frozen=True)
+class SpladeEncoderContext:
+    """Dependency provider for acquiring SPLADE encoder classes."""
+
+    encoder_factory: Callable[[], _SparseEncoderFactory]
+
+    @classmethod
+    def production(cls) -> SpladeEncoderContext:
+        """Return the encoder context used in production.
+
+        Returns
+        -------
+        SpladeEncoderContext
+            Context supplying the real sparse encoder factory.
+        """
+        return cls(encoder_factory=_require_sparse_encoder)
+
+
+@dataclass(frozen=True)
+class SpladeArtifactsContext:
+    """Dependencies for artifact export operations."""
+
+    encoder_context: SpladeEncoderContext
+    export_helpers_factory: Callable[[], tuple[_OptimizerFunction, _QuantizerFunction]]
+    clock: Callable[[], datetime]
+
+    @classmethod
+    def production(cls) -> SpladeArtifactsContext:
+        """Return the artifact context used in production.
+
+        Returns
+        -------
+        SpladeArtifactsContext
+            Context configured with encoder, helper, and clock factories.
+        """
+        return cls(
+            encoder_context=SpladeEncoderContext.production(),
+            export_helpers_factory=_require_export_helpers,
+            clock=lambda: datetime.now(UTC),
+        )
+
+
+@dataclass(frozen=True)
+class SpladeIndexContext:
+    """Dependencies for SPLADE Lucene index builds."""
+
+    subprocess_runner: Callable[[list[str], Mapping[str, str] | None], str]
+    version_provider: Callable[[], str]
+    directory_size: Callable[[Path], int]
+    clock: Callable[[], datetime]
+
+    @classmethod
+    def production(cls) -> SpladeIndexContext:
+        """Return the default index context.
+
+        Returns
+        -------
+        SpladeIndexContext
+            Context configured with production subprocess, clock, and version providers.
+        """
+        return cls(
+            subprocess_runner=lambda cmd, env=None: run_subprocess(cmd, env=env),
+            version_provider=_detect_pyserini_version,
+            directory_size=_directory_size,
+            clock=lambda: datetime.now(UTC),
+        )
 
 
 def _serialize_relative(path: Path, base: Path) -> str:
@@ -771,6 +848,8 @@ def _encode_records(
 def _optimize_export(
     encoder: _SparseEncoderProtocol,
     ctx: _ExportContext,
+    *,
+    optimizer: _OptimizerFunction | None,
 ) -> Path:
     """Run graph optimization if requested and return the base ONNX path.
 
@@ -793,6 +872,9 @@ def _optimize_export(
         Export context containing export options, directory paths, model
         identifier, and provider information. The ctx.options.optimize flag
         determines whether optimization is performed.
+    optimizer : _OptimizerFunction | None
+        Callable responsible for running optimization passes. When ``None``,
+        optimization is skipped regardless of configuration.
 
     Returns
     -------
@@ -803,10 +885,9 @@ def _optimize_export(
         the original model path (model.onnx).
     """
     base_onnx = ctx.onnx_dir / "model.onnx"
-    if not ctx.options.optimize:
+    if not ctx.options.optimize or optimizer is None:
         return base_onnx
 
-    optimizer, _quantizer = _require_export_helpers()
     optimized_path = ctx.onnx_dir / "model_O3.onnx"
     optimizer(
         model=encoder,
@@ -823,6 +904,7 @@ def _quantize_export(
     encoder: _SparseEncoderProtocol,
     ctx: _ExportContext,
     base_onnx: Path,
+    quantizer: _QuantizerFunction | None,
 ) -> bool:
     """Apply dynamic quantization and ensure the target ONNX exists.
 
@@ -851,6 +933,8 @@ def _quantize_export(
         Path to the base ONNX model file (optimized or original). This is the
         input for quantization. If quantization is disabled, this file is copied
         to the target path.
+    quantizer : _QuantizerFunction | None
+        Callable that performs quantization. When ``None``, quantization is skipped.
 
     Returns
     -------
@@ -867,7 +951,8 @@ def _quantize_export(
             shutil.copy2(base_onnx, target_path)
         return False
 
-    _optimizer, quantizer = _require_export_helpers()
+    if quantizer is None:
+        return False
     quantizer(
         model=encoder,
         quantization_config=options.quantization_config,
@@ -888,6 +973,7 @@ def _persist_export_metadata(
     *,
     ctx: _ExportContext,
     quantized: bool,
+    exported_at: datetime | None = None,
 ) -> SpladeExportSummary:
     """Write export metadata and return the resulting summary.
 
@@ -907,6 +993,8 @@ def _persist_export_metadata(
         Flag indicating whether the exported model is quantized. Determines
         which quantization configuration (if any) is stored in metadata. True
         if dynamic quantization was successfully applied, False otherwise.
+    exported_at : datetime | None, optional
+        Timestamp to record in metadata. When ``None`` the current UTC time is used.
 
     Returns
     -------
@@ -917,6 +1005,7 @@ def _persist_export_metadata(
         The summary can be used to locate the exported artifacts and verify
         export completion.
     """
+    timestamp = (exported_at or datetime.now(UTC)).isoformat()
     metadata = SpladeArtifactMetadata(
         model_id=ctx.model_id,
         model_dir=str(ctx.model_dir),
@@ -926,7 +1015,7 @@ def _persist_export_metadata(
         optimized=ctx.options.optimize,
         quantized=quantized,
         quantization_config=(ctx.options.quantization_config if ctx.options.quantize else None),
-        exported_at=datetime.now(UTC).isoformat(),
+        exported_at=timestamp,
         generator=GENERATOR_NAME,
     )
     metadata_path = ctx.onnx_dir / ARTIFACT_METADATA_FILENAME
@@ -937,11 +1026,18 @@ def _persist_export_metadata(
 class SpladeArtifactsManager:
     """Manage SPLADE model exports and ONNX artifacts."""
 
-    def __init__(self, settings: Settings, *, logger_: logging.Logger | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        logger_: logging.Logger | None = None,
+        artifacts_context: SpladeArtifactsContext | None = None,
+    ) -> None:
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
         self._config = settings.splade
+        self._artifacts_context = artifacts_context or SpladeArtifactsContext.production()
 
     @property
     def model_dir(self) -> Path:
@@ -979,7 +1075,8 @@ class SpladeArtifactsManager:
             Summary describing the exported artifact and metadata path.
         """
         opts = options or SpladeExportOptions()
-        sparse_encoder_cls = _require_sparse_encoder()
+        sparse_encoder_factory = self._artifacts_context.encoder_context.encoder_factory()
+        optimizer, quantizer = self._artifacts_context.export_helpers_factory()
         model_id = opts.model_id or self._config.model_id
         provider = opts.provider or self._config.provider
         model_dir = self.model_dir
@@ -995,9 +1092,10 @@ class SpladeArtifactsManager:
             },
         )
 
-        encoder = cast(
-            "_SparseEncoderProtocol",
-            sparse_encoder_cls(model_id, backend="onnx", model_kwargs={"provider": provider}),
+        encoder = sparse_encoder_factory(
+            model_id,
+            backend="onnx",
+            model_kwargs={"provider": provider},
         )
         encoder.save_pretrained(str(model_dir))
         ctx = _ExportContext(
@@ -1008,10 +1106,19 @@ class SpladeArtifactsManager:
             target_path=onnx_dir / (opts.file_name or self._config.onnx_file),
             options=opts,
         )
-        base_onnx = _optimize_export(encoder, ctx)
-        quantized = _quantize_export(encoder=encoder, ctx=ctx, base_onnx=base_onnx)
+        base_onnx = _optimize_export(encoder, ctx, optimizer=optimizer)
+        quantized = _quantize_export(
+            encoder=encoder,
+            ctx=ctx,
+            base_onnx=base_onnx,
+            quantizer=quantizer,
+        )
 
-        summary = _persist_export_metadata(ctx=ctx, quantized=quantized)
+        summary = _persist_export_metadata(
+            ctx=ctx,
+            quantized=quantized,
+            exported_at=self._artifacts_context.clock(),
+        )
         self._logger.info(
             "Exported SPLADE artifacts",
             extra={"onnx_file": summary.onnx_file, "metadata": summary.metadata_path},
@@ -1022,9 +1129,18 @@ class SpladeArtifactsManager:
 class SpladeEncoderService:
     """Encode corpora into SPLADE JsonVectorCollection shards."""
 
-    def __init__(self, settings: Settings, *, logger_: logging.Logger | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        logger_: logging.Logger | None = None,
+        encoder_context: SpladeEncoderContext | None = None,
+        timer: Callable[[], float] | None = None,
+    ) -> None:
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
+        self._encoder_context = encoder_context or SpladeEncoderContext.production()
+        self._timer = timer or perf_counter
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
         self._config = settings.splade
 
@@ -1111,7 +1227,7 @@ class SpladeEncoderService:
               None if no ONNX file was found and PyTorch model was used instead.
               This path can be stored in metadata for reproducibility.
         """
-        sparse_encoder_cls = _require_sparse_encoder()
+        sparse_encoder_factory = self._encoder_context.encoder_factory()
         model_dir = resolve_within_repo(self._repo_root, self._config.model_dir)
         onnx_dir = resolve_within_repo(self._repo_root, self._config.onnx_dir)
         search_paths: list[Path] = []
@@ -1130,12 +1246,12 @@ class SpladeEncoderService:
                 selected_relative = relative_path
                 break
 
-        encoder_instance = sparse_encoder_cls(
+        encoder_instance = sparse_encoder_factory(
             str(model_dir),
             backend="onnx",
             model_kwargs=model_kwargs,
         )
-        return cast("_SparseEncoderProtocol", encoder_instance), selected_relative
+        return encoder_instance, selected_relative
 
     def _build_encoder(self, *, provider: str, onnx_file: str | None) -> _SparseEncoderProtocol:
         encoder, _ = self._initialise_encoder(provider=provider, onnx_file=onnx_file)
@@ -1265,9 +1381,9 @@ class SpladeEncoderService:
 
         latencies: list[float] = []
         for _ in range(opts.measure_iterations):
-            start = perf_counter()
+            start = self._timer()
             encoder.encode_query(list(normalised))
-            elapsed = (perf_counter() - start) * 1000.0
+            elapsed = (self._timer() - start) * 1000.0
             latencies.append(elapsed)
 
         latencies.sort()
@@ -1303,11 +1419,18 @@ class SpladeEncoderService:
 class SpladeIndexManager:
     """Build SPLADE Lucene impact indexes from vector collections."""
 
-    def __init__(self, settings: Settings, *, logger_: logging.Logger | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        logger_: logging.Logger | None = None,
+        index_context: SpladeIndexContext | None = None,
+    ) -> None:
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
         self._config = settings.splade
+        self._index_context = index_context or SpladeIndexContext.production()
 
     @property
     def vectors_dir(self) -> Path:
@@ -1404,7 +1527,7 @@ class SpladeIndexManager:
                 "max_clause_count": max_clause,
             },
         )
-        run_subprocess(cmd, env=env_overrides)
+        self._index_context.subprocess_runner(cmd, env_overrides)
 
         metadata_path = vectors_dir / ENCODING_METADATA_FILENAME
         corpus_digest = None
@@ -1413,16 +1536,16 @@ class SpladeIndexManager:
             metadata = msgspec.json.decode(metadata_path.read_bytes(), type=SpladeEncodingMetadata)
             doc_count = metadata.doc_count
             corpus_digest = metadata.source_path
-        pyserini_version = _detect_pyserini_version()
+        pyserini_version = self._index_context.version_provider()
         index_metadata = SpladeIndexMetadata(
             doc_count=doc_count,
-            built_at=datetime.now(UTC).isoformat(),
+            built_at=self._index_context.clock().isoformat(),
             vectors_dir=str(vectors_dir),
             corpus_digest=corpus_digest,
             pyserini_version=pyserini_version,
             threads=threads,
             index_dir=str(index_dir),
-            index_size_bytes=_directory_size(index_dir),
+            index_size_bytes=self._index_context.directory_size(index_dir),
             generator=GENERATOR_NAME,
         )
         metadata_output = index_dir / INDEX_METADATA_FILENAME

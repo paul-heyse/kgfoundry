@@ -187,9 +187,7 @@ def test_encode_cli(
 ) -> None:
     """Encode should invoke the encoder service and persist metadata artifacts."""
     stub = _StubEncoderService(tmp_path)
-    context = splade_cli_context_builder(
-        encoder_factory=lambda: cast("SpladeEncoderService", stub)
-    )
+    context = splade_cli_context_builder(encoder_factory=lambda: cast("SpladeEncoderService", stub))
 
     source = tmp_path / "corpus.jsonl"
     source.write_text('{"id": "doc1", "contents": "text"}\n', encoding="utf-8")
@@ -223,9 +221,7 @@ def test_build_index_cli(
 ) -> None:
     """build-index should dispatch to the index manager with parsed options."""
     stub = _StubIndexManager(tmp_path)
-    context = splade_cli_context_builder(
-        index_factory=lambda: cast("SpladeIndexManager", stub)
-    )
+    context = splade_cli_context_builder(index_factory=lambda: cast("SpladeIndexManager", stub))
 
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
@@ -266,9 +262,7 @@ def test_bench_cli(
 ) -> None:
     """Bench should invoke the encoder service benchmark workflow."""
     stub = _StubEncoderService(tmp_path)
-    context = splade_cli_context_builder(
-        encoder_factory=lambda: cast("SpladeEncoderService", stub)
-    )
+    context = splade_cli_context_builder(encoder_factory=lambda: cast("SpladeEncoderService", stub))
 
     result = _invoke_splade(
         [

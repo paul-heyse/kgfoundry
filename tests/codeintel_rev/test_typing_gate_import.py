@@ -2,41 +2,21 @@
 
 from __future__ import annotations
 
-import builtins
-from collections.abc import Callable, Mapping, Sequence
-from types import ModuleType
-from typing import Any
-
 import pytest
 from codeintel_rev.typing import gate_import
 
 from tests._helpers import assertions
 
-ImportFunc = Callable[
-    [str, Mapping[str, Any] | None, Mapping[str, Any] | None, Sequence[str], int], ModuleType
-]
 
-
-def test_gate_import_missing_module_includes_extra_hint(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gate_import_missing_module_includes_extra_hint() -> None:
     """Verify gate_import includes pip install hint when module is missing."""
-    original_import: ImportFunc = builtins.__import__
 
-    def fake_import(
-        name: str,
-        globals_dict: Mapping[str, Any] | None = None,
-        locals_dict: Mapping[str, Any] | None = None,
-        fromlist: Sequence[str] = (),
-        level: int = 0,
-    ) -> ModuleType:
-        if name == "faiss":
-            message = "No module named 'faiss'"
-            raise ImportError(message)
-        return original_import(name, globals_dict, locals_dict, tuple(fromlist), level)
-
-    monkeypatch.setattr("builtins.__import__", fake_import)
+    def fake_import(_name: str) -> object:
+        message = "No module named 'faiss'"
+        raise ImportError(message)
 
     with pytest.raises(ImportError) as excinfo:
-        gate_import("faiss", "testing extras hint")
+        gate_import("faiss", "testing extras hint", import_func=fake_import)
 
     message = str(excinfo.value)
     assertions.expect_in("pip install codeintel-rev[faiss-cpu]", message)

@@ -60,14 +60,18 @@ async def test_file_operations(mock_application_context: ApplicationContext) -> 
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_session_id")
-async def test_text_search(
-    mock_application_context: ApplicationContext, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_text_search(mock_application_context: ApplicationContext) -> None:
     """Exercise the text search adapter for basic responses."""
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "module.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
 
-    def _fake_run_subprocess(cmd: list[str], *, cwd: Path | None, timeout: int) -> str:
+    def _fake_run_subprocess(
+        cmd: list[str],
+        *,
+        cwd: Path | None,
+        timeout: int,
+        env: Mapping[str, str] | None = None,
+    ) -> str:
         """Simulate ripgrep JSON output for deterministic tests.
 
         Parameters
@@ -78,13 +82,15 @@ async def test_text_search(
             Working directory for command execution.
         timeout : int
             Command timeout in seconds (unused in mock).
+        env : Mapping[str, str] | None
+            Environment variables provided to the subprocess helper (unused).
 
         Returns
         -------
         str
             Serialized JSON payload mimicking ripgrep output.
         """
-        _ = (cmd, timeout)
+        _ = (cmd, timeout, env)
         sample_path = (cwd or repo_root) / "module.py"
         payload = {
             "type": "match",
@@ -97,9 +103,12 @@ async def test_text_search(
         }
         return json.dumps(payload)
 
-    monkeypatch.setattr(text_search_adapter, "run_subprocess", _fake_run_subprocess)
-
-    result = await text_search_adapter.search_text(mock_application_context, "def", max_results=3)
+    result = await text_search_adapter.search_text(
+        mock_application_context,
+        "def",
+        max_results=3,
+        runner=_fake_run_subprocess,
+    )
     _expect(
         condition="matches" in result,
         message="Expected 'matches' key in search results",

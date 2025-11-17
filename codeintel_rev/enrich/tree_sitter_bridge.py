@@ -7,8 +7,9 @@ import importlib
 import importlib.util
 import logging
 import os
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -36,6 +37,27 @@ _OUTLINE_QUERY_PATTERNS: dict[str, str] = {
     """,
 }
 _OUTLINE_QUERY_CACHE: dict[str, QueryProtocol | None] = {}
+
+
+@dataclass(slots=True, frozen=True)
+class OutlineConfig:
+    """Configuration toggles for outline generation."""
+
+    use_ts_query: bool = _USE_TS_QUERY
+
+
+_OUTLINE_CONFIG_STACK: list[OutlineConfig] = [OutlineConfig()]
+
+
+@contextmanager
+def override_outline_config(**kwargs: object) -> Iterator[None]:
+    """Temporarily override outline configuration flags."""
+    config = replace(_OUTLINE_CONFIG_STACK[-1], **kwargs)
+    _OUTLINE_CONFIG_STACK.append(config)
+    try:
+        yield
+    finally:
+        _OUTLINE_CONFIG_STACK.pop()
 
 
 class ParserProtocol(Protocol):
@@ -141,7 +163,8 @@ def build_outline(path: str | Path, content: bytes) -> TSOutline | None:
     tree = parser.parse(content)
 
     nodes: list[OutlineNode] = []
-    if _USE_TS_QUERY:
+    config = _OUTLINE_CONFIG_STACK[-1]
+    if config.use_ts_query:
         nodes = _outline_with_query(language_name, language, tree, content)
     if not nodes:
         nodes = _outline_with_dfs(tree.root_node, content)

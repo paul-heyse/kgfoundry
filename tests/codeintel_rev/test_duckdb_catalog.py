@@ -12,13 +12,12 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from types import SimpleNamespace
 
 import duckdb
 import numpy as np
 import pytest
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
-from codeintel_rev.io.duckdb_manager import DuckDBQueryOptions
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogOptions, relation_exists
+from codeintel_rev.io.duckdb_manager import DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 from tests._helpers import assertions
 
@@ -767,45 +766,50 @@ class TestConcurrentAccess:
         assertions.expect_equal(result, [])
 
 
-def test_query_by_filters_uses_query_builder(
-    test_catalog: DuckDBCatalog, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_query_by_filters_uses_query_builder(test_catalog: DuckDBCatalog) -> None:
     """query_by_filters delegates SQL generation to DuckDBQueryBuilder."""
-    calls: list[dict[str, object]] = []
+    class _RecordingBuilder(DuckDBQueryBuilder):
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
 
-    def _fake_build_filter_query(
-        *,
-        chunk_ids: list[int],
-        options: DuckDBQueryOptions | None = None,
-    ) -> tuple[str, dict[str, list[int]]]:
-        calls.append(
-            {
-                "chunk_ids": list(chunk_ids),
-                "options": options,
-            }
-        )
-        sql = (
-            "SELECT c.*\n"
-            "FROM chunks AS c\n"
-            "JOIN UNNEST($ids) WITH ORDINALITY AS ids(id, position)\n"
-            "  ON c.id = ids.id\n"
-            "ORDER BY ids.position"
-        )
-        return sql, {"ids": list(chunk_ids)}
+        def build_filter_query(
+            self,
+            *,
+            chunk_ids: list[int],
+            options: DuckDBQueryOptions | None = None,
+        ) -> tuple[str, dict[str, list[int]]]:
+            self.calls.append(
+                {
+                    "chunk_ids": list(chunk_ids),
+                    "options": options,
+                }
+            )
+            sql = (
+                "SELECT c.*\n"
+                "FROM chunks AS c\n"
+                "JOIN UNNEST($ids) WITH ORDINALITY AS ids(id, position)\n"
+                "  ON c.id = ids.id\n"
+                "ORDER BY ids.position"
+            )
+            return sql, {"ids": list(chunk_ids)}
 
-    monkeypatch.setattr(
-        test_catalog,
-        "_query_builder",
-        SimpleNamespace(build_filter_query=_fake_build_filter_query),
+    builder = _RecordingBuilder()
+    catalog = DuckDBCatalog(
+        test_catalog.db_path,
+        test_catalog.vectors_dir,
+        options=DuckDBCatalogOptions(
+            manager=DuckDBManager(test_catalog.db_path),
+            query_builder_factory=lambda: builder,
+        ),
     )
 
-    results = test_catalog.query_by_filters([1, 2])
+    results = catalog.query_by_filters([1, 2])
 
     assertions.expect_equal(len(results), 2)
     assertions.expect_true(
-        bool(calls), reason="DuckDBQueryBuilder.build_filter_query should be invoked"
+        bool(builder.calls), reason="DuckDBQueryBuilder.build_filter_query should be invoked"
     )
-    recorded = calls[0]
+    recorded = builder.calls[0]
     options = recorded["options"]
     assertions.expect_true(
         isinstance(options, DuckDBQueryOptions), reason="options should be DuckDBQueryOptions"

@@ -5,9 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-import pytest
-from codeintel_rev.app import config_context
-from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.app.config_context import (
+    ApplicationContext,
+    ApplicationContextOverrides,
+    ResolvedPaths,
+)
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_manager import DuckDBManager
+from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server import service_context
 
 from tests._helpers import assertions
@@ -79,7 +86,7 @@ class DummyVLLMClient:
         return
 
 
-def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_service_context_resolves_paths(tmp_path: Path) -> None:
     """Relative configuration paths resolve against ``REPO_ROOT``."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -104,12 +111,36 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
         },
     )
 
-    monkeypatch.setattr(config_context, "_import_faiss_manager_cls", lambda: RecordingFAISSManager)
-    monkeypatch.setattr(config_context, "DuckDBCatalog", RecordingDuckDBCatalog)
-    monkeypatch.setattr(config_context, "VLLMClient", DummyVLLMClient)
-
     service_context.reset_service_context()
-    custom_context = ApplicationContext.create(settings=settings)
+
+    def _faiss_factory(cfg: Settings, resolved: ResolvedPaths) -> FAISSManager:
+        nlist_value = cfg.index.nlist or 1
+        return cast(
+            "FAISSManager",
+            RecordingFAISSManager(
+                index_path=resolved.faiss_index,
+                vec_dim=cfg.index.vec_dim,
+                nlist=nlist_value,
+                runtime=None,
+            ),
+        )
+
+    def _catalog_factory(
+        resolved: ResolvedPaths,
+        cfg: Settings,
+        manager: DuckDBManager,
+    ) -> DuckDBCatalog:
+        _ = cfg, manager
+        catalog = RecordingDuckDBCatalog(resolved.duckdb_path, resolved.vectors_dir)
+        catalog.set_idmap_path(resolved.faiss_idmap_path)
+        return cast("DuckDBCatalog", catalog)
+
+    overrides = ApplicationContextOverrides(
+        vllm_client=cast("VLLMClient", DummyVLLMClient(settings.vllm)),
+        faiss_manager_factory=_faiss_factory,
+        duckdb_catalog_factory=_catalog_factory,
+    )
+    custom_context = ApplicationContext.create(settings=settings, overrides=overrides)
     service_context.set_service_context(custom_context)
     context = service_context.get_service_context()
 

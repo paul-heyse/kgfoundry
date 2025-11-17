@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
+from codeintel_rev.io.coderank_embedder import (
+    CodeRankEmbedder,
+    CodeRankEmbedderContext,
+    SupportsCodeRankSettings,
+)
 
 from tests._helpers import assertions
 
@@ -16,30 +20,29 @@ class _FakeModel:
     def __init__(self) -> None:
         self.last_inputs: list[str] = []
 
-    def encode(self, texts: list[str], **_: object) -> list[list[float]]:
+    def encode(
+        self,
+        texts: Iterable[str],
+        *,
+        normalize_embeddings: bool,
+        batch_size: int,
+    ) -> Sequence[Sequence[float]]:
+        _ = normalize_embeddings, batch_size
         self.last_inputs = list(texts)
         return [[0.1, 0.2] for _ in texts]
 
 
-def _patch_gate(monkeypatch: pytest.MonkeyPatch, fake_model: _FakeModel) -> None:
-    def _build_model(*_: object, **__: object) -> _FakeModel:
+def _build_context(fake_model: _FakeModel) -> CodeRankEmbedderContext:
+    def _provider(settings: SupportsCodeRankSettings) -> _FakeModel:
+        _ = settings
         return fake_model
 
-    module = SimpleNamespace(SentenceTransformer=_build_model)
-
-    def _gate_import(*_: object, **__: object) -> SimpleNamespace:
-        return module
-
-    monkeypatch.setattr(
-        "codeintel_rev.io.coderank_embedder.gate_import",
-        _gate_import,
-    )
+    return CodeRankEmbedderContext(model_provider=_provider)
 
 
-def test_encode_queries_applies_instruction_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_encode_queries_applies_instruction_prefix() -> None:
     """Query encoding prepends the configured prefix."""
     fake_model = _FakeModel()
-    _patch_gate(monkeypatch, fake_model)
 
     settings = _EmbedderSettings(
         model_id="stub_queries",
@@ -49,7 +52,7 @@ def test_encode_queries_applies_instruction_prefix(monkeypatch: pytest.MonkeyPat
         normalize=True,
         batch_size=4,
     )
-    embedder = CodeRankEmbedder(settings=settings)
+    embedder = CodeRankEmbedder(settings=settings, context=_build_context(fake_model))
     vectors = embedder.encode_queries(["search scope"])
 
     assertions.expect_true(fake_model.last_inputs[0].startswith("Represent this query: "))
@@ -57,10 +60,9 @@ def test_encode_queries_applies_instruction_prefix(monkeypatch: pytest.MonkeyPat
     assertions.expect_equal(vectors.dtype, np.dtype(np.float32))
 
 
-def test_encode_codes_requires_input(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_encode_codes_requires_input() -> None:
     """Code encoding requires at least one snippet."""
     fake_model = _FakeModel()
-    _patch_gate(monkeypatch, fake_model)
     settings = _EmbedderSettings(
         model_id="stub_codes",
         device="cpu",
@@ -69,7 +71,7 @@ def test_encode_codes_requires_input(monkeypatch: pytest.MonkeyPatch) -> None:
         normalize=True,
         batch_size=4,
     )
-    embedder = CodeRankEmbedder(settings=settings)
+    embedder = CodeRankEmbedder(settings=settings, context=_build_context(fake_model))
 
     with pytest.raises(ValueError, match="code snippet"):
         embedder.encode_codes([])

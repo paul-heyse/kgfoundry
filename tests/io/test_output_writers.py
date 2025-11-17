@@ -25,9 +25,9 @@ def test_jsonl_writer_is_deterministic(tmp_path: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(output_writers.os, "getenv", _mock_getenv)
     path = tmp_path / "modules.jsonl"
     rows = [{"b": 2, "a": 1}, {"d": 4, "c": 3}]
-    write_jsonl(path, rows)
+    write_jsonl(path, rows, writer_version="v2")
     first = path.read_bytes()
-    write_jsonl(path, rows)
+    write_jsonl(path, rows, writer_version="v2")
     second = path.read_bytes()
     assertions.expect_equal(first, second)
     assertions.expect_true(first.endswith(b"\n"), reason="jsonl should end with newline")

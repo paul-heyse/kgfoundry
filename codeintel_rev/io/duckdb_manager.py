@@ -9,7 +9,7 @@ from pathlib import Path
 from queue import Empty, Full, LifoQueue
 from threading import Lock
 from time import perf_counter
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 
@@ -18,7 +18,13 @@ if TYPE_CHECKING:
 else:
     duckdb = cast("duckdb", LazyModule("duckdb", "DuckDB connection management"))
 
-__all__ = ["DuckDBConfig", "DuckDBManager", "DuckDBQueryBuilder", "DuckDBQueryOptions"]
+__all__ = [
+    "DuckDBConfig",
+    "DuckDBManager",
+    "DuckDBManagerContext",
+    "DuckDBQueryBuilder",
+    "DuckDBQueryOptions",
+]
 
 
 @dataclass(slots=True, frozen=True)
@@ -47,6 +53,35 @@ class DuckDBConfig:
     enable_object_cache: bool = True
     log_queries: bool = False
     pool_size: int | None = None
+
+
+class DuckDBConnector(Protocol):
+    """Callable protocol describing DuckDB connection factories."""
+
+    def __call__(self, database: str, *, read_only: bool) -> duckdb.DuckDBPyConnection:  # pragma: no cover - protocol
+        ...
+
+
+@dataclass(slots=True, frozen=True)
+class DuckDBManagerContext:
+    """Dependency providers for DuckDBManager."""
+
+    connector: DuckDBConnector
+
+    @classmethod
+    def production(cls) -> DuckDBManagerContext:
+        """Return context using the real duckdb.connect factory.
+
+        Returns
+        -------
+        DuckDBManagerContext
+            Context configured to call :func:`duckdb.connect`.
+        """
+
+        def _connector(database: str, *, read_only: bool) -> duckdb.DuckDBPyConnection:
+            return duckdb.connect(database, read_only=read_only)
+
+        return cls(connector=_connector)
 
 
 class _InstrumentedDuckDBConnection:
@@ -136,11 +171,22 @@ class DuckDBManager:
     config : DuckDBConfig | None, optional
         Connection configuration controlling threading and caching pragmas.
         If ``None``, uses default configuration. Defaults to ``None``.
+    context : DuckDBManagerContext | None, optional
+        Dependency overrides controlling how DuckDB connections are created.
+        Tests can pass a custom connector to observe connection counts or stub
+        DuckDB entirely. Defaults to :meth:`DuckDBManagerContext.production`.
     """
 
-    def __init__(self, db_path: Path, config: DuckDBConfig | None = None) -> None:
+    def __init__(
+        self,
+        db_path: Path,
+        config: DuckDBConfig | None = None,
+        *,
+        context: DuckDBManagerContext | None = None,
+    ) -> None:
         self._db_path = db_path
         self._config = config or DuckDBConfig()
+        self._context = context or DuckDBManagerContext.production()
         pool_size = self._config.pool_size or 0
         self._pool_size = max(pool_size, 0)
         self._pool: LifoQueue[duckdb.DuckDBPyConnection] | None = (
@@ -223,7 +269,8 @@ class DuckDBManager:
             self.close()
 
     def _create_connection(self, *, read_only: bool = False) -> duckdb.DuckDBPyConnection:
-        conn = duckdb.connect(str(self._db_path), read_only=read_only)
+        connector = self._context.connector
+        conn = connector(str(self._db_path), read_only=read_only)
         if self._config.enable_object_cache:
             conn.execute("PRAGMA enable_object_cache = true")
         conn.execute(f"SET threads = {self._config.threads}")

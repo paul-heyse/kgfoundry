@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
@@ -66,6 +66,59 @@ class _InprocessVLLMRuntime:
 
 
 @dataclass(slots=True, frozen=True)
+class InprocessVLLMContext:
+    """Dependency providers for in-process vLLM embeddings."""
+
+    tokenizer_factory: Callable[[str], PreTrainedTokenizerBase]
+    llm_factory: Callable[[VLLMConfig], LLM]
+    tokens_prompt_factory: Callable[[Sequence[int]], TokensPrompt]
+
+    @classmethod
+    def production(cls) -> InprocessVLLMContext:
+        """Return the production context using real vLLM modules.
+
+        Returns
+        -------
+        InprocessVLLMContext
+            Context configured with real tokenizer/LLM factories.
+        """
+
+        def _tokenizer(model_id: str) -> PreTrainedTokenizerBase:
+            transformers_mod = cast("Any", transformers)
+            tokenizer = transformers_mod.AutoTokenizer.from_pretrained(
+                model_id,
+                trust_remote_code=True,
+            )
+            return cast("PreTrainedTokenizerBase", tokenizer)
+
+        def _llm(cfg: VLLMConfig) -> LLM:
+            llm_cls = cast("type[LLM]", vllm.LLM)
+            pooler_config_cls = cast("type[PoolerConfig]", vllm_config.PoolerConfig)
+            return llm_cls(
+                model=cfg.model,
+                task="embed",
+                trust_remote_code=True,
+                enforce_eager=True,
+                gpu_memory_utilization=cfg.memory_utilization,
+                max_num_batched_tokens=cfg.max_num_batched_tokens,
+                override_pooler_config=pooler_config_cls(
+                    pooling_type=cfg.pooling_type,
+                    normalize=cfg.normalize,
+                ),
+            )
+
+        def _tokens_prompt(token_ids: Sequence[int]) -> TokensPrompt:
+            tokens_prompt_cls = cast("type[TokensPrompt]", vllm_inputs.TokensPrompt)
+            return tokens_prompt_cls(prompt_token_ids=list(map(int, token_ids)))
+
+        return cls(
+            tokenizer_factory=_tokenizer,
+            llm_factory=_llm,
+            tokens_prompt_factory=_tokens_prompt,
+        )
+
+
+@dataclass(slots=True)
 class InprocessVLLMEmbedder:
     """Embed text batches locally using vLLM.
 
@@ -102,9 +155,13 @@ class InprocessVLLMEmbedder:
         repr=False,
     )
 
+    context: InprocessVLLMContext | None = None
+
     def __post_init__(self) -> None:
         """Initialize tokenizer and vLLM engine."""
         os.environ.setdefault("VLLM_ATTENTION_BACKEND", "FLASHINFER")
+        if self.context is None:
+            object.__setattr__(self, "context", InprocessVLLMContext.production())
 
     def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
         """Return embeddings for ``texts`` (shape ``[N, dim]``).
@@ -172,10 +229,8 @@ class InprocessVLLMEmbedder:
             msg = "Tokenizer did not return input_ids"
             raise RuntimeError(msg)
         token_sequences = cast("Sequence[Sequence[int]]", raw_input_ids)
-        tokens_prompt_cls = cast("type[TokensPrompt]", vllm_inputs.TokensPrompt)
-        prompts: list[TokensPrompt] = [
-            tokens_prompt_cls(prompt_token_ids=list(map(int, ids))) for ids in token_sequences
-        ]
+        context = self._context()
+        prompts = [context.tokens_prompt_factory(ids) for ids in token_sequences]
         total_tokens = sum(len(ids) for ids in token_sequences)
         outputs = engine.embed(prompts)
         vectors = np.asarray(
@@ -183,40 +238,22 @@ class InprocessVLLMEmbedder:
             dtype=np.float32,
         )
         if vectors.shape[1] != self.config.embedding_dim:
-            pass
+            message = (
+                "vLLM embedding dimension mismatch: "
+                f"{vectors.shape[1]} != {self.config.embedding_dim}"
+            )
+            raise RuntimeError(message)
         return vectors, total_tokens
 
     def close(self) -> None:  # pragma: no cover - best-effort cleanup
         """Release tokenizer/engine references to help GC."""
         self._cell.close()
 
-    def _load_tokenizer(self) -> PreTrainedTokenizerBase:
-        transformers_mod = cast("Any", transformers)
-        return transformers_mod.AutoTokenizer.from_pretrained(
-            self.config.model,
-            trust_remote_code=True,
-        )
-
-    def _load_engine(self) -> LLM:
-        llm_cls = cast("type[LLM]", vllm.LLM)
-        pooler_config_cls = cast("type[PoolerConfig]", vllm_config.PoolerConfig)
-        return llm_cls(
-            model=self.config.model,
-            task="embed",
-            trust_remote_code=True,
-            enforce_eager=True,
-            gpu_memory_utilization=self.config.memory_utilization,
-            max_num_batched_tokens=self.config.max_num_batched_tokens,
-            override_pooler_config=pooler_config_cls(
-                pooling_type=self.config.pooling_type,
-                normalize=self.config.normalize,
-            ),
-        )
-
     def _initialize_runtime(self) -> _InprocessVLLMRuntime:
         runtime = _InprocessVLLMRuntime()
-        runtime.tokenizer = self._load_tokenizer()
-        runtime.engine = self._load_engine()
+        context = self._context()
+        runtime.tokenizer = context.tokenizer_factory(self.config.model)
+        runtime.engine = context.llm_factory(self.config)
         return runtime
 
     def _runtime(self) -> _InprocessVLLMRuntime:
@@ -225,6 +262,13 @@ class InprocessVLLMEmbedder:
             msg = "vLLM runtime not initialized"
             raise RuntimeError(msg)
         return runtime
+
+    def _context(self) -> InprocessVLLMContext:
+        context = self.context
+        if context is None:  # pragma: no cover - defensive
+            msg = "In-process vLLM context not initialized"
+            raise RuntimeError(msg)
+        return context
 
 
 __all__ = ["InprocessVLLMEmbedder"]

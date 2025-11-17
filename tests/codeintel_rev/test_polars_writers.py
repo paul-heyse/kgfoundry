@@ -91,14 +91,9 @@ def test_resolve_polars_frame_factory_returns_none_without_entry_points() -> Non
     assertions.expect_equal(resolve_polars_frame_factory(cast("PolarsModule", object())), None)
 
 
-def test_write_import_graph_supports_dataframe_only_polars(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_write_import_graph_supports_dataframe_only_polars(tmp_path: Path) -> None:
     """Import graph export should work without ``data_frame`` helper."""
     polars = _PolarsModern()
-    monkeypatch.setattr(
-        graph_builder, "gate_import", lambda *_args, **_kwargs: cast("PolarsModule", polars)
-    )
     graph = graph_builder.ImportGraph(
         edges={"a.py": {"b.py"}},
         fan_in={"a.py": 0, "b.py": 1},
@@ -107,20 +102,15 @@ def test_write_import_graph_supports_dataframe_only_polars(
     )
     target = tmp_path / "imports.parquet"
 
-    graph_builder.write_import_graph(graph, target)
+    graph_builder.write_import_graph(graph, target, polars_module=cast("PolarsModule", polars))
 
     assertions.expect_true(target.exists(), reason="target file should exist")
     assertions.expect_sequence_equal(polars.calls[0], [{"src_path": "a.py", "dst_path": "b.py"}])
 
 
-def test_write_use_graph_supports_dataframe_only_polars(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_write_use_graph_supports_dataframe_only_polars(tmp_path: Path) -> None:
     """Use graph export should work without ``data_frame`` helper."""
     polars = _PolarsModern()
-    monkeypatch.setattr(
-        uses_builder, "gate_import", lambda *_args, **_kwargs: cast("PolarsModule", polars)
-    )
     use_graph = uses_builder.UseGraph(
         uses_by_file={"a.py": {"b.py"}},
         symbol_usage={"a.py": 1},
@@ -128,7 +118,7 @@ def test_write_use_graph_supports_dataframe_only_polars(
     )
     target = tmp_path / "uses.parquet"
 
-    uses_builder.write_use_graph(use_graph, target)
+    uses_builder.write_use_graph(use_graph, target, polars_module=cast("PolarsModule", polars))
 
     assertions.expect_true(target.exists(), reason="target file should exist")
     assertions.expect_sequence_equal(

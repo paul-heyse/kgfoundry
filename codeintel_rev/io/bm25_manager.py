@@ -7,6 +7,8 @@ import json
 import logging
 import shutil
 import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -72,14 +74,47 @@ class BM25BuildOptions(msgspec.Struct, frozen=True):
     store_raw: bool = True
 
 
+@dataclass(frozen=True)
+class BM25BuildContext:
+    """Dependency injection hooks for BM25 index builds."""
+
+    pyserini_runner: Callable[[list[str]], None]
+    version_provider: Callable[[], str]
+    directory_size: Callable[[Path], int]
+    clock: Callable[[], datetime]
+
+    @classmethod
+    def production(cls) -> BM25BuildContext:
+        """Return the default build context used in production.
+
+        Returns
+        -------
+        BM25BuildContext
+            Context configured with runtime subprocess, filesystem, and clock helpers.
+        """
+        return cls(
+            pyserini_runner=_run_pyserini_index,
+            version_provider=_detect_pyserini_version,
+            directory_size=_directory_size,
+            clock=lambda: datetime.now(UTC),
+        )
+
+
 class BM25IndexManager:
     """Manage BM25 corpus preparation and Lucene index builds."""
 
-    def __init__(self, settings: Settings, *, logger_: logging.Logger | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        logger_: logging.Logger | None = None,
+        build_context: BM25BuildContext | None = None,
+    ) -> None:
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
         self._config = settings.bm25
+        self._build_context = build_context or BM25BuildContext.production()
 
     @property
     def corpus_dir(self) -> Path:
@@ -276,11 +311,11 @@ class BM25IndexManager:
             cmd.append("--storeRaw")
 
         self._logger.info("Building BM25 index via Pyserini: %s", " ".join(cmd))
-        _run_pyserini_index(cmd)
+        self._build_context.pyserini_runner(cmd)
 
-        built_at = datetime.now(UTC).isoformat()
-        pyserini_version = _detect_pyserini_version()
-        index_size_bytes = _directory_size(resolved_index_dir)
+        built_at = self._build_context.clock().isoformat()
+        pyserini_version = self._build_context.version_provider()
+        index_size_bytes = self._build_context.directory_size(resolved_index_dir)
 
         metadata = BM25IndexMetadata(
             doc_count=(corpus_metadata.doc_count if corpus_metadata else 0),

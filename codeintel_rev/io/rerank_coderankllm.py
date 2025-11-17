@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from codeintel_rev.typing import gate_import
@@ -27,6 +28,59 @@ JSON:
 _MAX_PREVIEW_CHARS = 400
 
 
+@dataclass(slots=True, frozen=True)
+class CoderankLLMRerankerContext:
+    """Dependency providers for CodeRank listwise reranker."""
+
+    tokenizer_factory: Callable[[str], PreTrainedTokenizerBase]
+    model_factory: Callable[[str], AutoModelForCausalLM]
+
+    @classmethod
+    def production(cls) -> CoderankLLMRerankerContext:
+        """Return the production context using transformers imports.
+
+        Returns
+        -------
+        CoderankLLMRerankerContext
+            Context configured to load tokenizer/model via ``transformers``.
+        """
+
+        def _tokenizer(model_id: str) -> PreTrainedTokenizerBase:
+            transformers_module = gate_import(
+                "transformers",
+                "CodeRank listwise reranker (install `transformers`)",
+            )
+            tokenizer_cls = getattr(transformers_module, "AutoTokenizer", None)
+            if tokenizer_cls is None:
+                msg = "transformers missing AutoTokenizer"
+                raise RuntimeError(msg)
+            tokenizer = tokenizer_cls.from_pretrained(model_id)
+            return cast("PreTrainedTokenizerBase", tokenizer)
+
+        def _model(model_id: str) -> AutoModelForCausalLM:
+            transformers_module = gate_import(
+                "transformers",
+                "CodeRank listwise reranker (install `transformers`)",
+            )
+            model_cls = getattr(transformers_module, "AutoModelForCausalLM", None)
+            if model_cls is None:
+                msg = "transformers missing AutoModelForCausalLM"
+                raise RuntimeError(msg)
+            model = model_cls.from_pretrained(model_id)
+            return cast("AutoModelForCausalLM", model)
+
+        return cls(tokenizer_factory=_tokenizer, model_factory=_model)
+
+
+@dataclass(slots=True, frozen=True)
+class CodeRankGenerationSettings:
+    """Generation parameters for CodeRank listwise reranker."""
+
+    max_new_tokens: int
+    temperature: float
+    top_p: float
+
+
 class CodeRankListwiseReranker:
     """Listwise reranking helper built on CodeRankLLM."""
 
@@ -40,15 +94,15 @@ class CodeRankListwiseReranker:
         *,
         model_id: str,
         device: str,
-        max_new_tokens: int,
-        temperature: float,
-        top_p: float,
+        settings: CodeRankGenerationSettings,
+        context: CoderankLLMRerankerContext | None = None,
     ) -> None:
         self.model_id = model_id
         self.device = device
-        self.max_new_tokens = max_new_tokens
-        self.temperature = temperature
-        self.top_p = top_p
+        self.max_new_tokens = settings.max_new_tokens
+        self.temperature = settings.temperature
+        self.top_p = settings.top_p
+        self._context = context or CoderankLLMRerankerContext.production()
 
     def rerank(self, query: str, candidates: Sequence[tuple[int, str]]) -> list[int]:
         """Return ordered chunk IDs ranked by CodeRankLLM.
@@ -111,22 +165,12 @@ class CodeRankListwiseReranker:
             cached = self._CACHE.get(cache_key)
             if cached:
                 return cached
-            transformers_module = gate_import(
-                "transformers",
-                "CodeRank listwise reranker (install `transformers`)",
-            )
-            tokenizer_cls = getattr(transformers_module, "AutoTokenizer", None)
-            model_cls = getattr(transformers_module, "AutoModelForCausalLM", None)
-            if tokenizer_cls is None or model_cls is None:
-                msg = "transformers missing AutoTokenizer/AutoModelForCausalLM"
-                raise RuntimeError(msg)
-            tokenizer = cast(
-                "PreTrainedTokenizerBase", tokenizer_cls.from_pretrained(self.model_id)
-            )
-            model = model_cls.from_pretrained(self.model_id)
-            model.to(self.device)
-            model.eval()
-            pair = (tokenizer, cast("AutoModelForCausalLM", model))
+            tokenizer = self._context.tokenizer_factory(self.model_id)
+            model = self._context.model_factory(self.model_id)
+            model_any = cast("Any", model)
+            model_any.to(self.device)
+            model_any.eval()
+            pair = (tokenizer, cast("AutoModelForCausalLM", model_any))
             self._CACHE[cache_key] = pair
             return pair
 

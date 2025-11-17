@@ -18,7 +18,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Protocol, cast
+from typing import Annotated, Protocol
 
 import click
 import typer
@@ -92,6 +92,8 @@ def _cli_context(ctx: typer.Context | None = None) -> XtrOpenContext:
         return context
     state["xtr_cli_context"] = _DEFAULT_CONTEXT
     return _DEFAULT_CONTEXT
+
+
 @APP.command("xtr-open")
 def xtr_open(
     root: _RootOption = None,
@@ -158,7 +160,7 @@ def xtr_open(
     """
     context = _cli_context()
     settings = context.settings_factory()
-    paths = cast("_XtrPaths", context.paths_resolver(settings))
+    paths = context.paths_resolver(settings)
     xtr_root = root or paths.xtr_dir
     if root is not None and not root.is_dir():
         _exit_with_problem(

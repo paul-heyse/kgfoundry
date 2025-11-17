@@ -7,13 +7,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from codeintel_rev.app import capabilities as capabilities_module
-from codeintel_rev.app.capabilities import Capabilities
+from codeintel_rev.app.capabilities import Capabilities, override_capability_imports
 from codeintel_rev.app.main import capz as capz_route
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from tests._helpers import assertions
+from tests._helpers.http import build_test_app
 from tests.app._context_factory import build_application_context
 
 
@@ -35,9 +34,7 @@ def _noop(*_: object, **__: object) -> None:
     """Provide a no-op callable for lazy import stubs."""
 
 
-def test_capabilities_snapshot_reports_paths(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_capabilities_snapshot_reports_paths(tmp_path: Path) -> None:
     """Verify capabilities snapshot reports all expected paths and flags."""
     ctx = build_application_context(tmp_path)
     fake_modules = {
@@ -47,19 +44,8 @@ def test_capabilities_snapshot_reports_paths(
         "torch": object(),
     }
 
-    def fake_import_optional(name: str) -> object | None:
-        """Mock import_optional to return fake modules.
-
-        Returns
-        -------
-        Any
-            Mock module object or None if not found.
-        """
-        return fake_modules.get(name)
-
-    monkeypatch.setattr(capabilities_module, "_import_optional", fake_import_optional)
-
-    snapshot = Capabilities.from_context(ctx)
+    with override_capability_imports(fake_modules):
+        snapshot = Capabilities.from_context(ctx)
     assertions.expect_true(snapshot.faiss_index, reason="faiss_index should be True")
     assertions.expect_true(snapshot.duckdb, reason="duckdb should be True")
     assertions.expect_true(snapshot.scip_index, reason="scip_index should be True")
@@ -93,15 +79,9 @@ def test_capz_endpoint_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     def _fake_from_context(_cls: type[Capabilities], _context: object) -> Capabilities:
         return refreshed
 
-    monkeypatch.setattr(
-        capabilities_module.Capabilities,
-        "from_context",
-        classmethod(_fake_from_context),
-    )
+    monkeypatch.setattr(Capabilities, "from_context", classmethod(_fake_from_context))
 
-    app = FastAPI()
-    app.state.context = ctx
-    app.state.capabilities = initial
+    app = build_test_app(ctx, capabilities_override=initial)
     app.add_api_route("/capz", capz_route)
 
     with TestClient(app) as client:

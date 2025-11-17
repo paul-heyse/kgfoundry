@@ -57,7 +57,12 @@ def build_use_graph(index: SCIPIndex) -> UseGraph:
     return UseGraph(uses_by_file=uses_by_file, symbol_usage=symbol_usage, edges=edges)
 
 
-def write_use_graph(use_graph: UseGraph, path: str | Path) -> None:
+def write_use_graph(
+    use_graph: UseGraph,
+    path: str | Path,
+    *,
+    polars_module: PolarsModule | None = None,
+) -> None:
     """Persist use graph edges to Parquet (or JSONL fallback).
 
     Parameters
@@ -66,6 +71,9 @@ def write_use_graph(use_graph: UseGraph, path: str | Path) -> None:
         Graph to serialize.
     path : str | Path
         Destination file path.
+    polars_module : PolarsModule | None, optional
+        Explicit polars module for Parquet writes. When ``None`` (default),
+        the helper imports polars dynamically.
     """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -76,7 +84,7 @@ def write_use_graph(use_graph: UseGraph, path: str | Path) -> None:
     if not records:
         target.write_text("", encoding="utf-8")
         return
-    if _write_parquet(records, target):  # pragma: no cover
+    if _write_parquet(records, target, polars_module=polars_module):  # pragma: no cover
         return
     with target.open("w", encoding="utf-8") as handle:
         for record in records:
@@ -103,7 +111,12 @@ def _is_definition(roles: list[str]) -> bool:
     return False
 
 
-def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
+def _write_parquet(
+    records: list[dict[str, str]],
+    target: Path,
+    *,
+    polars_module: PolarsModule | None = None,
+) -> bool:
     """Write records via polars when available.
 
     Parameters
@@ -112,16 +125,21 @@ def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
         List of dictionary records to write.
     target : Path
         File system path for the output Parquet file.
+    polars_module : PolarsModule | None, optional
+        Injected polars module; when ``None`` an import is attempted.
 
     Returns
     -------
     bool
         True if polars is available and write succeeded, False otherwise.
     """
-    try:
-        polars = cast("PolarsModule", gate_import("polars", "use graph export"))
-    except ImportError:
-        return False
+    if polars_module is None:
+        try:
+            polars = cast("PolarsModule", gate_import("polars", "use graph export"))
+        except ImportError:
+            return False
+    else:
+        polars = polars_module
     frame_factory = resolve_polars_frame_factory(polars)
     if frame_factory is None:
         return False

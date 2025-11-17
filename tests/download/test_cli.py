@@ -20,10 +20,13 @@ def test_harvest_emits_envelope(
     """The harvest command should write a structured CLI envelope on success."""
     expected_path = tmp_path / f"{cli.CLI_SETTINGS.bin_name}-{cli.CLI_COMMAND}-harvest.json"
     received: list[HarvestRequest] = []
+    artifact_dir = tmp_path / "artifacts"
 
     def _handler(request: HarvestRequest) -> str:
         received.append(request)
-        return f"[dry-run] mock harvest {request.topic} years={request.years} max={request.max_works}"
+        return (
+            f"[dry-run] mock harvest {request.topic} years={request.years} max={request.max_works}"
+        )
 
     context = download_cli_context_builder(harvest_handler=_handler)
 
@@ -33,6 +36,8 @@ def test_harvest_emits_envelope(
         [
             "--envelope-dir",
             str(tmp_path),
+            "--artifact-dir",
+            str(artifact_dir),
             "download",
             "harvest",
             "foundation models",
@@ -56,4 +61,9 @@ def test_harvest_emits_envelope(
     assertions.expect_equal(envelope["command"], cli.CLI_COMMAND)
     assertions.expect_equal(envelope["subcommand"], "harvest")
     assertions.expect_equal(envelope["status"], "success")
-    assertions.expect_equal(envelope["files"][0]["status"], "success")
+    artifact_path = artifact_dir / "foundation-models-artifacts.txt"
+    assertions.expect_true(artifact_path.exists())
+    assertions.expect_in("foundation models", artifact_path.read_text(encoding="utf-8"))
+    file_entry = envelope["files"][0]
+    assertions.expect_equal(file_entry["status"], "success")
+    assertions.expect_equal(file_entry["path"], str(artifact_path))
