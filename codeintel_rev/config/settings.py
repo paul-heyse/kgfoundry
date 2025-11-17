@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from dataclasses import dataclass
+from enum import StrEnum
+from functools import cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypedDict, cast
 
 import msgspec
 
@@ -22,6 +25,20 @@ DEFAULT_RRF_WEIGHTS: dict[str, float] = {
     "splade": 1.0,
     "warp": 1.1,
 }
+
+@cache
+def _emit_vllm_task_warning() -> None:
+    """Emit a deprecation warning exactly once."""
+    warnings.warn(
+        "VLLM task configuration is deprecated; configure embedding_mode instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+def _warn_vllm_task_deprecated(_: str) -> None:
+    """Proxy helper preserving the previous call signature."""
+    _emit_vllm_task_warning()
 
 
 @dataclass(frozen=True)
@@ -182,13 +199,14 @@ def _optional_int(raw: str | None) -> int | None:
 def _build_vllm_config() -> VLLMConfig:
     run_mode_env = os.environ.get("VLLM_RUN_MODE", "inprocess").lower()
     run_mode = VLLMRunMode(mode="http" if run_mode_env == "http" else "inprocess")
-    pooling_env = os.environ.get("VLLM_POOLING_TYPE", "last").strip().lower()
-    if pooling_env == "cls":
-        pooling_type: Literal["LAST", "CLS", "MEAN"] = "CLS"
-    elif pooling_env == "mean":
-        pooling_type = "MEAN"
-    else:
-        pooling_type = "LAST"
+    pooling_env = os.environ.get("VLLM_POOLING_TYPE", "last")
+    embedding_mode = VLLMEmbeddingMode.from_env(pooling_env)
+    task_env = os.environ.get("VLLM_TASK")
+    task_value: Literal["embed"] | None = None
+    if task_env:
+        _warn_vllm_task_deprecated("VLLM_TASK")
+        if task_env.strip().lower() == "embed":
+            task_value = "embed"
     memory_utilization_env = os.environ.get("VLLM_MEMORY_UTILIZATION", "0.92")
     return VLLMConfig(
         base_url=os.environ.get("VLLM_URL", "http://127.0.0.1:8001/v1"),
@@ -203,8 +221,9 @@ def _build_vllm_config() -> VLLMConfig:
             65_536,
         ),
         normalize=os.environ.get("VLLM_NORMALIZE", "1").lower() in {"1", "true", "yes"},
-        pooling_type=pooling_type,
+        embedding_mode=embedding_mode,
         max_concurrent_requests=int(os.environ.get("VLLM_MAX_CONCURRENT_REQUESTS", "4")),
+        task=task_value,
     )
 
 
@@ -390,6 +409,70 @@ class VLLMRunMode(msgspec.Struct, frozen=True):
     mode: Literal["inprocess", "http"] = "inprocess"
 
 
+class VLLMEmbeddingMode(StrEnum):
+    """Embedding pooling strategy supported by vLLM."""
+
+    LAST = "LAST"
+    CLS = "CLS"
+    MEAN = "MEAN"
+
+    @classmethod
+    def from_value(cls, value: str | VLLMEmbeddingMode | None) -> VLLMEmbeddingMode:
+        """Return an embedding mode parsed from user configuration.
+
+        Returns
+        -------
+        VLLMEmbeddingMode
+            Normalized embedding mode enum.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is provided but not one of LAST, CLS, or MEAN.
+        """
+        if isinstance(value, VLLMEmbeddingMode):
+            return value
+        if not value:
+            return cls.LAST
+        normalized = value.strip().upper()
+        try:
+            return cls(normalized)
+        except ValueError as exc:
+            msg = (
+                f"Unsupported embedding mode '{value}'. "
+                "Valid options are LAST, CLS, or MEAN."
+            )
+            raise ValueError(msg) from exc
+
+    @classmethod
+    def from_env(cls, value: str | None) -> VLLMEmbeddingMode:
+        """Return embedding mode parsed from environment variables.
+
+        Returns
+        -------
+        VLLMEmbeddingMode
+            Normalized embedding mode enum.
+        """
+        return cls.from_value(value)
+
+    def as_literal(self) -> Literal["LAST", "CLS", "MEAN"]:
+        """Return literal form for compatibility helpers.
+
+        Returns
+        -------
+        Literal["LAST", "CLS", "MEAN"]
+            Literal value consumed by PoolerConfig.
+        """
+        return cast("Literal['LAST', 'CLS', 'MEAN']", self.value)
+
+
+class PoolerConfigKwargs(TypedDict):
+    """Typed keyword arguments for vLLM PoolerConfig."""
+
+    pooling_type: Literal["LAST", "CLS", "MEAN"]
+    normalize: bool
+
+
 class VLLMConfig(msgspec.Struct, frozen=True):
     """vLLM embedding service configuration.
 
@@ -436,14 +519,16 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     normalize : bool
         Whether to L2-normalize embeddings after generation. Normalized embeddings
         enable cosine similarity computation via dot product. Defaults to True.
-    pooling_type : Literal["LAST", "CLS", "MEAN"]
+    embedding_mode : VLLMEmbeddingMode
         Token pooling strategy for generating embeddings from token-level outputs.
-        Values are case-insensitive and normalized to ``LAST``, ``CLS``, or ``MEAN``.
-        "last" uses the final token embedding, "cls" uses a special CLS token,
-        "mean" averages all token embeddings. Defaults to "last".
+        Encapsulates the CLS, MEAN, and LAST pooling behaviors supported by vLLM.
+        Defaults to ``VLLMEmbeddingMode.LAST``.
     max_concurrent_requests : int
         Maximum number of concurrent embedding requests allowed when using HTTP mode.
         Higher values improve throughput but increase memory usage. Defaults to 4.
+    task : Literal["embed"] | None
+        Deprecated legacy configuration mirroring the old ``task="embed"`` toggle.
+        This value is ignored; a deprecation warning is emitted when provided.
     """
 
     base_url: str = "http://127.0.0.1:8001/v1"
@@ -455,8 +540,45 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     memory_utilization: float = 0.92
     max_num_batched_tokens: int = 65_536
     normalize: bool = True
-    pooling_type: Literal["LAST", "CLS", "MEAN"] = "LAST"
+    embedding_mode: VLLMEmbeddingMode = VLLMEmbeddingMode.LAST
     max_concurrent_requests: int = 4
+    task: Literal["embed"] | None = None
+
+    def resolved_embedding_mode(self) -> VLLMEmbeddingMode:
+        """Return embedding mode while handling deprecated task flag.
+
+        Returns
+        -------
+        VLLMEmbeddingMode
+            Embedding mode to use for pooling.
+        """
+        if self.task:
+            _warn_vllm_task_deprecated("VLLMConfig.task")
+        return self.embedding_mode
+
+    @property
+    def pooling_type(self) -> Literal["LAST", "CLS", "MEAN"]:
+        """Return the literal pooling type for backwards compatibility.
+
+        Returns
+        -------
+        Literal["LAST", "CLS", "MEAN"]
+            Literal string consumed by PoolerConfig.
+        """
+        return self.resolved_embedding_mode().as_literal()
+
+    def pooler_kwargs(self) -> PoolerConfigKwargs:
+        """Return kwargs for PoolerConfig construction.
+
+        Returns
+        -------
+        PoolerConfigKwargs
+            Keyword arguments for ``PoolerConfig`` instantiation.
+        """
+        return {
+            "pooling_type": self.pooling_type,
+            "normalize": self.normalize,
+        }
 
 
 class EmbeddingsConfig(msgspec.Struct, frozen=True):
@@ -1441,6 +1563,7 @@ __all__ = [
     "Settings",
     "SpladeConfig",
     "VLLMConfig",
+    "VLLMEmbeddingMode",
     "VLLMRunMode",
     "WarpConfig",
     "XTRConfig",

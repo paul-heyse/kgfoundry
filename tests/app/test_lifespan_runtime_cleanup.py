@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -9,6 +10,7 @@ from typing import Any, cast
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import lifespan, override_app_hooks
+from codeintel_rev.io.hybrid_search import HybridSearchEngine
 from fastapi import FastAPI
 
 from tests._helpers import assertions
@@ -102,7 +104,6 @@ async def test_lifespan_preload_and_cleanup() -> None:
 
 def test_close_all_runtimes_idempotent(
     application_context: ApplicationContext,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Ensure runtime cleanup is idempotent across repeated calls."""
 
@@ -115,14 +116,13 @@ def test_close_all_runtimes_idempotent(
 
     created: list[_Disposable] = []
 
-    def _factory(*_: object, **__: object) -> _Disposable:
+    def _factory() -> _Disposable:
         instance = _Disposable()
         created.append(instance)
         return instance
 
-    monkeypatch.setattr(
-        "codeintel_rev.app.config_context.HybridSearchEngine",
-        _factory,
+    application_context.set_runtime_factories_for_tests(
+        hybrid_engine_factory=cast("Callable[[], HybridSearchEngine]", _factory),
     )
     application_context.get_hybrid_engine()
     disposable = created[0]
@@ -175,7 +175,7 @@ def application_context(_base_application_context: ApplicationContext) -> Applic
 
 
 @pytest.mark.asyncio
-async def test_lifespan_closes_resources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_lifespan_closes_resources(tmp_path: Path) -> None:
     """The production lifespan helper should close runtimes and scope stores."""
     base_context = build_application_context(tmp_path)
     tracker = _FakeScopeStore()
@@ -183,18 +183,16 @@ async def test_lifespan_closes_resources(tmp_path: Path, monkeypatch: pytest.Mon
     readiness = _FakeReadinessProbe(context)
 
     close_calls = {"count": 0}
-    original_close = ApplicationContext.close_all_runtimes
 
-    def _tracked_close_all_runtimes(self: ApplicationContext) -> None:
+    def _track_shutdown(target: ApplicationContext) -> None:
         close_calls["count"] += 1
-        original_close(self)
-
-    monkeypatch.setattr(ApplicationContext, "close_all_runtimes", _tracked_close_all_runtimes)
+        target.close_all_runtimes()
 
     with override_app_hooks(
         context_factory=lambda _overrides: context,
         readiness_probe_factory=lambda _: readiness,
         faiss_health_check=lambda: {"status": "ok"},
+        shutdown_observer=_track_shutdown,
     ):
         app = FastAPI(lifespan=lifespan)
         async with app.router.lifespan_context(app):

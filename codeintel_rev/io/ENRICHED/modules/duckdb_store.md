@@ -21,32 +21,34 @@ Utilities for loading enrichment artifacts into DuckDB.
 
 ## Definitions
 
-- variable: `DuckDBConnection` (line 63)
-- variable: `DuckDBConnection` (line 65)
-- class: `_DuckDBModule` (line 68)
-- class: `DuckConn` (line 94)
-- function: `_duckdb` (line 100)
-- function: `ensure_schema` (line 112)
-- function: `ingest_modules_jsonl` (line 156)
-- function: `_load_json_rows` (line 186)
-- function: `_coerce_value` (line 204)
-- function: `_apply_pragmas` (line 213)
-- function: `_ingest_via_native_json` (line 226)
-- function: `_ingest_via_python` (line 257)
+- function: `_parse_pragmas` (line 61)
+- variable: `DuckDBConnection` (line 81)
+- variable: `DuckDBConnection` (line 83)
+- class: `_DuckDBModule` (line 86)
+- class: `DuckConn` (line 112)
+- class: `DuckDBIngestContext` (line 119)
+- function: `_duckdb` (line 138)
+- function: `ensure_schema` (line 150)
+- function: `ingest_modules_jsonl` (line 195)
+- function: `_load_json_rows` (line 235)
+- function: `_coerce_value` (line 253)
+- function: `_apply_pragmas` (line 262)
+- function: `_ingest_via_native_json` (line 269)
+- function: `_ingest_via_python` (line 300)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 78
+- **cycle_group**: 82
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -55,7 +57,7 @@ Utilities for loading enrichment artifacts into DuckDB.
 
 ## Declared Exports (__all__)
 
-DuckConn, ensure_schema, ingest_modules_jsonl
+DuckConn, DuckDBIngestContext, ensure_schema, ingest_modules_jsonl
 
 ## Doc Health
 
@@ -84,7 +86,7 @@ DuckConn, ensure_schema, ingest_modules_jsonl
 
 ## Hotspot
 
-- score: 2.00
+- score: 2.04
 
 ## Side Effects
 
@@ -93,22 +95,22 @@ DuckConn, ensure_schema, ingest_modules_jsonl
 
 ## Complexity
 
-- branches: 27
-- cyclomatic: 28
-- loc: 275
+- branches: 31
+- cyclomatic: 32
+- loc: 318
 
 ## Doc Coverage
 
+- `_parse_pragmas` (function): summary=no, examples=no
 - `_DuckDBModule` (class): summary=yes, examples=no — Protocol describing the subset of duckdb module APIs we rely on.
 - `DuckConn` (class): summary=yes, examples=no — Connection metadata for enrichment DuckDB ingestion.
+- `DuckDBIngestContext` (class): summary=yes, examples=no — Dependency providers and options for DuckDB ingestion routines.
 - `_duckdb` (function): summary=yes, params=ok, examples=no — Import duckdb on demand to keep it optional at runtime.
 - `ensure_schema` (function): summary=yes, params=mismatch, examples=no — Create the ``modules`` table if it does not already exist.
 - `ingest_modules_jsonl` (function): summary=yes, params=ok, examples=no — Load modules.jsonl rows into DuckDB, replacing existing paths.
 - `_load_json_rows` (function): summary=no, examples=no
 - `_coerce_value` (function): summary=no, examples=no
 - `_apply_pragmas` (function): summary=no, examples=no
-- `_ingest_via_native_json` (function): summary=no, examples=no
-- `_ingest_via_python` (function): summary=no, examples=no
 
 ## Tags
 

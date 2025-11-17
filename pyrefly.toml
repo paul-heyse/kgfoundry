@@ -1,4 +1,4 @@
-project-includes = ["src", "tests", "tools", "codeintel_rev"]
+project-includes = ["src", "tests", "tools", "codeintel_rev", "docs", "bin"]
 project-excludes = [
     "**/tests/fixtures*",
     "**/build/",

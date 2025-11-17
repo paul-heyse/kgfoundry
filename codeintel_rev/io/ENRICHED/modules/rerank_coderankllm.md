@@ -11,28 +11,31 @@ Listwise reranking using the CodeRankLLM checkpoint.
 - from **__future__** import annotations
 - from **(absolute)** import json
 - from **(absolute)** import threading
-- from **collections.abc** import Sequence
+- from **collections.abc** import Callable, Sequence
+- from **dataclasses** import dataclass
 - from **typing** import TYPE_CHECKING, Any, ClassVar, cast
 - from **codeintel_rev.typing** import gate_import
 - from **transformers** import AutoModelForCausalLM, PreTrainedTokenizerBase
 
 ## Definitions
 
-- class: `CodeRankListwiseReranker` (line 30)
+- class: `CoderankLLMRerankerContext` (line 32)
+- class: `CodeRankGenerationSettings` (line 76)
+- class: `CodeRankListwiseReranker` (line 84)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 109
+- **cycle_group**: 111
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -60,7 +63,7 @@ Listwise reranking using the CodeRankLLM checkpoint.
 
 ## Hotspot
 
-- score: 1.91
+- score: 1.93
 
 ## Side Effects
 
@@ -68,12 +71,14 @@ Listwise reranking using the CodeRankLLM checkpoint.
 
 ## Complexity
 
-- branches: 20
-- cyclomatic: 21
-- loc: 164
+- branches: 21
+- cyclomatic: 22
+- loc: 208
 
 ## Doc Coverage
 
+- `CoderankLLMRerankerContext` (class): summary=yes, examples=no — Dependency providers for CodeRank listwise reranker.
+- `CodeRankGenerationSettings` (class): summary=yes, examples=no — Generation parameters for CodeRank listwise reranker.
 - `CodeRankListwiseReranker` (class): summary=yes, examples=no — Listwise reranking helper built on CodeRankLLM.
 
 ## Tags

@@ -23,9 +23,10 @@ from typing import TYPE_CHECKING, Any, cast
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.errors import VectorIndexIncompatibleError, VectorIndexStateError
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.faiss_compat import load_faiss_module
 from codeintel_rev.retrieval.rerank_flat import FlatReranker
 from codeintel_rev.retrieval.types import SearchHit
-from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
+from codeintel_rev.typing import NDArrayF32, NDArrayI64
 from kgfoundry_common.errors import VectorSearchError
 
 if TYPE_CHECKING:
@@ -100,8 +101,8 @@ class _LazyFaissProxy:
             Materialized FAISS module.
         """
         if self._module is None:
-            imported = gate_import("faiss", "FAISS manager operations")
-            self._module = cast("ModuleType", imported)
+            imported = load_faiss_module("FAISS manager operations")
+            self._module = imported
         return self._module
 
     def __getattr__(self, name: str) -> object:

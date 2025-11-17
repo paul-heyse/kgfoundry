@@ -96,15 +96,11 @@ class InprocessVLLMContext:
             pooler_config_cls = cast("type[PoolerConfig]", vllm_config.PoolerConfig)
             return llm_cls(
                 model=cfg.model,
-                task="embed",
                 trust_remote_code=True,
                 enforce_eager=True,
                 gpu_memory_utilization=cfg.memory_utilization,
                 max_num_batched_tokens=cfg.max_num_batched_tokens,
-                override_pooler_config=pooler_config_cls(
-                    pooling_type=cfg.pooling_type,
-                    normalize=cfg.normalize,
-                ),
+                override_pooler_config=pooler_config_cls(**cfg.pooler_kwargs()),
             )
 
         def _tokens_prompt(token_ids: Sequence[int]) -> TokensPrompt:

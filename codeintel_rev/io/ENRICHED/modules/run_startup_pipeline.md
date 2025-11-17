@@ -33,7 +33,7 @@ are already exported (e.g., ``REPO_ROOT``, ``SCIP_INDEX``, ``VLLM_URL``).
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 146
+- **cycle_group**: 148
 
 ## Ownership
 

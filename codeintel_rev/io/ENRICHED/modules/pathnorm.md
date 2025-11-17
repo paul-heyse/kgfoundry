@@ -21,9 +21,9 @@ Helpers for repo-relative path normalization and stable identifiers.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 0
-- **cycle_group**: 62
+- **cycle_group**: 70
 
 ## Ownership
 
@@ -69,7 +69,7 @@ detect_repo_root, module_name_from_path, stable_id_for_path, to_repo_relative
 
 ## Hotspot
 
-- score: 1.54
+- score: 1.71
 
 ## Side Effects
 

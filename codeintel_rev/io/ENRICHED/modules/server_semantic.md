@@ -30,7 +30,7 @@ Semantic MCP tool registrations (pure move from server.py).
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 130
+- **cycle_group**: 132
 
 ## Ownership
 

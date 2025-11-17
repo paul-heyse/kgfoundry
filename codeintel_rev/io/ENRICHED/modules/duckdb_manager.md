@@ -16,18 +16,20 @@ Thread-safe DuckDB connection manager.
 - from **queue** import Empty, Full, LifoQueue
 - from **threading** import Lock
 - from **time** import perf_counter
-- from **typing** import TYPE_CHECKING, cast
+- from **typing** import TYPE_CHECKING, Protocol, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **(absolute)** import duckdb
 
 ## Definitions
 
 - variable: `duckdb` (line 19)
-- class: `DuckDBConfig` (line 25)
-- class: `_InstrumentedDuckDBConnection` (line 52)
-- class: `DuckDBManager` (line 129)
-- class: `DuckDBQueryOptions` (line 267)
-- class: `DuckDBQueryBuilder` (line 282)
+- class: `DuckDBConfig` (line 31)
+- class: `DuckDBConnector` (line 58)
+- class: `DuckDBManagerContext` (line 66)
+- class: `_InstrumentedDuckDBConnection` (line 87)
+- class: `DuckDBManager` (line 164)
+- class: `DuckDBQueryOptions` (line 314)
+- class: `DuckDBQueryBuilder` (line 329)
 
 ## Graph Metrics
 
@@ -40,8 +42,8 @@ Thread-safe DuckDB connection manager.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 12
+- recent churn 90: 12
 
 ## Usage
 
@@ -50,7 +52,7 @@ Thread-safe DuckDB connection manager.
 
 ## Declared Exports (__all__)
 
-DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
+DuckDBConfig, DuckDBManager, DuckDBManagerContext, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Doc Health
 
@@ -82,13 +84,15 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Complexity
 
-- branches: 50
-- cyclomatic: 51
-- loc: 474
+- branches: 51
+- cyclomatic: 52
+- loc: 521
 
 ## Doc Coverage
 
 - `DuckDBConfig` (class): summary=yes, examples=no — Configuration parameters controlling DuckDB connections.
+- `DuckDBConnector` (class): summary=yes, examples=no — Callable protocol describing DuckDB connection factories.
+- `DuckDBManagerContext` (class): summary=yes, examples=no — Dependency providers for DuckDBManager.
 - `_InstrumentedDuckDBConnection` (class): summary=yes, examples=no — Proxy connection that instruments DuckDB execute calls.
 - `DuckDBManager` (class): summary=yes, examples=no — Factory for DuckDB connections with consistent pragmas.
 - `DuckDBQueryOptions` (class): summary=yes, examples=no — Options controlling DuckDB query generation.

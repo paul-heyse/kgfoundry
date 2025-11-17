@@ -22,9 +22,9 @@ Dataclasses and helpers shared across enrichment stages.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 2
-- **cycle_group**: 76
+- **cycle_group**: 74
 
 ## Ownership
 
@@ -70,7 +70,7 @@ ModuleRecord
 
 ## Hotspot
 
-- score: 1.98
+- score: 2.07
 
 ## Side Effects
 

@@ -15,22 +15,22 @@ Diagnostics endpoints (disabled - observability removed).
 ## Definitions
 
 - variable: `router` (line 8)
-- function: `get_run_report` (line 15)
-- function: `get_run_report_markdown` (line 37)
+- function: `get_run_report_markdown` (line 15)
+- function: `get_run_report` (line 38)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 39
+- **cycle_group**: 41
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -72,12 +72,12 @@ Diagnostics endpoints (disabled - observability removed).
 
 - branches: 0
 - cyclomatic: 1
-- loc: 56
+- loc: 58
 
 ## Doc Coverage
 
-- `get_run_report` (function): summary=yes, params=ok, examples=no — Diagnostics endpoint disabled - observability removed.
 - `get_run_report_markdown` (function): summary=yes, params=ok, examples=no — Diagnostics endpoint disabled - observability removed.
+- `get_run_report` (function): summary=yes, params=ok, examples=no — Diagnostics endpoint disabled - observability removed.
 
 ## Tags
 

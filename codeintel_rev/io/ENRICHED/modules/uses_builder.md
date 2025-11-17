@@ -21,22 +21,22 @@ SCIP-based symbol use graph helpers.
 - class: `UseGraph` (line 16)
 - function: `build_use_graph` (line 24)
 - function: `write_use_graph` (line 60)
-- function: `_is_definition` (line 86)
-- function: `_write_parquet` (line 106)
+- function: `_is_definition` (line 94)
+- function: `_write_parquet` (line 114)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 61
+- **cycle_group**: 77
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -64,7 +64,7 @@ SCIP-based symbol use graph helpers.
 
 ## Hotspot
 
-- score: 2.06
+- score: 2.07
 
 ## Side Effects
 
@@ -72,9 +72,9 @@ SCIP-based symbol use graph helpers.
 
 ## Complexity
 
-- branches: 16
-- cyclomatic: 17
-- loc: 131
+- branches: 17
+- cyclomatic: 18
+- loc: 149
 
 ## Doc Coverage
 

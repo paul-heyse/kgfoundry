@@ -22,22 +22,22 @@ Import graph builder utilities.
 - class: `ImportGraph` (line 21)
 - function: `build_import_graph` (line 30)
 - function: `write_import_graph` (line 85)
-- function: `_tarjan_scc` (line 102)
-- function: `_write_parquet` (line 164)
+- function: `_tarjan_scc` (line 118)
+- function: `_write_parquet` (line 180)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 58
+- **cycle_group**: 67
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -48,7 +48,7 @@ Import graph builder utilities.
 
 - **summary**: Import graph builder utilities.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -65,7 +65,7 @@ Import graph builder utilities.
 
 ## Hotspot
 
-- score: 2.19
+- score: 2.20
 
 ## Side Effects
 
@@ -73,15 +73,15 @@ Import graph builder utilities.
 
 ## Complexity
 
-- branches: 26
-- cyclomatic: 27
-- loc: 189
+- branches: 27
+- cyclomatic: 28
+- loc: 215
 
 ## Doc Coverage
 
 - `ImportGraph` (class): summary=yes, examples=no — Graph representation of intra-repo imports.
 - `build_import_graph` (function): summary=yes, params=ok, examples=no — Build an import graph across repo modules.
-- `write_import_graph` (function): summary=yes, params=mismatch, examples=no — Write import edges to Parquet (or JSONL fallback).
+- `write_import_graph` (function): summary=yes, params=ok, examples=no — Write import edges to Parquet (or JSONL fallback).
 - `_tarjan_scc` (function): summary=no, examples=no
 - `_write_parquet` (function): summary=yes, params=ok, examples=no — Persist records to Parquet via polars when available.
 

@@ -25,21 +25,21 @@ Token-level XTR index manager with late-interaction scoring utilities.
 - variable: `np` (line 19)
 - class: `XTRMetadata` (line 22)
 - class: `_XTRIndexRuntime` (line 34)
-- class: `XTRIndex` (line 58)
+- class: `XTRIndex` (line 60)
 
 ## Graph Metrics
 
 - **fan_in**: 8
 - **fan_out**: 4
-- **cycle_group**: 17
+- **cycle_group**: 28
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 14
-- recent churn 90: 14
+- recent churn 30: 15
+- recent churn 90: 15
 
 ## Usage
 
@@ -75,9 +75,9 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 ## Complexity
 
-- branches: 45
-- cyclomatic: 46
-- loc: 571
+- branches: 46
+- cyclomatic: 47
+- loc: 602
 
 ## Doc Coverage
 

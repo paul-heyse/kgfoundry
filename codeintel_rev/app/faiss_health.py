@@ -5,6 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any, cast
 
+from codeintel_rev.io.faiss_compat import load_faiss_module
 from codeintel_rev.typing import gate_import
 
 __all__ = ["check_faiss_health"]
@@ -19,7 +20,7 @@ def _faiss_cpu_smoke() -> tuple[bool, str]:
         Tuple of (test_passed, human-readable status message).
     """
     try:
-        faiss = cast("Any", gate_import("faiss", "FAISS CPU health check"))
+        faiss = cast("Any", load_faiss_module("FAISS CPU health check"))
     except ImportError:
         return False, "FAISS module not installed"
     except (RuntimeError, AttributeError, OSError) as exc:
@@ -66,7 +67,7 @@ def check_faiss_health() -> dict[str, bool | str | float | None]:
     }
 
     try:
-        faiss = cast("Any", gate_import("faiss", "FAISS CPU health check"))
+        faiss = cast("Any", load_faiss_module("FAISS CPU health check"))
     except ImportError:
         status["details"] = "FAISS module not installed"
         return status

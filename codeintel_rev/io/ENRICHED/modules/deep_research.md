@@ -36,7 +36,7 @@ Adapters that expose MCP Deep-Research search/fetch semantics.
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 116
+- **cycle_group**: 118
 
 ## Ownership
 

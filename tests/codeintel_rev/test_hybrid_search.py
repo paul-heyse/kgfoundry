@@ -73,12 +73,13 @@ def _hybrid_engine_factory() -> Callable[..., tuple[HybridSearchEngine, dict[str
         ) -> Callable[[str, int], Sequence[SearchHit]] | None:
             if hits is None:
                 return None
+            hits_snapshot = tuple(hits)
 
             def _run(_query: str, limit: int) -> Sequence[SearchHit]:
                 call_counts[name] += 1
                 if limit <= 0:
                     return []
-                return list(hits[:limit])
+                return list(hits_snapshot[:limit])
 
             return _run
 

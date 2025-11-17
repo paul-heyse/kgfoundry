@@ -53,8 +53,9 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **__future__** import annotations
 - from **(absolute)** import importlib
 - from **(absolute)** import os
+- from **collections.abc** import Callable, Iterator
 - from **contextlib** import contextmanager, suppress
-- from **dataclasses** import dataclass, field
+- from **dataclasses** import dataclass, field, replace
 - from **pathlib** import Path
 - from **threading** import Lock
 - from **types** import ModuleType
@@ -70,9 +71,11 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager
 - from **codeintel_rev.io.faiss_manager** import FAISSManager, FAISSRuntimeOptions
 - from **codeintel_rev.io.git_client** import AsyncGitClient, GitClient
+- from **codeintel_rev.io.hybrid_search** import HybridSearchContext
 - from **codeintel_rev.io.vllm_client** import VLLMClient, build_vllm_client
-- from **codeintel_rev.runtime** import NullRuntimeCellObserver, RuntimeCell, RuntimeCellObserver
+- from **codeintel_rev.runtime** import NullRuntimeCellObserver, RuntimeCell, RuntimeCellObserver, allow_runtime_cell_seeding
 - from **codeintel_rev.runtime.factory_adjustment** import DefaultFactoryAdjuster, FactoryAdjuster, NoopFactoryAdjuster
+- from **codeintel_rev.runtime.multiprocessing** import ensure_spawn_start_method
 - from **codeintel_rev.typing** import gate_import
 - from **kgfoundry_common.errors** import ConfigurationError
 - from **collections.abc** import Iterator
@@ -82,42 +85,48 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 ## Definitions
 
-- variable: `HybridSearchEngine` (line 90)
-- variable: `XTRIndex` (line 91)
-- function: `_infer_index_root` (line 101)
-- function: `_build_factory_adjuster` (line 131)
-- function: `_build_faiss_manager` (line 164)
-- function: `_build_scope_store` (line 198)
-- function: `_build_git_clients` (line 224)
-- function: `_assign_frozen` (line 245)
-- function: `_faiss_module` (line 250)
-- function: `_import_faiss_manager_cls` (line 266)
-- function: `_import_faiss_runtime_opts_cls` (line 278)
-- function: `_faiss_runtime_options_from_index` (line 290)
-- function: `_import_hybrid_engine_cls` (line 330)
-- function: `_import_xtr_index_cls` (line 347)
-- function: `_require_dependency` (line 364)
-- function: `_ensure_path_exists` (line 423)
-- class: `ResolvedPaths` (line 483)
-- function: `resolve_application_paths` (line 542)
-- variable: `T` (line 654)
-- class: `_FaissRuntimeState` (line 657)
-- class: `_ContextRuntimeState` (line 668)
-- class: `ApplicationContext` (line 708)
+- variable: `HybridSearchEngine` (line 96)
+- variable: `XTRIndex` (line 97)
+- class: `ApplicationContextOverrides` (line 115)
+- class: `GateConfig` (line 165)
+- function: `override_gate_config` (line 175)
+- function: `_call_gate_import` (line 185)
+- class: `RuntimeFactoryOverrides` (line 193)
+- function: `_infer_index_root` (line 199)
+- function: `_build_factory_adjuster` (line 229)
+- function: `_build_faiss_manager` (line 262)
+- function: `_default_duckdb_catalog_factory` (line 306)
+- function: `_build_scope_store` (line 323)
+- function: `_build_git_clients` (line 349)
+- function: `_assign_frozen` (line 370)
+- function: `_faiss_module` (line 375)
+- function: `_import_faiss_manager_cls` (line 391)
+- function: `_import_faiss_runtime_opts_cls` (line 403)
+- function: `_faiss_runtime_options_from_index` (line 415)
+- function: `_import_hybrid_engine_cls` (line 455)
+- function: `_import_xtr_index_cls` (line 472)
+- function: `_require_dependency` (line 489)
+- function: `_ensure_path_exists` (line 548)
+- class: `ResolvedPaths` (line 608)
+- function: `resolve_application_paths` (line 667)
+- variable: `T` (line 779)
+- class: `_FaissRuntimeState` (line 782)
+- class: `_ContextRuntimeState` (line 793)
+- class: `ApplicationContext` (line 833)
 
 ## Graph Metrics
 
 - **fan_in**: 23
-- **fan_out**: 16
-- **cycle_group**: 28
+- **fan_out**: 17
+- **cycle_group**: 30
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 44
-- recent churn 90: 44
+- recent churn 30: 46
+- recent churn 90: 46
 
 ## Usage
 
@@ -126,13 +135,13 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 ## Declared Exports (__all__)
 
-ApplicationContext, ResolvedPaths, resolve_application_paths
+ApplicationContext, ApplicationContextOverrides, GateConfig, ResolvedPaths, override_gate_config, resolve_application_paths
 
 ## Doc Health
 
 - **summary**: Application-level configuration context manager.
 - has summary: yes
-- param parity: yes
+- param parity: no
 - examples present: yes
 
 ## Typedness
@@ -153,7 +162,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Hotspot
 
-- score: 3.27
+- score: 3.36
 
 ## Side Effects
 
@@ -162,22 +171,22 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Complexity
 
-- branches: 61
-- cyclomatic: 62
-- loc: 1437
+- branches: 82
+- cyclomatic: 83
+- loc: 1632
 
 ## Doc Coverage
 
+- `ApplicationContextOverrides` (class): summary=yes, examples=no — Optional dependency overrides for :meth:`ApplicationContext.create`.
+- `GateConfig` (class): summary=yes, examples=no — Overrides for runtime dependency gates.
+- `override_gate_config` (function): summary=yes, params=mismatch, examples=no — Temporarily override dependency gate configuration.
+- `_call_gate_import` (function): summary=no, examples=no
+- `RuntimeFactoryOverrides` (class): summary=yes, examples=no — Test-only overrides for runtime factory callables.
 - `_infer_index_root` (function): summary=yes, params=ok, examples=no — Return the directory that stores versioned index assets.
 - `_build_factory_adjuster` (function): summary=yes, params=ok, examples=no — Return a DefaultFactoryAdjuster derived from settings.
 - `_build_faiss_manager` (function): summary=yes, params=ok, examples=no — Construct and log the FAISS manager for the main index.
+- `_default_duckdb_catalog_factory` (function): summary=no, examples=no
 - `_build_scope_store` (function): summary=yes, params=ok, examples=no — Return the session scope store backed by redis.asyncio.
-- `_build_git_clients` (function): summary=yes, params=ok, examples=no — Initialize Git clients for blame and history operations.
-- `_assign_frozen` (function): summary=yes, params=mismatch, examples=no — Assign attribute on a frozen dataclass instance.
-- `_faiss_module` (function): summary=yes, params=ok, examples=no — Return the cached FAISS manager module.
-- `_import_faiss_manager_cls` (function): summary=yes, params=ok, examples=no — Import ``FAISSManager`` lazily to keep module import costs low.
-- `_import_faiss_runtime_opts_cls` (function): summary=yes, params=ok, examples=no — Return the FAISS runtime options dataclass.
-- `_faiss_runtime_options_from_index` (function): summary=yes, params=ok, examples=no — Materialize FAISS runtime options from the structured index config.
 
 ## Tags
 

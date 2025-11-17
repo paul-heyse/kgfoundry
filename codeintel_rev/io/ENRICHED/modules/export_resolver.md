@@ -23,7 +23,7 @@ Resolve exports and re-exports for module records.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 2
 - **cycle_group**: 64
 
@@ -61,7 +61,7 @@ Resolve exports and re-exports for module records.
 
 ## Hotspot
 
-- score: 2.17
+- score: 2.26
 
 ## Side Effects
 

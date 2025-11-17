@@ -13,6 +13,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Final
 
+from codeintel_rev.io.faiss_compat import load_faiss_module
 from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 
 from codeintel_rev.errors import RuntimeLifecycleError
 
-__all__ = ["Capabilities", "override_capability_imports"]
+__all__ = ["Capabilities", "override_capabilities", "override_capability_imports"]
 
 
 _CAPABILITY_HINT_ATTRS: Final[dict[str, str]] = {
@@ -53,6 +54,11 @@ def _import_optional(module_name: str) -> ModuleType | None:
     at runtime. Time complexity: O(1) for cached imports, O(module_load_time)
     for first-time imports.
     """
+    if module_name == "faiss":
+        try:
+            return load_faiss_module("capabilities detection")
+        except ImportError:
+            return None
     spec = importlib.util.find_spec(module_name)
     if spec is None:
         return None
@@ -63,13 +69,28 @@ def _import_optional(module_name: str) -> ModuleType | None:
 
 
 _OPTIONAL_IMPORTER_STACK: list[Callable[[str], ModuleType | None]] = [_import_optional]
+_CAPABILITIES_OVERRIDE_STACK: list[Callable[[ApplicationContext], Capabilities] | None] = [None]
 
 
 @contextmanager
 def override_capability_imports(
-    overrides: Mapping[str, ModuleType | None] | Callable[[str], ModuleType | None]
+    overrides: Mapping[str, ModuleType | None] | Callable[[str], ModuleType | None],
 ) -> Iterator[None]:
-    """Temporarily override optional imports used for capability detection."""
+    """Temporarily override optional imports used for capability detection.
+
+    Parameters
+    ----------
+    overrides : Mapping[str, ModuleType | None] | Callable[[str], ModuleType | None]
+        Either a mapping of module names to modules (or None), or a callable
+        function that takes a module name and returns a module (or None).
+
+    Yields
+    ------
+    None
+        This context manager yields None. While the context is active, optional
+        imports used for capability detection are overridden according to the
+        provided mapping or callable.
+    """
 
     def _from_mapping(
         mapping: Mapping[str, ModuleType | None],
@@ -91,6 +112,32 @@ def override_capability_imports(
         yield
     finally:
         _OPTIONAL_IMPORTER_STACK.pop()
+
+
+@contextmanager
+def override_capabilities(
+    factory: Callable[[ApplicationContext], Capabilities] | None,
+) -> Iterator[None]:
+    """Temporarily override the capability snapshot factory.
+
+    Parameters
+    ----------
+    factory : Callable[[ApplicationContext], Capabilities] | None
+        Optional factory function that takes an ApplicationContext and returns
+        a Capabilities instance. If None, the override is cleared.
+
+    Yields
+    ------
+    None
+        This context manager yields None. While the context is active, the
+        capability snapshot factory is overridden with the provided factory
+        function.
+    """
+    _CAPABILITIES_OVERRIDE_STACK.append(factory)
+    try:
+        yield
+    finally:
+        _CAPABILITIES_OVERRIDE_STACK.pop()
 
 
 def _path_exists(path: Path | None) -> bool:
@@ -249,6 +296,9 @@ class Capabilities:
         for MCP tool gating and the /capz endpoint. Time
         complexity: O(1) for most checks, O(module_load_time) for optional imports.
         """
+        override_factory = _CAPABILITIES_OVERRIDE_STACK[-1]
+        if override_factory is not None:
+            return override_factory(context)
         paths = getattr(context, "paths", None)
         importer = _OPTIONAL_IMPORTER_STACK[-1]
         faiss_module = importer("faiss")

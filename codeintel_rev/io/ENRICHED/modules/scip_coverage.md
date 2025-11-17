@@ -32,7 +32,7 @@ SCIP symbol coverage evaluator.
 
 - **fan_in**: 1
 - **fan_out**: 5
-- **cycle_group**: 44
+- **cycle_group**: 46
 
 ## Ownership
 

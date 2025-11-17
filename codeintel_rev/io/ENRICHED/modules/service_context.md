@@ -31,20 +31,21 @@ variables change or when they need fresh dependencies.
 - function: `_set_cached_context` (line 42)
 - function: `get_service_context` (line 47)
 - function: `reset_service_context` (line 71)
+- function: `set_service_context` (line 82)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 132
+- **cycle_group**: 134
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -53,7 +54,7 @@ variables change or when they need fresh dependencies.
 
 ## Declared Exports (__all__)
 
-get_service_context, reset_service_context
+get_service_context, reset_service_context, set_service_context
 
 ## Doc Health
 
@@ -76,7 +77,7 @@ get_service_context, reset_service_context
 
 ## Hotspot
 
-- score: 1.36
+- score: 1.41
 
 ## Side Effects
 
@@ -84,9 +85,9 @@ get_service_context, reset_service_context
 
 ## Complexity
 
-- branches: 4
-- cyclomatic: 5
-- loc: 80
+- branches: 5
+- cyclomatic: 6
+- loc: 92
 
 ## Doc Coverage
 
@@ -94,6 +95,7 @@ get_service_context, reset_service_context
 - `_set_cached_context` (function): summary=yes, params=mismatch, examples=no — Update the cached context reference.
 - `get_service_context` (function): summary=yes, params=ok, examples=no — Return the cached :class:`ApplicationContext` instance.
 - `reset_service_context` (function): summary=yes, params=ok, examples=no — Clear the cached :class:`ApplicationContext`.
+- `set_service_context` (function): summary=yes, params=ok, examples=no — Explicitly set the cached context (intended for tests).
 
 ## Tags
 

@@ -34,15 +34,15 @@ CLI entrypoint for CST dataset builds.
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 101
+- **cycle_group**: 103
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 

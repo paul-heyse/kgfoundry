@@ -21,7 +21,7 @@ XTR-backed reranker implementation.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 121
+- **cycle_group**: 123
 
 ## Ownership
 

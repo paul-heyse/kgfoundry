@@ -10,6 +10,7 @@ Tests verify path and language filtering functionality, including:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -775,9 +776,9 @@ def test_query_by_filters_uses_query_builder(test_catalog: DuckDBCatalog) -> Non
         def build_filter_query(
             self,
             *,
-            chunk_ids: list[int],
+            chunk_ids: Sequence[int],
             options: DuckDBQueryOptions | None = None,
-        ) -> tuple[str, dict[str, list[int]]]:
+        ) -> tuple[str, dict[str, list[int] | list[str] | str]]:
             self.calls.append(
                 {
                     "chunk_ids": list(chunk_ids),

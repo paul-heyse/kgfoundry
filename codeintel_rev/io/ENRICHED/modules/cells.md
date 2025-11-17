@@ -11,7 +11,9 @@ Thread-safe runtime cell primitive for mutable subsystems.
 - from **__future__** import annotations
 - from **(absolute)** import os
 - from **(absolute)** import time
-- from **collections.abc** import Callable
+- from **collections.abc** import Callable, Iterator
+- from **contextlib** import contextmanager
+- from **contextvars** import ContextVar
 - from **dataclasses** import dataclass
 - from **threading** import Condition, RLock
 - from **typing** import Literal, Protocol, TypeVar, final, runtime_checkable
@@ -21,30 +23,31 @@ Thread-safe runtime cell primitive for mutable subsystems.
 
 ## Definitions
 
-- variable: `T` (line 16)
-- variable: `InitStatus` (line 23)
-- variable: `CloseStatus` (line 24)
-- class: `RuntimeCellCloseResult` (line 28)
-- class: `RuntimeCellInitContext` (line 40)
-- class: `RuntimeCellInitResult` (line 48)
-- function: `_seed_allowed` (line 60)
-- class: `RuntimeCellObserver` (line 67)
-- class: `NullRuntimeCellObserver` (line 86)
-- class: `RuntimeCell` (line 113)
+- variable: `T` (line 18)
+- variable: `InitStatus` (line 28)
+- variable: `CloseStatus` (line 29)
+- class: `RuntimeCellCloseResult` (line 33)
+- class: `RuntimeCellInitContext` (line 45)
+- class: `RuntimeCellInitResult` (line 53)
+- function: `_seed_allowed` (line 65)
+- function: `allow_runtime_cell_seeding` (line 72)
+- class: `RuntimeCellObserver` (line 89)
+- class: `NullRuntimeCellObserver` (line 108)
+- class: `RuntimeCell` (line 135)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 14
+- **cycle_group**: 13
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 18
-- recent churn 90: 18
+- recent churn 30: 19
+- recent churn 90: 19
 
 ## Usage
 
@@ -53,7 +56,7 @@ Thread-safe runtime cell primitive for mutable subsystems.
 
 ## Declared Exports (__all__)
 
-NullRuntimeCellObserver, RuntimeCell, RuntimeCellCloseResult, RuntimeCellInitContext, RuntimeCellInitResult, RuntimeCellObserver
+NullRuntimeCellObserver, RuntimeCell, RuntimeCellCloseResult, RuntimeCellInitContext, RuntimeCellInitResult, RuntimeCellObserver, allow_runtime_cell_seeding
 
 ## Doc Health
 
@@ -76,7 +79,7 @@ NullRuntimeCellObserver, RuntimeCell, RuntimeCellCloseResult, RuntimeCellInitCon
 
 ## Hotspot
 
-- score: 2.47
+- score: 2.48
 
 ## Side Effects
 
@@ -88,9 +91,9 @@ cooldown_error
 
 ## Complexity
 
-- branches: 44
-- cyclomatic: 45
-- loc: 595
+- branches: 45
+- cyclomatic: 46
+- loc: 622
 
 ## Doc Coverage
 
@@ -98,6 +101,7 @@ cooldown_error
 - `RuntimeCellInitContext` (class): summary=yes, examples=no — Request-scoped metadata captured during initialization.
 - `RuntimeCellInitResult` (class): summary=yes, examples=no — Immutable payload describing initialization outcome.
 - `_seed_allowed` (function): summary=no, examples=no
+- `allow_runtime_cell_seeding` (function): summary=yes, params=ok, examples=no — Temporarily allow RuntimeCell.seed() without env toggles.
 - `RuntimeCellObserver` (class): summary=yes, examples=no — Protocol for observing RuntimeCell lifecycle events.
 - `NullRuntimeCellObserver` (class): summary=yes, examples=no — No-op observer used when instrumentation is disabled.
 - `RuntimeCell` (class): summary=yes, examples=no — Thread-safe lazy holder for mutable runtime state with single-flight init.

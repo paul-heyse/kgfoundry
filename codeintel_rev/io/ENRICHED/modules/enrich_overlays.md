@@ -19,21 +19,21 @@ Overlay-focused CLI for enrichment tooling.
 
 - variable: `app` (line 17)
 - function: `overlays` (line 22)
-- function: `main` (line 113)
+- function: `main` (line 115)
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 83
+- **cycle_group**: 85
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -65,7 +65,7 @@ app
 
 ## Hotspot
 
-- score: 1.97
+- score: 1.85
 
 ## Side Effects
 
@@ -75,7 +75,7 @@ app
 
 - branches: 16
 - cyclomatic: 17
-- loc: 122
+- loc: 124
 
 ## Doc Coverage
 

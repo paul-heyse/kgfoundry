@@ -60,6 +60,7 @@ low-coverage:
 - enrich/output_writers.py
 - enrich/ownership.py
 - enrich/pathnorm.py
+- enrich/pipeline_helpers.py
 - enrich/scip_reader.py
 - enrich/slices_builder.py
 - enrich/stubs_overlay.py
@@ -88,6 +89,7 @@ low-coverage:
 - io/coderank_embedder.py
 - io/duckdb_catalog.py
 - io/duckdb_manager.py
+- io/faiss_compat.py
 - io/faiss_manager.py
 - io/git_client.py
 - io/hybrid_search.py
@@ -153,6 +155,7 @@ low-coverage:
 - runtime/__init__.py
 - runtime/cells.py
 - runtime/factory_adjustment.py
+- runtime/multiprocessing.py
 - runtime/request_context.py
 - startup/__init__.py
 - startup/run_startup_pipeline.py
@@ -170,6 +173,7 @@ public-api:
 - app/scope_registry.py
 - app/scope_store.py
 - app/server_settings.py
+- cli/__init__.py
 - cli/enrich_analytics.py
 - cli/enrich_overlays.py
 - cli/xtr.py
@@ -184,6 +188,7 @@ public-api:
 - enrich/models.py
 - enrich/ownership.py
 - enrich/pathnorm.py
+- enrich/pipeline_helpers.py
 - enrich/slices_builder.py
 - enrich/validators.py
 - errors.py
@@ -237,6 +242,7 @@ public-api:
 - runtime/__init__.py
 - runtime/cells.py
 - runtime/factory_adjustment.py
+- runtime/multiprocessing.py
 - runtime/request_context.py
 - typing.py
 pydantic:
@@ -250,4 +256,5 @@ reexport-hub:
 - mcp_server/schemas.py
 - retrieval/mcp_search.py
 - retrieval/types.py
+- runtime/__init__.py
 - typing.py

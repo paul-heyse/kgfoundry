@@ -589,7 +589,7 @@ testpaths = ["tests"]
 
 [tool.uv.sources]
 #vllm = { index = "wheelhouse" }
-faiss = { index = "wheelhouse" }
+#faiss = { index = "wheelhouse" }
 #xformers = { index = "wheelhouse" }
 
 # point torch packages to the *named* PyTorch cu129 index

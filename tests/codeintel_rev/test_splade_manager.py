@@ -108,7 +108,8 @@ class _StubEncoder:
         self.model_kwargs = dict(model_kwargs or {})
         self._last_texts: list[str] = []
 
-    def save_pretrained(self, path: str) -> None:
+    @staticmethod
+    def save_pretrained(path: str) -> None:
         """Save pretrained model stub.
 
         Parameters

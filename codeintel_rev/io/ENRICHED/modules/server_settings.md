@@ -17,27 +17,27 @@ and when exporting the Hypercorn-facing ASGI callable.
 - from **__future__** import annotations
 - from **functools** import lru_cache
 - from **typing** import ClassVar, Literal
-- from **pydantic** import Field
+- from **pydantic** import Field, model_validator
 - from **pydantic_settings** import BaseSettings, SettingsConfigDict
 
 ## Definitions
 
-- class: `ServerSettings` (line 19)
-- function: `get_server_settings` (line 108)
+- class: `ServerSettings` (line 22)
+- function: `get_server_settings` (line 126)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 31
+- **cycle_group**: 33
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -46,7 +46,7 @@ and when exporting the Hypercorn-facing ASGI callable.
 
 ## Declared Exports (__all__)
 
-ServerSettings, get_server_settings
+ServerSettings, _DEFAULT_SSE_KEEPALIVE_SECONDS, get_server_settings
 
 ## Doc Health
 
@@ -83,7 +83,7 @@ ServerSettings, get_server_settings
 
 - branches: 0
 - cyclomatic: 1
-- loc: 123
+- loc: 141
 
 ## Doc Coverage
 

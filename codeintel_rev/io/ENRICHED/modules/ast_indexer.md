@@ -41,7 +41,7 @@ AST indexer producing join-ready Parquet datasets.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 1
 - **cycle_group**: 69
 
@@ -89,7 +89,7 @@ AST_METRIC_SCHEMA, AST_NODE_SCHEMA, AstMetricsRow, AstNodeRow, DefInfo, collect_
 
 ## Hotspot
 
-- score: 1.99
+- score: 2.10
 
 ## Side Effects
 

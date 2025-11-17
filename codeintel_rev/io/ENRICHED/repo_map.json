@@ -1,11 +1,11 @@
 {
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
-  "module_count": 156,
+  "module_count": 159,
   "symbol_edge_count": 0,
-  "coverage_records": 156,
-  "config_files": 222,
-  "generated_at": "2025-11-17T05:11:20+00:00",
+  "coverage_records": 159,
+  "config_files": 225,
+  "generated_at": "2025-11-17T20:46:24+00:00",
   "tags": {
     "low-coverage": [
       "__init__.py",
@@ -65,6 +65,7 @@
       "enrich/output_writers.py",
       "enrich/ownership.py",
       "enrich/pathnorm.py",
+      "enrich/pipeline_helpers.py",
       "enrich/scip_reader.py",
       "enrich/slices_builder.py",
       "enrich/stubs_overlay.py",
@@ -93,6 +94,7 @@
       "io/coderank_embedder.py",
       "io/duckdb_catalog.py",
       "io/duckdb_manager.py",
+      "io/faiss_compat.py",
       "io/faiss_manager.py",
       "io/git_client.py",
       "io/hybrid_search.py",
@@ -158,6 +160,7 @@
       "runtime/__init__.py",
       "runtime/cells.py",
       "runtime/factory_adjustment.py",
+      "runtime/multiprocessing.py",
       "runtime/request_context.py",
       "startup/__init__.py",
       "startup/run_startup_pipeline.py",
@@ -176,6 +179,7 @@
       "app/scope_registry.py",
       "app/scope_store.py",
       "app/server_settings.py",
+      "cli/__init__.py",
       "cli/enrich_analytics.py",
       "cli/enrich_overlays.py",
       "cli/xtr.py",
@@ -190,6 +194,7 @@
       "enrich/models.py",
       "enrich/ownership.py",
       "enrich/pathnorm.py",
+      "enrich/pipeline_helpers.py",
       "enrich/slices_builder.py",
       "enrich/validators.py",
       "errors.py",
@@ -243,6 +248,7 @@
       "runtime/__init__.py",
       "runtime/cells.py",
       "runtime/factory_adjustment.py",
+      "runtime/multiprocessing.py",
       "runtime/request_context.py",
       "typing.py"
     ],
@@ -263,14 +269,15 @@
       "mcp_server/schemas.py",
       "retrieval/mcp_search.py",
       "retrieval/types.py",
+      "runtime/__init__.py",
       "typing.py"
     ]
   },
   "tag_counts": {
-    "low-coverage": 156,
-    "public-api": 79,
+    "low-coverage": 159,
+    "public-api": 82,
     "fastapi": 3,
     "pydantic": 2,
-    "reexport-hub": 8
+    "reexport-hub": 9
   }
 }

@@ -44,94 +44,103 @@ Typer CLI for managing index lifecycle operations.
 - variable: `app` (line 53)
 - variable: `DEFAULT_XTR_ORACLE` (line 54)
 - variable: `embeddings_app` (line 55)
-- function: `_get_settings` (line 60)
-- variable: `RootOption` (line 71)
-- variable: `ExtraOption` (line 72)
-- variable: `VersionArg` (line 80)
-- variable: `PathArg` (line 81)
-- variable: `QueriesArg` (line 82)
-- variable: `IndexOption` (line 86)
-- variable: `AssetsArg` (line 87)
-- variable: `SidecarOption` (line 95)
-- variable: `VersionOption` (line 103)
-- variable: `ParquetOption` (line 107)
-- variable: `OutputOption` (line 110)
-- variable: `ChunkBatchOption` (line 111)
-- variable: `SampleOption` (line 115)
-- variable: `EpsilonOption` (line 116)
-- variable: `SweepMode` (line 120)
-- class: `SearchCommandParams` (line 135)
-- variable: `SWEEP_OPTION` (line 147)
-- variable: `IdMapOption` (line 152)
-- variable: `DuckOption` (line 153)
-- variable: `OutOption` (line 154)
-- variable: `ParamSpaceArg` (line 155)
-- variable: `EvalTopKOption` (line 159)
-- variable: `EvalKFactorOption` (line 163)
-- variable: `EvalNProbeOption` (line 167)
-- variable: `EvalXtrOracleOption` (line 171)
-- function: `global_options` (line 181)
-- function: `_default_root` (line 186)
-- function: `_resolve_root` (line 193)
-- function: `_manager` (line 199)
-- function: `_build_assets` (line 204)
-- function: `_parse_extras` (line 222)
-- function: `_parse_sidecars` (line 232)
-- function: `_resolve_version_dir` (line 246)
-- function: `_manifest_path_for` (line 256)
-- function: `_load_manifest` (line 260)
-- function: `_write_manifest` (line 269)
-- class: `_EmbeddingBuildContext` (line 274)
-- function: `_build_context` (line 284)
-- function: `_resolve_duck_path` (line 312)
-- function: `_resolve_output_path` (line 329)
-- function: `_parquet_meta` (line 349)
-- function: `_build_embedding_manifest` (line 362)
-- function: `_compute_chunk_checksum` (line 388)
-- function: `_collect_chunks_and_embeddings` (line 403)
-- function: `_deterministic_sample` (line 450)
-- function: `_evaluate_drift` (line 484)
-- function: `_execute_embeddings_build` (line 509)
-- function: `_run_embedding_validation` (line 571)
-- function: `_write_embedding_meta` (line 608)
-- function: `embeddings_build_command` (line 619)
-- function: `embeddings_validate_command` (line 644)
-- function: `_parse_tune_overrides` (line 706)
-- function: `_faiss_manager` (line 746)
-- function: `_duckdb_catalog` (line 759)
-- function: `_duckdb_embedding_dim` (line 773)
-- function: `_count_idmap_rows` (line 799)
-- function: `_load_xtr_index` (line 829)
-- function: `_eval_paths` (line 843)
-- function: `status_command` (line 853)
-- function: `stage_command` (line 863)
-- function: `publish_command` (line 920)
-- function: `rollback_command` (line 930)
-- function: `list_command` (line 940)
-- function: `health_command` (line 952)
-- function: `export_idmap_command` (line 1011)
-- function: `materialize_join_command` (line 1032)
-- function: `tune_command` (line 1048)
-- function: `tune_params_command` (line 1118)
-- function: `show_profile_command` (line 1160)
-- function: `_write_tuning_audit` (line 1166)
-- function: `_run_autotune` (line 1177)
-- function: `eval_command` (line 1203)
-- function: `_execute_search` (line 1231)
+- function: `_cached_settings` (line 60)
+- function: `_default_faiss_manager_factory` (line 64)
+- function: `_default_duckdb_catalog_factory` (line 79)
+- function: `_default_duckdb_embedding_dim` (line 95)
+- function: `_default_count_idmap_rows` (line 107)
+- function: `_default_embedding_provider_factory` (line 117)
+- class: `IndexctlCliContext` (line 122)
+- function: `_cli_context` (line 154)
+- function: `_get_settings` (line 166)
+- variable: `RootOption` (line 170)
+- variable: `ExtraOption` (line 171)
+- variable: `VersionArg` (line 179)
+- variable: `PathArg` (line 180)
+- variable: `QueriesArg` (line 181)
+- variable: `IndexOption` (line 185)
+- variable: `AssetsArg` (line 186)
+- variable: `SidecarOption` (line 194)
+- variable: `VersionOption` (line 202)
+- variable: `ParquetOption` (line 206)
+- variable: `OutputOption` (line 209)
+- variable: `ChunkBatchOption` (line 210)
+- variable: `SampleOption` (line 214)
+- variable: `EpsilonOption` (line 215)
+- variable: `SweepMode` (line 219)
+- class: `SearchCommandParams` (line 234)
+- variable: `SWEEP_OPTION` (line 246)
+- variable: `IdMapOption` (line 251)
+- variable: `DuckOption` (line 252)
+- variable: `OutOption` (line 253)
+- variable: `ParamSpaceArg` (line 254)
+- variable: `EvalTopKOption` (line 258)
+- variable: `EvalKFactorOption` (line 262)
+- variable: `EvalNProbeOption` (line 266)
+- variable: `EvalXtrOracleOption` (line 270)
+- function: `global_options` (line 280)
+- function: `_default_root` (line 288)
+- function: `_resolve_root` (line 295)
+- function: `_manager` (line 301)
+- function: `_build_assets` (line 306)
+- function: `_parse_extras` (line 324)
+- function: `_parse_sidecars` (line 334)
+- function: `_resolve_version_dir` (line 348)
+- function: `_manifest_path_for` (line 358)
+- function: `_load_manifest` (line 362)
+- function: `_write_manifest` (line 371)
+- class: `_EmbeddingBuildContext` (line 376)
+- function: `_build_context` (line 386)
+- function: `_resolve_duck_path` (line 414)
+- function: `_resolve_output_path` (line 431)
+- function: `_parquet_meta` (line 451)
+- function: `_build_embedding_manifest` (line 464)
+- function: `_compute_chunk_checksum` (line 490)
+- function: `_collect_chunks_and_embeddings` (line 505)
+- function: `_deterministic_sample` (line 552)
+- function: `_evaluate_drift` (line 586)
+- function: `_execute_embeddings_build` (line 611)
+- function: `_run_embedding_validation` (line 673)
+- function: `_write_embedding_meta` (line 710)
+- function: `embeddings_build_command` (line 721)
+- function: `embeddings_validate_command` (line 746)
+- function: `_parse_tune_overrides` (line 808)
+- function: `_faiss_manager` (line 848)
+- function: `_duckdb_catalog` (line 853)
+- function: `_duckdb_embedding_dim` (line 858)
+- function: `_count_idmap_rows` (line 876)
+- function: `_embedding_provider` (line 894)
+- function: `_load_xtr_index` (line 898)
+- function: `_eval_paths` (line 912)
+- function: `status_command` (line 922)
+- function: `stage_command` (line 932)
+- function: `publish_command` (line 989)
+- function: `rollback_command` (line 999)
+- function: `list_command` (line 1009)
+- function: `health_command` (line 1021)
+- function: `export_idmap_command` (line 1080)
+- function: `materialize_join_command` (line 1101)
+- function: `tune_command` (line 1117)
+- function: `tune_params_command` (line 1187)
+- function: `show_profile_command` (line 1229)
+- function: `_write_tuning_audit` (line 1235)
+- function: `_run_autotune` (line 1246)
+- function: `eval_command` (line 1272)
+- function: `_execute_search` (line 1300)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 12
-- **cycle_group**: 86
+- **cycle_group**: 88
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 18
-- recent churn 90: 18
+- recent churn 30: 19
+- recent churn 90: 19
 
 ## Usage
 
@@ -159,7 +168,7 @@ Typer CLI for managing index lifecycle operations.
 
 ## Hotspot
 
-- score: 2.97
+- score: 2.98
 
 ## Side Effects
 
@@ -168,22 +177,22 @@ Typer CLI for managing index lifecycle operations.
 
 ## Complexity
 
-- branches: 103
-- cyclomatic: 104
-- loc: 1310
+- branches: 107
+- cyclomatic: 108
+- loc: 1379
 
 ## Doc Coverage
 
-- `_get_settings` (function): summary=yes, params=ok, examples=no — Load settings once and reuse for subsequent commands.
+- `_cached_settings` (function): summary=no, examples=no
+- `_default_faiss_manager_factory` (function): summary=no, examples=no
+- `_default_duckdb_catalog_factory` (function): summary=no, examples=no
+- `_default_duckdb_embedding_dim` (function): summary=no, examples=no
+- `_default_count_idmap_rows` (function): summary=no, examples=no
+- `_default_embedding_provider_factory` (function): summary=no, examples=no
+- `IndexctlCliContext` (class): summary=yes, examples=no — Dependency injection context for the indexctl CLI.
+- `_cli_context` (function): summary=no, examples=no
+- `_get_settings` (function): summary=no, examples=no
 - `SearchCommandParams` (class): summary=yes, examples=no — Typed container for CLI-provided semantic search arguments.
-- `global_options` (function): summary=yes, params=mismatch, examples=no — Configure shared CLI options.
-- `_default_root` (function): summary=no, examples=no
-- `_resolve_root` (function): summary=no, examples=no
-- `_manager` (function): summary=no, examples=no
-- `_build_assets` (function): summary=no, examples=no
-- `_parse_extras` (function): summary=no, examples=no
-- `_parse_sidecars` (function): summary=no, examples=no
-- `_resolve_version_dir` (function): summary=no, examples=no
 
 ## Tags
 

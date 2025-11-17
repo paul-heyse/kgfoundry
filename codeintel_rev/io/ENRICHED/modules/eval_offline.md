@@ -24,7 +24,7 @@ Command-line entry point for offline FAISS recall evaluation.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 46
+- **cycle_group**: 48
 
 ## Ownership
 

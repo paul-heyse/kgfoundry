@@ -31,7 +31,7 @@ Offline recall evaluator leveraging FAISS + DuckDB catalogs.
 
 - **fan_in**: 2
 - **fan_out**: 7
-- **cycle_group**: 28
+- **cycle_group**: 30
 
 ## Ownership
 

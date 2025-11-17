@@ -10,7 +10,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 - from **__future__** import annotations
 - from **(absolute)** import math
-- from **collections.abc** import Mapping, Sequence
+- from **collections.abc** import Callable, Mapping, Sequence
 - from **dataclasses** import dataclass
 - from **importlib** import import_module
 - from **pathlib** import Path
@@ -36,24 +36,26 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - class: `SpladeSearchProvider` (line 170)
 - class: `HybridSearchTuning` (line 338)
 - class: `HybridSearchOptions` (line 346)
-- class: `_MethodStats` (line 356)
-- class: `_FusionContext` (line 365)
-- class: `_FusionWork` (line 378)
-- class: `HybridSearchEngine` (line 391)
+- class: `HybridSearchProviders` (line 356)
+- class: `HybridSearchContext` (line 365)
+- class: `_MethodStats` (line 375)
+- class: `_FusionContext` (line 384)
+- class: `_FusionWork` (line 397)
+- class: `HybridSearchEngine` (line 410)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 12
-- **cycle_group**: 28
+- **cycle_group**: 30
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 31
-- recent churn 90: 31
+- recent churn 30: 32
+- recent churn 90: 32
 
 ## Usage
 
@@ -62,7 +64,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 ## Declared Exports (__all__)
 
-BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, HybridSearchResult, HybridSearchTuning, SpladeSearchProvider
+BM25SearchProvider, HybridResultDoc, HybridSearchContext, HybridSearchEngine, HybridSearchOptions, HybridSearchProviders, HybridSearchResult, HybridSearchTuning, SpladeSearchProvider
 
 ## Doc Health
 
@@ -85,7 +87,7 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 ## Hotspot
 
-- score: 3.12
+- score: 3.13
 
 ## Side Effects
 
@@ -93,9 +95,9 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 ## Complexity
 
-- branches: 109
-- cyclomatic: 110
-- loc: 1050
+- branches: 116
+- cyclomatic: 117
+- loc: 1097
 
 ## Doc Coverage
 
@@ -106,9 +108,9 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 - `SpladeSearchProvider` (class): summary=yes, examples=no — SPLADE query encoder and Lucene impact searcher for learned sparse retrieval.
 - `HybridSearchTuning` (class): summary=yes, examples=no — Runtime overrides for FAISS search metadata.
 - `HybridSearchOptions` (class): summary=yes, examples=no — Optional knobs influencing hybrid fusion.
+- `HybridSearchProviders` (class): summary=yes, examples=no — Optional channel provider overrides for hybrid search.
+- `HybridSearchContext` (class): summary=yes, examples=no — Dependency overrides for :class:`HybridSearchEngine`.
 - `_MethodStats` (class): summary=no, examples=no
-- `_FusionContext` (class): summary=yes, examples=no — All inputs required to fuse dense and sparse channel runs.
-- `_FusionWork` (class): summary=yes, examples=no — Resolved fusion parameters after pooler/weights are selected.
 
 ## Tags
 

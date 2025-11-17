@@ -10,7 +10,8 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 
 - from **__future__** import annotations
 - from **(absolute)** import threading
-- from **collections.abc** import Iterable
+- from **collections.abc** import Callable, Iterable, Sequence
+- from **dataclasses** import dataclass
 - from **typing** import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
@@ -19,24 +20,26 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 
 ## Definitions
 
-- variable: `np` (line 16)
-- variable: `SentenceTransformer` (line 17)
-- class: `SupportsCodeRankSettings` (line 20)
-- class: `CodeRankEmbedder` (line 54)
+- variable: `np` (line 17)
+- variable: `SentenceTransformer` (line 18)
+- class: `SupportsCodeRankSettings` (line 21)
+- class: `SentenceEncoderProtocol` (line 55)
+- class: `CodeRankEmbedderContext` (line 70)
+- class: `CodeRankEmbedder` (line 104)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 108
+- **cycle_group**: 110
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -64,7 +67,7 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 
 ## Hotspot
 
-- score: 1.68
+- score: 1.71
 
 ## Side Effects
 
@@ -72,13 +75,15 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 
 ## Complexity
 
-- branches: 8
-- cyclomatic: 9
-- loc: 169
+- branches: 9
+- cyclomatic: 10
+- loc: 209
 
 ## Doc Coverage
 
 - `SupportsCodeRankSettings` (class): summary=yes, examples=no — Protocol describing the minimal settings required by the embedder.
+- `SentenceEncoderProtocol` (class): summary=yes, examples=no — Minimal interface required from embedding backends.
+- `CodeRankEmbedderContext` (class): summary=yes, examples=no — Dependency providers for the CodeRank embedder.
 - `CodeRankEmbedder` (class): summary=yes, examples=no — Encode queries or code snippets with the CodeRank bi-encoder.
 
 ## Tags

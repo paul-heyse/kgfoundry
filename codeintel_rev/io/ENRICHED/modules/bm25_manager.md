@@ -14,6 +14,8 @@ BM25 indexing workflow helpers.
 - from **(absolute)** import logging
 - from **(absolute)** import shutil
 - from **(absolute)** import sys
+- from **collections.abc** import Callable
+- from **dataclasses** import dataclass
 - from **datetime** import UTC, datetime
 - from **hashlib** import sha256
 - from **pathlib** import Path
@@ -25,35 +27,36 @@ BM25 indexing workflow helpers.
 
 ## Definitions
 
-- variable: `GENERATOR_NAME` (line 23)
-- variable: `CORPUS_METADATA_FILENAME` (line 24)
-- variable: `INDEX_METADATA_FILENAME` (line 25)
-- variable: `logger` (line 27)
-- class: `BM25CorpusMetadata` (line 30)
-- class: `BM25CorpusSummary` (line 40)
-- class: `BM25IndexMetadata` (line 49)
-- class: `BM25BuildOptions` (line 63)
-- class: `BM25IndexManager` (line 75)
-- function: `_write_struct` (line 307)
-- function: `_read_corpus_metadata` (line 314)
-- function: `_parse_corpus_line` (line 346)
-- function: `_run_pyserini_index` (line 423)
-- function: `_detect_pyserini_version` (line 428)
-- function: `_directory_size` (line 444)
+- variable: `GENERATOR_NAME` (line 25)
+- variable: `CORPUS_METADATA_FILENAME` (line 26)
+- variable: `INDEX_METADATA_FILENAME` (line 27)
+- variable: `logger` (line 29)
+- class: `BM25CorpusMetadata` (line 32)
+- class: `BM25CorpusSummary` (line 42)
+- class: `BM25IndexMetadata` (line 51)
+- class: `BM25BuildOptions` (line 65)
+- class: `BM25BuildContext` (line 78)
+- class: `BM25IndexManager` (line 103)
+- function: `_write_struct` (line 342)
+- function: `_read_corpus_metadata` (line 349)
+- function: `_parse_corpus_line` (line 381)
+- function: `_run_pyserini_index` (line 458)
+- function: `_detect_pyserini_version` (line 463)
+- function: `_directory_size` (line 479)
 
 ## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 52
+- **cycle_group**: 54
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -85,7 +88,7 @@ BM25BuildOptions, BM25CorpusMetadata, BM25CorpusSummary, BM25IndexManager, BM25I
 
 ## Hotspot
 
-- score: 2.44
+- score: 2.45
 
 ## Side Effects
 
@@ -93,9 +96,9 @@ BM25BuildOptions, BM25CorpusMetadata, BM25CorpusSummary, BM25IndexManager, BM25I
 
 ## Complexity
 
-- branches: 39
-- cyclomatic: 40
-- loc: 479
+- branches: 40
+- cyclomatic: 41
+- loc: 514
 
 ## Doc Coverage
 
@@ -103,12 +106,12 @@ BM25BuildOptions, BM25CorpusMetadata, BM25CorpusSummary, BM25IndexManager, BM25I
 - `BM25CorpusSummary` (class): summary=yes, examples=no — Summary information returned after preparing a corpus.
 - `BM25IndexMetadata` (class): summary=yes, examples=no — Metadata describing a built BM25 index.
 - `BM25BuildOptions` (class): summary=yes, examples=no — Options controlling BM25 index builds.
+- `BM25BuildContext` (class): summary=yes, examples=no — Dependency injection hooks for BM25 index builds.
 - `BM25IndexManager` (class): summary=yes, examples=no — Manage BM25 corpus preparation and Lucene index builds.
 - `_write_struct` (function): summary=yes, params=mismatch, examples=no — Write a msgspec struct to JSON with UTF-8 encoding.
 - `_read_corpus_metadata` (function): summary=yes, params=ok, examples=no — Read corpus metadata from JSON file.
 - `_parse_corpus_line` (function): summary=yes, params=ok, examples=no — Parse and validate a JSONL line from the corpus source.
 - `_run_pyserini_index` (function): summary=yes, params=mismatch, examples=no — Execute the Pyserini index command and raise for failures.
-- `_detect_pyserini_version` (function): summary=yes, params=ok, examples=no — Return the installed Pyserini version or ``'unknown'`` if unavailable.
 
 ## Tags
 

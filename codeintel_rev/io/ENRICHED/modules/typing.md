@@ -17,6 +17,7 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - from **collections.abc** import Callable, Mapping, Sequence
 - from **os** import PathLike
 - from **typing** import TYPE_CHECKING, Any, Literal, Protocol
+- from **kgfoundry_common.typing** import EXTRAS_HINT
 - from **kgfoundry_common.typing** import HEAVY_DEPS
 - from **kgfoundry_common.typing** import gate_import
 - from **(absolute)** import numpy
@@ -24,27 +25,27 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 ## Definitions
 
-- variable: `NDArrayF32` (line 26)
-- variable: `NDArrayI64` (line 27)
-- variable: `NDArrayAny` (line 28)
-- variable: `HEAVY_DEPS` (line 44)
-- function: `gate_import` (line 48)
-- class: `TorchDeviceProperties` (line 91)
-- class: `TorchCudaAPI` (line 97)
-- class: `TorchTensor` (line 194)
-- class: `TorchModule` (line 243)
-- class: `FaissIndex` (line 261)
-- class: `FaissModule` (line 267)
-- class: `NumpyRandomState` (line 296)
-- class: `NumpyRandomNamespace` (line 317)
-- class: `NumpyLinalgNamespace` (line 341)
-- class: `NumpyModule` (line 368)
-- class: `PolarsDataFrame` (line 375)
-- class: `PolarsModule` (line 396)
+- variable: `NDArrayF32` (line 27)
+- variable: `NDArrayI64` (line 28)
+- variable: `NDArrayAny` (line 29)
+- variable: `HEAVY_DEPS` (line 45)
+- function: `gate_import` (line 49)
+- class: `TorchDeviceProperties` (line 121)
+- class: `TorchCudaAPI` (line 127)
+- class: `TorchTensor` (line 224)
+- class: `TorchModule` (line 273)
+- class: `FaissIndex` (line 291)
+- class: `FaissModule` (line 297)
+- class: `NumpyRandomState` (line 326)
+- class: `NumpyRandomNamespace` (line 347)
+- class: `NumpyLinalgNamespace` (line 371)
+- class: `NumpyModule` (line 398)
+- class: `PolarsDataFrame` (line 405)
+- class: `PolarsModule` (line 426)
 
 ## Graph Metrics
 
-- **fan_in**: 94
+- **fan_in**: 97
 - **fan_out**: 0
 - **cycle_group**: 1
 
@@ -53,8 +54,8 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 17
-- recent churn 90: 17
+- recent churn 30: 18
+- recent churn 90: 18
 
 ## Usage
 
@@ -86,7 +87,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 ## Hotspot
 
-- score: 2.70
+- score: 2.96
 
 ## Side Effects
 
@@ -98,9 +99,9 @@ NotImplementedError
 
 ## Complexity
 
-- branches: 1
-- cyclomatic: 2
-- loc: 422
+- branches: 5
+- cyclomatic: 6
+- loc: 452
 
 ## Doc Coverage
 

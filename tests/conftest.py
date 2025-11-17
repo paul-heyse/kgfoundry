@@ -31,6 +31,7 @@ from codeintel_rev.config.settings import Settings
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
 from codeintel_rev.io.bm25_manager import BM25IndexManager
+from codeintel_rev.io.faiss_compat import load_faiss_module
 from codeintel_rev.io.splade_manager import (
     SpladeArtifactsManager,
     SpladeEncoderService,
@@ -38,6 +39,7 @@ from codeintel_rev.io.splade_manager import (
 )
 from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.ops.runtime.xtr_open import XtrOpenContext
+from codeintel_rev.runtime.multiprocessing import ensure_spawn_start_method
 from codeintel_rev.typedness import FileTypeSignals
 from fastapi import FastAPI
 from tools import repo_scan
@@ -59,10 +61,18 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 R = TypeVar("R")
 
+ensure_spawn_start_method(force=True)
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Run before any tests so multiprocessing always uses spawn."""
+    del session
+    ensure_spawn_start_method(force=True)
+
 
 def _faiss_runtime_available() -> bool:
     try:
-        faiss_module = import_module("faiss")
+        faiss_module = load_faiss_module("pytest FAISS support check")
     except ModuleNotFoundError:
         return False
     except (
@@ -82,7 +92,7 @@ def _faiss_runtime_available() -> bool:
 HAS_FAISS_SUPPORT = _faiss_runtime_available()
 
 if HAS_FAISS_SUPPORT:
-    FAISS_MODULE = cast("Any", import_module("faiss"))
+    FAISS_MODULE = cast("Any", load_faiss_module("pytest FAISS module cache"))
 else:
     FAISS_MODULE: Any | None = None
 

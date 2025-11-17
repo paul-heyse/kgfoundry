@@ -11,18 +11,19 @@ FAISS CPU health checks used during application startup.
 - from **__future__** import annotations
 - from **functools** import lru_cache
 - from **typing** import Any, cast
+- from **codeintel_rev.io.faiss_compat** import load_faiss_module
 - from **codeintel_rev.typing** import gate_import
 
 ## Definitions
 
-- function: `_faiss_cpu_smoke` (line 13)
-- function: `check_faiss_health` (line 51)
+- function: `_faiss_cpu_smoke` (line 14)
+- function: `check_faiss_health` (line 52)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 1
-- **cycle_group**: 29
+- **fan_out**: 2
+- **cycle_group**: 31
 
 ## Ownership
 
@@ -66,7 +67,7 @@ check_faiss_health
 
 ## Hotspot
 
-- score: 1.65
+- score: 1.76
 
 ## Side Effects
 
@@ -76,7 +77,7 @@ check_faiss_health
 
 - branches: 7
 - cyclomatic: 8
-- loc: 85
+- loc: 86
 
 ## Doc Coverage
 

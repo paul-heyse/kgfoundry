@@ -28,9 +28,10 @@ corpus size for optimal performance.
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.errors** import VectorIndexIncompatibleError, VectorIndexStateError
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
+- from **codeintel_rev.io.faiss_compat** import load_faiss_module
 - from **codeintel_rev.retrieval.rerank_flat** import FlatReranker
 - from **codeintel_rev.retrieval.types** import SearchHit
-- from **codeintel_rev.typing** import NDArrayF32, NDArrayI64, gate_import
+- from **codeintel_rev.typing** import NDArrayF32, NDArrayI64
 - from **kgfoundry_common.errors** import VectorSearchError
 - from **(absolute)** import faiss
 - from **(absolute)** import numpy
@@ -39,44 +40,44 @@ corpus size for optimal performance.
 
 ## Definitions
 
-- variable: `FaissIndex` (line 35)
-- variable: `np` (line 37)
-- variable: `FaissIndex` (line 38)
-- variable: `pa` (line 44)
-- variable: `pq` (line 45)
-- function: `_run_index_search` (line 50)
-- class: `_LazyFaissProxy` (line 86)
-- variable: `faiss` (line 130)
-- function: `_faiss_module` (line 133)
-- function: `apply_parameters` (line 144)
-- class: `FAISSRuntimeController` (line 194)
-- function: `_log_extra` (line 368)
-- class: `FAISSRuntimeOptions` (line 386)
-- class: `SearchRuntimeOverrides` (line 405)
-- class: `RefineSearchConfig` (line 414)
-- class: `SecondaryUpdateSnapshot` (line 423)
-- class: `_TuningOverrides` (line 433)
-- class: `_SearchExecutionParams` (line 444)
-- class: `_SearchPlan` (line 453)
-- class: `_FAISSIdMapMixin` (line 462)
-- class: `FAISSManager` (line 641)
-- class: `AutoTuner` (line 3214)
-- function: `_coerce_to_int` (line 3312)
-- function: `_configure_direct_map` (line 3335)
-- function: `_set_direct_map_type` (line 3343)
-- function: `_wrap_bool_contains` (line 3380)
-- function: `_wrap_index_contains` (line 3416)
-- function: `_coerce_optional_int` (line 3454)
-- function: `_coerce_optional_float` (line 3488)
-- function: `_parse_tuning_overrides` (line 3522)
-- function: `_persist_tuning_profile` (line 3548)
-- function: `_get_compile_options` (line 3557)
+- variable: `FaissIndex` (line 36)
+- variable: `np` (line 38)
+- variable: `FaissIndex` (line 39)
+- variable: `pa` (line 45)
+- variable: `pq` (line 46)
+- function: `_run_index_search` (line 51)
+- class: `_LazyFaissProxy` (line 87)
+- variable: `faiss` (line 131)
+- function: `_faiss_module` (line 134)
+- function: `apply_parameters` (line 145)
+- class: `FAISSRuntimeController` (line 195)
+- function: `_log_extra` (line 369)
+- class: `FAISSRuntimeOptions` (line 387)
+- class: `SearchRuntimeOverrides` (line 406)
+- class: `RefineSearchConfig` (line 415)
+- class: `SecondaryUpdateSnapshot` (line 424)
+- class: `_TuningOverrides` (line 434)
+- class: `_SearchExecutionParams` (line 445)
+- class: `_SearchPlan` (line 454)
+- class: `_FAISSIdMapMixin` (line 463)
+- class: `FAISSManager` (line 642)
+- class: `AutoTuner` (line 3215)
+- function: `_coerce_to_int` (line 3313)
+- function: `_configure_direct_map` (line 3336)
+- function: `_set_direct_map_type` (line 3344)
+- function: `_wrap_bool_contains` (line 3381)
+- function: `_wrap_index_contains` (line 3417)
+- function: `_coerce_optional_int` (line 3455)
+- function: `_coerce_optional_float` (line 3489)
+- function: `_parse_tuning_overrides` (line 3523)
+- function: `_persist_tuning_profile` (line 3549)
+- function: `_get_compile_options` (line 3558)
 
 ## Graph Metrics
 
 - **fan_in**: 8
-- **fan_out**: 6
-- **cycle_group**: 28
+- **fan_out**: 7
+- **cycle_group**: 30
 
 ## Ownership
 
@@ -116,7 +117,7 @@ AutoTuner, FAISSManager, FAISSRuntimeController, apply_parameters
 
 ## Hotspot
 
-- score: 3.27
+- score: 3.29
 
 ## Side Effects
 
@@ -126,7 +127,7 @@ AutoTuner, FAISSManager, FAISSRuntimeController, apply_parameters
 
 - branches: 231
 - cyclomatic: 232
-- loc: 3573
+- loc: 3574
 
 ## Doc Coverage
 

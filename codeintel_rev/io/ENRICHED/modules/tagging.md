@@ -26,9 +26,9 @@ Rule-based tagging helpers for enrichment outputs.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 80
+- **cycle_group**: 72
 
 ## Ownership
 
@@ -70,7 +70,7 @@ Rule-based tagging helpers for enrichment outputs.
 
 ## Hotspot
 
-- score: 1.91
+- score: 2.03
 
 ## Side Effects
 

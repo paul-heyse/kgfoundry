@@ -11,7 +11,9 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 - from **__future__** import annotations
 - from **(absolute)** import json
 - from **(absolute)** import os
-- from **collections.abc** import Iterable, Mapping, Sequence
+- from **collections.abc** import Callable, Iterable, Iterator, Mapping, Sequence
+- from **contextlib** import contextmanager
+- from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, Any
 - from **(absolute)** import orjson
@@ -22,54 +24,57 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 
 ## Definitions
 
-- variable: `orjson` (line 15)
-- variable: `pa` (line 22)
-- variable: `ds` (line 23)
-- variable: `pq` (line 24)
-- variable: `PaTable` (line 29)
+- variable: `orjson` (line 17)
+- variable: `pa` (line 24)
+- variable: `ds` (line 25)
+- variable: `pq` (line 26)
 - variable: `PaTable` (line 31)
-- variable: `RowMapping` (line 33)
-- function: `_dump_json` (line 52)
-- function: `_dump_jsonl_bytes` (line 75)
-- function: `_resolve_dictionary_fields` (line 104)
-- function: `write_json` (line 130)
-- function: `write_jsonl` (line 137)
-- function: `write_parquet` (line 158)
-- function: `write_parquet_dataset` (line 171)
-- function: `_write_dataset_table` (line 222)
-- function: `_append_section` (line 262)
-- function: `_format_imports` (line 270)
-- function: `_format_definitions` (line 289)
-- function: `_format_graph_metrics` (line 305)
-- function: `_format_ownership` (line 314)
-- function: `_format_usage` (line 336)
-- function: `_format_exports` (line 347)
-- function: `_format_exports_resolved` (line 355)
-- function: `_format_reexports` (line 365)
-- function: `_format_doc_metrics` (line 379)
-- function: `_format_typedness` (line 394)
-- function: `_format_side_effects` (line 413)
-- function: `_format_raises` (line 423)
-- function: `_format_complexity` (line 432)
-- function: `_format_doc_items` (line 444)
-- function: `_format_coverage` (line 471)
-- function: `_format_config_refs` (line 482)
-- function: `_format_hotspot` (line 489)
-- function: `write_markdown_module` (line 496)
+- variable: `PaTable` (line 33)
+- variable: `RowMapping` (line 35)
+- function: `_dump_json` (line 54)
+- function: `_dump_jsonl_bytes` (line 77)
+- function: `_resolve_dictionary_fields` (line 106)
+- function: `write_json` (line 132)
+- class: `WriterEnvConfig` (line 140)
+- function: `override_writer_env` (line 150)
+- function: `_resolve_env` (line 162)
+- function: `write_jsonl` (line 169)
+- function: `write_parquet` (line 197)
+- function: `write_parquet_dataset` (line 210)
+- function: `_write_dataset_table` (line 261)
+- function: `_append_section` (line 301)
+- function: `_format_imports` (line 309)
+- function: `_format_definitions` (line 328)
+- function: `_format_graph_metrics` (line 344)
+- function: `_format_ownership` (line 353)
+- function: `_format_usage` (line 375)
+- function: `_format_exports` (line 386)
+- function: `_format_exports_resolved` (line 394)
+- function: `_format_reexports` (line 404)
+- function: `_format_doc_metrics` (line 418)
+- function: `_format_typedness` (line 433)
+- function: `_format_side_effects` (line 452)
+- function: `_format_raises` (line 462)
+- function: `_format_complexity` (line 471)
+- function: `_format_doc_items` (line 483)
+- function: `_format_coverage` (line 510)
+- function: `_format_config_refs` (line 521)
+- function: `_format_hotspot` (line 528)
+- function: `write_markdown_module` (line 535)
 
 ## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 71
+- **cycle_group**: 61
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 12
-- recent churn 90: 12
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -103,7 +108,7 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 
 ## Hotspot
 
-- score: 2.68
+- score: 2.69
 
 ## Side Effects
 
@@ -111,9 +116,9 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 
 ## Complexity
 
-- branches: 111
-- cyclomatic: 112
-- loc: 531
+- branches: 114
+- cyclomatic: 115
+- loc: 570
 
 ## Doc Coverage
 
@@ -121,12 +126,12 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 - `_dump_jsonl_bytes` (function): summary=yes, params=ok, examples=no — Serialize JSON rows for JSONL outputs with deterministic ordering.
 - `_resolve_dictionary_fields` (function): summary=yes, params=ok, examples=no — Return dictionary-encoded columns present in ``table``.
 - `write_json` (function): summary=yes, params=mismatch, examples=no — Write an object as pretty-printed JSON.
+- `WriterEnvConfig` (class): summary=yes, examples=no — Configuration for resolving writer environment variables.
+- `override_writer_env` (function): summary=yes, params=mismatch, examples=no — Temporarily override the environment resolver for JSONL writers.
+- `_resolve_env` (function): summary=no, examples=no
 - `write_jsonl` (function): summary=yes, params=mismatch, examples=no — Write newline-delimited JSON records.
 - `write_parquet` (function): summary=yes, params=mismatch, examples=no — Persist ``rows`` to Parquet, falling back to JSONL when PyArrow is missing.
 - `write_parquet_dataset` (function): summary=yes, params=ok, examples=no — Write records to a partitioned Parquet dataset directory.
-- `_write_dataset_table` (function): summary=yes, params=mismatch, examples=no — Write ``table`` to Parquet using dataset writer settings.
-- `_append_section` (function): summary=no, examples=no
-- `_format_imports` (function): summary=no, examples=no
 
 ## Tags
 

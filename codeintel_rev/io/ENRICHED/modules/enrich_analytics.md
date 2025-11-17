@@ -26,9 +26,9 @@ Analytics CLI for enrichment artifacts.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 82
+- **cycle_group**: 84
 
 ## Ownership
 
@@ -68,7 +68,7 @@ app
 
 ## Hotspot
 
-- score: 1.68
+- score: 1.51
 
 ## Side Effects
 

@@ -44,7 +44,7 @@ Targeted overlay generation with opt-in activation.
 
 - **fan_in**: 2
 - **fan_out**: 3
-- **cycle_group**: 72
+- **cycle_group**: 62
 
 ## Ownership
 

@@ -10,7 +10,7 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 
 - from **__future__** import annotations
 - from **(absolute)** import os
-- from **collections.abc** import Sequence
+- from **collections.abc** import Callable, Sequence
 - from **contextlib** import suppress
 - from **dataclasses** import dataclass, field
 - from **typing** import TYPE_CHECKING, Any, cast
@@ -41,21 +41,22 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 - variable: `vllm_config` (line 44)
 - variable: `vllm_inputs` (line 45)
 - class: `_InprocessVLLMRuntime` (line 48)
-- class: `InprocessVLLMEmbedder` (line 69)
+- class: `InprocessVLLMContext` (line 69)
+- class: `InprocessVLLMEmbedder` (line 118)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 20
+- **cycle_group**: 15
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 13
-- recent churn 90: 13
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 
@@ -87,7 +88,7 @@ InprocessVLLMEmbedder
 
 ## Hotspot
 
-- score: 2.16
+- score: 2.19
 
 ## Side Effects
 
@@ -95,13 +96,14 @@ InprocessVLLMEmbedder
 
 ## Complexity
 
-- branches: 14
-- cyclomatic: 15
-- loc: 231
+- branches: 16
+- cyclomatic: 17
+- loc: 271
 
 ## Doc Coverage
 
 - `_InprocessVLLMRuntime` (class): summary=yes, examples=no — Mutable runtime backing the frozen embedder.
+- `InprocessVLLMContext` (class): summary=yes, examples=no — Dependency providers for in-process vLLM embeddings.
 - `InprocessVLLMEmbedder` (class): summary=yes, examples=yes — Embed text batches locally using vLLM.
 
 ## Tags

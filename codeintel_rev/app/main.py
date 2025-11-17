@@ -56,6 +56,7 @@ class AppLifecycleHooks:
     faiss_health_check: Callable[[], object] | None = None
     readiness_probe_factory: Callable[[ApplicationContext], ReadinessProbe] | None = None
     env_flag_resolver: Callable[[str], bool] | None = None
+    shutdown_observer: Callable[[ApplicationContext], None] | None = None
 
 
 _APP_HOOKS_STACK: list[AppLifecycleHooks] = [AppLifecycleHooks()]
@@ -398,7 +399,10 @@ async def _shutdown_context(
     readiness: ReadinessProbe | None,
 ) -> None:
     """Shut down mutable runtimes and readiness probes."""
+    hooks = _APP_HOOKS_STACK[-1]
     if context is not None:
+        if hooks.shutdown_observer is not None:
+            hooks.shutdown_observer(context)
         with suppress(Exception):
             context.close_all_runtimes()
         if hasattr(context, "scope_store"):

@@ -81,7 +81,7 @@ the FAISS index, then hydrating results from DuckDB.
 
 - **fan_in**: 0
 - **fan_out**: 11
-- **cycle_group**: 119
+- **cycle_group**: 121
 
 ## Ownership
 

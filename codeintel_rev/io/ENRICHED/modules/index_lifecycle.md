@@ -57,7 +57,7 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 27
+- **cycle_group**: 26
 
 ## Ownership
 

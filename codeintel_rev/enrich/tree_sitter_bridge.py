@@ -15,6 +15,8 @@ from typing import Any, Protocol, cast
 
 from tree_sitter import Language, Node, Parser, Query, Tree
 
+LOGGER = logging.getLogger(__name__)
+
 _languages_spec = importlib.util.find_spec("tree_sitter_languages")
 if _languages_spec is not None:  # pragma: no cover
     _languages_module = importlib.import_module("tree_sitter_languages")
@@ -26,9 +28,6 @@ try:  # pragma: no cover - optional dependency
     from tree_sitter_python import language as _python_language
 except ImportError:  # pragma: no cover
     _python_language = None
-
-
-LOGGER = logging.getLogger(__name__)
 _USE_TS_QUERY = os.getenv("USE_TS_QUERY", "1") not in {"0", "false", "False"}
 _OUTLINE_QUERY_PATTERNS: dict[str, str] = {
     "python": """
@@ -60,24 +59,33 @@ def override_outline_config(**kwargs: object) -> Iterator[None]:
         _OUTLINE_CONFIG_STACK.pop()
 
 
-class ParserProtocol(Protocol):
-    """Subset of :class:`tree_sitter.Parser` used by this module."""
-
-    def set_language(self, language: Language) -> None:
-        """Bind the parser to ``language``."""
-        ...
-
-    def parse(self, content: bytes) -> Tree:
-        """Parse UTF-8 ``content`` into a :class:`tree_sitter.Tree`."""
-        ...
-
-
 class QueryProtocol(Protocol):
     """Subset of :class:`tree_sitter.Query` APIs required for outlines."""
 
     def captures(self, node: Node) -> Sequence[tuple[Node, str]]:
         """Return captures for ``node``."""
         ...
+
+def _as_language(candidate: object | None) -> Language | None:
+    """Return a ``Language`` instance for ``candidate`` when possible.
+
+    Returns
+    -------
+    Language | None
+        Coerced ``Language`` object, or ``None`` when conversion fails.
+    """
+    if candidate is None:
+        return None
+    if isinstance(candidate, Language):
+        return candidate
+    try:
+        # ``tree_sitter_python.language()`` returns a PyCapsule that can be
+        # wrapped by ``Language`` to obtain the concrete binding.
+        converted = Language(candidate)
+    except (TypeError, ValueError):
+        LOGGER.debug("Failed to coerce Tree-sitter language from %r", candidate)
+        return None
+    return converted
 
 
 def _lang_for_ext(ext: str) -> tuple[str, Language] | None:
@@ -107,12 +115,12 @@ def _lang_for_ext(ext: str) -> tuple[str, Language] | None:
         }
         target = name_map.get(normalized)
         if target:
-            language_obj = _get_language(target)
-            if isinstance(language_obj, Language):
+            language_obj = _as_language(_get_language(target))
+            if language_obj is not None:
                 return target, language_obj
     if normalized == ".py" and _python_language is not None:
-        language_obj = _python_language()
-        if isinstance(language_obj, Language):
+        language_obj = _as_language(_python_language())
+        if language_obj is not None:
             return "python", language_obj
     return None
 
@@ -158,8 +166,8 @@ def build_outline(path: str | Path, content: bytes) -> TSOutline | None:
     if lang_info is None:
         return None
     language_name, language = lang_info
-    parser = cast("ParserProtocol", Parser())
-    parser.set_language(language)
+    parser = Parser()
+    _set_parser_language(parser, language)
     tree = parser.parse(content)
 
     nodes: list[OutlineNode] = []
@@ -169,6 +177,15 @@ def build_outline(path: str | Path, content: bytes) -> TSOutline | None:
     if not nodes:
         nodes = _outline_with_dfs(tree.root_node, content)
     return TSOutline(language=language_name, nodes=nodes)
+
+
+def _set_parser_language(parser: Parser, language: Language) -> None:
+    """Bind ``parser`` to ``language`` across Tree-sitter releases."""
+    setter = getattr(parser, "set_language", None)
+    if callable(setter):
+        setter(language)
+        return
+    parser.language = language
 
 
 def _extract_identifier(content: bytes, node: Node | None) -> str:

@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -134,6 +136,36 @@ def write_json(path: str | Path, obj: object) -> None:
     target.write_text(_dump_json(obj), encoding="utf-8")
 
 
+@dataclass(slots=True)
+class WriterEnvConfig:
+    """Configuration for resolving writer environment variables."""
+
+    env_resolver: Callable[[str, str | None], str | None] | None = None
+
+
+_WRITER_ENV_STACK: list[WriterEnvConfig] = [WriterEnvConfig()]
+
+
+@contextmanager
+def override_writer_env(
+    env_resolver: Callable[[str, str | None], str | None]
+) -> Iterator[None]:
+    """Temporarily override the environment resolver for JSONL writers."""
+    config = WriterEnvConfig(env_resolver=env_resolver)
+    _WRITER_ENV_STACK.append(config)
+    try:
+        yield
+    finally:
+        _WRITER_ENV_STACK.pop()
+
+
+def _resolve_env(key: str, default: str | None = None) -> str | None:
+    resolver = _WRITER_ENV_STACK[-1].env_resolver
+    if resolver is not None:
+        return resolver(key, default)
+    return os.getenv(key, default)
+
+
 def write_jsonl(
     path: str | Path,
     rows: Iterable[RowMapping],
@@ -144,7 +176,7 @@ def write_jsonl(
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     resolved_version = (
-        writer_version or os.getenv(_JSONL_WRITER_ENV) or _JSONL_DEFAULT_VERSION
+        writer_version or _resolve_env(_JSONL_WRITER_ENV) or _JSONL_DEFAULT_VERSION
     ).lower()
     if resolved_version == _JSONL_V2 and _ORJSON_JSONL_OPTS is not None:
         with target.open("wb") as handle:

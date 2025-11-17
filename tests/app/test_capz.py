@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from http import HTTPStatus
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType
 
-import pytest
-from codeintel_rev.app.capabilities import Capabilities, override_capability_imports
+from codeintel_rev.app.capabilities import (
+    Capabilities,
+    override_capabilities,
+    override_capability_imports,
+)
 from codeintel_rev.app.main import capz as capz_route
 from fastapi.testclient import TestClient
 
@@ -16,18 +19,18 @@ from tests._helpers.http import build_test_app
 from tests.app._context_factory import build_application_context
 
 
-def _mock_module(**attrs: object) -> SimpleNamespace:
-    """Create a mock module namespace with the given attributes.
+def _mock_module(name: str, **attrs: object) -> ModuleType:
+    """Create a mock module with the given attributes.
 
     Returns
     -------
-    Any
-        SimpleNamespace instance with the provided attributes.
+    ModuleType
+        Module instance populated with the provided attributes.
     """
-    namespace = SimpleNamespace()
+    module = ModuleType(name)
     for key, value in attrs.items():
-        setattr(namespace, key, value)
-    return namespace
+        setattr(module, key, value)
+    return module
 
 
 def _noop(*_: object, **__: object) -> None:
@@ -38,10 +41,10 @@ def test_capabilities_snapshot_reports_paths(tmp_path: Path) -> None:
     """Verify capabilities snapshot reports all expected paths and flags."""
     ctx = build_application_context(tmp_path)
     fake_modules = {
-        "faiss": _mock_module(normalize_L2=_noop),
-        "duckdb": object(),
+        "faiss": _mock_module("faiss", normalize_L2=_noop),
+        "duckdb": _mock_module("duckdb"),
         "httpx": None,
-        "torch": object(),
+        "torch": _mock_module("torch"),
     }
 
     with override_capability_imports(fake_modules):
@@ -58,7 +61,7 @@ def test_capabilities_snapshot_reports_paths(tmp_path: Path) -> None:
     assertions.expect_equal(payload["versions_available"], 0)
 
 
-def test_capz_endpoint_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_capz_endpoint_refresh(tmp_path: Path) -> None:
     """Verify capz endpoint refreshes capabilities when requested."""
     ctx = build_application_context(tmp_path)
     initial = Capabilities(faiss_index=True, duckdb=True, scip_index=True, vllm_client=True)
@@ -76,15 +79,13 @@ def test_capz_endpoint_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         versions_available=2,
     )
 
-    def _fake_from_context(_cls: type[Capabilities], _context: object) -> Capabilities:
+    def _fake_from_context(_context: object) -> Capabilities:
         return refreshed
-
-    monkeypatch.setattr(Capabilities, "from_context", classmethod(_fake_from_context))
 
     app = build_test_app(ctx, capabilities_override=initial)
     app.add_api_route("/capz", capz_route)
 
-    with TestClient(app) as client:
+    with override_capabilities(_fake_from_context), TestClient(app) as client:
         resp = client.get("/capz")
         assertions.expect_equal(resp.status_code, HTTPStatus.OK)
         body = resp.json()

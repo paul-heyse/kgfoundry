@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import faiss
 import numpy as np
 from codeintel_rev.indexing.cast_chunker import Chunk
+from codeintel_rev.io.faiss_compat import load_faiss_module
 from codeintel_rev.io.parquet_store import (
     ParquetWriteOptions,
     read_chunks_parquet,
@@ -14,6 +14,8 @@ from codeintel_rev.io.parquet_store import (
 )
 
 from tests._helpers import assertions
+
+faiss = load_faiss_module("golden flat oracle tests")
 
 
 def _mk_chunks() -> list[Chunk]:

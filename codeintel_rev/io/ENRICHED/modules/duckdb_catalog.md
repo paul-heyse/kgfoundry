@@ -39,21 +39,21 @@ chunk retrieval and joins.
 - class: `StructureAnnotations` (line 122)
 - class: `_StructMaterializationPlan` (line 132)
 - class: `DuckDBCatalogOptions` (line 210)
-- class: `_DuckDBQueryMixin` (line 219)
-- class: `_LegacyOptions` (line 433)
-- class: `DuckDBCatalog` (line 440)
-- function: `_relation_exists` (line 1630)
-- function: `relation_exists` (line 1664)
-- function: `_file_checksum` (line 1682)
-- function: `_parquet_hash` (line 1704)
-- function: `ensure_faiss_idmap_view` (line 1732)
-- function: `refresh_faiss_idmap_materialized` (line 1776)
+- class: `_DuckDBQueryMixin` (line 220)
+- class: `_LegacyOptions` (line 434)
+- class: `DuckDBCatalog` (line 441)
+- function: `_relation_exists` (line 1638)
+- function: `relation_exists` (line 1672)
+- function: `_file_checksum` (line 1690)
+- function: `_parquet_hash` (line 1712)
+- function: `ensure_faiss_idmap_view` (line 1740)
+- function: `refresh_faiss_idmap_materialized` (line 1784)
 
 ## Graph Metrics
 
 - **fan_in**: 11
 - **fan_out**: 5
-- **cycle_group**: 28
+- **cycle_group**: 30
 
 ## Ownership
 
@@ -102,9 +102,9 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Complexity
 
-- branches: 151
-- cyclomatic: 152
-- loc: 1875
+- branches: 152
+- cyclomatic: 153
+- loc: 1883
 
 ## Doc Coverage
 

@@ -48,7 +48,7 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 47
+- **cycle_group**: 49
 
 ## Ownership
 

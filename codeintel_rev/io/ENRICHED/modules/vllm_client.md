@@ -15,7 +15,8 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - from **(absolute)** import importlib.util
 - from **(absolute)** import logging
 - from **(absolute)** import os
-- from **collections.abc** import Sequence
+- from **collections.abc** import Callable, Sequence
+- from **dataclasses** import dataclass
 - from **functools** import lru_cache
 - from **importlib** import import_module
 - from **types** import ModuleType
@@ -29,32 +30,36 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 ## Definitions
 
-- variable: `httpx` (line 29)
-- variable: `LOGGER` (line 31)
-- function: `_truthy_env` (line 34)
-- function: `_use_stub_client` (line 40)
-- function: `_module_available` (line 44)
-- function: `_get_numpy` (line 61)
-- class: `EmbeddingRequest` (line 97)
-- class: `EmbeddingData` (line 125)
-- class: `EmbeddingResponse` (line 150)
-- class: `VLLMClient` (line 181)
-- class: `_StubVLLMClient` (line 532)
-- function: `build_vllm_client` (line 557)
+- variable: `httpx` (line 30)
+- variable: `LOGGER` (line 32)
+- function: `_truthy_env` (line 35)
+- function: `_use_stub_client` (line 41)
+- function: `_module_available` (line 45)
+- function: `_get_numpy` (line 62)
+- function: `_default_http_client_factory` (line 98)
+- function: `_default_async_http_client_factory` (line 108)
+- function: `_default_inprocess_embedder_factory` (line 118)
+- class: `VLLMTransportContext` (line 125)
+- class: `EmbeddingRequest` (line 148)
+- class: `EmbeddingData` (line 176)
+- class: `EmbeddingResponse` (line 201)
+- class: `VLLMClient` (line 232)
+- class: `_StubVLLMClient` (line 575)
+- function: `build_vllm_client` (line 600)
 
 ## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 4
-- **cycle_group**: 21
+- **cycle_group**: 16
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 38
-- recent churn 90: 38
+- recent churn 30: 39
+- recent churn 90: 39
 
 ## Usage
 
@@ -96,9 +101,9 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient, build_vllm_clien
 
 ## Complexity
 
-- branches: 29
-- cyclomatic: 30
-- loc: 588
+- branches: 30
+- cyclomatic: 31
+- loc: 631
 
 ## Doc Coverage
 
@@ -106,12 +111,12 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient, build_vllm_clien
 - `_use_stub_client` (function): summary=no, examples=no
 - `_module_available` (function): summary=yes, params=ok, examples=no — Return ``True`` when ``module_name`` can be imported.
 - `_get_numpy` (function): summary=yes, params=ok, examples=no — Load numpy lazily when embeddings are computed.
+- `_default_http_client_factory` (function): summary=no, examples=no
+- `_default_async_http_client_factory` (function): summary=no, examples=no
+- `_default_inprocess_embedder_factory` (function): summary=no, examples=no
+- `VLLMTransportContext` (class): summary=yes, examples=no — Dependencies for constructing VLLM transport clients.
 - `EmbeddingRequest` (class): summary=yes, examples=no — OpenAI-compatible embedding request payload.
 - `EmbeddingData` (class): summary=yes, examples=no — Single embedding result from a batch request.
-- `EmbeddingResponse` (class): summary=yes, examples=no — OpenAI-compatible embedding response payload.
-- `VLLMClient` (class): summary=yes, examples=yes — vLLM embedding client supporting HTTP or in-process execution.
-- `_StubVLLMClient` (class): summary=yes, examples=no — Minimal stand-in for :class:`VLLMClient` used in test environments.
-- `build_vllm_client` (function): summary=yes, params=ok, examples=no — Return a real or stubbed VLLM client based on environment configuration.
 
 ## Tags
 

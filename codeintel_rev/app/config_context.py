@@ -80,8 +80,11 @@ from codeintel_rev.runtime.factory_adjustment import (
     FactoryAdjuster,
     NoopFactoryAdjuster,
 )
+from codeintel_rev.runtime.multiprocessing import ensure_spawn_start_method
 from codeintel_rev.typing import gate_import
 from kgfoundry_common.errors import ConfigurationError
+
+ensure_spawn_start_method()
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -184,6 +187,13 @@ def _call_gate_import(module: str, purpose: str) -> object:
     if override is not None:
         return override(module, purpose)
     return gate_import(module, purpose)
+
+
+@dataclass(slots=True)
+class RuntimeFactoryOverrides:
+    """Test-only overrides for runtime factory callables."""
+
+    hybrid_engine_factory: Callable[[], HybridSearchEngine] | None = None
 
 
 def _infer_index_root(paths: ResolvedPaths) -> Path:
@@ -925,6 +935,9 @@ class ApplicationContext:
     )
     index_manager: IndexLifecycleManager = field(init=False, repr=False)
     _offline_evaluator: OfflineRecallEvaluator | None = field(default=None, init=False, repr=False)
+    _runtime_factories: RuntimeFactoryOverrides | None = field(
+        default=None, init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         """Attach the configured observer to all runtime cells."""
@@ -1352,6 +1365,9 @@ class ApplicationContext:
         HybridSearchEngine
             Configured hybrid search engine instance.
         """
+        factories = self._runtime_factories
+        if factories and factories.hybrid_engine_factory is not None:
+            return factories.hybrid_engine_factory()
         engine_cls = _import_hybrid_engine_cls()
         capabilities = None
         try:
@@ -1568,12 +1584,26 @@ class ApplicationContext:
             self.faiss_manager.cpu_index = None
             runtime.faiss.loaded = False
 
+    def set_runtime_factories_for_tests(
+        self,
+        *,
+        hybrid_engine_factory: Callable[[], HybridSearchEngine] | None = None,
+    ) -> None:
+        """Install factory overrides for runtime components during tests."""
+        factories = self._runtime_factories
+        if factories is None:
+            factories = RuntimeFactoryOverrides()
+            _assign_frozen(self, "_runtime_factories", factories)
+        if hybrid_engine_factory is not None:
+            factories.hybrid_engine_factory = hybrid_engine_factory
+
     def seed_runtime_cells_for_tests(
         self,
         *,
         coderank_faiss: FAISSManager | None = None,
         hybrid_engine: HybridSearchEngine | None = None,
         xtr_index: XTRIndex | None = None,
+        hybrid_engine_factory: Callable[[], HybridSearchEngine] | None = None,
     ) -> None:
         """Seed runtime cells with test doubles.
 
@@ -1585,6 +1615,8 @@ class ApplicationContext:
             Stub hybrid search engine injected into the hybrid runtime cell.
         xtr_index : XTRIndex | None, optional
             Stub XTR index injected into the XTR runtime cell.
+        hybrid_engine_factory : Callable[[], HybridSearchEngine] | None, optional
+            Override factory used when lazily constructing hybrid engines.
         """
         with allow_runtime_cell_seeding():
             if coderank_faiss is not None:
@@ -1593,3 +1625,7 @@ class ApplicationContext:
                 self._runtime.hybrid.seed(hybrid_engine)
             if xtr_index is not None:
                 self._runtime.xtr.seed(xtr_index)
+        if hybrid_engine_factory is not None:
+            self.set_runtime_factories_for_tests(
+                hybrid_engine_factory=hybrid_engine_factory
+            )
