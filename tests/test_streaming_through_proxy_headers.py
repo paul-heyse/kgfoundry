@@ -14,10 +14,9 @@ from tests._helpers import assertions
 @pytest.mark.asyncio
 async def test_sse_stream_flushes_events(  # streaming must survive proxies
     networking_test_app: FastAPI,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that SSE stream flushes events and sets proxy buffering headers correctly."""
-    monkeypatch.setenv("SSE_MAX_KEEPALIVES", "0")
+    networking_test_app.state.server_settings.sse_max_keepalives = 0
     transport = httpx.ASGITransport(app=networking_test_app)
     try:
         async with (

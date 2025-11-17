@@ -33,7 +33,7 @@ Thread-safe DuckDB connection manager.
 
 - **fan_in**: 10
 - **fan_out**: 2
-- **cycle_group**: 5
+- **cycle_group**: 7
 
 ## Ownership
 

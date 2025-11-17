@@ -61,7 +61,9 @@ def overlays(
             generated.append(rel)
             generated_set.add(rel)
             manifest_entries.append(f"{overlay_ctx.package_name}/{rel}")
-            if len(generated) >= overlay_ctx.policy.max_overlays or pipeline.ensure_package_overlays(
+            if len(
+                generated
+            ) >= overlay_ctx.policy.max_overlays or pipeline.ensure_package_overlays(
                 rel_path=Path(rel),
                 generated=generated,
                 generated_set=generated_set,

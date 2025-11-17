@@ -11,22 +11,38 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
-import typer
+from click.testing import Result
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Iterable
-    from pathlib import Path
 
     from _pytest.logging import LogCaptureFixture
 else:  # pragma: no cover - runtime alias for type checking convenience
     LogCaptureFixture = Any
 
-pytest.importorskip("orchestration.cli")
-from orchestration.cli import index_bm25, index_faiss
 from tests._helpers import assertions
+from tests._helpers import cli as cli_helpers
+
+cli_module = pytest.importorskip("orchestration.cli")
+
+
+def _invoke_orchestration_cli(
+    envelope_dir: Path,
+    args: Sequence[str],
+) -> Result:
+    return cli_helpers.invoke(
+        cli_module.app,
+        [
+            "--envelope-dir",
+            str(envelope_dir),
+            *args,
+        ],
+    )
 
 
 def test_index_bm25_identical_on_retry(
@@ -58,26 +74,41 @@ def test_index_bm25_identical_on_retry(
         },
     ]
     chunks_file.write_text(json.dumps(chunks_data))
+    envelope_dir = temp_index_dir / "cli_envelopes"
 
     for backend in ("lucene", "pure"):
         caplog.clear()
         caplog.set_level(logging.INFO)
 
         index_dir_1 = temp_index_dir / f"index_{backend}_1"
-        index_bm25(
-            chunks_parquet=str(chunks_file),
-            backend=backend,
-            index_dir=str(index_dir_1),
+        result_one = _invoke_orchestration_cli(
+            envelope_dir,
+            [
+                "index-bm25",
+                str(chunks_file),
+                "--backend",
+                backend,
+                "--index-dir",
+                str(index_dir_1),
+            ],
         )
+        assertions.expect_equal(result_one.exit_code, 0)
 
         assertions.expect_true(index_dir_1.exists(), reason="index_dir_1 should exist")
 
         index_dir_2 = temp_index_dir / f"index_{backend}_2"
-        index_bm25(
-            chunks_parquet=str(chunks_file),
-            backend=backend,
-            index_dir=str(index_dir_2),
+        result_two = _invoke_orchestration_cli(
+            envelope_dir,
+            [
+                "index-bm25",
+                str(chunks_file),
+                "--backend",
+                backend,
+                "--index-dir",
+                str(index_dir_2),
+            ],
         )
+        assertions.expect_equal(result_two.exit_code, 0)
 
         assertions.expect_true(index_dir_1.exists(), reason="index_dir_1 should still exist")
         assertions.expect_true(index_dir_2.exists(), reason="index_dir_2 should exist")
@@ -111,23 +142,36 @@ def test_index_faiss_identical_on_retry(
         {"key": "v2", "vector": [0.4, 0.5, 0.6]},
     ]
     vectors_file.write_text(json.dumps(vectors_data))
+    envelope_dir = temp_index_dir / "cli_envelopes"
 
     # First run
     index_path_1 = temp_index_dir / "index_1.idx"
-    index_faiss(
-        dense_vectors=str(vectors_file),
-        index_path=str(index_path_1),
+    result_one = _invoke_orchestration_cli(
+        envelope_dir,
+        [
+            "index-faiss",
+            str(vectors_file),
+            "--index-path",
+            str(index_path_1),
+        ],
     )
+    assertions.expect_equal(result_one.exit_code, 0)
 
     # Verify index was created
     assertions.expect_true(index_path_1.exists(), reason="index_path_1 should exist")
 
     # Second run (idempotent)
     index_path_2 = temp_index_dir / "index_2.idx"
-    index_faiss(
-        dense_vectors=str(vectors_file),
-        index_path=str(index_path_2),
+    result_two = _invoke_orchestration_cli(
+        envelope_dir,
+        [
+            "index-faiss",
+            str(vectors_file),
+            "--index-path",
+            str(index_path_2),
+        ],
     )
+    assertions.expect_equal(result_two.exit_code, 0)
 
     # Both should exist
     assertions.expect_true(index_path_1.exists(), reason="index_path_1 should still exist")
@@ -156,14 +200,18 @@ def test_index_bm25_missing_file(
     """
     caplog.set_level(logging.ERROR)
 
-    with pytest.raises(typer.Exit) as exc_info:
-        index_bm25(
-            chunks_parquet=str(temp_index_dir / "nonexistent.json"),
-            backend="lucene",
-            index_dir=str(temp_index_dir / "output"),
-        )
-
-    assertions.expect_equal(exc_info.value.exit_code, 1)
+    result = _invoke_orchestration_cli(
+        temp_index_dir / "cli_envelopes",
+        [
+            "index-bm25",
+            str(temp_index_dir / "nonexistent.json"),
+            "--backend",
+            "lucene",
+            "--index-dir",
+            str(temp_index_dir / "output"),
+        ],
+    )
+    assertions.expect_equal(result.exit_code, 1)
 
     # Verify error was logged
     assertions.expect_true(
@@ -175,7 +223,6 @@ def test_index_bm25_missing_file(
 def test_index_faiss_malformed_vectors(
     temp_index_dir: Path,
     caplog: LogCaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verify malformed vector data is rejected.
 
@@ -185,8 +232,6 @@ def test_index_faiss_malformed_vectors(
         Temporary directory for test artifacts.
     caplog : LogCaptureFixture
         Pytest fixture for log capture.
-    monkeypatch : pytest.MonkeyPatch
-        Fixture used to capture Problem Details output from ``typer.echo``.
     """
     caplog.set_level(logging.ERROR)
 
@@ -195,24 +240,22 @@ def test_index_faiss_malformed_vectors(
     bad_payload: dict[str, object] = {"not": "a list"}
     vectors_file.write_text(json.dumps(bad_payload))
 
-    # Capture Problem Details emission
-    messages: list[tuple[str, bool]] = []
+    result = _invoke_orchestration_cli(
+        temp_index_dir / "cli_envelopes",
+        [
+            "index-faiss",
+            str(vectors_file),
+            "--index-path",
+            str(temp_index_dir / "output.idx"),
+        ],
+    )
+    assertions.expect_equal(result.exit_code, 1)
 
-    def _fake_echo(message: object, *, err: bool = False, **_: object) -> None:
-        messages.append((str(message), err))
-
-    monkeypatch.setattr(typer, "echo", _fake_echo)
-
-    with pytest.raises(typer.Exit) as exc_info:
-        index_faiss(
-            dense_vectors=str(vectors_file),
-            index_path=str(temp_index_dir / "output.idx"),
-        )
-
-    assertions.expect_equal(exc_info.value.exit_code, 1)
-    assertions.expect_true(bool(messages), reason="Expected Problem Details payload to be emitted")
-
-    json_messages = [msg for msg, err in messages if err and msg.strip().startswith("{")]
+    json_messages = [
+        line
+        for line in result.stderr.splitlines()
+        if line.strip().startswith("{") and line.strip().endswith("}")
+    ]
     assertions.expect_true(bool(json_messages), reason="Expected structured Problem Details output")
     problem_raw: object = json.loads(json_messages[-1])
     assertions.expect_true(isinstance(problem_raw, dict), reason="problem_raw should be dict")

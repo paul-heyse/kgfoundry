@@ -53,7 +53,7 @@ Usage:
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 61
+- **cycle_group**: 89
 
 ## Ownership
 

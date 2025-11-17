@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
-import pytest
+from codeintel_rev.cli.indexctl import IndexctlCliContext
 from codeintel_rev.cli.indexctl import app as indexctl_app
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.faiss_manager import FAISSManager
 
 from tests._helpers import assertions, cli, constants
 
@@ -88,18 +93,27 @@ class _Settings(SimpleNamespace):
         super().__init__(paths=paths, index=_IndexCfg())
 
 
-def test_health_command_reports_ok(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_health_command_reports_ok(tmp_path: Path) -> None:
     """`indexctl health` reports OK when subsystems agree on counts."""
     vector_dim = constants.VECTOR_DIMS.small
     vector_count = constants.BATCH_SIZES.large
     manager = _ManagerStub(vec_dim=vector_dim, total=vector_count)
     catalog = _CatalogStub()
-    monkeypatch.setattr("codeintel_rev.cli.indexctl._get_settings", lambda: _Settings(tmp_path))
-    monkeypatch.setattr("codeintel_rev.cli.indexctl._faiss_manager", lambda *_: manager)
-    monkeypatch.setattr("codeintel_rev.cli.indexctl._duckdb_catalog", lambda *_: catalog)
-    monkeypatch.setattr("codeintel_rev.cli.indexctl._duckdb_embedding_dim", lambda _c: vector_dim)
-    monkeypatch.setattr("codeintel_rev.cli.indexctl._count_idmap_rows", lambda _p: vector_count)
-    result = cli.invoke(indexctl_app, ["health"], catch_exceptions=False)
+    base_context = IndexctlCliContext.production()
+    context = replace(
+        base_context,
+        settings_factory=lambda: cast("Settings", _Settings(tmp_path)),
+        faiss_manager_factory=lambda *_: cast("FAISSManager", manager),
+        duckdb_catalog_factory=lambda *_: cast("DuckDBCatalog", catalog),
+        duckdb_dim_resolver=lambda _catalog: vector_dim,
+        idmap_row_counter=lambda _path: vector_count,
+    )
+    result = cli.invoke(
+        indexctl_app,
+        ["health"],
+        catch_exceptions=False,
+        obj={"cli_context": context},
+    )
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
     payload = json.loads(result.stdout)
     assertions.expect_true(payload["ok"])

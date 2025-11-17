@@ -7,6 +7,7 @@ IndexCliConfig and handle error cases correctly.
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
 from unittest.mock import patch
@@ -15,9 +16,23 @@ from orchestration import cli as cli_module
 from orchestration.cli import index_faiss, run_index_faiss
 from orchestration.config import IndexCliConfig
 from tests._helpers import assertions
+from tests._helpers import cli as cli_helpers
 
 # Test constants for docstring length assertions
 _MIN_DOCSTRING_LENGTH = 50
+
+
+def _invoke_index_faiss_cli(envelope_dir: Path, args: Sequence[str]) -> None:
+    result = cli_helpers.invoke(
+        cli_module.app,
+        [
+            "--envelope-dir",
+            str(envelope_dir),
+            "index-faiss",
+            *args,
+        ],
+    )
+    assertions.expect_equal(result.exit_code, 0)
 
 
 def test_keyword_only_parameter() -> None:
@@ -59,14 +74,22 @@ def test_index_faiss_constructs_config_correctly() -> None:
 
         # Create dummy vectors file
         vectors_file.write_text("[]", encoding="utf-8")
+        envelope_dir = Path(tmpdir) / "envelopes"
 
         # Mock run_index_faiss to capture the config
         with patch("orchestration.cli.run_index_faiss") as mock_run:
-            index_faiss(
-                str(vectors_file),
-                str(index_file),
-                "Flat",
-                "ip",
+            mock_run.return_value = {"vector_count": 1, "dimension": 2}
+            _invoke_index_faiss_cli(
+                envelope_dir,
+                [
+                    str(vectors_file),
+                    "--index-path",
+                    str(index_file),
+                    "--factory",
+                    "Flat",
+                    "--metric",
+                    "ip",
+                ],
             )
             # Verify run_index_faiss was called once
             assertions.expect_equal(mock_run.call_count, 1)
@@ -90,7 +113,13 @@ def test_index_faiss_uses_defaults() -> None:
         vectors_file.write_text("[]", encoding="utf-8")
 
         with patch("orchestration.cli.run_index_faiss") as mock_run:
-            index_faiss(str(vectors_file))
+            mock_run.return_value = {"vector_count": 1, "dimension": 2}
+            _invoke_index_faiss_cli(
+                Path(tmpdir) / "envelopes",
+                [
+                    str(vectors_file),
+                ],
+            )
             call_kwargs = cast("dict[str, object]", mock_run.call_args[1])
             config = cast("IndexCliConfig", call_kwargs["config"])
             assertions.expect_true(

@@ -43,7 +43,7 @@ AST indexer producing join-ready Parquet datasets.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 66
+- **cycle_group**: 69
 
 ## Ownership
 

@@ -20,9 +20,14 @@ Timestamp: 2025-11-12T02:32:28Z
 uv pip install -e ".[scan-plus]"  # or: pip install -e ".[scan-plus]"
 
 # 3) Run (path to SCIP is required; output dir optional)
-python -m codeintel_rev.cli_enrich --scip index.json --root . --out codeintel_rev/io/ENRICHED
-# or via console script (after adding to pyproject):
-codeintel-enrich --scip index.json --root . --out codeintel_rev/io/ENRICHED
+python -m codeintel_rev.cli.enrich_pipeline --scip index.json --root . --out codeintel_rev/io/ENRICHED
+# or via console scripts (after adding to pyproject):
+codeintel-enrich-pipeline --scip index.json --root . --out codeintel_rev/io/ENRICHED
+codeintel-enrich-analytics --root . --scip index.json graph --dry-run
+codeintel-enrich-overlays --root . --scip index.json --out codeintel_rev/io/ENRICHED overlays
+
+# Legacy shim
+codeintel-enrich --scip index.json --root . --out codeintel_rev/io/ENRICHED  # proxies to the pipeline CLI
 ```
 
 Outputs (defaults under `codeintel_rev/io/ENRICHED/`):

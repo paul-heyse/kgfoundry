@@ -1,11 +1,11 @@
 {
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
-  "module_count": 153,
+  "module_count": 156,
   "symbol_edge_count": 0,
-  "coverage_records": 153,
+  "coverage_records": 156,
   "config_files": 222,
-  "generated_at": "2025-11-17T03:54:03+00:00",
+  "generated_at": "2025-11-17T05:11:20+00:00",
   "tags": {
     "low-coverage": [
       "__init__.py",
@@ -32,6 +32,9 @@
       "cli/__init__.py",
       "cli/bm25.py",
       "cli/build_indexes.py",
+      "cli/enrich_analytics.py",
+      "cli/enrich_overlays.py",
+      "cli/enrich_pipeline.py",
       "cli/indexctl.py",
       "cli/splade.py",
       "cli/st_embed.py",
@@ -173,6 +176,8 @@
       "app/scope_registry.py",
       "app/scope_store.py",
       "app/server_settings.py",
+      "cli/enrich_analytics.py",
+      "cli/enrich_overlays.py",
       "cli/xtr.py",
       "config/settings.py",
       "config/utils.py",
@@ -262,8 +267,8 @@
     ]
   },
   "tag_counts": {
-    "low-coverage": 153,
-    "public-api": 77,
+    "low-coverage": 156,
+    "public-api": 79,
     "fastapi": 3,
     "pydantic": 2,
     "reexport-hub": 8

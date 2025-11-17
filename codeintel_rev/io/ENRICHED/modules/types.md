@@ -29,7 +29,7 @@ Shared retrieval dataclasses for multi-stage pipelines.
 
 - **fan_in**: 13
 - **fan_out**: 0
-- **cycle_group**: 11
+- **cycle_group**: 12
 
 ## Ownership
 

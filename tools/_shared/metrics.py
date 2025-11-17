@@ -130,10 +130,12 @@ def observe_tool_run(
         on context exit. Thread-safe for concurrent subprocess observations.
 
     Exception Propagation:
-        Exceptions raised while running the tool are recorded (``observation.failure``)
-        and then propagated unchanged. Callers will observe the original exception
-        type (e.g., subprocess.CalledProcessError, subprocess.TimeoutExpired,
-        FileNotFoundError, PermissionError, OSError).
+        Any exception raised during tool execution is caught using ``except Exception``,
+        recorded via ``observation.failure("exception")``, and then re-raised via
+        ``raise`` to preserve the original exception type and stack trace. Common
+        exception types include subprocess.CalledProcessError, subprocess.TimeoutExpired,
+        FileNotFoundError, PermissionError, and OSError. The exception is re-raised
+        unchanged so callers observe the original exception type.
 
     See Also
     --------

@@ -17,7 +17,7 @@ Provides file listing, reading, and scope configuration.
 - from **collections.abc** import Sequence
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **typing** import TYPE_CHECKING, SupportsIndex, cast
+- from **typing** import TYPE_CHECKING, cast
 - from **codeintel_rev.app.middleware** import get_session_id
 - from **codeintel_rev.errors** import FileReadError, InvalidLineRangeError, PathNotDirectoryError, PathNotFoundError
 - from **codeintel_rev.io.path_utils** import PathOutsideRepositoryError, resolve_within_repo
@@ -32,31 +32,31 @@ Provides file listing, reading, and scope configuration.
 - function: `set_scope` (line 55)
 - function: `list_paths` (line 94)
 - function: `_normalize_list_paths_arguments` (line 190)
-- function: `_list_paths_sync` (line 222)
-- function: `_collect_filtered_paths` (line 322)
-- function: `_prune_directories` (line 387)
-- function: `_create_file_entry` (line 409)
-- function: `open_file` (line 466)
-- function: `_resolve_search_root` (line 572)
-- function: `_matches_any` (line 619)
-- function: `_relative_path_str` (line 624)
-- function: `_safe_stat` (line 636)
-- function: `_collect_language_extensions` (line 643)
-- function: `_matches_language` (line 662)
+- function: `_list_paths_sync` (line 219)
+- function: `_collect_filtered_paths` (line 319)
+- function: `_prune_directories` (line 384)
+- function: `_create_file_entry` (line 406)
+- function: `open_file` (line 463)
+- function: `_resolve_search_root` (line 569)
+- function: `_matches_any` (line 616)
+- function: `_relative_path_str` (line 621)
+- function: `_safe_stat` (line 633)
+- function: `_collect_language_extensions` (line 640)
+- function: `_matches_language` (line 659)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 7
-- **cycle_group**: 114
+- **cycle_group**: 117
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 24
-- recent churn 90: 24
+- recent churn 30: 25
+- recent churn 90: 25
 
 ## Usage
 
@@ -99,7 +99,7 @@ list_paths, open_file, set_scope
 
 - branches: 49
 - cyclomatic: 50
-- loc: 680
+- loc: 677
 
 ## Doc Coverage
 

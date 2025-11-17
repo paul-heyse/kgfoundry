@@ -36,7 +36,7 @@ Thread-safe runtime cell primitive for mutable subsystems.
 
 - **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 20
+- **cycle_group**: 14
 
 ## Ownership
 

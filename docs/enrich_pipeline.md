@@ -1,6 +1,7 @@
 # Enrichment Pipeline Overview
 
-The enrichment CLI (`codeintel_rev/cli_enrich.py`) orchestrates a composable set of
+The enrichment CLI suite (`codeintel_rev/cli/enrich_pipeline.py`,
+`cli/enrich_analytics.py`, `cli/enrich_overlays.py`) orchestrates a composable set of
 stages that merge SCIP, LibCST, Tree-sitter, type-checker signals, analytics, and
 writers into a stable `modules/` artifact bundle. The stages are intentionally small,
 idempotent, and logged via structured `stage=*` spans so operators can pinpoint where
@@ -44,7 +45,7 @@ time is spent or why a module failed.
 ## CLI usage
 
 ```bash
-codeintel-enrich \
+codeintel-enrich-pipeline \
   --root . \
   --scip build/index.scip.json \
   --out build/enrich \
@@ -54,9 +55,14 @@ codeintel-enrich \
 ```
 
 The `all`/`run` commands execute the entire stage flow described above. Narrow commands
-(`graph`, `typedness`, `hotspots`, `overlays`, etc.) share the same discovery and ingestion
-stages but only execute the writers relevant to that command. All options are declared on
-the Typer command functions so `--help` always reflects the current surface.
+(`graph`, `typedness`, `hotspots`, `overlays`, etc.) now live in dedicated CLIs:
+
+- `codeintel-enrich-pipeline` — full pipeline orchestration (`all`, `exports`, `to-duckdb`, …)
+- `codeintel-enrich-analytics` — analytics-only writers (`graph`, `uses`, `typedness`, …)
+- `codeintel-enrich-overlays` — overlay generation and activation
+
+All three CLIs share the same global options. The legacy `codeintel-enrich` entry point
+remains as a compatibility shim that proxies to the split CLIs.
 
 Add `--dry-run` after the command name to validate discovery/ingest/analytics without
 emitting artifacts. The CLI still logs stage timings and counts, but no files are written
@@ -65,7 +71,9 @@ under `--out`.
 To materialize the `modules.jsonl` data into DuckDB for downstream SQL analysis:
 
 ```bash
-codeintel-enrich to-duckdb --modules-jsonl build/enrich/modules/modules.jsonl --db build/enrich/enrich.duckdb
+codeintel-enrich-pipeline to-duckdb \
+  --modules-jsonl build/enrich/modules/modules.jsonl \
+  --db build/enrich/enrich.duckdb
 ```
 
 The command is idempotent on `path` and will upsert rows as the scanner regenerates them.
@@ -80,7 +88,7 @@ Key options:
 | `--pyrefly-json PATH` | Optional Pyrefly JSON/JSONL report used in the type-signal stage. |
 | `--tags-yaml PATH` | Optional YAML rules to override default tagging heuristics. |
 | `--max-file-bytes N` | Skip files larger than `N` bytes but record a structured error. |
-| `--dry-run` | Execute all non-writer stages and print counts without writing artifacts. |
+| `--dry-run` | Execute all non-writer stages and print counts without writing artifacts (supported by all enrichment CLIs). |
 
 ## Outputs
 
@@ -96,7 +104,7 @@ idempotent — re-running the CLI overwrites previous results with the same file
 | `graphs/uses.parquet` | Use-graph linking definitions to references. |
 | `graphs/symbol_graph.json` | SCIP symbol → file edges. |
 | `analytics/typedness.parquet` | Annotation ratios, type error counts, untyped defs. |
-| `analytics/hotspots.parquet` | Hotspot score + fan-in/out + usage counts. |
+| `analytics/hotspots.parquet` | Hotspot score + fan-in/out + usage counts (emitted via `codeintel-enrich-analytics hotspots`). |
 | `analytics/ownership.parquet` | Owners, churn, bus-factor metrics. |
 | `docs/doc_health.parquet` | Doc summaries and coverage of doc sections. |
 | `coverage/coverage.parquet` | Line and def coverage ratios per module. |

@@ -38,7 +38,7 @@ Invoke via:
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 60
+- **cycle_group**: 88
 
 ## Ownership
 

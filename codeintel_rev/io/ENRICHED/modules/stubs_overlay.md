@@ -42,9 +42,9 @@ Targeted overlay generation with opt-in activation.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 3
-- **cycle_group**: 82
+- **cycle_group**: 72
 
 ## Ownership
 
@@ -86,7 +86,7 @@ Targeted overlay generation with opt-in activation.
 
 ## Hotspot
 
-- score: 2.48
+- score: 2.55
 
 ## Side Effects
 

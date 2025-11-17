@@ -22,6 +22,7 @@ def invoke(
     *,
     env: Mapping[str, str] | None = None,
     catch_exceptions: bool = False,
+    obj: object | None = None,
 ) -> Result:
     """Invoke ``app`` with ``args`` and return the Typer result.
 
@@ -45,6 +46,9 @@ def invoke(
     catch_exceptions : bool, optional
         Whether to catch exceptions during invocation (default: False). When True,
         exceptions are captured in the result object instead of propagating.
+    obj : object | None, optional
+        Optional Click ``obj`` passed to the CLI context. Defaults to None,
+        allowing callers to inject dependency contexts for testing.
 
     Returns
     -------
@@ -67,4 +71,10 @@ def invoke(
         normalizer = cast("_ArgNormalizer", normalizer_obj)
         normalized = normalizer(["cli", *arg_list])
         arg_list = normalized[1:]
-    return _RUNNER.invoke(app, arg_list, env=env, catch_exceptions=catch_exceptions)
+    return _RUNNER.invoke(
+        app,
+        arg_list,
+        env=env,
+        catch_exceptions=catch_exceptions,
+        obj=obj,
+    )

@@ -57,15 +57,114 @@ app.add_typer(embeddings_app, name="embeddings")
 
 
 @lru_cache(maxsize=1)
-def _get_settings() -> Settings:
-    """Load settings once and reuse for subsequent commands.
-
-    Returns
-    -------
-    Settings
-        Cached settings object.
-    """
+def _cached_settings() -> Settings:
     return load_settings()
+
+
+def _default_faiss_manager_factory(
+    settings: Settings,
+    index_override: Path | None,
+) -> FAISSManager:
+    index_path = (index_override or Path(settings.paths.faiss_index)).expanduser().resolve()
+    nlist = int(settings.index.nlist or settings.index.faiss_nlist)
+    manager = FAISSManager(
+        index_path=index_path,
+        vec_dim=settings.index.vec_dim,
+        nlist=nlist,
+    )
+    manager.load_cpu_index()
+    return manager
+
+
+def _default_duckdb_catalog_factory(
+    settings: Settings,
+    path_override: Path | None,
+) -> DuckDBCatalog:
+    db_path = (path_override or Path(settings.paths.duckdb_path)).expanduser().resolve()
+    vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
+    catalog = DuckDBCatalog(
+        db_path=db_path,
+        vectors_dir=vectors_dir,
+        repo_root=Path(settings.paths.repo_root).expanduser().resolve(),
+        materialize=settings.index.duckdb_materialize,
+    )
+    catalog.set_idmap_path(Path(settings.paths.faiss_idmap_path).expanduser().resolve())
+    return catalog
+
+
+def _default_duckdb_embedding_dim(catalog: DuckDBCatalog) -> int:
+    with catalog.connection() as conn:
+        row = conn.execute("SELECT embedding FROM chunks LIMIT 1").fetchone()
+    if not row or row[0] is None:
+        return 0
+    embedding = row[0]
+    try:
+        return len(embedding)
+    except TypeError:
+        return 0
+
+
+def _default_count_idmap_rows(path: Path) -> int:
+    if not path.exists():
+        return 0
+    if pyarrow_parquet is None:
+        msg = "pyarrow is required to inspect the ID map sidecar"
+        raise RuntimeError(msg)
+    metadata = pyarrow_parquet.ParquetFile(path).metadata
+    return metadata.num_rows if metadata is not None else 0
+
+
+def _default_embedding_provider_factory(settings: Settings) -> EmbeddingProvider:
+    return get_embedding_provider(settings)
+
+
+@dataclass(slots=True, frozen=True)
+class IndexctlCliContext:
+    """Dependency injection context for the indexctl CLI."""
+
+    settings_factory: Callable[[], Settings]
+    faiss_manager_factory: Callable[[Settings, Path | None], FAISSManager]
+    duckdb_catalog_factory: Callable[[Settings, Path | None], DuckDBCatalog]
+    duckdb_dim_resolver: Callable[[DuckDBCatalog], int]
+    idmap_row_counter: Callable[[Path], int]
+    embedding_provider_factory: Callable[[Settings], EmbeddingProvider]
+
+    @classmethod
+    def production(cls) -> IndexctlCliContext:
+        """Return the production CLI context.
+
+        Returns
+        -------
+        IndexctlCliContext
+            Context configured with the production factories.
+        """
+        return cls(
+            settings_factory=_cached_settings,
+            faiss_manager_factory=_default_faiss_manager_factory,
+            duckdb_catalog_factory=_default_duckdb_catalog_factory,
+            duckdb_dim_resolver=_default_duckdb_embedding_dim,
+            idmap_row_counter=_default_count_idmap_rows,
+            embedding_provider_factory=_default_embedding_provider_factory,
+        )
+
+
+_DEFAULT_CONTEXT = IndexctlCliContext.production()
+
+
+def _cli_context(ctx: click.Context | None = None) -> IndexctlCliContext:
+    active = ctx or click.get_current_context(silent=True)
+    if active is None:
+        return _DEFAULT_CONTEXT
+    state = active.ensure_object(dict)
+    existing = state.get("cli_context")
+    if isinstance(existing, IndexctlCliContext):
+        return existing
+    state["cli_context"] = _DEFAULT_CONTEXT
+    return _DEFAULT_CONTEXT
+
+
+def _get_settings() -> Settings:
+    return _cli_context().settings_factory()
 
 
 RootOption = Annotated[Path | None, typer.Option("--root", help="Index lifecycle root directory.")]
@@ -180,7 +279,10 @@ EvalXtrOracleOption = Annotated[
 @app.callback()
 def global_options(ctx: click.Context, root: RootOption = None) -> None:
     """Configure shared CLI options."""
-    ctx.obj = {"root": root}
+    state = ctx.ensure_object(dict)
+    if root is not None:
+        state["root"] = root
+    state.setdefault("cli_context", _DEFAULT_CONTEXT)
 
 
 def _default_root() -> Path:
@@ -513,7 +615,7 @@ def _execute_embeddings_build(
     force: bool,
 ) -> None:
     settings = context.settings
-    provider = get_embedding_provider(settings)
+    provider = _embedding_provider(settings)
     db_manager = DuckDBManager(context.duck_path, settings.duckdb)
     try:
         checksum, row_count = _compute_chunk_checksum(db_manager)
@@ -585,7 +687,7 @@ def _run_embedding_validation(
     contents = cast("list[str]", table.column("content").to_pylist())
     indices = _deterministic_sample(total_rows, sample_size)
 
-    provider = get_embedding_provider(settings)
+    provider = _embedding_provider(settings)
     try:
         max_drift, drift_sum, failure_count = _evaluate_drift(
             indices=indices,
@@ -745,29 +847,12 @@ def _parse_tune_overrides(
 
 def _faiss_manager(index_override: Path | None = None) -> FAISSManager:
     settings = _get_settings()
-    index_path = (index_override or Path(settings.paths.faiss_index)).expanduser().resolve()
-    nlist = int(settings.index.nlist or settings.index.faiss_nlist)
-    manager = FAISSManager(
-        index_path=index_path,
-        vec_dim=settings.index.vec_dim,
-        nlist=nlist,
-    )
-    manager.load_cpu_index()
-    return manager
+    return _cli_context().faiss_manager_factory(settings, index_override)
 
 
 def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     settings = _get_settings()
-    db_path = (path_override or Path(settings.paths.duckdb_path)).expanduser().resolve()
-    vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
-    catalog = DuckDBCatalog(
-        db_path=db_path,
-        vectors_dir=vectors_dir,
-        repo_root=Path(settings.paths.repo_root).expanduser().resolve(),
-        materialize=settings.index.duckdb_materialize,
-    )
-    catalog.set_idmap_path(Path(settings.paths.faiss_idmap_path).expanduser().resolve())
-    return catalog
+    return _cli_context().duckdb_catalog_factory(settings, path_override)
 
 
 def _duckdb_embedding_dim(catalog: DuckDBCatalog) -> int:
@@ -785,15 +870,7 @@ def _duckdb_embedding_dim(catalog: DuckDBCatalog) -> int:
         The dimension of embeddings stored in the catalog. Returns 0 if no
         embeddings are found or if the embedding column is empty/None.
     """
-    with catalog.connection() as conn:
-        row = conn.execute("SELECT embedding FROM chunks LIMIT 1").fetchone()
-    if not row or row[0] is None:
-        return 0
-    embedding = row[0]
-    try:
-        return len(embedding)
-    except TypeError:
-        return 0
+    return _cli_context().duckdb_dim_resolver(catalog)
 
 
 def _count_idmap_rows(path: Path) -> int:
@@ -810,20 +887,12 @@ def _count_idmap_rows(path: Path) -> int:
     int
         Number of rows in the ID map Parquet file, or 0 if the file doesn't
         exist.
-
-    Raises
-    ------
-    RuntimeError
-        Raised when pyarrow is not installed. pyarrow is required to read
-        Parquet metadata and determine the row count.
     """
-    if not path.exists():
-        return 0
-    if pyarrow_parquet is None:
-        msg = "pyarrow is required to inspect the ID map sidecar"
-        raise RuntimeError(msg)
-    metadata = pyarrow_parquet.ParquetFile(path).metadata
-    return metadata.num_rows if metadata is not None else 0
+    return _cli_context().idmap_row_counter(path)
+
+
+def _embedding_provider(settings: Settings) -> EmbeddingProvider:
+    return _cli_context().embedding_provider_factory(settings)
 
 
 def _load_xtr_index(settings: Settings) -> XTRIndex | None:
@@ -1245,7 +1314,7 @@ def _execute_search(params: SearchCommandParams) -> None:
     settings = _get_settings()
     manager = _faiss_manager(params.index)
     catalog = _duckdb_catalog(params.duckdb)
-    embedder = get_embedding_provider(settings)
+    embedder = _embedding_provider(settings)
     runtime = SearchRuntimeOverrides()
     try:
         try:

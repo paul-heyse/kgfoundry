@@ -12,8 +12,11 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import ClassVar, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEFAULT_SSE_KEEPALIVE_SECONDS = 25.0
+_MIN_SSE_KEEPALIVE_SECONDS = 5.0
 
 
 class ServerSettings(BaseSettings):
@@ -67,6 +70,14 @@ class ServerSettings(BaseSettings):
         Canonical domain used in docs/runbooks (default: None). Does not affect
         runtime behavior but avoids duplicating values elsewhere. Optional
         metadata field for documentation purposes.
+    sse_keepalive_seconds : float
+        SSE keep-alive interval in seconds (default: 25.0). Minimum value is 5.0
+        seconds, enforced by validator. Used to send periodic keep-alive frames
+        in Server-Sent Events streams to prevent connection timeouts.
+    sse_max_keepalives : int | None
+        Optional cap on keep-alive frames for long-lived SSE streams (default: None).
+        If set, limits the number of keep-alive frames sent before closing the stream.
+        None disables the cap. Negative values are treated as None.
     model_config : ClassVar[SettingsConfigDict]
         Pydantic settings configuration dict. Configures pydantic-settings to
         load from .env (if present) and to use the CODEINTEL_SERVER_ prefix
@@ -95,6 +106,8 @@ class ServerSettings(BaseSettings):
     proxy_mode: Literal["legacy", "modern"] = "modern"
     proxy_trusted_hops: int = 1
     domain: str | None = None
+    sse_keepalive_seconds: float = Field(default=_DEFAULT_SSE_KEEPALIVE_SECONDS)
+    sse_max_keepalives: int | None = None
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=".env",
@@ -102,6 +115,11 @@ class ServerSettings(BaseSettings):
         env_prefix="CODEINTEL_SERVER_",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def _validate_keepalive_interval(self) -> ServerSettings:
+        self.sse_keepalive_seconds = max(self.sse_keepalive_seconds, _MIN_SSE_KEEPALIVE_SECONDS)
+        return self
 
 
 @lru_cache
@@ -119,4 +137,4 @@ def get_server_settings() -> ServerSettings:
     return ServerSettings()
 
 
-__all__ = ["ServerSettings", "get_server_settings"]
+__all__ = ["_DEFAULT_SSE_KEEPALIVE_SECONDS", "ServerSettings", "get_server_settings"]

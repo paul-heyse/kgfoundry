@@ -693,14 +693,14 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         (problem details, status) will not occur for unlisted custom exceptions.
 
         When ``cfg.exit_on_error`` is ``False``, caught exceptions are re-raised
-        after cleanup via ``raise error`` to preserve their original type and
-        traceback. The re-raised exception type matches the original failure
-        (e.g., ValueError, TypeError, OSError, RuntimeError, KgFoundryError, or
-        any other built-in exception caught by the handler). When ``cfg.exit_on_error``
-        is ``True``, the exception is wrapped in ``SystemExit(1)`` and raised with
-        the original exception as the cause. When ``cfg.exit_on_error`` is ``False``,
-        the exception is re-raised directly via ``raise error`` (where ``error`` is
-        a variable containing the caught exception instance).
+        after cleanup via ``raise error`` (where ``error`` is a variable containing
+        the caught exception) to preserve their original type and traceback. The
+        re-raised exception type matches the original failure (e.g., ValueError,
+        TypeError, OSError, RuntimeError, KgFoundryError, or any other built-in
+        exception caught by the handler). When ``cfg.exit_on_error`` is ``True``,
+        the exception is wrapped in ``SystemExit(1)`` and raised with the original
+        exception as the cause. Any exception type caught by the handler can be
+        re-raised when ``exit_on_error`` is ``False``.
 
     Performance & Side Effects:
         Time complexity O(1) per invocation; I/O occurs during envelope finalization

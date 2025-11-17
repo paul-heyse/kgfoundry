@@ -76,6 +76,7 @@ class _CommandContext:
     operation_id: str
     correlation_id: str
     start: float
+    envelope_dir: Path
 
     def extensions(self, extras: Mapping[str, object] | None = None) -> dict[str, JsonValue]:
         """Build Problem Details extensions dictionary from context.
@@ -138,6 +139,30 @@ def _resolve_cli_help() -> str:
 app = typer.Typer(help=_resolve_cli_help(), no_args_is_help=True, add_completion=False)
 
 
+def _store_cli_state(ctx: typer.Context, envelope_dir: Path) -> None:
+    state = ctx.ensure_object(dict)
+    state["envelope_dir"] = envelope_dir
+
+
+def _resolve_envelope_dir(ctx: typer.Context | None) -> Path:
+    if ctx is None or ctx.obj is None:
+        return CLI_ENVELOPE_DIR
+    state = ctx.ensure_object(dict)
+    directory = state.get("envelope_dir")
+    if directory is None:
+        return CLI_ENVELOPE_DIR
+    return Path(directory)
+
+
+@app.callback()
+def orchestration_callback(
+    ctx: typer.Context,
+    envelope_dir: _EnvelopeDirOption = CLI_ENVELOPE_DIR,
+) -> None:
+    """Configure shared orchestration CLI options."""
+    _store_cli_state(ctx, envelope_dir)
+
+
 def _coerce_extension_value(value: object) -> JsonValue:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
@@ -167,7 +192,9 @@ def _log_cli_event(
 
 
 def _start_command(
-    subcommand: str, **log_fields: object
+    ctx: typer.Context,
+    subcommand: str,
+    **log_fields: object,
 ) -> tuple[_CommandContext, CliEnvelopeBuilder]:
     operation_id = CLI_OPERATION_IDS.get(subcommand, subcommand)
     correlation_id = uuid4().hex
@@ -185,6 +212,7 @@ def _start_command(
         operation_id=operation_id,
         correlation_id=correlation_id,
         start=time.monotonic(),
+        envelope_dir=_resolve_envelope_dir(ctx),
     )
     _log_cli_event(
         logging.INFO,
@@ -242,15 +270,15 @@ def _build_cli_problem(
     )
 
 
-def _envelope_path(subcommand: str) -> Path:
+def _envelope_path(subcommand: str, *, envelope_dir: Path) -> Path:
     safe_subcommand = subcommand or "root"
     filename = f"{CLI_SETTINGS.bin_name}-{CLI_COMMAND}-{safe_subcommand.replace('/', '-')}.json"
-    return CLI_ENVELOPE_DIR / filename
+    return envelope_dir / filename
 
 
-def _emit_envelope(envelope: CliEnvelope, *, subcommand: str) -> Path:
-    path = _envelope_path(subcommand)
-    CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
+def _emit_envelope(envelope: CliEnvelope, *, subcommand: str, envelope_dir: Path) -> Path:
+    path = _envelope_path(subcommand, envelope_dir=envelope_dir)
+    envelope_dir.mkdir(parents=True, exist_ok=True)
     payload = render_cli_envelope(envelope)
     path.write_text(payload + "\n", encoding="utf-8")
     return path
@@ -258,7 +286,11 @@ def _emit_envelope(envelope: CliEnvelope, *, subcommand: str) -> Path:
 
 def _finish_success(context: _CommandContext, builder: CliEnvelopeBuilder) -> CliEnvelope:
     envelope = builder.finish(duration_seconds=time.monotonic() - context.start)
-    path = _emit_envelope(envelope, subcommand=context.subcommand)
+    path = _emit_envelope(
+        envelope,
+        subcommand=context.subcommand,
+        envelope_dir=context.envelope_dir,
+    )
     typer.echo(
         f"{context.subcommand} completed in {envelope.duration_seconds:.2f}s (envelope: {path})"
     )
@@ -296,7 +328,11 @@ def _handle_failure(
     builder = builder.add_error(status=cli_error_status, message=detail, problem=problem_payload)
     builder = builder.set_problem(problem_payload)
     envelope = builder.finish(duration_seconds=time.monotonic() - context.start)
-    path = _emit_envelope(envelope, subcommand=context.subcommand)
+    path = _emit_envelope(
+        envelope,
+        subcommand=context.subcommand,
+        envelope_dir=context.envelope_dir,
+    )
     typer.echo(
         f"{context.subcommand} failed ({cli_run_status}); envelope: {path}",
         err=True,
@@ -491,10 +527,21 @@ _FactoryOption = Annotated[str, typer.Option(help="FAISS factory string", show_d
 _MetricOption = Annotated[
     str, typer.Option(help="Similarity metric ('ip' or 'l2')", show_default=True)
 ]
+_EnvelopeDirOption = Annotated[
+    Path,
+    typer.Option(
+        "--envelope-dir",
+        help="Directory where CLI envelopes are written.",
+        dir_okay=True,
+        file_okay=False,
+        show_default=True,
+    ),
+]
 
 
 @app.command(name=SUBCOMMAND_INDEX_BM25)
 def index_bm25(
+    ctx: typer.Context,
     chunks_parquet: _ChunksParquetArg,
     backend: _BackendOption = "lucene",
     index_dir: _IndexDirOption = "./_indices/bm25",
@@ -503,6 +550,8 @@ def index_bm25(
 
     Parameters
     ----------
+    ctx : typer.Context
+        Typer context containing shared CLI state.
     chunks_parquet : _ChunksParquetArg
         Path to Parquet/JSONL file with chunks. Type alias for
         ``Annotated[str, typer.Argument(...)]`` for CLI argument specification.
@@ -520,6 +569,7 @@ def index_bm25(
         generated envelope captures the associated Problem Details payload.
     """
     context, builder = _start_command(
+        ctx,
         SUBCOMMAND_INDEX_BM25,
         backend=backend,
         chunks_path=chunks_parquet,
@@ -638,6 +688,7 @@ def run_index_faiss(*, config: IndexCliConfig) -> dict[str, object]:
 
 @app.command(name=SUBCOMMAND_INDEX_FAISS)
 def index_faiss(
+    ctx: typer.Context,
     dense_vectors: _DenseVectorsArg,
     index_path: _IndexPathOption = "./_indices/faiss/shard_000.idx",
     factory: _FactoryOption = "Flat",
@@ -647,6 +698,8 @@ def index_faiss(
 
     Parameters
     ----------
+    ctx : typer.Context
+        Typer context containing shared CLI state.
     dense_vectors : _DenseVectorsArg
         Path to the dense vector payload (JSON skeleton format). Type alias for
         ``Annotated[str, typer.Argument(...)]`` for CLI argument specification.
@@ -678,6 +731,7 @@ def index_faiss(
     ... )
     """
     context, builder = _start_command(
+        ctx,
         SUBCOMMAND_INDEX_FAISS,
         factory=factory,
         metric=metric,
@@ -777,11 +831,16 @@ app.command(name="index_faiss")(index_faiss)
 
 
 @app.command(name=SUBCOMMAND_API)
-def api(port: int = typer.Option(8080, help="Port to bind", show_default=True)) -> None:
+def api(
+    ctx: typer.Context,
+    port: int = typer.Option(8080, help="Port to bind", show_default=True),
+) -> None:
     """Launch the FastAPI search service using uvicorn.
 
     Parameters
     ----------
+    ctx : typer.Context
+        Typer context containing shared CLI state.
     port : int
         Port to bind the server to. Defaults to 8080.
 
@@ -792,7 +851,7 @@ def api(port: int = typer.Option(8080, help="Port to bind", show_default=True)) 
         missing dependency). Envelopes record the failure metadata for
         downstream tooling.
     """
-    context, builder = _start_command(SUBCOMMAND_API, port=port)
+    context, builder = _start_command(ctx, SUBCOMMAND_API, port=port)
     builder = builder.add_file(path="<api>", status="success", message=f"Configured port {port}")
 
     try:
@@ -837,7 +896,7 @@ def _run_e2e_flow() -> list[str]:
 
 
 @app.command(name=SUBCOMMAND_E2E)
-def e2e() -> None:
+def e2e(ctx: typer.Context) -> None:
     """Execute the Prefect-powered end-to-end orchestration pipeline.
 
     Raises
@@ -847,7 +906,7 @@ def e2e() -> None:
         (for example, Prefect is not installed). The envelope captures the
         associated Problem Details payload.
     """
-    context, builder = _start_command(SUBCOMMAND_E2E)
+    context, builder = _start_command(ctx, SUBCOMMAND_E2E)
     try:
         stages = _run_e2e_flow()
     except RuntimeError as exc:

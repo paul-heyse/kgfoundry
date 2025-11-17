@@ -10,7 +10,7 @@ Startup orchestration helpers for bootstrapping vector indexes.
 
 - **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 142
+- **cycle_group**: 145
 
 ## Ownership
 

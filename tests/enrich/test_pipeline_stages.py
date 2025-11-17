@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from codeintel_rev import cli_enrich
-from codeintel_rev.cli_enrich import ScanInputs, ScipContext
+from codeintel_rev.cli import enrich_pipeline
+from codeintel_rev.cli.enrich_pipeline import ScanInputs, ScipContext
 from codeintel_rev.enrich.duckdb_store import DuckConn, ingest_modules_jsonl
 from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.output_writers import write_markdown_module
@@ -175,7 +175,7 @@ _OUTLINE_NODES_ATTR = "_outline_nodes_for"
 _TYPE_ERROR_COUNT_ATTR = "_type_error_count"
 _APPLY_TAGGING_ATTR = "_apply_tagging"
 
-_BUILD_MODULE_ROW = getattr(cli_enrich, _BUILD_MODULE_ROW_ATTR)
-_OUTLINE_NODES_FOR = getattr(cli_enrich, _OUTLINE_NODES_ATTR)
-_TYPE_ERROR_COUNT = getattr(cli_enrich, _TYPE_ERROR_COUNT_ATTR)
-_APPLY_TAGGING = getattr(cli_enrich, _APPLY_TAGGING_ATTR)
+_BUILD_MODULE_ROW = getattr(enrich_pipeline, _BUILD_MODULE_ROW_ATTR)
+_OUTLINE_NODES_FOR = getattr(enrich_pipeline, _OUTLINE_NODES_ATTR)
+_TYPE_ERROR_COUNT = getattr(enrich_pipeline, _TYPE_ERROR_COUNT_ATTR)
+_APPLY_TAGGING = getattr(enrich_pipeline, _APPLY_TAGGING_ATTR)

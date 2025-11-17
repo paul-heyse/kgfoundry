@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import typer
 
-import codeintel_rev.cli.enrich_analytics as enrich_analytics
-import codeintel_rev.cli.enrich_overlays as enrich_overlays
-import codeintel_rev.cli.enrich_pipeline as enrich_pipeline
+from codeintel_rev.cli import enrich_analytics, enrich_overlays, enrich_pipeline
 
 app = typer.Typer(
     add_completion=True,

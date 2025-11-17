@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
+from typing import cast
 
 import duckdb
 import numpy as np
 import pyarrow.parquet as pq
 import pytest
+from codeintel_rev.cli.indexctl import IndexctlCliContext
 from codeintel_rev.cli.indexctl import app as indexctl_app
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.embeddings import EmbeddingProvider
 from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
 from tests._helpers import assertions, cli, constants
@@ -40,17 +45,21 @@ class _StubProvider:
         """No-op."""
 
 
-@pytest.fixture
-def stub_provider(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Install the deterministic stub provider for the duration of a test."""
+@pytest.fixture(name="indexctl_context")
+def _indexctl_context() -> IndexctlCliContext:
+    """Provide an indexctl CLI context with deterministic embedding provider.
 
-    def _provider_factory(_settings: object) -> _StubProvider:
-        return _StubProvider()
+    Returns
+    -------
+    IndexctlCliContext
+        Context configured with a deterministic embedding provider stub.
+    """
+    base = IndexctlCliContext.production()
 
-    monkeypatch.setattr(
-        "codeintel_rev.cli.indexctl.get_embedding_provider",
-        _provider_factory,
-    )
+    def _provider_factory(_settings: Settings) -> EmbeddingProvider:
+        return cast("EmbeddingProvider", _StubProvider())
+
+    return replace(base, embedding_provider_factory=_provider_factory)
 
 
 def _create_duckdb(path: Path) -> None:
@@ -82,8 +91,10 @@ def _create_duckdb(path: Path) -> None:
     conn.close()
 
 
-@pytest.mark.usefixtures("stub_provider")
-def test_embeddings_build_writes_parquet_and_manifest(tmp_path: Path) -> None:
+def test_embeddings_build_writes_parquet_and_manifest(
+    tmp_path: Path,
+    indexctl_context: IndexctlCliContext,
+) -> None:
     """`indexctl embeddings build` writes artifacts and manifest metadata."""
     db_path = tmp_path / "catalog.duckdb"
     _create_duckdb(db_path)
@@ -103,6 +114,7 @@ def test_embeddings_build_writes_parquet_and_manifest(tmp_path: Path) -> None:
             "--force",
         ],
         catch_exceptions=False,
+        obj={"cli_context": indexctl_context},
     )
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
 
@@ -114,8 +126,10 @@ def test_embeddings_build_writes_parquet_and_manifest(tmp_path: Path) -> None:
     assertions.expect_equal(table.num_rows, constants.BATCH_SIZES.minimal)
 
 
-@pytest.mark.usefixtures("stub_provider")
-def test_embeddings_validate_passes_with_stub(tmp_path: Path) -> None:
+def test_embeddings_validate_passes_with_stub(
+    tmp_path: Path,
+    indexctl_context: IndexctlCliContext,
+) -> None:
     """`indexctl embeddings validate` succeeds with the stub provider."""
     db_path = tmp_path / "catalog.duckdb"
     _create_duckdb(db_path)
@@ -134,6 +148,7 @@ def test_embeddings_validate_passes_with_stub(tmp_path: Path) -> None:
             "--force",
         ],
         catch_exceptions=False,
+        obj={"cli_context": indexctl_context},
     )
     assertions.expect_equal(build_result.exit_code, 0, reason=build_result.output)
 
@@ -148,5 +163,6 @@ def test_embeddings_validate_passes_with_stub(tmp_path: Path) -> None:
             str(constants.BATCH_SIZES.minimal),
         ],
         catch_exceptions=False,
+        obj={"cli_context": indexctl_context},
     )
     assertions.expect_equal(validate_result.exit_code, 0, reason=validate_result.output)

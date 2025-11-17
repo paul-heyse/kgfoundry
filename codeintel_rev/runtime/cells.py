@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from threading import Condition, RLock
 from typing import Literal, Protocol, TypeVar, final, runtime_checkable
@@ -17,8 +19,11 @@ T = TypeVar("T")
 
 _SEED_ENV = "KGFOUNDRY_ALLOW_RUNTIME_SEED"
 _SEED_GUARD_MESSAGE = (
-    f"RuntimeCell.seed() is restricted to tests. Set {_SEED_ENV}=1 to override explicitly."
+    "RuntimeCell.seed() is restricted to tests. Use "
+    "`allow_runtime_cell_seeding()` or set "
+    f"{_SEED_ENV}=1 to override explicitly."
 )
+_SEED_OVERRIDE = ContextVar("runtime_cell_seed_override", default=False)
 
 InitStatus = Literal["ok", "error"]
 CloseStatus = Literal["ok", "error", "noop"]
@@ -60,7 +65,24 @@ class RuntimeCellInitResult:
 def _seed_allowed() -> bool:
     flag = os.getenv(_SEED_ENV, "")
     explicit = flag.strip().lower() in {"1", "true", "yes", "on"}
-    return explicit or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    return explicit or _SEED_OVERRIDE.get()
+
+
+@contextmanager
+def allow_runtime_cell_seeding() -> Iterator[None]:
+    """Temporarily allow RuntimeCell.seed() without env toggles.
+
+    Yields
+    ------
+    None
+        This context manager yields None. While the context is active,
+        RuntimeCell.seed() can be called without environment variable toggles.
+    """
+    token = _SEED_OVERRIDE.set(True)
+    try:
+        yield
+    finally:
+        _SEED_OVERRIDE.reset(token)
 
 
 @runtime_checkable
@@ -244,9 +266,11 @@ class RuntimeCell[T]:
         Exception Re-raising:
             When a cooldown period is active after a previous initialization failure,
             the original exception (e.g., RuntimeError, OSError, ImportError) is
-            re-raised via ``raise cooldown_error``. The exception type matches
+            re-raised via ``raise cooldown_error`` (where ``cooldown_error`` is a
+            variable containing the previous exception). The exception type matches
             the original failure and is preserved from the previous initialization
-            attempt. Callers should handle this to implement retry logic with
+            attempt. Any exception type from the previous failure can be re-raised
+            this way. Callers should handle this to implement retry logic with
             backoff. Additionally, exceptions raised by the factory function
             during initialization are re-raised to preserve the original exception
             type and stack trace.
@@ -342,10 +366,12 @@ class RuntimeCell[T]:
         Exception Re-raising:
             When ``silent=False`` and an unexpected exception occurs during payload
             disposal (not AttributeError, OSError, or RuntimeError), it is re-raised
+            via ``raise exc`` (where ``exc`` is a variable containing the caught exception)
             to preserve the original exception type and stack trace. This defensive
             catch-all ensures all exceptions propagate correctly when silent mode
-            is disabled even though the specific exception type is determined by
-            the payload being closed.
+            is disabled. Any exception type not explicitly handled (AttributeError,
+            OSError, RuntimeError) can be re-raised this way, though the specific
+            exception type is determined by the payload being closed.
         """
         with self._condition:
             current = self._value
@@ -591,4 +617,5 @@ __all__ = [
     "RuntimeCellInitContext",
     "RuntimeCellInitResult",
     "RuntimeCellObserver",
+    "allow_runtime_cell_seeding",
 ]

@@ -94,7 +94,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 - **fan_in**: 0
 - **fan_out**: 16
-- **cycle_group**: 119
+- **cycle_group**: 122
 
 ## Ownership
 

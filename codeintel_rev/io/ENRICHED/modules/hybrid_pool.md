@@ -25,7 +25,7 @@ Feature-normalized hybrid pooling utilities.
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 15
+- **cycle_group**: 23
 
 ## Ownership
 

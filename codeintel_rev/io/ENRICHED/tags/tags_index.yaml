@@ -27,6 +27,9 @@ low-coverage:
 - cli/__init__.py
 - cli/bm25.py
 - cli/build_indexes.py
+- cli/enrich_analytics.py
+- cli/enrich_overlays.py
+- cli/enrich_pipeline.py
 - cli/indexctl.py
 - cli/splade.py
 - cli/st_embed.py
@@ -167,6 +170,8 @@ public-api:
 - app/scope_registry.py
 - app/scope_store.py
 - app/server_settings.py
+- cli/enrich_analytics.py
+- cli/enrich_overlays.py
 - cli/xtr.py
 - config/settings.py
 - config/utils.py

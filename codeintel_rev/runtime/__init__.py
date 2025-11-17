@@ -9,6 +9,7 @@ from codeintel_rev.runtime.cells import (
     RuntimeCellInitContext,
     RuntimeCellInitResult,
     RuntimeCellObserver,
+    allow_runtime_cell_seeding,
 )
 from codeintel_rev.runtime.factory_adjustment import (
     DefaultFactoryAdjuster,
@@ -26,4 +27,5 @@ __all__ = [
     "RuntimeCellInitContext",
     "RuntimeCellInitResult",
     "RuntimeCellObserver",
+    "allow_runtime_cell_seeding",
 ]

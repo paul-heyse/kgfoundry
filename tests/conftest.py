@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 import pytest
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
+from codeintel_rev.app.server_settings import get_server_settings
 from fastapi import FastAPI
 
 from tests.app._context_factory import build_application_context
@@ -143,6 +144,7 @@ def _networking_test_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Fas
 
     ctx = build_application_context(tmp_path)
     app = FastAPI()
+    app.state.server_settings = get_server_settings().model_copy(deep=True)
     app.state.context = ctx
     app.state.readiness = _FakeReadinessProbe()
 

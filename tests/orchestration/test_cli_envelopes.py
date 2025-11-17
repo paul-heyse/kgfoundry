@@ -28,8 +28,6 @@ def test_index_bm25_emits_success_envelope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner
 ) -> None:
     """Test that index-bm25 command emits a success envelope with file artifacts."""
-    monkeypatch.setattr(orchestration_cli, "CLI_ENVELOPE_DIR", tmp_path)
-
     def fake_build(
         config: orchestration_cli.BM25BuildConfig,
         *,
@@ -53,6 +51,8 @@ def test_index_bm25_emits_success_envelope(
     result = runner.invoke(
         orchestration_cli.app,
         [
+            "--envelope-dir",
+            str(tmp_path),
             "index-bm25",
             str(chunks_file),
             "--backend",
@@ -77,8 +77,6 @@ def test_index_faiss_records_validation_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runner: CliRunner
 ) -> None:
     """Test that index-faiss command records validation failures in error envelope."""
-    monkeypatch.setattr(orchestration_cli, "CLI_ENVELOPE_DIR", tmp_path)
-
     error = VectorValidationError("invalid payload", errors=["row 1: missing vector"])
 
     def fake_run(*, config: orchestration_cli.IndexCliConfig) -> dict[str, object]:
@@ -96,6 +94,8 @@ def test_index_faiss_records_validation_failure(
     result = runner.invoke(
         orchestration_cli.app,
         [
+            "--envelope-dir",
+            str(tmp_path),
             "index-faiss",
             str(vectors_file),
             "--index-path",

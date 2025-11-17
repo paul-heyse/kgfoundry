@@ -32,7 +32,10 @@ from codeintel_rev.app.faiss_health import check_faiss_health
 from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
 from codeintel_rev.app.routers import index_admin
-from codeintel_rev.app.server_settings import get_server_settings
+from codeintel_rev.app.server_settings import (
+    ServerSettings,
+    get_server_settings,
+)
 from codeintel_rev.errors import RequestContextError, RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
 from codeintel_rev.runtime.cells import RuntimeCellObserver
@@ -42,8 +45,6 @@ try:
     _DIST_VERSION = version("kgfoundry")
 except PackageNotFoundError:
     _DIST_VERSION = None
-
-_DEFAULT_SSE_KEEPALIVE_SECONDS = 25.0
 
 
 def request_identity(request: Request) -> dict[str, str | None]:
@@ -67,8 +68,36 @@ def request_identity(request: Request) -> dict[str, str | None]:
     }
 
 
-def _sse_keepalive_interval() -> float:
+def _resolve_server_settings(request: Request | None = None) -> ServerSettings:
+    """Return server settings, preferring request-level overrides.
+
+    Parameters
+    ----------
+    request : Request | None, optional
+        FastAPI request object. If provided and contains server_settings in app.state,
+        returns those settings. Otherwise returns the global SERVER_SETTINGS.
+
+    Returns
+    -------
+    ServerSettings
+        Server settings instance, either from request.app.state.server_settings
+        if available, or the global SERVER_SETTINGS instance.
+    """
+    if request is not None:
+        candidate = getattr(request.app.state, "server_settings", None)
+        if isinstance(candidate, SERVER_SETTINGS.__class__):
+            return candidate
+    return SERVER_SETTINGS
+
+
+def _sse_keepalive_interval(request: Request | None = None) -> float:
     """Return the configured SSE keep-alive interval (seconds).
+
+    Parameters
+    ----------
+    request : Request | None, optional
+        FastAPI request object. If provided, uses request-level server settings
+        if available. Otherwise uses global SERVER_SETTINGS.
 
     Returns
     -------
@@ -77,30 +106,28 @@ def _sse_keepalive_interval() -> float:
         Defaults to ``_DEFAULT_SSE_KEEPALIVE_SECONDS`` if environment variable
         is unset or invalid.
     """
-    raw_value = os.getenv("SSE_KEEPALIVE_SECONDS", str(_DEFAULT_SSE_KEEPALIVE_SECONDS))
-    try:
-        interval = float(raw_value)
-    except ValueError:
-        return _DEFAULT_SSE_KEEPALIVE_SECONDS
-    return max(5.0, interval)
+    settings = _resolve_server_settings(request)
+    return settings.sse_keepalive_seconds
 
 
-def _sse_keepalive_budget() -> int | None:
+def _sse_keepalive_budget(request: Request | None = None) -> int | None:
     """Return optional cap on keep-alive frames for long-lived SSE streams.
+
+    Parameters
+    ----------
+    request : Request | None, optional
+        FastAPI request object. If provided, uses request-level server settings
+        if available. Otherwise uses global SERVER_SETTINGS.
 
     Returns
     -------
     int | None
         Maximum number of keep-alive frames to emit after the initial payload.
-        ``None`` indicates infinite keep-alives (default). Intended for tests to
-        keep the stream finite by setting ``SSE_MAX_KEEPALIVES``.
+        ``None`` indicates infinite keep-alives (default).
     """
-    raw_value = os.getenv("SSE_MAX_KEEPALIVES")
-    if raw_value is None:
-        return None
-    try:
-        budget = int(raw_value)
-    except ValueError:
+    settings = _resolve_server_settings(request)
+    budget = settings.sse_max_keepalives
+    if budget is None:
         return None
     return None if budget < 0 else budget
 
@@ -430,6 +457,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.state.server_settings = SERVER_SETTINGS
 # CORS middleware for browser clients (handle preflight before session scope)
 app.add_middleware(
     CORSMiddleware,
@@ -486,7 +514,7 @@ async def set_mcp_context(
     """Set ApplicationContext in context variable for MCP tool handlers.
 
     This middleware sets the ApplicationContext in a context variable that
-    can be accessed by FastMCP tool handlers. FastMCP doesn't support Request
+    can be accessed by FastMCP tool handlers. FastMCP does not support Request
     injection directly, so we use contextvars to pass the context.
 
     Parameters
@@ -562,7 +590,7 @@ async def disable_nginx_buffering(
     backpressure and real-time delivery are important.
 
     The middleware runs after the request handler executes, modifying the
-    response headers before it's sent to the client. This ensures that NGINX
+    response headers before it is sent to the client. This ensures that NGINX
     will stream the response directly to the client rather than buffering it
     in memory, which is essential for long-running streams and prevents memory
     issues with large responses.
@@ -718,8 +746,8 @@ async def sse_demo(request: Request) -> StreamingResponse:
         SSE stream containing ready event, 5 data events, and recurring keep-alive
         comments.
     """
-    keepalive_interval = _sse_keepalive_interval()
-    keepalive_budget = _sse_keepalive_budget()
+    keepalive_interval = _sse_keepalive_interval(request)
+    keepalive_budget = _sse_keepalive_budget(request)
 
     async def event_generator() -> AsyncIterator[bytes]:
         r"""Generate Server-Sent Events (SSE) stream for demo purposes.

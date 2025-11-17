@@ -7,6 +7,8 @@ from types import ModuleType
 
 import typer
 
+from codeintel_rev.cli import enrich_analytics, enrich_overlays, enrich_pipeline
+
 app = typer.Typer(
     help="CodeIntel operational commands.",
     no_args_is_help=True,
@@ -63,6 +65,15 @@ app.add_typer(
     name="xtr",
     help="XTR/WARP index management commands.",
 )
+
+
+__all__ = [
+    "app",
+    "enrich_analytics",
+    "enrich_overlays",
+    "enrich_pipeline",
+    "main",
+]
 
 
 def main() -> None:

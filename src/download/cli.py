@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Protocol
 
+import click
 import typer
 from tools import (
     CliEnvelope,
@@ -20,6 +22,8 @@ from download import cli_context
 from kgfoundry_common.navmap_loader import load_nav_metadata
 
 __all__ = [
+    "DownloadCliContext",
+    "HarvestRequest",
     "app",
     "harvest",
 ]
@@ -47,6 +51,46 @@ DEFAULT_YEARS = ">=2018"
 DEFAULT_MAX_WORKS = 20_000
 
 
+@dataclass(slots=True, frozen=True)
+class HarvestRequest:
+    """Structured request describing a harvest invocation."""
+
+    topic: str
+    years: str
+    max_works: int
+
+
+class HarvestHandler(Protocol):
+    """Protocol describing harvest handler callables."""
+
+    def __call__(self, request: HarvestRequest) -> str: ...
+
+
+def _default_harvest_handler(request: HarvestRequest) -> str:
+    return (
+        "[dry-run] would harvest "
+        f"topic={request.topic!r} years={request.years!r} max_works={request.max_works}"
+    )
+
+
+@dataclass(slots=True, frozen=True)
+class DownloadCliContext:
+    """Dependency injection context for download CLI operations."""
+
+    harvest_handler: HarvestHandler
+
+    @classmethod
+    def production(cls) -> DownloadCliContext:
+        """Return the production CLI context with default handler.
+
+        Returns
+        -------
+        DownloadCliContext
+            Context configured with the default harvest handler.
+        """
+        return cls(harvest_handler=_default_harvest_handler)
+
+
 def _resolve_cli_help() -> str:
     title = CLI_CONFIG.title or CLI_TITLE
     version = CLI_CONFIG.version
@@ -57,20 +101,73 @@ app = typer.Typer(help=_resolve_cli_help(), no_args_is_help=True, add_completion
 download_app = typer.Typer(help=HARVEST_DESCRIPTION, no_args_is_help=True, add_completion=False)
 app.add_typer(download_app, name=CLI_COMMAND, help=HARVEST_DESCRIPTION)
 
+_DEFAULT_CONTEXT = DownloadCliContext.production()
 
-def _envelope_path(subcommand: str) -> Path:
+
+EnvelopeDirOption = Annotated[
+    Path,
+    typer.Option(
+        "--envelope-dir",
+        help="Directory where CLI envelopes are written.",
+        dir_okay=True,
+        file_okay=False,
+        show_default=True,
+    ),
+]
+
+
+def _store_cli_state(ctx: typer.Context, envelope_dir: Path) -> None:
+    state = ctx.ensure_object(dict)
+    state["envelope_dir"] = envelope_dir
+
+
+def _resolve_envelope_dir(ctx: typer.Context | None) -> Path:
+    if ctx is None or ctx.obj is None:
+        return CLI_ENVELOPE_DIR
+    state = ctx.ensure_object(dict)
+    directory = state.get("envelope_dir")
+    if directory is None:
+        return CLI_ENVELOPE_DIR
+    return Path(directory)
+
+
+def _cli_context(ctx: typer.Context | None = None) -> DownloadCliContext:
+    active = ctx or click.get_current_context(silent=True)
+    if active is None:
+        return _DEFAULT_CONTEXT
+    state = active.ensure_object(dict)
+    existing = state.get("cli_context")
+    if isinstance(existing, DownloadCliContext):
+        return existing
+    state["cli_context"] = _DEFAULT_CONTEXT
+    return _DEFAULT_CONTEXT
+
+
+@app.callback()
+def main_callback(
+    ctx: typer.Context,
+    envelope_dir: EnvelopeDirOption = CLI_ENVELOPE_DIR,
+) -> None:
+    """Configure shared CLI options applicable to all subcommands."""
+    _store_cli_state(ctx, envelope_dir)
+    state = ctx.ensure_object(dict)
+    state.setdefault("cli_context", _DEFAULT_CONTEXT)
+
+
+def _envelope_path(subcommand: str, *, envelope_dir: Path) -> Path:
     safe_subcommand = subcommand or "root"
     filename = f"{CLI_SETTINGS.bin_name}-{CLI_COMMAND}-{safe_subcommand.replace('/', '-')}.json"
-    return CLI_ENVELOPE_DIR / filename
+    return envelope_dir / filename
 
 
 def _emit_envelope(
     envelope: CliEnvelope,
     *,
     subcommand: str,
+    envelope_dir: Path,
 ) -> Path:
-    path = _envelope_path(subcommand)
-    CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
+    path = _envelope_path(subcommand, envelope_dir=envelope_dir)
+    envelope_dir.mkdir(parents=True, exist_ok=True)
     rendered = render_cli_envelope(envelope)
     path.write_text(rendered + "\n", encoding="utf-8")
     return path
@@ -93,6 +190,7 @@ def _harvest_problem(
 
 @download_app.command(help=HARVEST_DESCRIPTION)
 def harvest(
+    ctx: typer.Context,
     topic: str = typer.Argument(..., help="Topic query string to harvest."),
     years: str = typer.Option(
         DEFAULT_YEARS,
@@ -115,6 +213,8 @@ def harvest(
 
     Parameters
     ----------
+    ctx : typer.Context
+        Typer context object providing access to CLI state and shared options.
     topic : str
         Topic query string to harvest.
     years : str
@@ -133,8 +233,12 @@ def harvest(
         status="success",
         subcommand="harvest",
     )
+    envelope_dir = _resolve_envelope_dir(ctx)
+    download_context = _cli_context(ctx)
     try:
-        message = f"[dry-run] would harvest topic={topic!r} years={years!r} max_works={max_works}"
+        message = download_context.harvest_handler(
+            HarvestRequest(topic=topic, years=years, max_works=max_works)
+        )
         builder = builder.add_file(path="openalex", status="success", message=message)
         typer.echo(message)
     except Exception as exc:  # pragma: no cover - defensive catch for future integrations
@@ -151,7 +255,7 @@ def harvest(
         )
         failure_builder = failure_builder.set_problem(problem)
         envelope = failure_builder.finish(duration_seconds=time.monotonic() - start)
-        path = _emit_envelope(envelope, subcommand="harvest")
+        path = _emit_envelope(envelope, subcommand="harvest", envelope_dir=envelope_dir)
         typer.echo(
             f"Harvest command failed; envelope saved to {path}",
             err=True,
@@ -159,7 +263,7 @@ def harvest(
         raise typer.Exit(code=1) from exc
 
     envelope = builder.finish(duration_seconds=time.monotonic() - start)
-    path = _emit_envelope(envelope, subcommand="harvest")
+    path = _emit_envelope(envelope, subcommand="harvest", envelope_dir=envelope_dir)
     typer.echo(f"Harvest command completed; envelope saved to {path}")
 
 

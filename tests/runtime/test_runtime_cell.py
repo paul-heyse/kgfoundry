@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Iterator
 from typing import cast
 
 import pytest
@@ -14,6 +15,7 @@ from codeintel_rev.runtime import (
     RuntimeCellInitContext,
     RuntimeCellInitResult,
     RuntimeCellObserver,
+    allow_runtime_cell_seeding,
 )
 
 from tests._helpers import assertions
@@ -69,6 +71,20 @@ class RecordingObserver(RuntimeCellObserver):
                     "error": event.error,
                 }
             )
+
+
+@pytest.fixture
+def runtime_seed_enabled() -> Iterator[None]:
+    """Temporarily allow RuntimeCell.seed without touching env vars.
+
+    Yields
+    ------
+    None
+        This fixture yields None. While active, RuntimeCell.seed can be called
+        without environment variable toggles.
+    """
+    with allow_runtime_cell_seeding():
+        yield
 
 
 def test_runtime_cell_initializes_once_under_high_concurrency() -> None:
@@ -171,9 +187,9 @@ def test_runtime_cell_record_failure_short_circuits_and_recovers() -> None:
     assertions.expect_equal(calls["count"], 1)
 
 
-def test_runtime_cell_seed_constraints(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.usefixtures("runtime_seed_enabled")
+def test_runtime_cell_seed_constraints() -> None:
     """Test that runtime cell seed enforces constraints (single seed, requires guard)."""
-    monkeypatch.setenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", "1")
     cell: RuntimeCell[int] = RuntimeCell()
     cell.seed(1)
     with pytest.raises(RuntimeError):
@@ -185,18 +201,16 @@ def test_runtime_cell_seed_constraints(monkeypatch: pytest.MonkeyPatch) -> None:
         cell.seed(4)
 
 
-def test_runtime_cell_seed_requires_guard(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that runtime cell seed requires guard environment variable."""
-    monkeypatch.delenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", raising=False)
-    monkeypatch.setenv("PYTEST_CURRENT_TEST", "")
+def test_runtime_cell_seed_requires_guard() -> None:
+    """Test that runtime cell seed requires explicit guard."""
     cell: RuntimeCell[int] = RuntimeCell()
     with pytest.raises(RuntimeError):
         cell.seed(42)
 
 
-def test_runtime_cell_close_invokes_close_and_observer(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.usefixtures("runtime_seed_enabled")
+def test_runtime_cell_close_invokes_close_and_observer() -> None:
     """Test that runtime cell close invokes payload close method and observer."""
-    monkeypatch.setenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", "1")
     observer = RecordingObserver()
 
     class DummyRuntime:
@@ -236,9 +250,9 @@ def test_runtime_cell_close_handles_payload_without_close_method() -> None:
     assertions.expect_equal(close_event["status"], "ok")
 
 
-def test_runtime_cell_close_exception_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.usefixtures("runtime_seed_enabled")
+def test_runtime_cell_close_exception_paths() -> None:
     """Test that runtime cell close handles exceptions in silent and non-silent modes."""
-    monkeypatch.setenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", "1")
     observer = RecordingObserver()
 
     class ExplodingRuntime:
@@ -261,9 +275,9 @@ def test_runtime_cell_close_exception_paths(monkeypatch: pytest.MonkeyPatch) -> 
         cell.close(silent=False)
 
 
-def test_runtime_cell_repr_masks_inner(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.usefixtures("runtime_seed_enabled")
+def test_runtime_cell_repr_masks_inner() -> None:
     """Test that runtime cell repr masks inner payload representation."""
-    monkeypatch.setenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", "1")
 
     class SecretRuntime:
         def __repr__(self) -> str:  # pragma: no cover - immaterial to assertion

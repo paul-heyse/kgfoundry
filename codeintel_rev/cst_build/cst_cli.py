@@ -90,7 +90,7 @@ def _build_options(ctx: click.Context) -> CLIOptions:
     type=click.Path(file_okay=True, dir_okay=False, exists=True, path_type=Path),
     default=MODULES_DEFAULT,
     show_default=True,
-    help="Path to modules.jsonl produced by codeintel-enrich.",
+    help="Path to modules.jsonl produced by codeintel-enrich-pipeline.",
 )
 @click.option(
     "--out",
