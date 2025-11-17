@@ -11,7 +11,6 @@ import logging
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from glob import glob as _glob
 from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
@@ -257,12 +256,9 @@ class _DuckDBQueryMixin:
             ORDER BY ids.position
             """
         params = [list(ids)]
-        with catalog._readonly_connection() as conn:
+        with catalog.readonly_connection() as conn:
             relation = conn.execute(sql, params)
-            return catalog._return_catalog_payload(
-                relation,
-                query_name="query_by_ids",
-            )
+            return DuckDBCatalog.catalog_payload(relation, query_name="query_by_ids")
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
         """Return structural overlays (symbols/AST/CST) for chunk ``ids``.
@@ -283,7 +279,7 @@ class _DuckDBQueryMixin:
             return {}
         unique_ids = list(dict.fromkeys(cleaned))
         catalog = cast("DuckDBCatalog", self)
-        with catalog._readonly_connection() as conn:
+        with catalog.readonly_connection() as conn:
             base_rows = self._fetch_annotation_rows(conn, unique_ids)
             annotations, boundaries = self._initialize_annotation_maps(base_rows)
             if not annotations:
@@ -441,7 +437,7 @@ class _LegacyOptions(TypedDict, total=False):
     repo_root: Path
 
 
-class DuckDBCatalog(_DuckDBQueryMixin):
+class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - catalog exposes many helpers
     """DuckDB catalog for querying chunks.
 
     This class provides a high-level interface for querying chunk metadata and
@@ -580,6 +576,18 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             yield conn
 
     @contextmanager
+    def readonly_connection(self) -> Iterator[duckdb.DuckDBPyConnection]:
+        """Yield a read-only DuckDB connection for hydration queries.
+
+        Yields
+        ------
+        duckdb.DuckDBPyConnection
+            Connection opened in read-only mode for catalog reads.
+        """
+        with self._readonly_connection() as conn:
+            yield conn
+
+    @contextmanager
     def _readonly_connection(self) -> Iterator[duckdb.DuckDBPyConnection]:
         """Yield a read-only DuckDB connection for hydration queries.
 
@@ -598,11 +606,25 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         return
 
     @staticmethod
-    def _return_catalog_payload(
+    def catalog_payload(
         relation: duckdb.DuckDBPyRelation | duckdb.DuckDBPyConnection,
         *,
         query_name: str,
     ) -> list[dict[str, object]]:
+        """Convert a DuckDB relation into a list of row dictionaries.
+
+        Parameters
+        ----------
+        relation : duckdb.DuckDBPyRelation | duckdb.DuckDBPyConnection
+            Relation or cursor containing the query result.
+        query_name : str
+            Logical name of the query for logging.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            Materialized rows keyed by column name.
+        """
         rows = relation.fetchall()
         cols = [desc[0] for desc in relation.description]
         payload = [dict(zip(cols, row, strict=True)) for row in rows]
@@ -616,7 +638,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         """Create required views and tables to hydrate chunk metadata."""
         self._install_chunks_view(conn)
         self._install_optional_views(conn)
-        self._ensure_idmap_tables(conn)
+        self.ensure_idmap_tables(conn)
         self._ensure_faiss_idmap_view(conn, None)
         self._ensure_faiss_join_view(conn)
 
@@ -771,7 +793,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         conn.execute(plan.count_sql).fetchone()
 
     @staticmethod
-    def _ensure_idmap_tables(conn: duckdb.DuckDBPyConnection) -> None:
+    def ensure_idmap_tables(conn: duckdb.DuckDBPyConnection) -> None:
         """Ensure IDMap materialization tables exist for joins and checksums."""
         conn.execute(
             """
@@ -1042,7 +1064,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         """
         if limit <= 0:
             return []
-        with self._readonly_connection() as conn:
+        with self.readonly_connection() as conn:
             result = conn.execute(
                 """
                 SELECT id, embedding
@@ -1174,9 +1196,9 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 chunk_ids=spec.chunk_ids,
                 options=options,
             )
-            with self._readonly_connection() as conn:
+            with self.readonly_connection() as conn:
                 relation = conn.execute(sql, sql_params)
-                results = self._return_catalog_payload(
+                results = self.catalog_payload(
                     relation,
                     query_name="query_by_filters",
                 )
@@ -1450,7 +1472,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             List of symbol identifiers associated with the chunk. Returns empty
             list if chunk has no symbols or chunk_id doesn't exist.
         """
-        with self._readonly_connection() as conn:
+        with self.readonly_connection() as conn:
             if _relation_exists(conn, "v_chunk_symbols"):
                 sql = "SELECT symbol FROM v_chunk_symbols WHERE chunk_id = ?"
             else:
@@ -1495,9 +1517,9 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             sql = "SELECT * FROM chunks WHERE uri = ? ORDER BY id LIMIT ?"
             params.append(limit)
 
-        with self._readonly_connection() as conn:
+        with self.readonly_connection() as conn:
             relation = conn.execute(sql, params)
-            return self._return_catalog_payload(
+            return self.catalog_payload(
                 relation,
                 query_name="get_chunks_by_uri",
             )
@@ -1582,7 +1604,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             is empty or no Parquet files exist.
 
         """
-        with self._readonly_connection() as conn:
+        with self.readonly_connection() as conn:
             result = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
         return result[0] if result else 0
 
@@ -1596,7 +1618,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         """
         if self._embedding_dim_cache is not None:
             return self._embedding_dim_cache
-        with self._readonly_connection() as conn:
+        with self.readonly_connection() as conn:
             result = conn.execute("SELECT embedding FROM chunks LIMIT 1").fetchone()
         if result and result[0] is not None:
             self._embedding_dim_cache = len(result[0])
@@ -1717,7 +1739,8 @@ def ensure_faiss_idmap_view(
     conn.sql("SELECT * FROM read_parquet(?)", params=[idmap_parquet]).create_view(
         "v_faiss_idmap", replace=True
     )
-    chunk_files = _glob(chunks_parquet)
+    chunk_pattern = Path(chunks_parquet)
+    chunk_files = list(chunk_pattern.parent.glob(chunk_pattern.name))
     if chunk_files:
         conn.sql("SELECT * FROM read_parquet(?)", params=[chunks_parquet]).create_view(
             "v_chunks", replace=True
@@ -1781,7 +1804,7 @@ def refresh_faiss_idmap_materialized(
         Metadata describing the materialized table including checksum, row count,
         and whether a refresh occurred.
     """
-    DuckDBCatalog._ensure_idmap_tables(conn)
+    DuckDBCatalog.ensure_idmap_tables(conn)
     ensure_faiss_idmap_view(
         conn,
         idmap_parquet=idmap_parquet,

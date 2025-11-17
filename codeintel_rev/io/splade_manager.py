@@ -65,6 +65,11 @@ if TYPE_CHECKING:
                 document from the corpus. The encoder processes the batch together
                 for efficiency.
 
+            Raises
+            ------
+            NotImplementedError
+                This is a protocol stub method that must be implemented by concrete classes.
+
             Notes
             -----
             The embeddings produced by this method are optimized for document
@@ -89,6 +94,15 @@ if TYPE_CHECKING:
             queries : Sequence[str]
                 Batch of query texts to encode. Each string represents one search
                 query. The encoder processes the batch together for efficiency.
+
+            Raises
+            ------
+            NotImplementedError
+                This is a protocol stub method that must be implemented by concrete classes.
+                When implemented, returns Sequence[object] sparse vector embeddings for the
+                input queries. The exact type depends on the encoder implementation
+                (typically numpy arrays or PyTorch tensors). Each embedding represents one
+                input query and can be decoded into token-weight pairs using decode().
 
             Notes
             -----
@@ -124,6 +138,16 @@ if TYPE_CHECKING:
                 returns all non-zero tokens. If specified, returns only the
                 top-k tokens by weight (descending order). Defaults to None.
 
+            Raises
+            ------
+            NotImplementedError
+                This is a protocol stub method that must be implemented by concrete classes.
+                When implemented, returns Sequence[Sequence[tuple[str, float]]] decoded
+                token-weight pairs for each input embedding. Outer sequence has one entry
+                per input embedding. Inner sequence contains (token, weight) tuples sorted
+                by weight (descending). Tokens are vocabulary strings; weights are
+                floating-point relevance scores (typically non-negative, higher is more relevant).
+
             Notes
             -----
             The decode operation is typically used for:
@@ -151,6 +175,11 @@ if TYPE_CHECKING:
                 this directory if it doesn't exist and writes model files (weights,
                 config, vocabulary) into it. The path should be writable and have
                 sufficient disk space for the model artifacts.
+
+            Raises
+            ------
+            NotImplementedError
+                This is a protocol stub method that must be implemented by concrete classes.
 
             Notes
             -----

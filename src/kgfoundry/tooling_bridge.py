@@ -13,22 +13,26 @@ available in the current environment before importing this module.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, MutableMapping
 from importlib import import_module
-from typing import TYPE_CHECKING
+from types import ModuleType
+
 from kgfoundry_common.navmap_loader import load_nav_metadata
 
-if TYPE_CHECKING:
-    from collections.abc import Iterable, MutableMapping
-    from types import ModuleType
-
 _namespace_proxy = import_module("kgfoundry._namespace_proxy")
-NamespaceRegistry = getattr(_namespace_proxy, "NamespaceRegistry")
-namespace_attach = getattr(_namespace_proxy, "namespace_attach")
-namespace_dir = getattr(_namespace_proxy, "namespace_dir")
-namespace_exports = getattr(_namespace_proxy, "namespace_exports")
-namespace_getattr = getattr(_namespace_proxy, "namespace_getattr")
+NamespaceRegistry = _namespace_proxy.NamespaceRegistry
+_namespace_attach = _namespace_proxy.namespace_attach
+_namespace_dir = _namespace_proxy.namespace_dir
+_namespace_exports = _namespace_proxy.namespace_exports
+_namespace_getattr = _namespace_proxy.namespace_getattr
 
-__all__ = ["NamespaceRegistry", "namespace_attach", "namespace_dir", "namespace_exports", "namespace_getattr"]
+__all__ = [
+    "NamespaceRegistry",
+    "namespace_attach",
+    "namespace_dir",
+    "namespace_exports",
+    "namespace_getattr",
+]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
@@ -109,6 +113,3 @@ def namespace_getattr(module: ModuleType, name: str) -> object:
         The attribute value from the module.
     """
     return _namespace_getattr(module, name)
-
-
-NamespaceRegistry = _NamespaceRegistry

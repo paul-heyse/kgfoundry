@@ -78,7 +78,9 @@ class ServerSettings(BaseSettings):
 
     host: str = "127.0.0.1"
     port: int = 8080
-    allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1"])
+    allowed_hosts: list[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "testserver"]
+    )
     cors_allow_origins: list[str] = Field(
         default_factory=lambda: [
             "https://chat.openai.com",

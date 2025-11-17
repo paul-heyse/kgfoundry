@@ -268,7 +268,10 @@ class SPLADEv3Encoder:
         ------
         NotImplementedError
             This function is not implemented in the skeleton. Use LuceneImpactIndex
-            instead.
+            instead. When implemented, returns list[tuple[list[int], list[float]]]
+            sparse embeddings, one per input text. Each embedding is a tuple of
+            (token_indices, token_weights) where token_indices is a list of integer
+            token IDs and token_weights is a list of float importance weights.
 
         Notes
         -----

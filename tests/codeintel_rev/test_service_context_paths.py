@@ -30,8 +30,9 @@ class RecordingFAISSManager:
         self.cpu_index = None
         self.load_calls = 0
         self.runtime = runtime
+        self.autotune_profile_path = index_path.with_name("tuning.json")
 
-    def load_cpu_index(self) -> None:
+    def load_cpu_index(self, *_: object, **__: object) -> None:
         """Record CPU index load attempts."""
         self.load_calls += 1
 
@@ -55,6 +56,7 @@ class RecordingDuckDBCatalog:
         self.vectors_dir = vectors_dir
         self.open_called = False
         self.closed = False
+        self.idmap_path: Path | None = None
 
     def open(self) -> None:  # pragma: no cover - trivial shim
         """Record catalog opening."""
@@ -63,6 +65,10 @@ class RecordingDuckDBCatalog:
     def close(self) -> None:  # pragma: no cover - trivial shim
         """Record catalog closing."""
         self.closed = True
+
+    def set_idmap_path(self, path: Path) -> None:
+        """Record configured FAISS ID map path."""
+        self.idmap_path = path
 
 
 class DummyVLLMClient:

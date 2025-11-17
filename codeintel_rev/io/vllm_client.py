@@ -6,6 +6,8 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 from __future__ import annotations
 
 import asyncio
+import importlib.util
+import logging
 import os
 from collections.abc import Sequence
 from functools import lru_cache
@@ -26,6 +28,8 @@ if TYPE_CHECKING:
 else:
     httpx = cast("httpx", LazyModule("httpx", "vLLM HTTP client"))
 
+LOGGER = logging.getLogger(__name__)
+
 
 def _truthy_env(value: str | None) -> bool:
     if value is None:
@@ -35,6 +39,11 @@ def _truthy_env(value: str | None) -> bool:
 
 def _use_stub_client() -> bool:
     return _truthy_env(os.getenv("KGFOUNDRY_TEST_VLLM_STUB"))
+
+
+def _module_available(module_name: str) -> bool:
+    """Return ``True`` when ``module_name`` can be imported."""
+    return importlib.util.find_spec(module_name) is not None
 
 
 @lru_cache(maxsize=1)
@@ -549,6 +558,11 @@ def build_vllm_client(config: VLLMConfig) -> VLLMClient:
         ``VLLMClient`` interface.
     """
     if _use_stub_client():
+        return cast("VLLMClient", _StubVLLMClient(config))
+    if getattr(config.run, "mode", "inprocess") == "inprocess" and not _module_available("vllm"):
+        LOGGER.warning(
+            "vLLM extras are not installed; falling back to stubbed embeddings client.",
+        )
         return cast("VLLMClient", _StubVLLMClient(config))
     return VLLMClient(config)
 

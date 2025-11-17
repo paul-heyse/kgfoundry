@@ -421,9 +421,7 @@ class _IndexVisitor(cst.CSTVisitor):
         }
         self._untyped_defs = 0
 
-    def on_visit(
-        self, node: cst.CSTNode
-    ) -> bool:  # lint-ignore[C901,PLR0912]: visitor handles many node types
+    def on_visit(self, node: cst.CSTNode) -> bool:
         """Visit a LibCST node during AST traversal and collect metadata.
 
         This method is called by LibCST for each node during AST traversal. It

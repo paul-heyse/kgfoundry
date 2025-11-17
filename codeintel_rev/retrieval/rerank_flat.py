@@ -377,6 +377,8 @@ def _compute_similarity(
     """
     query_expanded = np.broadcast_to(query_mat[:, None, :], vectors.shape)
     target_vectors = vectors
+    prepared_queries = query_expanded
+    prepared_targets = target_vectors
     if metric == "cos":
         query_norm = (
             np.linalg.norm(query_expanded, axis=_VECTOR_AXIS, keepdims=True) + _SIMILARITY_EPS
@@ -384,9 +386,9 @@ def _compute_similarity(
         cand_norm = (
             np.linalg.norm(target_vectors, axis=_VECTOR_AXIS, keepdims=True) + _SIMILARITY_EPS
         )
-        query_expanded /= query_norm
-        target_vectors /= cand_norm
-    sims = np.einsum("bid,bid->bi", target_vectors, query_expanded, optimize=True)
+        prepared_queries = query_expanded / query_norm
+        prepared_targets = target_vectors / cand_norm
+    sims = np.einsum("bid,bid->bi", prepared_targets, prepared_queries, optimize=True)
     sims[~filled] = np.finfo(np.float32).min
     return sims
 

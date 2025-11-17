@@ -41,7 +41,7 @@ def test_cli_nav_metadata_derives_from_cli_contracts() -> None:
     assertions.expect_true(
         isinstance(metadata, NavMetadataModel), reason="metadata should be NavMetadataModel"
     )
-    assertions.expect_equal(metadata.module_meta.owner, "@data-platform")
+    assertions.expect_equal(metadata.module_meta.owner, "kgfoundry")
     assertions.expect_true(
         metadata.symbols["harvest"].handler is not None, reason="harvest handler should be set"
     )

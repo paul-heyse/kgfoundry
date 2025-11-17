@@ -105,7 +105,6 @@ def test_index_faiss_cli_success(
                 "--index-path",
                 str(index_path),
             ],
-            mix_stderr=False,
         )
 
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
@@ -149,7 +148,6 @@ def test_index_faiss_cli_problem_details(
                 "--index-path",
                 str(index_path),
             ],
-            mix_stderr=False,
         )
 
     assertions.expect_equal(result.exit_code, 1)

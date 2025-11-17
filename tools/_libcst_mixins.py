@@ -66,7 +66,13 @@ class ImportFromTransformerMixin:
         del self, original_node
         return updated_node
 
-    leave_ImportFrom = leave_import_from
+    # Bridge CamelCase hook invoked by LibCST to the snake_case override.
+    def leave_ImportFrom(  # noqa: N802 - LibCST API requires CamelCase
+        self,
+        original_node: cst.ImportFrom,
+        updated_node: cst.ImportFrom,
+    ) -> cst.ImportFrom | cst.RemovalSentinel | cst.FlattenSentinel[cst.BaseSmallStatement]:
+        return self.leave_import_from(original_node, updated_node)
 
 
 class CallTransformerMixin:
@@ -81,26 +87,10 @@ class CallTransformerMixin:
 
     Notes
     -----
-    The CamelCase method delegates to the snake_case method, which subclasses
-    should override. The default implementation returns the updated node unchanged.
+    The CamelCase hook is provided automatically via attribute aliasing. Subclasses
+    override :meth:`leave_call` and the mixin exposes the CamelCase hook that LibCST
+    expects.
     """
-
-    def leave_Call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
-        """LibCST hook called when exiting Call nodes.
-
-        Parameters
-        ----------
-        original_node : cst.Call
-            Original Call node before any transformations.
-        updated_node : cst.Call
-            Call node after child transformations.
-
-        Returns
-        -------
-        cst.Call
-            Delegates to ``leave_call`` for snake_case override pattern.
-        """
-        return self.leave_call(original_node, updated_node)
 
     def leave_call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
         """Snake_case override called by LibCST when exiting Call nodes.
@@ -141,6 +131,13 @@ class CallTransformerMixin:
         del self, original_node
         return updated_node
 
+    def leave_Call(  # noqa: N802 - LibCST API requires CamelCase
+        self,
+        original_node: cst.Call,
+        updated_node: cst.Call,
+    ) -> cst.Call:
+        return self.leave_call(original_node, updated_node)
+
 
 class ExceptHandlerTransformerMixin:
     """Provide a snake_case hook for ``leave_ExceptHandler``.
@@ -154,30 +151,9 @@ class ExceptHandlerTransformerMixin:
 
     Notes
     -----
-    The CamelCase method delegates to the snake_case method, which subclasses
-    should override. The default implementation returns the updated node unchanged.
+    The CamelCase hook is provided automatically via attribute aliasing. Subclasses
+    override :meth:`leave_except_handler` only.
     """
-
-    def leave_ExceptHandler(
-        self,
-        original_node: cst.ExceptHandler,
-        updated_node: cst.ExceptHandler,
-    ) -> cst.ExceptHandler:
-        """LibCST hook called when exiting ExceptHandler nodes.
-
-        Parameters
-        ----------
-        original_node : cst.ExceptHandler
-            Original ExceptHandler node before any transformations.
-        updated_node : cst.ExceptHandler
-            ExceptHandler node after child transformations.
-
-        Returns
-        -------
-        cst.ExceptHandler
-            Delegates to ``leave_except_handler`` for snake_case override pattern.
-        """
-        return self.leave_except_handler(original_node, updated_node)
 
     def leave_except_handler(
         self,
@@ -223,6 +199,13 @@ class ExceptHandlerTransformerMixin:
         del self, original_node
         return updated_node
 
+    def leave_ExceptHandler(  # noqa: N802 - LibCST API requires CamelCase
+        self,
+        original_node: cst.ExceptHandler,
+        updated_node: cst.ExceptHandler,
+    ) -> cst.ExceptHandler:
+        return self.leave_except_handler(original_node, updated_node)
+
 
 class WithTransformerMixin:
     """Provide a snake_case hook for ``leave_With``.
@@ -236,26 +219,9 @@ class WithTransformerMixin:
 
     Notes
     -----
-    The CamelCase method delegates to the snake_case method, which subclasses
-    should override. The default implementation returns the updated node unchanged.
+    The CamelCase hook is provided automatically via attribute aliasing. Subclasses
+    override :meth:`leave_with` only.
     """
-
-    def leave_With(self, original_node: cst.With, updated_node: cst.With) -> cst.With:
-        """LibCST hook called when exiting With nodes.
-
-        Parameters
-        ----------
-        original_node : cst.With
-            Original With node before any transformations.
-        updated_node : cst.With
-            With node after child transformations.
-
-        Returns
-        -------
-        cst.With
-            Delegates to ``leave_with`` for snake_case override pattern.
-        """
-        return self.leave_with(original_node, updated_node)
 
     def leave_with(self, original_node: cst.With, updated_node: cst.With) -> cst.With:
         """Snake_case override called by LibCST when exiting With nodes.
@@ -297,6 +263,13 @@ class WithTransformerMixin:
         del self, original_node
         return updated_node
 
+    def leave_With(  # noqa: N802 - LibCST API requires CamelCase
+        self,
+        original_node: cst.With,
+        updated_node: cst.With,
+    ) -> cst.With:
+        return self.leave_with(original_node, updated_node)
+
 
 class IfTransformerMixin:
     """Provide a snake_case hook for ``leave_If``.
@@ -310,26 +283,9 @@ class IfTransformerMixin:
 
     Notes
     -----
-    The CamelCase method delegates to the snake_case method, which subclasses
-    should override. The default implementation returns the updated node unchanged.
+    The CamelCase hook is provided automatically via attribute aliasing. Subclasses
+    override :meth:`leave_if` only.
     """
-
-    def leave_If(self, original_node: cst.If, updated_node: cst.If) -> cst.If:
-        """LibCST hook called when exiting If nodes.
-
-        Parameters
-        ----------
-        original_node : cst.If
-            Original If node before any transformations.
-        updated_node : cst.If
-            If node after child transformations.
-
-        Returns
-        -------
-        cst.If
-            Delegates to ``leave_if`` for snake_case override pattern.
-        """
-        return self.leave_if(original_node, updated_node)
 
     def leave_if(self, original_node: cst.If, updated_node: cst.If) -> cst.If:
         """Snake_case override called by LibCST when exiting If nodes.
@@ -369,3 +325,10 @@ class IfTransformerMixin:
         """
         del self, original_node
         return updated_node
+
+    def leave_If(  # noqa: N802 - LibCST API requires CamelCase
+        self,
+        original_node: cst.If,
+        updated_node: cst.If,
+    ) -> cst.If:
+        return self.leave_if(original_node, updated_node)

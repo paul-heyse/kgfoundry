@@ -19,8 +19,6 @@ from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.server import build_http_app, mcp
 
-from kgfoundry_common.errors import VectorSearchError
-
 
 def _expect(*, condition: bool, message: str) -> None:
     if not condition:
@@ -115,15 +113,23 @@ async def test_text_search(
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_session_id")
 async def test_semantic_search_no_index(mock_application_context: ApplicationContext) -> None:
-    """Semantic search should gracefully handle missing FAISS index."""
+    """Semantic search should degrade gracefully when FAISS search fails."""
     faiss_manager = cast("MagicMock", mock_application_context.faiss_manager)
     faiss_manager.search.side_effect = RuntimeError("missing index")
-    with pytest.raises(VectorSearchError):
-        await semantic_adapter.semantic_search(
-            mock_application_context,
-            "integration smoke test",
-            limit=5,
-        )
+    result = await semantic_adapter.semantic_search(
+        mock_application_context,
+        "integration smoke test",
+        limit=5,
+    )
+    _expect(
+        condition=not result.get("findings"),
+        message="Expected search to return no hydrated findings when FAISS fails",
+    )
+    limits = result.get("limits", [])
+    _expect(
+        condition=any("faiss_fallback:unavailable" in entry for entry in limits),
+        message="Expected limits metadata to include FAISS fallback notice",
+    )
 
 
 @pytest.mark.asyncio

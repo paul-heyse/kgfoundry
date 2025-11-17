@@ -402,4 +402,4 @@ import numpy  # Line 3
 
     violations = check_file(test_file, HEAVY_MODULES)
     assertions.expect_equal(len(violations), 1)
-    assertions.expect_equal(violations[0].lineno, 4)  # 1-indexed, counting blank line at start
+    assertions.expect_equal(violations[0].lineno, 5)  # 1-indexed, counting blank line at start

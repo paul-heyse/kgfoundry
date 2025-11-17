@@ -638,9 +638,7 @@ class _FAISSIdMapMixin:
         return vectors
 
 
-class FAISSManager(
-    _FAISSIdMapMixin
-):  # lint-ignore[PLR0904]: manager orchestrates multiple subsystems
+class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates many subsystems
     """FAISS index manager with adaptive indexing and incremental updates.
 
     Uses a dual-index architecture for fast incremental updates.
@@ -739,22 +737,47 @@ class FAISSManager(
 
     @property
     def runtime(self) -> FAISSRuntimeController:
-        """Runtime tuning controller for this manager."""
+        """Runtime tuning controller for this manager.
+
+        Returns
+        -------
+        FAISSRuntimeController
+            Helper object that exposes runtime tuning and override operations.
+        """
         return self._runtime_controller
 
     @property
     def tuning_lock(self) -> RLock:
-        """Lock guarding runtime tuning mutations."""
+        """Lock guarding runtime tuning mutations.
+
+        Returns
+        -------
+        RLock
+            Re-entrant lock used to serialize runtime tuning mutations.
+        """
         return self._tuning_lock
 
     @property
     def runtime_overrides(self) -> dict[str, float]:
-        """Mutable mapping of runtime search overrides."""
+        """Mutable mapping of runtime search overrides.
+
+        Returns
+        -------
+        dict[str, float]
+            Dictionary storing the currently applied runtime overrides.
+        """
         return self._runtime_overrides
 
     @property
     def last_secondary_update(self) -> SecondaryUpdateSnapshot | None:
-        """Metadata for the most recent secondary index ingestion."""
+        """Metadata for the most recent secondary index ingestion.
+
+        Returns
+        -------
+        SecondaryUpdateSnapshot | None
+            Snapshot describing the latest incremental update, or ``None`` if
+            ``update_index`` has not run yet.
+        """
         return self._last_secondary_update
 
     def _write_profile(self, path: Path) -> None:
@@ -1055,7 +1078,7 @@ class FAISSManager(
         """
         try:
             cpu_index = self._require_cpu_index()
-        except RuntimeError:
+        except (RuntimeError, VectorIndexStateError):
             return lambda _id: False
 
         id_map_obj = getattr(cpu_index, "id_map", None)
@@ -3237,26 +3260,16 @@ class AutoTuner:
             ``refine_k_factor`` (float). Additional metadata such as the index
             ``factory`` is included when available.
         """
-        xq = self._manager.ensure_2d(queries).astype(
-            np.float32
-        )  # lint-ignore[SLF001]: share private helper inside module
-        xt = self._manager.ensure_2d(truths).astype(
-            np.float32
-        )  # lint-ignore[SLF001]: share private helper inside module
+        xq = self._manager.ensure_2d(queries).astype(np.float32)
+        xt = self._manager.ensure_2d(truths).astype(np.float32)
         faiss.normalize_L2(xq)
         faiss.normalize_L2(xt)
         eval_sweep = tuple(sweep) if sweep else self._DEFAULT_SWEEP
-        truth_ids = self._manager.brute_force_truth_ids(
-            xq, xt, min(k, xt.shape[0])
-        )  # lint-ignore[SLF001]: reuse internal helper for evaluation
+        truth_ids = self._manager.brute_force_truth_ids(xq, xt, min(k, xt.shape[0]))
         candidates: list[dict[str, float | str]] = []
         for spec in eval_sweep:
-            latency_ms, (_, ids) = self._manager.timed_search_with_params(
-                xq, k, spec
-            )  # lint-ignore[SLF001]: reuse internal helper for evaluation
-            recall = self._manager.estimate_recall(
-                ids, truth_ids
-            )  # lint-ignore[SLF001]: reuse internal helper for evaluation
+            latency_ms, (_, ids) = self._manager.timed_search_with_params(xq, k, spec)
+            recall = self._manager.estimate_recall(ids, truth_ids)
             candidates.append(
                 {
                     "param_str": spec,
@@ -3268,9 +3281,7 @@ class AutoTuner:
         profile["refine_k_factor"] = float(
             refine_k_factor if refine_k_factor is not None else self._manager.refine_k_factor
         )
-        meta = (
-            self._manager.meta_snapshot()
-        )  # lint-ignore[SLF001]: reuse internal helper for evaluation
+        meta = self._manager.meta_snapshot()
         if "factory" in meta:
             profile["factory"] = meta["factory"]
         return profile

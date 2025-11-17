@@ -469,7 +469,8 @@ runtime-evaluated-base-classes = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Intentionally empty; suppressions removed pending holistic fixes.
+# Typer CLI wiring intentionally accepts many arguments/positionals.
+"codeintel_rev/cli_enrich.py" = ["PLR0913", "PLR0917"]
 
 [tool.ruff.lint.isort]
 known-first-party = [

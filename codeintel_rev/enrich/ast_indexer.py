@@ -467,7 +467,7 @@ def _table_from_rows(rows: Sequence[RowType], schema: pa.Schema) -> pa.Table:
     return pa.Table.from_pylist(as_dicts, schema=schema)
 
 
-class _MetricsVisitor(ast.NodeVisitor):  # lint-ignore[PLR0904]: visitor needs dedicated methods
+class _MetricsVisitor(ast.NodeVisitor):
     """Collects aggregate counts for AST metrics."""
 
     BRANCH_NODES = (

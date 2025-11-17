@@ -251,18 +251,12 @@ def test_hybrid_search_exposes_stage_metadata(
     assertions.expect_true(result.method is not None, reason="should have method metadata")
     if result.method is None:  # pragma: no cover - defensive
         pytest.fail("should have method metadata")
-    stages = result.method.get("stages")
-    assertions.expect_true(bool(stages), reason="expected stage metadata in method payload")
-    assertions.expect_true(isinstance(stages, list), reason="stages should be a list")
-    if not isinstance(stages, list):  # pragma: no cover - defensive
-        pytest.fail("stages should be a list")
-    stage_dicts: list[dict[str, object]] = [stage for stage in stages if isinstance(stage, dict)]
-    stage_names: set[str] = set()
-    for stage in stage_dicts:
-        name = stage.get("name")
-        if isinstance(name, str):
-            stage_names.add(name)
-    assertions.expect_in("search.faiss", stage_names)
+    retrieval = result.method.get("retrieval")
     assertions.expect_true(
-        any(name.startswith("fusion.") for name in stage_names), reason="should have fusion stage"
+        isinstance(retrieval, list) and bool(retrieval), reason="expected retrieval metadata"
+    )
+    coverage = result.method.get("coverage")
+    assertions.expect_true(
+        isinstance(coverage, str) and "results" in coverage,
+        reason="expected coverage metadata in method payload",
     )

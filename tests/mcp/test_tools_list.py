@@ -30,4 +30,4 @@ def test_tools_list_includes_search_and_fetch() -> None:
     fetch_schema = fetch_tool.parameters
 
     assertions.expect_equal(search_schema["properties"]["query"]["type"], "string")
-    assertions.expect_in("objectIds", fetch_schema["properties"])
+    assertions.expect_in("object_ids", fetch_schema["properties"])

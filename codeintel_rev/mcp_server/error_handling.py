@@ -54,6 +54,7 @@ Error envelope structure:
 from __future__ import annotations
 
 import inspect
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
@@ -71,6 +72,8 @@ if TYPE_CHECKING:
     from kgfoundry_common.problem_details import ProblemDetails
 
 F = TypeVar("F", bound=Callable[..., object])
+
+LOGGER = logging.getLogger(__name__)
 
 # Comprehensive list of user exceptions that can be raised by adapters
 # System-level exceptions (KeyboardInterrupt, SystemExit, GeneratorExit) are excluded
@@ -322,6 +325,8 @@ def convert_exception_to_envelope(
     response = format_error_response(exc, instance=operation)
     problem = cast("ProblemDetails", response["problem"])
 
+    _log_exception(exc, operation, problem)
+
     # Build envelope: empty result fields + error + problem
     envelope = dict(empty_result)
     detail = problem.get("detail", str(exc))
@@ -329,6 +334,38 @@ def convert_exception_to_envelope(
     envelope["problem"] = problem
 
     return envelope
+
+
+def _log_exception(exc: BaseException, operation: str, problem: ProblemDetails) -> None:
+    """Emit structured logs for adapter exceptions."""
+    detail = problem.get("detail", str(exc))
+    if isinstance(exc, KgFoundryError):
+        code_value = getattr(exc.code, "value", exc.code)
+        LOGGER.log(
+            exc.log_level,
+            detail,
+            extra={"operation": operation, "error_code": code_value},
+            exc_info=exc.log_level >= logging.ERROR,
+        )
+        return
+    if isinstance(exc, UnicodeDecodeError):
+        LOGGER.warning(
+            detail,
+            extra={"operation": operation, "component": "mcp-adapter"},
+        )
+        return
+    for exc_type in EXCEPTION_TO_ERROR_CODE:
+        if isinstance(exc, exc_type):
+            LOGGER.warning(
+                detail,
+                extra={"operation": operation, "component": "mcp-adapter"},
+            )
+            return
+    LOGGER.error(
+        detail,
+        extra={"operation": operation, "exception_type": type(exc).__name__},
+        exc_info=True,
+    )
 
 
 def handle_adapter_errors(

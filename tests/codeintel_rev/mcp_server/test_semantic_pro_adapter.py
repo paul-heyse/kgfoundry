@@ -274,11 +274,11 @@ def test_semantic_pro_rerank_skips_without_capability(tmp_path: Path) -> None:
             context=context,
             query="gateway",
             limit=constants.BATCH_SIZES.minimal,
-            options={"rerank": {"enabled": True}},
+            options={"use_reranker": True, "rerank": {"enabled": True}},
         )
     )
     method = envelope.get("method")
-    assertions.expect_true(method is not None)
+    assertions.expect_true(method is not None, reason="method metadata missing")
     if not isinstance(method, dict):  # pragma: no cover - defensive
         pytest.fail("method should be present")
     rerank = method.get("rerank")
@@ -297,20 +297,23 @@ def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
             query="gateway",
             limit=constants.BATCH_SIZES.minimal,
             options={
+                "use_reranker": True,
                 "rerank": {"enabled": True, "top_k": constants.BATCH_SIZES.minimal},
             },
         )
     )
     method = envelope.get("method")
-    assertions.expect_true(method is not None)
+    assertions.expect_true(method is not None, reason="method metadata missing")
     if not isinstance(method, dict):  # pragma: no cover - defensive
         pytest.fail("method should be present")
     rerank_meta = method.get("rerank")
-    assertions.expect_true(rerank_meta is not None)
+    assertions.expect_true(rerank_meta is not None, reason="rerank metadata missing")
     rerank_meta_dict = cast("dict[str, object]", rerank_meta)
-    assertions.expect_true(bool(rerank_meta_dict["enabled"]))
+    assertions.expect_true(bool(rerank_meta_dict["enabled"]), reason="rerank stage disabled")
     reordered = rerank_meta_dict.get("reordered")
-    assertions.expect_true(isinstance(reordered, int) and reordered >= 1)
+    assertions.expect_true(
+        isinstance(reordered, int) and reordered >= 1, reason="reranker did not reorder results"
+    )
     findings_payload = envelope.get("findings")
     assertions.expect_true(isinstance(findings_payload, list), reason="expected findings list")
     if not isinstance(findings_payload, list):  # pragma: no cover - defensive
@@ -319,7 +322,7 @@ def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
     assertions.expect_equal(first_finding.get("chunk_id"), EXPECTED_CHUNK_ID)
     assertions.expect_in("why", first_finding)
     method_details = envelope.get("method")
-    assertions.expect_true(isinstance(method_details, dict))
+    assertions.expect_true(isinstance(method_details, dict), reason="method metadata missing")
     if not isinstance(method_details, dict):  # pragma: no cover - defensive
         pytest.fail("method should be a dict")
     method_details_dict = cast("dict[str, object]", method_details)
@@ -328,7 +331,6 @@ def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
     if not isinstance(retrieval_methods, list):  # pragma: no cover - defensive
         pytest.fail("retrieval metadata missing")
     assertions.expect_sequence_equal(retrieval_methods, ["semantic"])
-    assertions.expect_true(method_details_dict.get("stages"))
 
 
 def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:

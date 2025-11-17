@@ -143,10 +143,10 @@ def test_connection_pool_reuses_connections(
     real_connect = duckdb.connect
     created: int = 0
 
-    def _instrumented_connect(path: str) -> duckdb.DuckDBPyConnection:
+    def _instrumented_connect(path: str, **kwargs: object) -> duckdb.DuckDBPyConnection:
         nonlocal created
         created += 1
-        return real_connect(path)
+        return real_connect(path, **kwargs)
 
     monkeypatch.setattr(
         "codeintel_rev.io.duckdb_manager.duckdb.connect",

@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
+import duckdb
 import numpy as np
 import pytest
 
@@ -161,8 +162,9 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
     paths.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
     paths.xtr_dir.mkdir(parents=True, exist_ok=True)
     paths.faiss_index.touch()
-    paths.duckdb_path.touch()
-    paths.faiss_idmap_path.touch()
+    paths.faiss_idmap_path.parent.mkdir(parents=True, exist_ok=True)
+    with duckdb.connect(str(paths.duckdb_path)):
+        pass
 
     vllm_client = MagicMock(spec=VLLMClient)
     vllm_client.embed_batch.return_value = np.zeros(
@@ -170,6 +172,8 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         dtype=np.float32,
     )
     faiss_manager = MagicMock(spec=FAISSManager)
+    # ApplicationContext.ensure_faiss_ready touches tuning paths on the FAISS manager.
+    faiss_manager.autotune_profile_path = paths.faiss_index.with_name("tuning.json")
     git_client = MagicMock(spec=GitClient)
     async_git_client = AsyncMock(spec=AsyncGitClient)
     async_git_client.blame_range.return_value = [

@@ -31,6 +31,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import io
+import logging
 from importlib import import_module
 from typing import TYPE_CHECKING, BinaryIO, Protocol, cast
 
@@ -470,6 +471,8 @@ class SignedPickleWrapper:
 
     def __init__(self, signing_key: bytes) -> None:
         self.signing_key = signing_key
+        if len(signing_key) < _MIN_SIGNING_KEY_BYTES:
+            LOGGER.warning("Signing key < %d bytes; security is degraded.", _MIN_SIGNING_KEY_BYTES)
 
     def dump(self, obj: object, file: BinaryIO) -> None:
         """Dump object with HMAC signature.
@@ -592,3 +595,5 @@ __all__ = [
     "load_unsigned_legacy",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
+# Module-level logger for operational warnings (e.g., key hygiene).
+LOGGER = logging.getLogger(__name__)

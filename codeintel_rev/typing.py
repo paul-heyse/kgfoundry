@@ -361,7 +361,7 @@ class NumpyLinalgNamespace(Protocol):
             When implemented, returns NDArrayF32 norm values computed along the specified
             axis, dtype float32. Shape depends on input shape and keepdims parameter.
         """
-        _ = (array, axis, keepdims)
+        del self, array, axis, keepdims
         raise NotImplementedError
 
 

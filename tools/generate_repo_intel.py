@@ -255,7 +255,7 @@ def run(
     r'file1.py\\nfile2.py\\n'
     >>> run("git ls-files", capture=True)  # String is safely parsed
     r'file1.py\\nfile2.py\\n'
-    """  # lint-ignore[D301] docstring continuation
+    """
     validated_cmd = _validate_command(cmd)
     sanitized_cwd = _sanitize_cwd(cwd)
     shown = " ".join(shlex.quote(arg) for arg in validated_cmd)

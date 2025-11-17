@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
+from typing import NoReturn
 
 from kgfoundry_common.http.tenacity_retry import TenacityRetryStrategy
 from kgfoundry_common.http.types import RetryStrategy
@@ -310,8 +311,9 @@ class HttpClient:
                 HTTP request implementation is not yet complete. This is raised
                 as a placeholder until the actual HTTP client integration is implemented.
                 The exception message indicates that HTTP requests are not yet supported.
-                When fully implemented, this function will return an HTTP response object
-                instead of raising.
+                This function never returns. The return type annotation (object) exists
+                for signature compatibility. When fully implemented, this function will
+                return an HTTP response object matching the return type annotation.
 
             Notes
             -----
@@ -321,11 +323,10 @@ class HttpClient:
             The return type annotation indicates the intended return type when the
             implementation is complete, but currently all code paths raise.
             """
-            HttpClient._http_not_implemented(
-                method=method,
-                url=url,
-                options=options,
-            )
+            try:
+                HttpClient._http_not_implemented(method=method, url=url, options=options)
+            except NotImplementedError as exc:  # pragma: no cover - placeholder path
+                raise NotImplementedError(str(exc)) from exc
 
         return _attempt
 

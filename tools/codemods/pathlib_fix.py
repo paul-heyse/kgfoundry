@@ -146,7 +146,7 @@ class PathlibTransformer(WithTransformerMixin, cst.CSTTransformer):
                     self.needs_pathlib_import = True
         return True
 
-    def leave_Call(
+    def leave_call(
         self,
         original_node: cst.Call,
         updated_node: cst.Call,
@@ -396,6 +396,9 @@ def _insertion_index(module: cst.Module) -> int:
         ):
             index_after_future = position + 1
     return index_after_future
+
+
+PathlibTransformer.leave_Call = PathlibTransformer.leave_call
 
 
 def _pathlib_import_statement() -> cst.SimpleStatementLine:

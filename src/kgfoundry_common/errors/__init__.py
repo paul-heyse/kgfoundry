@@ -152,7 +152,9 @@ except ImportError:  # pragma: no cover - optional dependency
         Raises
         ------
         RuntimeError
-            Always raised to indicate missing FastAPI dependency.
+            Always raised to indicate missing FastAPI dependency. This function never
+            returns. The return type annotation (JSONResponseProtocol) exists for
+            signature compatibility with the FastAPI implementation.
         """
         del error, request
         message = (

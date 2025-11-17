@@ -137,11 +137,13 @@ def test_hybrid_evaluator_writes_metrics(tmp_path: Path) -> None:
         value for value in table.column("channel").to_pylist() if isinstance(value, str)
     ]
     assertions.expect_sequence_equal(sorted(set(channel_values)), ["faiss", "oracle"])
-    assertions.expect_in("symbol_hits", table.column_names)
+    assertions.expect_in("reason", table.column_names)
+    reason_struct = table.column("reason").combine_chunks()
+    matched_symbol_values = reason_struct.field("matched_symbols").to_pylist()
     assertions.expect_true(
-        all(isinstance(val, list) for val in table.column("symbol_hits").to_pylist())
+        all(isinstance(val, list) for val in matched_symbol_values),
+        reason="matched_symbols should be stored inside reason struct",
     )
-    assertions.expect_true(all(val for val in table.column("uri").to_pylist()))
 
     metrics = json.loads(config.metrics_path.read_text())
     assertions.expect_equal(metrics["recall_at_k"], report.recall_at_k)

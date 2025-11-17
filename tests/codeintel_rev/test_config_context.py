@@ -103,7 +103,11 @@ def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     # Act
     context = ApplicationContext.create()
-    monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
+    monkeypatch.setattr(
+        context.faiss_manager,
+        "load_cpu_index",
+        lambda *args, **kwargs: None,
+    )
 
     # Assert
     assertions.expect_true(context.settings is not None)
@@ -144,7 +148,11 @@ def test_application_context_ensure_faiss_ready(
     monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
 
     context = ApplicationContext.create()
-    monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
+    monkeypatch.setattr(
+        context.faiss_manager,
+        "load_cpu_index",
+        lambda *args, **kwargs: None,
+    )
 
     # Act - ensure_faiss_ready should handle missing index gracefully
     ready, limits, error = context.ensure_faiss_ready()
@@ -174,7 +182,11 @@ def test_application_context_ensure_faiss_ready_cached(
     monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
 
     context = ApplicationContext.create()
-    monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
+    monkeypatch.setattr(
+        context.faiss_manager,
+        "load_cpu_index",
+        lambda *args, **kwargs: None,
+    )
 
     # Act - call twice
     ready1, limits1, error1 = context.ensure_faiss_ready()

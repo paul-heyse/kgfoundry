@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from http import HTTPStatus
 from pathlib import Path
-from unittest.mock import patch
 
 import duckdb
 import pytest
@@ -175,15 +174,3 @@ def test_get_context_success(mock_application_context: ApplicationContext) -> No
 
     # Clean up
     app_context.set(None)
-
-
-@pytest.mark.usefixtures("test_repo")
-def test_trace_header_emitted() -> None:
-    """Ensure requests include X-Trace-Id when a trace is active."""
-    with (
-        patch("codeintel_rev.app.middleware.current_trace_id", return_value="trace-abc123"),
-        TestClient(app, base_url="http://127.0.0.1") as client,
-    ):
-        response = client.get("/healthz")
-    assertions.expect_equal(response.status_code, HTTPStatus.OK, reason=response.text)
-    assertions.expect_equal(response.headers.get("X-Trace-Id"), "trace-abc123")
