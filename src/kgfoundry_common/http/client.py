@@ -305,23 +305,26 @@ class HttpClient:
             is implemented. When implemented, it will return an HTTP response object
             matching the return type annotation.
 
+            Returns
+            -------
+            object
+                HTTP response object matching the return type annotation. Currently
+                not implemented; always raises NotImplementedError instead. The return
+                type annotation exists for signature compatibility and indicates the
+                intended return type when the implementation is complete.
+
             Raises
             ------
             NotImplementedError
                 HTTP request implementation is not yet complete. This is raised
                 as a placeholder until the actual HTTP client integration is implemented.
                 The exception message indicates that HTTP requests are not yet supported.
-                This function never returns. The return type annotation (object) exists
-                for signature compatibility. When fully implemented, this function will
-                return an HTTP response object matching the return type annotation.
 
             Notes
             -----
             Time complexity depends on network latency. Space complexity O(1) aside from
             request/response payloads. This function performs network I/O when fully
             implemented. Thread-safe if the underlying HTTP client is thread-safe.
-            The return type annotation indicates the intended return type when the
-            implementation is complete, but currently all code paths raise.
             """
             try:
                 HttpClient._http_not_implemented(method=method, url=url, options=options)

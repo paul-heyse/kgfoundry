@@ -20,9 +20,7 @@ from tests._helpers.imports import with_module_presence
         {"faiss", "duckdb", "torch", "numpy"},
     ],
 )
-def test_import_package_in_minimal_env(
-    missing_modules: set[str]
-) -> None:
+def test_import_package_in_minimal_env(missing_modules: set[str]) -> None:
     """Simulate a minimal environment where heavy deps are unavailable."""
     modules_override = dict.fromkeys(missing_modules, None)
 

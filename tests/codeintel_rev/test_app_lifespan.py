@@ -11,7 +11,7 @@ import duckdb
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import readyz
-from codeintel_rev.app.readiness import ReadinessProbe
+from codeintel_rev.app.runtime_readiness import ReadinessProbe
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

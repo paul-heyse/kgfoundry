@@ -4,28 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 import numpy as np
 from codeintel_rev.config.settings import VLLMConfig, VLLMRunMode
-from codeintel_rev.io.vllm_engine import InprocessVLLMContext, InprocessVLLMEmbedder
+from codeintel_rev.io.vllm_engine import (
+    LLM,
+    InprocessVLLMContext,
+    InprocessVLLMEmbedder,
+    TokenizerProtocol,
+    TokensPrompt,
+)
 
 from tests._helpers import assertions
-
-if TYPE_CHECKING:
-    from transformers import PreTrainedTokenizerBase
-    from vllm import LLM
-    from vllm.inputs import TokensPrompt
-else:  # pragma: no cover - runtime fallbacks for heavy deps
-    class PreTrainedTokenizerBase:
-        """Runtime stub for tokenizer protocol."""
-
-    class LLM:
-        """Runtime stub for vLLM model."""
-
-    class TokensPrompt:
-        """Runtime stub for vLLM tokens prompt."""
 
 
 class _StubTokenizer:
@@ -48,20 +39,33 @@ class _StubLLM:
     def __init__(self, *_: object, **__: object) -> None:
         self.calls: list[list[list[int]]] = []
 
-    def embed(self, prompts: Sequence[_StubTokensPrompt]) -> list[SimpleNamespace]:
+    def embed(self, prompts: Sequence[TokensPrompt]) -> list[_StubEmbeddingResult]:
         token_ids = [prompt.prompt_token_ids for prompt in prompts]
         self.calls.append([list(ids) for ids in token_ids])
 
-        def _result(value: list[int]) -> SimpleNamespace:
-            return SimpleNamespace(outputs=SimpleNamespace(embedding=[float(len(value)), 0.0]))
+        def _result(value: list[int]) -> _StubEmbeddingResult:
+            embedding = _StubEmbeddingOutput(embedding=[float(len(value)), 0.0])
+            return _StubEmbeddingResult(outputs=embedding)
 
         return [_result(ids) for ids in token_ids]
 
+    def shutdown(self) -> None:
+        """Protocol shim for graceful shutdown."""
+
+
+@dataclass(frozen=True)
+class _StubEmbeddingOutput:
+    embedding: list[float]
+
+
+@dataclass(frozen=True)
+class _StubEmbeddingResult:
+    outputs: _StubEmbeddingOutput
 
 
 def _build_context() -> InprocessVLLMContext:
-    def _tokenizer_factory(_model_id: str) -> PreTrainedTokenizerBase:
-        return cast("PreTrainedTokenizerBase", _StubTokenizer())
+    def _tokenizer_factory(_model_id: str) -> TokenizerProtocol:
+        return cast("TokenizerProtocol", _StubTokenizer())
 
     def _llm_factory(_config: VLLMConfig) -> LLM:
         return cast("LLM", _StubLLM())

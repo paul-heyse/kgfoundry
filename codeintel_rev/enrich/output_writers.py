@@ -147,9 +147,7 @@ _WRITER_ENV_STACK: list[WriterEnvConfig] = [WriterEnvConfig()]
 
 
 @contextmanager
-def override_writer_env(
-    env_resolver: Callable[[str, str | None], str | None]
-) -> Iterator[None]:
+def override_writer_env(env_resolver: Callable[[str, str | None], str | None]) -> Iterator[None]:
     """Temporarily override the environment resolver for JSONL writers."""
     config = WriterEnvConfig(env_resolver=env_resolver)
     _WRITER_ENV_STACK.append(config)

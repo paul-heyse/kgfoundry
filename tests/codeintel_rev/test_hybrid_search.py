@@ -124,7 +124,7 @@ def _hybrid_engine_factory() -> Callable[..., tuple[HybridSearchEngine, dict[str
 
 
 def test_hybrid_search_engine_rrf_fuses_channels(
-    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]]
+    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]],
 ) -> None:
     """Test that hybrid search engine fuses multiple channels using RRF (Reciprocal Rank Fusion)."""
     bm25_hits = [
@@ -160,7 +160,7 @@ def test_hybrid_search_engine_rrf_fuses_channels(
 
 
 def test_hybrid_search_engine_respects_channel_flags(
-    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]]
+    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]],
 ) -> None:
     """Test that hybrid search engine respects channel enable/disable flags."""
     engine, calls = hybrid_engine_factory(
@@ -184,7 +184,7 @@ def test_hybrid_search_engine_respects_channel_flags(
 
 
 def test_hybrid_search_engine_accepts_extra_channels(
-    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]]
+    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]],
 ) -> None:
     """Test that hybrid search engine accepts extra channels via search options."""
     engine, _ = hybrid_engine_factory(
@@ -207,7 +207,7 @@ def test_hybrid_search_engine_accepts_extra_channels(
 
 
 def test_hybrid_channel_skips_missing_capability(
-    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]]
+    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]],
 ) -> None:
     """Test that hybrid search engine skips channels when required capabilities are missing."""
     splade_hits = [SearchHit(doc_id="5", rank=0, score=2.0, source="splade")]
@@ -223,7 +223,7 @@ def test_hybrid_channel_skips_missing_capability(
 
 
 def test_hybrid_search_falls_back_when_faiss_unavailable(
-    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]]
+    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]],
 ) -> None:
     """Test that hybrid search falls back to other channels when FAISS is unavailable."""
     bm25_hits = [SearchHit(doc_id="5", rank=0, score=3.2, source="bm25")]
@@ -248,7 +248,7 @@ def test_hybrid_search_falls_back_when_faiss_unavailable(
 
 
 def test_hybrid_search_drops_low_semantic_scores(
-    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]]
+    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]],
 ) -> None:
     """Test that hybrid search drops semantic hits below minimum score threshold."""
     bm25_hits = [SearchHit(doc_id="7", rank=0, score=4.5, source="bm25")]
@@ -268,7 +268,7 @@ def test_hybrid_search_drops_low_semantic_scores(
 
 
 def test_hybrid_search_exposes_stage_metadata(
-    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]]
+    hybrid_engine_factory: Callable[..., tuple[HybridSearchEngine, dict[str, int]]],
 ) -> None:
     """Test that hybrid search exposes stage metadata for observability."""
     bm25_hits = [SearchHit("1", rank=0, score=1.2, source="bm25")]

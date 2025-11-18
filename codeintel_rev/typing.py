@@ -374,6 +374,12 @@ class NumpyLinalgNamespace(Protocol):
     def norm(self, array: NDArrayF32, axis: int, *, keepdims: bool) -> NDArrayF32:
         """Compute vector or matrix norm along specified axis.
 
+        Extended Summary
+        ----------------
+        Computes the norm (typically L2/Euclidean norm) along the specified axis
+        of a float32 array. Used for vector normalization and distance computations
+        in embedding operations.
+
         Parameters
         ----------
         array : NDArrayF32
@@ -384,12 +390,17 @@ class NumpyLinalgNamespace(Protocol):
             If True, keep reduced dimensions with size 1 in the result. If False,
             remove reduced dimensions.
 
+        Returns
+        -------
+        NDArrayF32
+            Norm values computed along the specified axis, dtype float32. Shape
+            depends on input shape and keepdims parameter. This protocol method
+            raises NotImplementedError and must be implemented by concrete classes.
+
         Raises
         ------
         NotImplementedError
             This is a protocol stub method that must be implemented by concrete classes.
-            When implemented, returns NDArrayF32 norm values computed along the specified
-            axis, dtype float32. Shape depends on input shape and keepdims parameter.
         """
         del self, array, axis, keepdims
         raise NotImplementedError

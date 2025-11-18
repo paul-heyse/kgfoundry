@@ -13,7 +13,9 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.config_context import resolve_application_paths
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from kgfoundry_common.subprocess_utils import (
@@ -40,14 +42,15 @@ def _run_index_pipeline(args: Sequence[str]) -> None:
     run_subprocess(cmd)
 
 
-def _summarize_artifacts(settings: Settings) -> dict[str, object]:
+def _summarize_artifacts(paths: ResolvedPaths, settings: Settings) -> dict[str, object]:
     """Collect chunk counts, embedding dimensions, and FAISS file locations.
 
     Parameters
     ----------
+    paths : ResolvedPaths
+        Canonical filesystem paths resolved for the current environment.
     settings : Settings
-        Application settings containing paths and configuration for DuckDB
-        and FAISS artifacts.
+        Application settings containing DuckDB and FAISS configuration.
 
     Returns
     -------
@@ -60,7 +63,6 @@ def _summarize_artifacts(settings: Settings) -> dict[str, object]:
     DuckDB tables or Parquet files cannot be read or when hydration fails.
     These exceptions propagate unchanged.
     """
-    paths = resolve_application_paths(settings)
     vectors_dir = paths.vectors_dir
     duckdb_path = paths.duckdb_path
 
@@ -143,10 +145,12 @@ def main() -> None:
         forwarded.extend(["--phase", cli_args.phase])
 
     settings = load_settings()
+    paths = resolve_application_paths(settings)
+    fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     _run_index_pipeline(forwarded)
 
     if not cli_args.skip_summary:
-        _summarize_artifacts(settings)
+        _summarize_artifacts(paths, settings)
 
 
 if __name__ == "__main__":

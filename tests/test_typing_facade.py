@@ -117,8 +117,9 @@ def test_resolve_fastapi_emits_deprecation_warning() -> None:
 def test_resolve_faiss_emits_deprecation_warning() -> None:
     """resolve_faiss() emits a DeprecationWarning."""
     fake_module = _fake_faiss_module()
-    with override_gate_import({"faiss": fake_module}), pytest.warns(
-        DeprecationWarning, match=r"resolve_faiss.*deprecated"
+    with (
+        override_gate_import({"faiss": fake_module}),
+        pytest.warns(DeprecationWarning, match=r"resolve_faiss.*deprecated"),
     ):
         resolve_faiss()
 
@@ -153,8 +154,9 @@ def test_resolve_fastapi_returns_module() -> None:
 def test_resolve_faiss_returns_module() -> None:
     """resolve_faiss() returns the faiss module (despite deprecation)."""
     fake_module = _fake_faiss_module()
-    with override_gate_import({"faiss": fake_module}), pytest.warns(
-        DeprecationWarning, match=r"deprecated"
+    with (
+        override_gate_import({"faiss": fake_module}),
+        pytest.warns(DeprecationWarning, match=r"deprecated"),
     ):
         faiss = resolve_faiss()
     # Just verify we got something that looks like a module

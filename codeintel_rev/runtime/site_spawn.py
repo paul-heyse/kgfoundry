@@ -9,4 +9,4 @@ from contextlib import suppress
 def configure_spawn_start_method() -> None:
     """Force the global multiprocessing start method to spawn."""
     with suppress(RuntimeError):
-        _multiprocessing.set_start_method("spawn")
+        _multiprocessing.set_start_method("spawn", force=True)

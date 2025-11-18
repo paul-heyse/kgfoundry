@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 
+from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import load_settings
 from codeintel_rev.indexing.xtr_build import build_xtr_index
@@ -51,6 +52,7 @@ def verify() -> None:
     """
     settings = load_settings()
     paths = resolve_application_paths(settings)
+    fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     index = XTRIndex(paths.xtr_dir, settings.xtr)
     index.open()
     if not index.ready:
@@ -123,6 +125,7 @@ def search(
     """
     settings = load_settings()
     paths = resolve_application_paths(settings)
+    fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     index = XTRIndex(paths.xtr_dir, settings.xtr)
     index.open()
     if not index.ready:

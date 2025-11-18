@@ -192,11 +192,24 @@ class CodeRankEmbedder:
     def _ensure_model(self) -> SentenceEncoderProtocol:
         """Load the underlying SentenceTransformer lazily.
 
+        Extended Summary
+        ----------------
+        Implements lazy loading and caching of the SentenceTransformer model instance.
+        Uses a thread-safe cache keyed by model_id and device to avoid redundant model
+        loads. This method is called internally before encoding operations.
+
         Returns
         -------
-        SentenceTransformer
-            Cached or newly loaded SentenceTransformer model instance.
+        SentenceEncoderProtocol
+            Cached or newly loaded SentenceTransformer model instance conforming to
+            the SentenceEncoderProtocol interface. The model is cached per (model_id, device)
+            tuple for subsequent calls.
 
+        Notes
+        -----
+        Thread-safe via module-level lock. Model loading is expensive (network I/O and
+        GPU memory allocation), so caching is critical for performance. Cache entries
+        persist for the lifetime of the process.
         """
         cache_key = (self.model_id, self.device)
         with self._CACHE_LOCK:

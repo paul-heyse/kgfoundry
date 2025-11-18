@@ -235,7 +235,7 @@ def override_gate_import(overrides: Mapping[str, object]) -> Iterator[None]:
 
     Yields
     ------
-    Iterator[None]
+    None
         Context where ``gate_import`` uses the overrides.
     """
     original_gate = gate_import

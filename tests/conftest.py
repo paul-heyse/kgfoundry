@@ -13,12 +13,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import multiprocessing as mp
 import sys
 from collections.abc import Callable, Mapping
 from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 import pytest
 from codeintel_rev.app.capabilities import Capabilities
@@ -27,6 +28,7 @@ from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.cli.bm25 import BM25CliContext
 from codeintel_rev.cli.enrich_pipeline import OverlayContext, ScanInputs, ScipContext
 from codeintel_rev.cli.splade import SpladeCliContext
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
@@ -67,6 +69,9 @@ ensure_spawn_start_method(force=True)
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Run before any tests so multiprocessing always uses spawn."""
     del session
+    method = mp.get_start_method(allow_none=True)
+    if method != "spawn":
+        mp.set_start_method("spawn", force=True)
     ensure_spawn_start_method(force=True)
 
 
@@ -98,14 +103,6 @@ else:
 
 pytest_plugins: tuple[str, ...] = ()
 # Pytest plugin modules auto-loaded for the test suite.
-
-
-class _XtrPathsProtocol(Protocol):
-    """Protocol describing the subset of XTR paths used in tests."""
-
-    @property
-    def xtr_dir(self) -> Path:  # pragma: no cover - structural hook only
-        ...
 
 
 if TYPE_CHECKING:  # pragma: no cover - typing support only
@@ -491,7 +488,7 @@ def fixture_xtr_cli_context_builder() -> Callable[..., XtrOpenContext]:
     def build(
         *,
         settings_factory: Callable[[], Settings] | None = None,
-        paths_resolver: Callable[[Settings], _XtrPathsProtocol] | None = None,
+        paths_resolver: Callable[[Settings], ResolvedPaths] | None = None,
         index_factory: Callable[[Path, Settings], XTRIndex] | None = None,
     ) -> XtrOpenContext:
         return XtrOpenContext(

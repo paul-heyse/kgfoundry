@@ -66,13 +66,27 @@ class QueryProtocol(Protocol):
         """Return captures for ``node``."""
         ...
 
+
 def _as_language(candidate: object | None) -> Language | None:
     """Return a ``Language`` instance for ``candidate`` when possible.
+
+    Extended Summary
+    ----------------
+    Attempts to coerce a candidate object into a Tree-sitter Language instance.
+    Handles None, Language instances, and PyCapsule objects returned by language
+    bindings. Used internally for flexible language object handling.
+
+    Parameters
+    ----------
+    candidate : object | None
+        Object to coerce into a Language instance. Can be None, a Language instance,
+        or a PyCapsule from language bindings.
 
     Returns
     -------
     Language | None
-        Coerced ``Language`` object, or ``None`` when conversion fails.
+        Coerced ``Language`` object, or ``None`` when conversion fails or candidate
+        is None.
     """
     if candidate is None:
         return None

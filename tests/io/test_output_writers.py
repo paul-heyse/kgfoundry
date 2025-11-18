@@ -19,7 +19,9 @@ def test_jsonl_writer_is_deterministic(tmp_path: Path) -> None:
     """Ensure the orjson-backed JSONL writer emits stable bytes."""
     path = tmp_path / "modules.jsonl"
     rows = [{"b": 2, "a": 1}, {"d": 4, "c": 3}]
-    with override_writer_env(lambda key, default=None: "v2" if key == "ENRICH_JSONL_WRITER" else default):
+    with override_writer_env(
+        lambda key, default=None: "v2" if key == "ENRICH_JSONL_WRITER" else default
+    ):
         write_jsonl(path, rows, writer_version="v2")
         first = path.read_bytes()
         write_jsonl(path, rows, writer_version="v2")

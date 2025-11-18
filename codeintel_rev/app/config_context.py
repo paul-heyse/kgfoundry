@@ -39,7 +39,7 @@ In request handlers:
 
 See Also
 --------
-codeintel_rev.app.readiness : Readiness probe system for health checks
+codeintel_rev.app.runtime_readiness : Readiness probe system for health checks
 codeintel_rev.config.settings : Settings dataclasses and environment loading
 """
 
@@ -47,8 +47,10 @@ from __future__ import annotations
 
 import importlib
 import os
+import warnings
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from threading import Lock
@@ -57,8 +59,10 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 
+from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
 from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
@@ -105,9 +109,11 @@ __all__ = [
     "ApplicationContext",
     "ApplicationContextOverrides",
     "GateConfig",
-    "ResolvedPaths",
+    "ResolvedPaths",  # re-export during transition to codeintel_rev.config.paths
     "override_gate_config",
+    "paths",
     "resolve_application_paths",
+    "set_paths",
 ]
 
 
@@ -187,6 +193,46 @@ def _call_gate_import(module: str, purpose: str) -> object:
     if override is not None:
         return override(module, purpose)
     return gate_import(module, purpose)
+
+
+_PATH_CACHE: ContextVar[ResolvedPaths | None] = ContextVar("_PATH_CACHE", default=None)
+
+
+def set_paths(resolved: ResolvedPaths) -> None:
+    """Install ``resolved`` for backwards-compatible global access.
+
+    Parameters
+    ----------
+    resolved : ResolvedPaths
+        Canonical filesystem layout produced by :func:`resolve_application_paths`.
+    """
+    _PATH_CACHE.set(resolved)
+
+
+def paths() -> ResolvedPaths:
+    """Return the cached :class:`ResolvedPaths` for legacy callers.
+
+    Returns
+    -------
+    ResolvedPaths
+        The most recently installed paths object.
+
+    Raises
+    ------
+    RuntimeLifecycleError
+        Raised when the paths cache is empty, meaning
+        :func:`ApplicationContext.create` has not been invoked yet.
+    """
+    cached = _PATH_CACHE.get()
+    if cached is None:
+        msg = "paths() called before ApplicationContext initialization"
+        raise RuntimeLifecycleError(msg, runtime="config-context")
+    warnings.warn(
+        "config_context.paths() is deprecated; inject ResolvedPaths explicitly",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return cached
 
 
 @dataclass(slots=True)
@@ -604,178 +650,6 @@ def _ensure_path_exists(path: Path, *, runtime: str, description: str) -> None:
     )
 
 
-@dataclass(slots=True, frozen=True)
-class ResolvedPaths:
-    """Canonicalized filesystem paths for runtime operations.
-
-    All paths are absolute and resolved relative to repo_root. This eliminates
-    ambiguity and ensures consistent path handling throughout the application.
-    Path resolution is performed once at application startup rather than on
-    each request.
-
-    Attributes
-    ----------
-    repo_root : Path
-        Absolute path to repository root directory. This is the base directory
-        for all source code and must exist before application startup.
-    data_dir : Path
-        Absolute path to base data directory containing indexes and databases.
-    vectors_dir : Path
-        Absolute path to directory containing Parquet files with vector embeddings.
-    faiss_index : Path
-        Absolute path to FAISS IVF-PQ index file (CPU version).
-    faiss_idmap_path : Path
-        Absolute path to the FAISS ID map Parquet sidecar used for chunk hydration.
-    duckdb_path : Path
-        Absolute path to DuckDB catalog database file.
-    scip_index : Path
-        Absolute path to SCIP index file (JSON or protobuf format).
-    coderank_vectors_dir : Path
-        Directory storing CodeRank chunk embeddings or shards.
-    coderank_faiss_index : Path
-        Path to the CodeRank FAISS index used for Stage-A retrieval.
-    warp_index_dir : Path
-        Directory containing WARP/XTR index artifacts.
-    xtr_dir : Path
-        Directory containing XTR token-level artifacts (memmaps + metadata).
-
-    Examples
-    --------
-    Paths are created during application startup:
-
-    >>> settings = load_settings()
-    >>> paths = resolve_application_paths(settings)
-    >>> paths.repo_root
-    PosixPath('/home/user/kgfoundry')
-    >>> paths.faiss_index
-    PosixPath('/home/user/kgfoundry/data/faiss/code.ivfpq.faiss')
-    """
-
-    repo_root: Path
-    data_dir: Path
-    vectors_dir: Path
-    faiss_index: Path
-    faiss_idmap_path: Path
-    duckdb_path: Path
-    scip_index: Path
-    coderank_vectors_dir: Path
-    coderank_faiss_index: Path
-    warp_index_dir: Path
-    xtr_dir: Path
-
-
-def resolve_application_paths(settings: Settings) -> ResolvedPaths:
-    """Resolve all configured paths to absolute paths.
-
-    Converts relative paths to absolute paths relative to repo_root, validates
-    that repo_root exists and is a directory, and returns a frozen dataclass
-    containing all resolved paths.
-
-    This function is called once during application startup. Path resolution
-    failures cause ConfigurationError to be raised, which prevents the
-    application from starting.
-
-    Parameters
-    ----------
-    settings : Settings
-        Application settings containing path configuration loaded from
-        environment variables.
-
-    Returns
-    -------
-    ResolvedPaths
-        Fully resolved absolute paths for all application resources.
-
-    Raises
-    ------
-    ConfigurationError
-        If repo_root does not exist, is not a directory, or cannot be accessed.
-        Error includes RFC 9457 Problem Details with context fields for
-        debugging (repo_root value, source environment variable).
-
-    Examples
-    --------
-    >>> settings = Settings(
-    ...     paths=PathsConfig(
-    ...         repo_root="/home/user/kgfoundry",
-    ...         data_dir="data",
-    ...         faiss_index="data/faiss/code.ivfpq.faiss",
-    ...     ),
-    ...     # ... other settings
-    ... )
-    >>> paths = resolve_application_paths(settings)
-    >>> paths.data_dir.is_absolute()
-    True
-    >>> paths.data_dir.parent == paths.repo_root
-    True
-    """
-    repo_root = Path(settings.paths.repo_root).expanduser().resolve()
-
-    if not repo_root.exists():
-        msg = f"Repository root does not exist: {repo_root}"
-        raise ConfigurationError(
-            msg,
-            context={"repo_root": str(repo_root), "source": "REPO_ROOT env var"},
-        )
-
-    if not repo_root.is_dir():
-        msg = f"Repository root is not a directory: {repo_root}"
-        raise ConfigurationError(
-            msg,
-            context={"repo_root": str(repo_root)},
-        )
-
-    def _resolve(path_str: str) -> Path:
-        """Resolve a path string relative to repo_root.
-
-        Parameters
-        ----------
-        path_str : str
-            Path string that may be relative or absolute.
-
-        Returns
-        -------
-        Path
-            Absolute resolved path.
-        """
-        path = Path(path_str)
-        if path.is_absolute():
-            return path.expanduser().resolve()
-        return (repo_root / path).resolve()
-
-    paths = ResolvedPaths(
-        repo_root=repo_root,
-        data_dir=_resolve(settings.paths.data_dir),
-        vectors_dir=_resolve(settings.paths.vectors_dir),
-        faiss_index=_resolve(settings.paths.faiss_index),
-        faiss_idmap_path=_resolve(settings.paths.faiss_idmap_path),
-        duckdb_path=_resolve(settings.paths.duckdb_path),
-        scip_index=_resolve(settings.paths.scip_index),
-        coderank_vectors_dir=_resolve(settings.paths.coderank_vectors_dir),
-        coderank_faiss_index=_resolve(settings.paths.coderank_faiss_index),
-        warp_index_dir=_resolve(settings.paths.warp_index_dir),
-        xtr_dir=_resolve(settings.paths.xtr_dir),
-    )
-
-    for directory in (
-        paths.data_dir,
-        paths.vectors_dir,
-        paths.coderank_vectors_dir,
-        paths.warp_index_dir,
-        paths.xtr_dir,
-        paths.faiss_idmap_path.parent,
-    ):
-        try:
-            directory.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            msg = f"Failed to ensure required directory exists: {directory}"
-            raise ConfigurationError(
-                msg,
-                context={"path": str(directory), "source": "resolve_application_paths"},
-            ) from exc
-    return paths
-
-
 T = TypeVar("T")
 
 
@@ -935,9 +809,7 @@ class ApplicationContext:
     )
     index_manager: IndexLifecycleManager = field(init=False, repr=False)
     _offline_evaluator: OfflineRecallEvaluator | None = field(default=None, init=False, repr=False)
-    _runtime_factories: RuntimeFactoryOverrides | None = field(
-        default=None, init=False, repr=False
-    )
+    _runtime_factories: RuntimeFactoryOverrides | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Attach the configured observer to all runtime cells."""
@@ -1019,9 +891,10 @@ class ApplicationContext:
         """
         settings = settings or load_settings()
         effective_overrides = overrides or ApplicationContextOverrides()
-        # resolve_application_paths() raises ConfigurationError if paths are invalid
-        # This exception propagates to the caller, causing application startup to fail
         paths = resolve_application_paths(settings)
+        readiness_results = fs_readiness.validate_paths(paths)
+        fs_readiness.raise_on_errors(readiness_results)
+        set_paths(paths)
 
         vllm_client = effective_overrides.vllm_client or build_vllm_client(settings.vllm)
         faiss_manager = effective_overrides.faiss_manager or _build_faiss_manager(
@@ -1626,6 +1499,4 @@ class ApplicationContext:
             if xtr_index is not None:
                 self._runtime.xtr.seed(xtr_index)
         if hybrid_engine_factory is not None:
-            self.set_runtime_factories_for_tests(
-                hybrid_engine_factory=hybrid_engine_factory
-            )
+            self.set_runtime_factories_for_tests(hybrid_engine_factory=hybrid_engine_factory)

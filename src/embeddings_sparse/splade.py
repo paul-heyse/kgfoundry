@@ -256,22 +256,31 @@ class SPLADEv3Encoder:
     def encode(self, texts: list[str]) -> list[tuple[list[int], list[float]]]:
         """Encode texts into SPLADE sparse embeddings.
 
+        Extended Summary
+        ----------------
         This method is not implemented in the skeleton implementation. Use
-        LuceneImpactIndex for SPLADE-based retrieval instead.
+        LuceneImpactIndex for SPLADE-based retrieval instead. When implemented,
+        this method will return sparse embeddings encoded as token-index and weight
+        tuples matching the SPLADE impact index format.
 
         Parameters
         ----------
         texts : list[str]
             List of text strings to encode.
 
+        Returns
+        -------
+        list[tuple[list[int], list[float]]]
+            Sparse embeddings, one per input text. Each embedding is a tuple of
+            (token_indices, token_weights) where token_indices is a list of integer
+            token IDs and token_weights is a list of float importance weights.
+            Currently not implemented; raises NotImplementedError instead.
+
         Raises
         ------
         NotImplementedError
             This function is not implemented in the skeleton. Use LuceneImpactIndex
-            instead. When implemented, returns list[tuple[list[int], list[float]]]
-            sparse embeddings, one per input text. Each embedding is a tuple of
-            (token_indices, token_weights) where token_indices is a list of integer
-            token IDs and token_weights is a list of float importance weights.
+            instead for production SPLADE encoding and retrieval.
 
         Notes
         -----

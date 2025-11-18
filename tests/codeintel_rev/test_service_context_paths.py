@@ -5,11 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from codeintel_rev.app.config_context import (
-    ApplicationContext,
-    ApplicationContextOverrides,
-    ResolvedPaths,
-)
+from codeintel_rev.app.config_context import ApplicationContext, ApplicationContextOverrides
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
@@ -90,6 +87,14 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
     """Relative configuration paths resolve against ``REPO_ROOT``."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
+    config_dir = repo_root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "config.yaml").write_text("tests: true")
+    for relative in ("logs", ".cache", ".tmp", "plugins"):
+        (repo_root / relative).mkdir(parents=True, exist_ok=True)
+    default_data_dir = repo_root / "data"
+    default_data_dir.mkdir(parents=True, exist_ok=True)
+    (default_data_dir / "vectors").mkdir(parents=True, exist_ok=True)
     faiss_rel = "indexes/code.ivfpq.faiss"
     duckdb_rel = "catalog/catalog.duckdb"
     vectors_rel = "artifacts/vectors"

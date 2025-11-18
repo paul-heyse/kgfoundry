@@ -31,8 +31,8 @@ from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext, ApplicationContextOverrides
 from codeintel_rev.app.faiss_health import check_faiss_health
 from codeintel_rev.app.middleware import SessionScopeMiddleware
-from codeintel_rev.app.readiness import ReadinessProbe
 from codeintel_rev.app.routers import index_admin
+from codeintel_rev.app.runtime_readiness import ReadinessProbe
 from codeintel_rev.app.server_settings import (
     ServerSettings,
     get_server_settings,
@@ -52,7 +52,9 @@ except PackageNotFoundError:
 class AppLifecycleHooks:
     """Override hooks for application startup/shutdown behavior."""
 
-    context_factory: Callable[[ApplicationContextOverrides | None], ApplicationContext] | None = None
+    context_factory: Callable[[ApplicationContextOverrides | None], ApplicationContext] | None = (
+        None
+    )
     faiss_health_check: Callable[[], object] | None = None
     readiness_probe_factory: Callable[[ApplicationContext], ReadinessProbe] | None = None
     env_flag_resolver: Callable[[str], bool] | None = None

@@ -7,7 +7,7 @@ from importlib.metadata import EntryPoint
 from types import SimpleNamespace
 from typing import cast
 
-from codeintel_rev.app.config_context import ResolvedPaths
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.plugins.channels import Channel, ChannelContext
 from codeintel_rev.plugins.registry import ChannelRegistry, override_channel_entry_points
@@ -63,6 +63,7 @@ def test_registry_discovers_entry_points() -> None:
 
     def _factory(_: ChannelContext) -> _ToyChannel:
         return _ToyChannel()
+
     entry_points = cast("Iterable[EntryPoint]", [_FakeEntryPoint(_factory)])
     context = ChannelContext(
         settings=cast("Settings", SimpleNamespace()),

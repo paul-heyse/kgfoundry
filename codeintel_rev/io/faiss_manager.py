@@ -23,8 +23,43 @@ from typing import TYPE_CHECKING, Any, cast
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.errors import VectorIndexIncompatibleError, VectorIndexStateError
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.faiss_build import (
+    IndexBuildConfig,
+    IndexFamily,
+    build_primary_index,
+)
+from codeintel_rev.io.faiss_build import (
+    add_vectors as builder_add_vectors,
+)
+from codeintel_rev.io.faiss_build import (
+    load_index as builder_load_index,
+)
+from codeintel_rev.io.faiss_build import (
+    save_index as builder_save_index,
+)
 from codeintel_rev.io.faiss_compat import load_faiss_module
-from codeintel_rev.retrieval.rerank_flat import FlatReranker
+from codeintel_rev.io.faiss_runtime import (
+    FAISSRuntimeOptions,
+)
+from codeintel_rev.io.faiss_runtime import (
+    apply_runtime_parameters as runtime_apply_parameters,
+)
+from codeintel_rev.io.faiss_runtime import (
+    search_dual as runtime_search_dual,
+)
+from codeintel_rev.io.faiss_store import (
+    IndexArtifactPaths,
+    export_idmap_parquet,
+)
+from codeintel_rev.io.faiss_store import (
+    get_idmap_array as store_get_idmap_array,
+)
+from codeintel_rev.io.faiss_store import (
+    load_secondary_index as store_load_secondary,
+)
+from codeintel_rev.io.faiss_store import (
+    save_secondary_index as store_save_secondary,
+)
 from codeintel_rev.retrieval.types import SearchHit
 from codeintel_rev.typing import NDArrayF32, NDArrayI64
 from kgfoundry_common.errors import VectorSearchError
@@ -37,13 +72,6 @@ if TYPE_CHECKING:
 else:
     np = cast("Any", LazyModule("numpy", "FAISS manager vector operations"))
     FaissIndex = object
-
-try:  # optional heavy dependency
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-except ModuleNotFoundError:  # pragma: no cover - optional runtime extra
-    pa = None
-    pq = None
 
 _SEARCH_RESULT_DIM = 2
 
@@ -384,25 +412,6 @@ def _log_extra(**kwargs: object) -> dict[str, object]:
 
 
 @dataclass(frozen=True, slots=True)
-class FAISSRuntimeOptions:
-    """Runtime tuning options passed to :class:`FAISSManager`."""
-
-    faiss_family: str | None = "auto"
-    pq_m: int = 64
-    pq_nbits: int = 8
-    opq_m: int = 0
-    default_nprobe: int | None = None
-    default_k: int = 50
-    hnsw_m: int = 32
-    hnsw_ef_construction: int = 200
-    hnsw_ef_search: int = 128
-    refine_k_factor: float = 2.0
-    autotune_on_start: bool = False
-    enable_range_search: bool = False
-    semantic_min_score: float = 0.0
-
-
-@dataclass(frozen=True, slots=True)
 class SearchRuntimeOverrides:
     """Per-search overrides for HNSW/quantizer parameters."""
 
@@ -460,186 +469,7 @@ class _SearchPlan:
     params: _SearchExecutionParams
 
 
-class _FAISSIdMapMixin:
-    """Mixin providing ID map export helpers."""
-
-    index_path: Path
-
-    def get_idmap_array(self) -> NDArrayI64:
-        """Return the mapping from FAISS row IDs to external chunk IDs.
-
-        Returns
-        -------
-        NDArrayI64
-            Array where ``array[row]`` equals the external chunk ID.
-
-        Raises
-        ------
-        RuntimeError
-            If the primary index is not wrapped with IndexIDMap2.
-        TypeError
-            If the ID map interface is invalid.
-        """
-        manager = cast("FAISSManager", self)
-        cpu_index = manager.require_cpu_index()
-        id_map_obj = getattr(cpu_index, "id_map", None)
-        if id_map_obj is None:
-            msg = (
-                "Primary index is not wrapped with IndexIDMap2; chunk hydration "
-                "requires faiss.IndexIDMap2"
-            )
-            raise RuntimeError(msg)
-        vector_to_array = getattr(faiss, "vector_to_array", None)
-        if callable(vector_to_array):
-            array = vector_to_array(id_map_obj)
-            return np.asarray(array, dtype=np.int64)
-        ntotal = cpu_index.ntotal
-        ids = np.empty(ntotal, dtype=np.int64)
-        at_callable = getattr(id_map_obj, "at", None)
-        if not callable(at_callable):
-            msg = "FAISS id_map does not expose vector_to_array() or at() helpers."
-            raise TypeError(msg)
-        id_accessor = cast("Callable[[int], int]", at_callable)
-        for row in range(ntotal):
-            ids[row] = int(id_accessor(row))
-        return ids
-
-    def export_idmap(self, out_path: Path) -> int:
-        """Persist ``{faiss_row -> external_id}`` to Parquet and return row count.
-
-        Parameters
-        ----------
-        out_path : Path
-            Destination path for the Parquet sidecar.
-
-        Returns
-        -------
-        int
-            Number of ID rows exported.
-
-        Raises
-        ------
-        RuntimeError
-            If pyarrow is not available at runtime.
-        """
-        if pa is None or pq is None:  # pragma: no cover - optional dependency
-            msg = "pyarrow is required to export ID maps"
-            raise RuntimeError(msg)
-        idmap = self.get_idmap_array()
-        rows = np.arange(idmap.shape[0], dtype=np.int64)
-        index_label = self.index_path.name or self.index_path.stem or str(self.index_path)
-        exported_at = datetime.now(UTC)
-        table = pa.Table.from_arrays(
-            [
-                pa.array(rows),
-                pa.array(idmap),
-                pa.array([index_label] * len(rows)),
-                pa.array(
-                    [exported_at] * len(rows),
-                    type=pa.timestamp("ns", tz="UTC"),
-                ),
-            ],
-            names=["faiss_row", "external_id", "index_name", "ts"],
-        )
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        pq.write_table(table, out_path, compression="snappy", use_dictionary=True)
-        return int(idmap.shape[0])
-
-    @staticmethod
-    def hydrate_by_ids(catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
-        """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
-
-        This method queries the DuckDB catalog to retrieve full chunk metadata
-        (file paths, line numbers, text content, etc.) for a batch of chunk IDs.
-        The IDs correspond to external chunk identifiers stored in the FAISS index,
-        enabling retrieval of complete chunk information after vector search.
-
-        Parameters
-        ----------
-        catalog : DuckDBCatalog
-            DuckDB catalog instance providing query_by_ids() method for batch
-            chunk metadata retrieval. The catalog must be initialized and connected
-            to the same database containing chunk metadata.
-        ids : Sequence[int]
-            Sequence of external chunk IDs to hydrate. These IDs should match
-            the IDs stored in the FAISS index (from add_vectors() or update_index()).
-            Empty sequences return an empty list without querying the catalog.
-
-        Returns
-        -------
-        list[dict]
-            List of hydrated chunk metadata dictionaries, one per ID. Each dictionary
-            contains chunk fields (id, uri, start_line, end_line, text, symbols, etc.)
-            as defined by the DuckDB catalog schema. The list may be shorter than
-            the input sequence if some IDs are not found in the catalog.
-
-        Notes
-        -----
-        This method performs database queries via the DuckDB catalog. Time complexity:
-        O(n) where n is the number of IDs, plus database query overhead. The method
-        logs debug information including the count of IDs and index path.
-        Thread-safe if the catalog instance is thread-safe.
-        """
-        if not ids:
-            return []
-        return catalog.query_by_ids(list(ids))
-
-    def reconstruct_batch(self, ids: Sequence[int]) -> NDArrayF32:
-        """Reconstruct vectors for a batch of external chunk IDs.
-
-        This method reconstructs the original embedding vectors for a batch of
-        chunk IDs by querying the FAISS index. For quantized indexes (IVF-PQ),
-        reconstruction returns approximate vectors (dequantized from the codebook).
-        For flat indexes, reconstruction returns exact vectors. The method requires
-        that the index supports direct map access for reconstruction.
-
-        Parameters
-        ----------
-        ids : Sequence[int]
-            Sequence of external chunk IDs to reconstruct vectors for. These IDs
-            should match the IDs stored in the FAISS index. Empty sequences return
-            an empty array with shape (0, vec_dim).
-
-        Returns
-        -------
-        NDArrayF32
-            Array of reconstructed vectors with shape ``(len(ids), vec_dim)``.
-            Each row corresponds to one input ID. Vectors are float32 dtype and
-            normalized for cosine similarity (L2-normalized). For quantized indexes,
-            vectors are approximate reconstructions.
-
-        Raises
-        ------
-        RuntimeError
-            If the index does not support vector reconstruction (e.g., missing
-            direct map, unsupported index type, or reconstruction fails for a
-            specific ID). The error message includes the failing chunk ID for
-            debugging.
-
-        Notes
-        -----
-        This method requires that _configure_direct_map() has been called on
-        the index to enable reconstruction. Time complexity: O(len(ids) * vec_dim)
-        for reconstruction, plus index lookup overhead. The method performs no
-        I/O operations and is thread-safe if the FAISS index is thread-safe.
-        """
-        manager = cast("FAISSManager", self)
-        if not ids:
-            return np.empty((0, manager.vec_dim), dtype=np.float32)
-        cpu_index = manager.require_cpu_index()
-        _configure_direct_map(cpu_index)
-        vectors = np.empty((len(ids), manager.vec_dim), dtype=np.float32)
-        for pos, chunk_id in enumerate(ids):
-            try:
-                reconstructed = cpu_index.reconstruct(int(chunk_id))
-                vectors[pos] = np.asarray(reconstructed, dtype=np.float32)
-            except (AttributeError, RuntimeError) as exc:
-                msg = f"Unable to reconstruct FAISS vector for chunk_id {chunk_id}"
-                raise RuntimeError(msg) from exc
-        return vectors
-
-
-class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates many subsystems
+class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
     """FAISS index manager with adaptive indexing and incremental updates.
 
     Uses a dual-index architecture for fast incremental updates.
@@ -722,10 +552,6 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
         # Secondary index for incremental updates (dual-index architecture)
         self.secondary_index: _faiss.Index | None = None
         self.incremental_ids: set[int] = set()
-        # Secondary index path: same directory as primary, with .secondary suffix
-        self.secondary_index_path = (
-            index_path.parent / f"{index_path.stem}.secondary{index_path.suffix}"
-        )
         self.tuned_parameters: dict[str, float | str] | None = None
         self._last_latency_ms: float | None = None
         self.autotune_profile_path = self.index_path.with_name("tuning.json")
@@ -832,28 +658,28 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
         >>> manager.build_index(vectors)
         >>> # Uses IndexFlatIP for 1000 vectors (small corpus)
         """
-        faiss.normalize_L2(vectors)
         with self._tuning_lock:
             self._runtime_overrides.clear()
 
+        cfg_family = (self.faiss_family or "auto").lower()
         n_vectors = len(vectors)
-        resolved_family = (family or self.faiss_family or "auto").lower()
-        if resolved_family == "auto":
-            cpu_index, factory_label = self._build_adaptive_index(vectors, n_vectors)
-        else:
-            factory = self._factory_string_for(resolved_family, n_vectors)
-            cpu_index = faiss.index_factory(
-                self.vec_dim,
-                factory,
-                faiss.METRIC_INNER_PRODUCT,
-            )
-            if getattr(cpu_index, "is_trained", False) and not cpu_index.is_trained:
-                cpu_index.train(vectors)
-            factory_label = factory
-
-        # Wrap in IDMap for ID management
-        cpu_id_map = faiss.IndexIDMap2(cpu_index)
-        _configure_direct_map(cpu_id_map)
+        cfg = IndexBuildConfig(
+            vec_dim=self.vec_dim,
+            default_nlist=self.nlist,
+            family=cast("IndexFamily", "adaptive" if cfg_family == "auto" else cfg_family),
+            pq_m=self.pq_m,
+            pq_bits=self.pq_nbits,
+            opq_m=self.opq_m,
+            hnsw_m=self.hnsw_m,
+        )
+        override_family: IndexFamily | None = None
+        if family is not None:
+            override_family = cast("IndexFamily", family.lower())
+        cpu_id_map, factory_label = build_primary_index(
+            vectors,
+            cfg=cfg,
+            override_family=override_family,
+        )
         self.cpu_index = cpu_id_map
         self._record_factory_choice(
             cpu_id_map,
@@ -951,12 +777,7 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
             msg = "Cannot add vectors: FAISS index has not been built or loaded."
             raise RuntimeError(msg) from exc
 
-        # Normalize vectors
-        vectors_norm = vectors.copy()
-        faiss.normalize_L2(vectors_norm)
-
-        # Add with IDs
-        cpu_index.add_with_ids(vectors_norm, ids.astype(np.int64))
+        builder_add_vectors(cpu_index, vectors, ids.astype(np.int64))
 
     def update_index(self, new_vectors: NDArrayF32, new_ids: NDArrayI64) -> None:
         """Add new vectors to secondary index for fast incremental updates.
@@ -1252,8 +1073,7 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
             msg = "Cannot save index: FAISS index has not been built or loaded."
             raise RuntimeError(msg) from exc
 
-        self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        faiss.write_index(cpu_index, str(self.index_path))
+        builder_save_index(cpu_index, self.index_path)
 
     def load_cpu_index(
         self,
@@ -1290,7 +1110,7 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
             msg = f"Index not found: {self.index_path}"
             raise FileNotFoundError(msg)
 
-        cpu_index = faiss.read_index(str(self.index_path))
+        cpu_index = builder_load_index(self.index_path)
         if not isinstance(cpu_index, faiss.IndexIDMap2):
             cpu_index = faiss.IndexIDMap2(cpu_index)
         _configure_direct_map(cpu_index)
@@ -1329,8 +1149,8 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
             msg = "Cannot save secondary index: secondary index has not been created."
             raise RuntimeError(msg)
 
-        self.secondary_index_path.parent.mkdir(parents=True, exist_ok=True)
-        faiss.write_index(self.secondary_index, str(self.secondary_index_path))
+        paths = IndexArtifactPaths(self.index_path)
+        store_save_secondary(self.secondary_index, paths)
 
     def load_secondary_index(self) -> None:
         """Load secondary index from disk.
@@ -1349,11 +1169,13 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
             If the secondary index file does not exist. This is normal if no
             incremental updates have been made yet.
         """
-        if not self.secondary_index_path.exists():
-            msg = f"Secondary index not found: {self.secondary_index_path}"
+        paths = IndexArtifactPaths(self.index_path)
+        secondary_path = paths.secondary_index_path
+        if not secondary_path.exists():
+            msg = f"Secondary index not found: {secondary_path}"
             raise FileNotFoundError(msg)
 
-        index = faiss.read_index(str(self.secondary_index_path))
+        index = store_load_secondary(paths)
         _configure_direct_map(index)
         self.secondary_index = index
 
@@ -1366,6 +1188,85 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
                 self.incremental_ids = {at_callable(i) for i in range(n_vectors)}
             else:
                 self.incremental_ids = set(range(n_vectors))
+
+    def export_idmap(self, out_path: Path) -> int:
+        """Persist ``{faiss_row -> external_id}`` to Parquet and return row count.
+
+        Parameters
+        ----------
+        out_path : Path
+            Destination for the Parquet sidecar.
+
+        Returns
+        -------
+        int
+            Number of ID rows exported.
+        """
+        cpu_index = self._require_cpu_index()
+        return export_idmap_parquet(cpu_index, out_path)
+
+    def get_idmap_array(self) -> NDArrayI64:
+        """Return the mapping from FAISS row IDs to external chunk IDs.
+
+        Returns
+        -------
+        NDArrayI64
+            Array where ``array[row]`` equals the external chunk ID.
+        """
+        cpu_index = self._require_cpu_index()
+        return store_get_idmap_array(cpu_index)
+
+    @staticmethod
+    def hydrate_by_ids(catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
+        """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog
+            Catalog used to hydrate chunk metadata.
+        ids : Sequence[int]
+            Chunk identifiers to hydrate.
+
+        Returns
+        -------
+        list[dict]
+            Hydrated chunk metadata entries.
+        """
+        if not ids:
+            return []
+        return catalog.query_by_ids(list(ids))
+
+    def reconstruct_batch(self, ids: Sequence[int]) -> NDArrayF32:
+        """Reconstruct vectors for a batch of external chunk IDs.
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Chunk identifiers to reconstruct.
+
+        Returns
+        -------
+        NDArrayF32
+            Array of reconstructed vectors with shape ``(len(ids), vec_dim)``.
+
+        Raises
+        ------
+        RuntimeError
+            If FAISS is unable to reconstruct a specific vector.
+        """
+        if not ids:
+            return np.empty((0, self.vec_dim), dtype=np.float32)
+        cpu_index = self.require_cpu_index()
+        _configure_direct_map(cpu_index)
+        vectors = np.empty((len(ids), self.vec_dim), dtype=np.float32)
+        for pos, chunk_id in enumerate(ids):
+            try:
+                reconstructed = cpu_index.reconstruct(int(chunk_id))
+            except (AttributeError, RuntimeError) as exc:
+                msg = f"Unable to reconstruct FAISS vector for chunk_id {chunk_id}"
+                raise RuntimeError(msg) from exc
+            vectors[pos] = np.asarray(reconstructed, dtype=np.float32)
+        return vectors
 
     def search(
         self,
@@ -1440,22 +1341,15 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
         O(n) for Flat, O(nprobe * k) for IVF-family, O(log n * ef_search) for HNSW.
         """
         plan = self._prepare_search_plan(query, k, nprobe, runtime)
+        duck_catalog = catalog if isinstance(catalog, DuckDBCatalog) else None
 
         start = perf_counter()
         try:
             distances, identifiers = self._execute_dual_search(
                 query=plan.queries,
-                search_k=plan.search_k,
-                params=plan.params,
-            )
-            duck_catalog = catalog if isinstance(catalog, DuckDBCatalog) else None
-            refined = self._maybe_refine_results(
-                catalog=duck_catalog,
                 plan=plan,
-                identifiers=identifiers,
+                catalog=duck_catalog,
             )
-            if refined is not None:
-                distances, identifiers = refined
             result = (distances[:, : plan.k], identifiers[:, : plan.k])
         except Exception as exc:
             msg = "FAISS search failed"
@@ -1728,8 +1622,8 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
         self,
         *,
         query: NDArrayF32,
-        search_k: int,
-        params: _SearchExecutionParams,
+        plan: _SearchPlan,
+        catalog: DuckDBCatalog | None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Run primary + optional secondary search with tracing.
 
@@ -1738,12 +1632,11 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
         query : NDArrayF32
             Query vector(s) of shape (n_queries, vec_dim) or (vec_dim,).
             Automatically normalized for cosine similarity.
-        search_k : int
-            Number of candidates to retrieve from each index before merging.
-            Typically larger than final k to improve recall after merging.
-        params : _SearchExecutionParams
-            Runtime parameters describing IVF/HNSW traversal (nprobe, ef_search,
-            quantizer efSearch).
+        plan : _SearchPlan
+            Prepared search plan containing normalization buffers and runtime
+            execution parameters.
+        catalog : DuckDBCatalog | None
+            Catalog used for optional exact rerank when available.
 
         Returns
         -------
@@ -1753,115 +1646,30 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
 
         Notes
         -----
-        This is an internal method that orchestrates dual-index search with
-        It applies runtime parameters, searches both
-        indexes if secondary exists, merges results by score, and returns
-        the combined candidate set. Time complexity: O(search_k * log n)
-        for HNSW, O(nprobe * search_k) for IVF-family indexes.
+        This is an internal method that orchestrates dual-index search with the
+        new runtime module helpers. It applies runtime parameters via the
+        ParameterSpace API, executes searches across both indexes, merges them,
+        and optionally reranks against the DuckDB catalog.
         """
+        params = plan.params
         self._apply_runtime_parameters(
             nprobe=params.nprobe,
             ef_search=params.ef_search,
             quantizer_ef_search=params.quantizer_ef_search,
         )
-        primary_dists, primary_ids = self._search_primary(query, search_k, params.nprobe)
-        if self.secondary_index is None:
-            return primary_dists, primary_ids
-        secondary_dists, secondary_ids = self._search_secondary(query, search_k)
-        merged_dists, merged_ids = self._merge_results(
-            primary_dists,
-            primary_ids,
-            secondary_dists,
-            secondary_ids,
-            search_k,
+        refine_factor = 1.0
+        if plan.k > 0:
+            refine_factor = max(1.0, plan.search_k / plan.k)
+        distances, identifiers = runtime_search_dual(
+            primary=self.active_index(),
+            secondary=self.secondary_index,
+            query=query,
+            k=plan.k,
+            nprobe=params.nprobe,
+            refine_k_factor=refine_factor,
+            catalog=catalog,
         )
-        return merged_dists, merged_ids
-
-    def _maybe_refine_results(
-        self,
-        *,
-        catalog: DuckDBCatalog | None,
-        plan: _SearchPlan,
-        identifiers: NDArrayI64,
-    ) -> tuple[NDArrayF32, NDArrayI64] | None:
-        """Optionally refine ANN candidates with exact similarity search.
-
-        This method performs optional refinement of approximate nearest neighbor
-        (ANN) search results by computing exact similarity scores using the original
-        embeddings from the catalog. Refinement improves recall by reranking
-        candidates based on exact inner product or cosine similarity rather than
-        approximate distances from the FAISS index.
-
-        Refinement is only performed when all conditions are met:
-        - Catalog is available for embedding retrieval
-        - Requested k is positive
-        - Search k (with k_factor expansion) is greater than requested k
-        - Refine k_factor is greater than 1.0
-
-        Parameters
-        ----------
-        catalog : DuckDBCatalog | None
-            DuckDB catalog instance providing embedding retrieval via
-            get_embeddings_by_ids(). If None, refinement is skipped.
-        plan : _SearchPlan
-            Search plan containing normalized queries, effective k, search_k
-            (with k_factor applied), and execution parameters. Used to determine
-            refinement parameters and query vectors.
-        identifiers : NDArrayI64
-            Candidate chunk IDs from ANN search, shape (n_queries, search_k).
-            These IDs are used to retrieve embeddings for exact similarity computation.
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64] | None
-            Tuple of (refined_scores, refined_ids) when refinement is performed
-            and successful, both with shape (n_queries, k). Returns None when
-            refinement is skipped (conditions not met), exact rerank is unavailable,
-            or refinement fails (falls back to ANN ordering). Refined scores are
-            exact similarity scores (inner product or cosine similarity); refined
-            IDs are the top-k chunk identifiers after reranking.
-
-        Notes
-        -----
-        This method uses exact_rerank() from codeintel_rev.retrieval.rerank_flat
-        to compute exact similarities. Refinement is best-effort - if it fails,
-        the method returns None and the caller falls back to ANN ordering. Time
-        complexity: O(n_queries * search_k * vec_dim) for exact similarity computation
-        plus O(n_queries * search_k * log(search_k)) for sorting. The method
-        Thread-safe if the catalog instance is thread-safe.
-        """
-        if catalog is None or plan.k <= 0 or plan.search_k <= plan.k or self.refine_k_factor <= 1.0:
-            return None
-        try:
-            reranker = FlatReranker(catalog)
-            rerank_scores, rerank_ids = reranker.rerank(
-                plan.queries,
-                identifiers[:, : plan.search_k],
-                top_k=plan.k,
-            )
-        except (RuntimeError, ValueError):  # pragma: no cover - rerank is best-effort
-            return None
-        self._log_refine_delta(identifiers[:, : plan.k], rerank_ids)
-        return rerank_scores, rerank_ids
-
-    @staticmethod
-    def _log_refine_delta(ann_ids: NDArrayI64, refined_ids: NDArrayI64) -> None:
-        """Emit structured logs describing differences between ANN and refined hits."""
-        if ann_ids.shape != refined_ids.shape:
-            return
-        overlaps: list[float] = []
-        replacements: list[int] = []
-        k = ann_ids.shape[1]
-        for ann_row, ref_row in zip(ann_ids, refined_ids, strict=True):
-            ann_set = {int(chunk_id) for chunk_id in ann_row if chunk_id >= 0}
-            ref_set = {int(chunk_id) for chunk_id in ref_row if chunk_id >= 0}
-            if not ann_set and not ref_set:
-                continue
-            overlap = len(ann_set & ref_set)
-            overlaps.append(overlap / max(k, 1))
-            replacements.append(max(len(ref_set) - overlap, 0))
-        if not overlaps:
-            return
+        return distances, identifiers
 
     def _search_secondary(self, query: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
         """Search the secondary index (flat, no training required).
@@ -2495,55 +2303,19 @@ class FAISSManager(_FAISSIdMapMixin):  # noqa: PLR0904 - manager orchestrates ma
         ef_search: int | None,
         quantizer_ef_search: int | None = None,
     ) -> None:
-        """Apply runtime search knobs to the active FAISS index.
-
-        This method applies runtime tuning parameters (nprobe, efSearch,
-        quantizer_efSearch) to the active FAISS index using the ParameterSpace
-        API. These parameters control search behavior: nprobe controls IVF cell
-        traversal, efSearch controls HNSW graph exploration, and quantizer_efSearch
-        controls quantizer search depth. The method falls back to direct attribute
-        assignment if ParameterSpace API is unavailable.
-
-        Parameters
-        ----------
-        nprobe : int | None
-            Number of IVF cells to probe during search. Higher values improve
-            recall but slow down search. Only applies to IVF-family indexes.
-            When None, the parameter is not applied.
-        ef_search : int | None
-            HNSW exploration factor controlling graph traversal depth. Higher
-            values improve recall but slow down search. Only applies to HNSW
-            indexes. When None, the parameter is not applied.
-        quantizer_ef_search : int | None, optional
-            Exploration factor for IVF quantizer search (default: None). Controls
-            quantizer traversal depth for hierarchical IVF indexes. When None,
-            the parameter is not applied.
-
-        Notes
-        -----
-        This method modifies the index object in-place, affecting all subsequent
-        search operations until parameters are changed again. The method attempts
-        to use FAISS ParameterSpace API first, then falls back to direct attribute
-        assignment (e.g., index.nprobe) if ParameterSpace is unavailable. Time
-        complexity: O(1) for parameter application. The method is not thread-safe
-        if the index is being used concurrently. Parameters persist for the lifetime
-        of the index object or until explicitly changed.
-        """
-        params: list[str] = []
-        if nprobe is not None:
-            params.append(f"nprobe={int(nprobe)}")
-        if ef_search is not None:
-            params.append(f"efSearch={int(ef_search)}")
-        if quantizer_ef_search is not None:
-            params.append(f"quantizer_efSearch={int(quantizer_ef_search)}")
-        if not params:
+        """Apply runtime search knobs to the active FAISS index."""
+        if nprobe is None and ef_search is None and quantizer_ef_search is None:
             return
-        index = self.active_index()
         try:
-            faiss.ParameterSpace().set_index_parameters(index, ",".join(params))
-        except (RuntimeError, AttributeError, ValueError):
-            if nprobe is not None and hasattr(index, "nprobe"):
-                index.nprobe = int(nprobe)
+            index = self.active_index()
+        except RuntimeError:
+            return
+        runtime_apply_parameters(
+            index,
+            nprobe=nprobe,
+            ef_search=ef_search,
+            quantizer_ef_search=quantizer_ef_search,
+        )
 
     def apply_runtime_parameters(self, overrides: Mapping[str, float | int]) -> None:
         """Best-effort application of overrides to the live index if available.
@@ -3570,4 +3342,12 @@ def _get_compile_options() -> str:
     return options
 
 
-__all__ = ["AutoTuner", "FAISSManager", "FAISSRuntimeController", "apply_parameters"]
+__all__ = [
+    "AutoTuner",
+    "FAISSManager",
+    "FAISSRuntimeController",
+    "FAISSRuntimeOptions",
+    "RefineSearchConfig",
+    "SearchRuntimeOverrides",
+    "apply_parameters",
+]

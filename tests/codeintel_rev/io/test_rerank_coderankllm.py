@@ -15,6 +15,7 @@ from tests._helpers import assertions
 if TYPE_CHECKING:
     from transformers import AutoModelForCausalLM, PreTrainedTokenizerBase
 else:  # pragma: no cover - tests avoid importing heavy deps at runtime
+
     class PreTrainedTokenizerBase:
         """Runtime stub matching the tokenizer protocol."""
 

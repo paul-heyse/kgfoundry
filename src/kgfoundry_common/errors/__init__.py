@@ -142,6 +142,14 @@ except ImportError:  # pragma: no cover - optional dependency
     ) -> JSONResponseProtocol:
         """Raise ``RuntimeError`` when FastAPI support is unavailable.
 
+        Extended Summary
+        ----------------
+        This function is a fallback stub that raises RuntimeError when FastAPI
+        support is not installed. It exists for signature compatibility with the
+        FastAPI implementation of problem_details_response. The return type annotation
+        (JSONResponseProtocol) exists for signature compatibility but this function
+        never returns.
+
         Parameters
         ----------
         error : KgFoundryError
@@ -149,12 +157,20 @@ except ImportError:  # pragma: no cover - optional dependency
         request : RequestProtocol | None, optional
             Request instance (unused, for signature compatibility).
 
+        Returns
+        -------
+        JSONResponseProtocol
+            This function never returns. The return type annotation exists for
+            signature compatibility with the FastAPI implementation. Always raises
+            RuntimeError instead. When FastAPI support is available, the actual
+            implementation returns a JSONResponse conforming to RFC 9457 Problem
+            Details format.
+
         Raises
         ------
         RuntimeError
-            Always raised to indicate missing FastAPI dependency. This function never
-            returns. The return type annotation (JSONResponseProtocol) exists for
-            signature compatibility with the FastAPI implementation.
+            Always raised to indicate missing FastAPI dependency. Install
+            kgfoundry[api] to enable problem details response helpers.
         """
         del error, request
         message = (

@@ -7,11 +7,8 @@ from typing import cast
 
 import duckdb
 import pytest
-from codeintel_rev.app.config_context import (
-    ApplicationContext,
-    ResolvedPaths,
-    resolve_application_paths,
-)
+from codeintel_rev.app.config_context import ApplicationContext, resolve_application_paths
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 
 from kgfoundry_common.errors import ConfigurationError
@@ -22,6 +19,19 @@ from tests._helpers.settings import build_settings_for_repo
 def _noop_load_cpu_index(*_: object, **__: object) -> None:
     """Test helper that simulates successful FAISS loading."""
     return
+
+
+def _prepare_base_repo(repo_root: Path) -> None:
+    """Create directories/files required by readiness probes."""
+    config_dir = repo_root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("tests: true")
+    for relative in ("logs", ".cache", ".tmp", "plugins"):
+        (repo_root / relative).mkdir(parents=True, exist_ok=True)
+    data_dir = repo_root / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "vectors").mkdir(parents=True, exist_ok=True)
 
 
 def test_resolve_application_paths_success(tmp_path: Path) -> None:
@@ -46,26 +56,24 @@ def test_resolve_application_paths_success(tmp_path: Path) -> None:
 
 
 def test_resolve_application_paths_missing_repo_root() -> None:
-    """Test that missing repo root raises ConfigurationError."""
-    # Arrange
+    """Missing repo roots are tolerated during pure resolution."""
     settings = build_settings_for_repo(Path("/nonexistent/path"))
 
-    # Act & Assert
-    with pytest.raises(ConfigurationError, match="Repository root does not exist"):
-        resolve_application_paths(settings)
+    paths = resolve_application_paths(settings)
+
+    assertions.expect_equal(paths.repo_root, Path("/nonexistent/path").resolve())
 
 
 def test_resolve_application_paths_not_directory(tmp_path: Path) -> None:
-    """Test that non-directory repo root raises ConfigurationError."""
-    # Arrange
+    """Non-directory repo roots are tolerated during pure resolution."""
     repo_file = tmp_path / "not_a_dir"
     repo_file.touch()
 
     settings = build_settings_for_repo(repo_file)
 
-    # Act & Assert
-    with pytest.raises(ConfigurationError, match="Repository root is not a directory"):
-        resolve_application_paths(settings)
+    paths = resolve_application_paths(settings)
+
+    assertions.expect_equal(paths.repo_root, repo_file.resolve())
 
 
 def test_resolve_application_paths_relative_conversion(tmp_path: Path) -> None:
@@ -92,9 +100,10 @@ def test_application_context_create(tmp_path: Path) -> None:
     # Arrange
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    (repo_root / "data").mkdir()
-    (repo_root / "data" / "vectors").mkdir()
-    (repo_root / "data" / "faiss").mkdir()
+    _prepare_base_repo(repo_root)
+    (repo_root / "data").mkdir(exist_ok=True)
+    (repo_root / "data" / "vectors").mkdir(exist_ok=True)
+    (repo_root / "data" / "faiss").mkdir(exist_ok=True)
     (repo_root / "data" / "faiss" / "code.ivfpq.faiss").touch()
     (repo_root / "data" / "catalog.duckdb").touch()
 
@@ -118,7 +127,7 @@ def test_application_context_create_invalid_config() -> None:
     settings = build_settings_for_repo(Path("/nonexistent/path"))
 
     # Act & Assert
-    with pytest.raises(ConfigurationError, match="Repository root does not exist"):
+    with pytest.raises(ConfigurationError, match="directory missing"):
         ApplicationContext.create(settings=settings)
 
 
@@ -129,9 +138,10 @@ def test_application_context_ensure_faiss_ready(
     # Arrange
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    (repo_root / "data").mkdir()
-    (repo_root / "data" / "vectors").mkdir()
-    (repo_root / "data" / "faiss").mkdir()
+    _prepare_base_repo(repo_root)
+    (repo_root / "data").mkdir(exist_ok=True)
+    (repo_root / "data" / "vectors").mkdir(exist_ok=True)
+    (repo_root / "data" / "faiss").mkdir(exist_ok=True)
     faiss_index = repo_root / "data" / "faiss" / "code.ivfpq.faiss"
     faiss_index.touch()
     (repo_root / "data" / "catalog.duckdb").touch()
@@ -158,9 +168,10 @@ def test_application_context_ensure_faiss_ready_cached(
     # Arrange
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    (repo_root / "data").mkdir()
-    (repo_root / "data" / "vectors").mkdir()
-    (repo_root / "data" / "faiss").mkdir()
+    _prepare_base_repo(repo_root)
+    (repo_root / "data").mkdir(exist_ok=True)
+    (repo_root / "data" / "vectors").mkdir(exist_ok=True)
+    (repo_root / "data" / "faiss").mkdir(exist_ok=True)
     faiss_index = repo_root / "data" / "faiss" / "code.ivfpq.faiss"
     faiss_index.touch()
     (repo_root / "data" / "catalog.duckdb").touch()
@@ -184,9 +195,10 @@ def test_application_context_open_catalog(tmp_path: Path) -> None:
     """Test open_catalog() context manager."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    (repo_root / "data").mkdir()
-    (repo_root / "data" / "vectors").mkdir()
-    (repo_root / "data" / "faiss").mkdir()
+    _prepare_base_repo(repo_root)
+    (repo_root / "data").mkdir(exist_ok=True)
+    (repo_root / "data" / "vectors").mkdir(exist_ok=True)
+    (repo_root / "data" / "faiss").mkdir(exist_ok=True)
     (repo_root / "data" / "faiss" / "code.ivfpq.faiss").touch()
     duckdb_path = repo_root / "data" / "catalog.duckdb"
     # Create a valid DuckDB database file
@@ -210,12 +222,13 @@ def test_build_factory_adjuster_from_settings(
     """Verify the default factory adjuster mirrors index settings."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
+    _prepare_base_repo(repo_root)
     data_dir = repo_root / "data"
     vectors = data_dir / "vectors"
     faiss_dir = data_dir / "faiss"
-    data_dir.mkdir()
-    vectors.mkdir()
-    faiss_dir.mkdir()
+    data_dir.mkdir(exist_ok=True)
+    vectors.mkdir(exist_ok=True)
+    faiss_dir.mkdir(exist_ok=True)
     (faiss_dir / "code.ivfpq.faiss").touch()
     (data_dir / "catalog.duckdb").touch()
     settings = build_settings_for_repo(repo_root)

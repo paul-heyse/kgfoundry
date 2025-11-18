@@ -132,7 +132,9 @@ class DuckDBIngestContext:
         DuckDBIngestContext
             Context configured with the project-wide DuckDB module and env toggles.
         """
-        return cls(duckdb_module=_duckdb(), use_native_json=_USE_NATIVE_JSON, pragmas=_PRAGMA_SETTINGS)
+        return cls(
+            duckdb_module=_duckdb(), use_native_json=_USE_NATIVE_JSON, pragmas=_PRAGMA_SETTINGS
+        )
 
 
 def _duckdb() -> _DuckDBModule:

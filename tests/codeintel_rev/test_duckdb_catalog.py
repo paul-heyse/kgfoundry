@@ -769,6 +769,7 @@ class TestConcurrentAccess:
 
 def test_query_by_filters_uses_query_builder(test_catalog: DuckDBCatalog) -> None:
     """query_by_filters delegates SQL generation to DuckDBQueryBuilder."""
+
     class _RecordingBuilder(DuckDBQueryBuilder):
         def __init__(self) -> None:
             self.calls: list[dict[str, object]] = []

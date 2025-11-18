@@ -181,7 +181,7 @@ def _load_factory(entry_point: EntryPoint) -> Callable[[ChannelContext], Channel
 
 @contextmanager
 def override_channel_entry_points(
-    overrides: Iterable[EntryPoint] | Callable[[], Iterable[EntryPoint]]
+    overrides: Iterable[EntryPoint] | Callable[[], Iterable[EntryPoint]],
 ) -> Iterator[None]:
     """Temporarily override channel entry points for discovery."""
     if callable(overrides):

@@ -17,7 +17,7 @@ from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
 from codeintel_rev.io.vllm_client import VLLMClient
 
 if TYPE_CHECKING:
-    from codeintel_rev.app.config_context import ResolvedPaths
+    from codeintel_rev.config.paths import ResolvedPaths
 
 
 @dataclass(slots=True, frozen=True)

@@ -26,6 +26,7 @@ DEFAULT_RRF_WEIGHTS: dict[str, float] = {
     "warp": 1.1,
 }
 
+
 @cache
 def _emit_vllm_task_warning() -> None:
     """Emit a deprecation warning exactly once."""
@@ -438,10 +439,7 @@ class VLLMEmbeddingMode(StrEnum):
         try:
             return cls(normalized)
         except ValueError as exc:
-            msg = (
-                f"Unsupported embedding mode '{value}'. "
-                "Valid options are LAST, CLS, or MEAN."
-            )
+            msg = f"Unsupported embedding mode '{value}'. Valid options are LAST, CLS, or MEAN."
             raise ValueError(msg) from exc
 
     @classmethod

@@ -13,12 +13,14 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.middleware import session_id_var
+from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 
 from tests._helpers import assertions, constants
+from tests._helpers.settings import build_settings_for_repo
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("RUN_BENCHMARKS"),
@@ -48,19 +50,8 @@ def mock_context(tmp_path: Path) -> Mock:
     for i in range(100):
         (repo_root / "src" / f"file_{i}.py").write_text(f"def func_{i}():\n    pass\n")
 
-    paths = ResolvedPaths(
-        repo_root=repo_root,
-        data_dir=repo_root / "data",
-        vectors_dir=repo_root / "data" / "vectors",
-        faiss_index=repo_root / "data" / "faiss" / "code.ivfpq.faiss",
-        faiss_idmap_path=repo_root / "data" / "faiss" / "faiss_idmap.parquet",
-        duckdb_path=repo_root / "data" / "catalog.duckdb",
-        scip_index=repo_root / "index.scip",
-        coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
-        coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
-        warp_index_dir=repo_root / "indexes" / "warp_xtr",
-        xtr_dir=repo_root / "data" / "xtr",
-    )
+    settings = build_settings_for_repo(repo_root)
+    paths = resolve_application_paths(settings)
 
     context = Mock(spec=ApplicationContext)
     context.paths = paths

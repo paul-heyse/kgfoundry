@@ -25,7 +25,7 @@ from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult, S
 
 if TYPE_CHECKING:
     from codeintel_rev.app.capabilities import Capabilities
-    from codeintel_rev.app.config_context import ResolvedPaths
+    from codeintel_rev.config.paths import ResolvedPaths
     from codeintel_rev.config.settings import Settings, SpladeConfig
     from codeintel_rev.io.duckdb_manager import DuckDBManager
 

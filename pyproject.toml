@@ -264,10 +264,10 @@ docs-validate-artifacts = "docs.toolchain:validate_artifacts"
 docs-symbol-delta = "docs.toolchain:symbol_delta"
 tools-build-navmap = "tools.cli:build_navmap"
 docs-serve-mkdocs = "tools.mkdocs_suite.serve:main"
-codeintel-enrich = "codeintel_rev.cli_enrich:main"
+codeintel-enrich = "codeintel_rev.cli.enrich.__main__:main"
 codeintel-enrich-pipeline = "codeintel_rev.cli.enrich_pipeline:main"
-codeintel-enrich-analytics = "codeintel_rev.cli.enrich_analytics:main"
-codeintel-enrich-overlays = "codeintel_rev.cli.enrich_overlays:main"
+codeintel-enrich-analytics = "codeintel_rev.cli.enrich.analytics:main"
+codeintel-enrich-overlays = "codeintel_rev.cli.enrich.overlays:main"
 codeintel = "codeintel_rev.cli:main"
 codeintel-cst = "codeintel_rev.cst_build.cst_cli:main"
 
@@ -473,6 +473,16 @@ runtime-evaluated-base-classes = [
 
 [tool.ruff.lint.per-file-ignores]
 # Typer CLI wiring intentionally accepts many arguments/positionals.
+
+# Protocol methods and stub implementations that have return type annotations
+# but always raise NotImplementedError. Pydoclint requires Returns sections
+# when return type annotations exist, but ruff DOC202 flags Returns sections
+# for functions that always raise. These ignores resolve the conflict.
+"src/embeddings_sparse/splade.py" = ["DOC202"]
+"src/kgfoundry_common/errors/__init__.py" = ["DOC202"]
+"src/kgfoundry_common/http/client.py" = ["DOC202"]
+"codeintel_rev/io/splade_manager.py" = ["DOC202"]
+"codeintel_rev/typing.py" = ["DOC202"]
 
 
 [tool.ruff.lint.isort]

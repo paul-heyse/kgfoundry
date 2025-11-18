@@ -33,10 +33,24 @@ __all__ = [
 def normalized_rel_path(path: Path, root: Path) -> str:
     """Return the normalized relative path for ``path`` under ``root``.
 
+    Extended Summary
+    ----------------
+    Computes a stable, POSIX-style relative path from a file path and repository
+    root. Used throughout the enrichment pipeline to generate consistent module
+    identifiers and cross-references.
+
+    Parameters
+    ----------
+    path : Path
+        Absolute file path to normalize.
+    root : Path
+        Repository root directory. The returned path will be relative to this root.
+
     Returns
     -------
     str
-        POSIX-style path relative to ``root``.
+        POSIX-style path relative to ``root``, normalized for cross-platform
+        consistency.
     """
     return stable_module_path(root, path)
 
@@ -48,10 +62,29 @@ def build_module_row(
 ) -> tuple[ModuleRecord, list[tuple[str, str]]]:
     """Construct a ModuleRecord and symbol edges for ``fp``.
 
+    Extended Summary
+    ----------------
+    Extracts module metadata and symbol graph edges from a Python source file
+    using SCIP indexing and AST analysis. This is a core enrichment pipeline
+    function that transforms raw source files into structured module records
+    with symbol relationships.
+
+    Parameters
+    ----------
+    fp : Path
+        Absolute path to the Python source file to process.
+    root : Path
+        Repository root directory for computing relative paths.
+    inputs : ScanInputs
+        Pipeline context containing SCIP index, type signals, coverage data,
+        and other enrichment inputs.
+
     Returns
     -------
     tuple[ModuleRecord, list[tuple[str, str]]]
         Module metadata row and symbol edges extracted from SCIP context.
+        The edges are (source_symbol_id, target_symbol_id) tuples representing
+        symbol relationships.
     """
     rel = normalized_rel_path(fp, root)
     repo_path = normalized_rel_path(fp, inputs.repo_root)
@@ -104,15 +137,30 @@ def build_module_row(
 def outline_nodes_for(rel_path: str, code: str) -> list[dict[str, Any]]:
     """Build Tree-sitter outline nodes for ``rel_path``.
 
+    Extended Summary
+    ----------------
+    Parses source code using Tree-sitter to extract structural outline information
+    including function/class names and their byte offsets. Used for code navigation
+    and outline generation in the enrichment pipeline.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the source file (used for language detection and error
+        reporting).
+    code : str
+        Source code content to parse.
+
     Returns
     -------
     list[dict[str, Any]]
-        Outline node structures capturing names and byte offsets.
+        Outline node structures capturing names and byte offsets. Each dict
+        contains node metadata including name, kind, and position information.
 
     Raises
     ------
     IndexingError
-        Raised when Tree-sitter parsing fails.
+        Raised when Tree-sitter parsing fails or the language cannot be determined.
     """
     try:
         outline = build_outline(rel_path, code.encode("utf-8"))
@@ -135,10 +183,24 @@ def outline_nodes_for(rel_path: str, code: str) -> list[dict[str, Any]]:
 def type_error_count(rel_path: str, inputs: ScanInputs) -> int:
     """Return the type error count for ``rel_path``.
 
+    Extended Summary
+    ----------------
+    Retrieves the aggregated type error count for a source file from the pipeline
+    context. Used for quality metrics and tagging decisions in the enrichment
+    pipeline.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the source file (must match keys in inputs.type_signals).
+    inputs : ScanInputs
+        Pipeline context containing type error signals indexed by relative path.
+
     Returns
     -------
     int
-        Maximum of Pyrefly and Pyright error counts for the path.
+        Maximum of Pyrefly and Pyright error counts for the path. Returns 0 if
+        no type signals are available for the path.
     """
     signal = inputs.type_signals.get(rel_path)
     return signal.total if signal else 0

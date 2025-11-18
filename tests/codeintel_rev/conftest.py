@@ -14,9 +14,10 @@ import pytest
 
 os.environ.setdefault("FAISS_OPT_LEVEL", "generic")
 
-from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.app.scope_store import ScopeStore
+from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.config.settings import (
     BM25Config,
     CodeRankConfig,
@@ -142,19 +143,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         coderank_llm=CodeRankLLMConfig(),
     )
 
-    paths = ResolvedPaths(
-        repo_root=repo_root,
-        data_dir=repo_root / "data",
-        vectors_dir=repo_root / "data" / "vectors",
-        faiss_index=repo_root / "data" / "faiss" / "index.faiss",
-        faiss_idmap_path=repo_root / "data" / "faiss" / "faiss_idmap.parquet",
-        duckdb_path=repo_root / "data" / "catalog.duckdb",
-        scip_index=repo_root / "index.scip.json",
-        coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
-        coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
-        warp_index_dir=repo_root / "indexes" / "warp_xtr",
-        xtr_dir=repo_root / "data" / "xtr",
-    )
+    paths = resolve_application_paths(settings)
 
     paths.data_dir.mkdir(parents=True, exist_ok=True)
     paths.vectors_dir.mkdir(parents=True, exist_ok=True)

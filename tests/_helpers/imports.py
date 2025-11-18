@@ -7,9 +7,7 @@ from importlib.machinery import ModuleSpec
 
 
 @contextmanager
-def with_module_presence(
-    overrides: Mapping[str, ModuleSpec | None]
-) -> Iterator[None]:
+def with_module_presence(overrides: Mapping[str, ModuleSpec | None]) -> Iterator[None]:
     """Temporarily override module discovery results for `importlib.util.find_spec`.
 
     Parameters

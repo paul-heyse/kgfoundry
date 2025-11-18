@@ -18,12 +18,14 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Protocol
+from typing import Annotated
 
 import click
 import typer
 
+from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.config_context import resolve_application_paths
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.xtr_manager import XTRIndex
@@ -55,7 +57,7 @@ class XtrOpenContext:
     """Dependency injection context for the xtr-open CLI."""
 
     settings_factory: Callable[[], Settings]
-    paths_resolver: Callable[[Settings], _XtrPaths]
+    paths_resolver: Callable[[Settings], ResolvedPaths]
     index_factory: Callable[[Path, Settings], XTRIndex]
 
     @classmethod
@@ -75,11 +77,6 @@ class XtrOpenContext:
 
 
 _DEFAULT_CONTEXT = XtrOpenContext.production()
-
-
-class _XtrPaths(Protocol):
-    @property
-    def xtr_dir(self) -> Path: ...
 
 
 def _cli_context(ctx: typer.Context | None = None) -> XtrOpenContext:
@@ -161,6 +158,7 @@ def xtr_open(
     context = _cli_context()
     settings = context.settings_factory()
     paths = context.paths_resolver(settings)
+    fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     xtr_root = root or paths.xtr_dir
     if root is not None and not root.is_dir():
         _exit_with_problem(

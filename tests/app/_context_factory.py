@@ -6,7 +6,8 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock
 
-from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
+from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 
 if TYPE_CHECKING:
     from codeintel_rev.config.settings import Settings
@@ -24,12 +25,8 @@ def _real_paths(repo_root: Path) -> ResolvedPaths:
     data_dir = repo_root / "data"
     vectors_dir = data_dir / "vectors"
     faiss_dir = data_dir / "faiss"
-    coderank_vectors = data_dir / "coderank_vectors"
-    warp_dir = repo_root / "indexes" / "warp_xtr"
-    xtr_dir = data_dir / "xtr"
     faiss_index = faiss_dir / "code.ivfpq.faiss"
     faiss_idmap = faiss_dir / "faiss_idmap.parquet"
-    coderank_index = faiss_dir / "coderank.ivfpq.faiss"
     duckdb_path = data_dir / "catalog.duckdb"
     scip_index = repo_root / "codeintel_rev" / "index.scip.json"
 
@@ -61,69 +58,58 @@ def _real_paths(repo_root: Path) -> ResolvedPaths:
         )
         raise FileNotFoundError(message)
 
-    return ResolvedPaths(
-        repo_root=repo_root,
-        data_dir=data_dir,
-        vectors_dir=vectors_dir,
-        faiss_index=faiss_index,
-        faiss_idmap_path=faiss_idmap,
-        duckdb_path=duckdb_path,
-        scip_index=scip_index,
-        coderank_vectors_dir=coderank_vectors,
-        coderank_faiss_index=coderank_index,
-        warp_index_dir=warp_dir,
-        xtr_dir=xtr_dir,
-    )
+    overrides = {
+        "BASE_DIR": repo_root,
+        "SCIP_INDEX": scip_index,
+    }
+    return resolve_application_paths(overrides)
 
 
 def _synthetic_paths(tmp_path: Path) -> ResolvedPaths:
     repo_root = tmp_path / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
     data_dir = repo_root / "data"
-    vectors_dir = data_dir / "vectors"
-    faiss_dir = data_dir / "faiss"
-    coderank_vectors = data_dir / "coderank_vectors"
-    warp_dir = repo_root / "warp"
-    xtr_dir = repo_root / "xtr"
+    subdirs = {
+        "vectors": data_dir / "vectors",
+        "faiss": data_dir / "faiss",
+        "coderank_vectors": data_dir / "coderank_vectors",
+        "lucene": data_dir / "lucene",
+        "splade": data_dir / "splade",
+        "xtr": data_dir / "xtr",
+    }
+    warp_dir = repo_root / "indexes" / "warp_xtr"
+
+    for directory in (data_dir, *subdirs.values(), warp_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    files = {
+        "faiss_index": subdirs["faiss"] / "code.ivfpq.faiss",
+        "faiss_idmap": subdirs["faiss"] / "faiss_idmap.parquet",
+        "coderank_index": subdirs["faiss"] / "coderank.ivfpq.faiss",
+        "duckdb_path": data_dir / "catalog.duckdb",
+        "scip_index": repo_root / "index.scip",
+    }
+    for path in files.values():
+        path.touch()
+
+    config_dir = repo_root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "config.yaml"
+    config_file.write_text("test: true")
 
     for directory in (
-        data_dir,
-        vectors_dir,
-        faiss_dir,
-        coderank_vectors,
-        warp_dir,
-        xtr_dir,
+        repo_root / "logs",
+        repo_root / ".cache",
+        repo_root / ".tmp",
+        repo_root / "plugins",
     ):
         directory.mkdir(parents=True, exist_ok=True)
 
-    faiss_index = faiss_dir / "code.ivfpq.faiss"
-    faiss_idmap = faiss_dir / "faiss_idmap.parquet"
-    coderank_index = faiss_dir / "coderank.faiss"
-    duckdb_path = data_dir / "catalog.duckdb"
-    scip_index = data_dir / "index.scip"
-
-    for path in (
-        faiss_index,
-        coderank_index,
-        duckdb_path,
-        scip_index,
-        faiss_idmap,
-    ):
-        path.touch()
-
-    return ResolvedPaths(
-        repo_root=repo_root,
-        data_dir=data_dir,
-        vectors_dir=vectors_dir,
-        faiss_index=faiss_index,
-        faiss_idmap_path=faiss_idmap,
-        duckdb_path=duckdb_path,
-        scip_index=scip_index,
-        coderank_vectors_dir=coderank_vectors,
-        coderank_faiss_index=coderank_index,
-        warp_index_dir=warp_dir,
-        xtr_dir=xtr_dir,
-    )
+    overrides = {
+        "BASE_DIR": repo_root,
+        "SCIP_INDEX": files["scip_index"],
+    }
+    return resolve_application_paths(overrides)
 
 
 def _prepare_paths(tmp_path: Path) -> ResolvedPaths:

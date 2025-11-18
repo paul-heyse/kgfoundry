@@ -12,7 +12,7 @@ import httpx
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import readyz
-from codeintel_rev.app.readiness import CheckResult, ReadinessProbe
+from codeintel_rev.app.runtime_readiness import CheckResult, ReadinessProbe
 from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, VLLMRunMode
 from codeintel_rev.config.utils import replace_settings, replace_struct
 from fastapi import FastAPI

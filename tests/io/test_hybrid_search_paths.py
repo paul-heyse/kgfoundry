@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
-from codeintel_rev.app.config_context import ResolvedPaths
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.hybrid_search import HybridSearchEngine
 

@@ -1,9 +1,15 @@
 # Enrichment Pipeline Overview
 
-The enrichment CLI suite (`codeintel_rev/cli/enrich_pipeline.py`,
-`cli/enrich_analytics.py`, `cli/enrich_overlays.py`) orchestrates a composable set of
-stages that merge SCIP, LibCST, Tree-sitter, type-checker signals, analytics, and
-writers into a stable `modules/` artifact bundle. The stages are intentionally small,
+The enrichment CLI now lives under `codeintel_rev/cli/enrich/` as a single Typer
+application that exposes the full pipeline (`exports`, `all`, `to-duckdb`), analytics
+(`analytics` subcommands), overlays, and DuckDB ingestion from one entry point
+(`codeintel-enrich`). The new CLI wires into the same staging flow described below and
+reuses the shared context in `services/enrich/**`. Compatibility shims
+(`codeintel_rev/cli/enrich_pipeline.py`, `cli_enrich.py`, etc.) remain in place so
+existing automation keeps working, but all new usage should favor the consolidated CLI.
+
+Every stage merges SCIP, LibCST, Tree-sitter, type-checker signals, analytics, and
+writers into a stable `modules/` artifact bundle. Stages are intentionally small,
 idempotent, and logged via structured `stage=*` spans so operators can pinpoint where
 time is spent or why a module failed.
 
@@ -45,7 +51,7 @@ time is spent or why a module failed.
 ## CLI usage
 
 ```bash
-codeintel-enrich-pipeline \
+codeintel-enrich \
   --root . \
   --scip build/index.scip.json \
   --out build/enrich \
@@ -54,15 +60,20 @@ codeintel-enrich-pipeline \
   all
 ```
 
-The `all`/`run` commands execute the entire stage flow described above. Narrow commands
-(`graph`, `typedness`, `hotspots`, `overlays`, etc.) now live in dedicated CLIs:
+Key subcommands on the new Typer app:
 
-- `codeintel-enrich-pipeline` — full pipeline orchestration (`all`, `exports`, `to-duckdb`, …)
-- `codeintel-enrich-analytics` — analytics-only writers (`graph`, `uses`, `typedness`, …)
-- `codeintel-enrich-overlays` — overlay generation and activation
+| Command | Purpose |
+| --- | --- |
+| `all` / `run` | Full enrichment pipeline (scan → analytics → all writers). |
+| `exports` | Emit `modules.jsonl`, repo map, tag index, Markdown sheets. |
+| `analytics` | Nested commands such as `graph`, `uses`, `typedness`, `cover­age`, `hotspots`. |
+| `overlays` | Overlay generation/activation (accepts `--config`/`--set` overrides). |
+| `to-duckdb` | Load `modules.jsonl` rows into DuckDB. |
 
-All three CLIs share the same global options. The legacy `codeintel-enrich` entry point
-remains as a compatibility shim that proxies to the split CLIs.
+The legacy entry points (`codeintel-enrich-pipeline`, `codeintel-enrich-analytics`,
+`codeintel-enrich-overlays`) now delegate to the same Typer application so existing
+automation continues to work, but all functionality is available directly through the
+`codeintel-enrich` CLI.
 
 Add `--dry-run` after the command name to validate discovery/ingest/analytics without
 emitting artifacts. The CLI still logs stage timings and counts, but no files are written
@@ -71,7 +82,7 @@ under `--out`.
 To materialize the `modules.jsonl` data into DuckDB for downstream SQL analysis:
 
 ```bash
-codeintel-enrich-pipeline to-duckdb \
+codeintel-enrich to-duckdb \
   --modules-jsonl build/enrich/modules/modules.jsonl \
   --db build/enrich/enrich.duckdb
 ```

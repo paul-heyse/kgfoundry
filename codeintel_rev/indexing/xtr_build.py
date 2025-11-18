@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
@@ -252,6 +253,7 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
     """
     settings = settings or load_settings()
     paths = resolve_application_paths(settings)
+    fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     catalog = DuckDBCatalog(
         db_path=paths.duckdb_path,
         vectors_dir=paths.vectors_dir,

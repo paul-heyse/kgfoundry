@@ -6,24 +6,56 @@ import os
 from collections.abc import Callable, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.runtime import RuntimeCell
 from codeintel_rev.typing import NDArrayF32
 
+
+class TokenizerProtocol(Protocol):
+    """Callable tokenizer interface used by the in-process embedder."""
+
+    def __call__(self, texts: Sequence[str], **kwargs: object) -> dict[str, Any]: ...
+
+
+class TokensPrompt(Protocol):
+    """Structured prompt container used by vLLM embeddings."""
+
+    prompt_token_ids: list[int]
+
+
+class _EmbeddingOutput(Protocol):
+    embedding: Sequence[float]
+
+
+class _EmbeddingResult(Protocol):
+    outputs: _EmbeddingOutput
+
+
+class LLM(Protocol):
+    """Interface for the vLLM embedding runtime."""
+
+    def embed(self, prompts: Sequence[TokensPrompt]) -> Sequence[_EmbeddingResult]: ...
+    def shutdown(self) -> None: ...
+
+
+class PoolerConfig(Protocol):
+    """Structured pooler configuration for vLLM."""
+
+    def __init__(self, **kwargs: object) -> None: ...
+
+
 if TYPE_CHECKING:
     import numpy as np
-    import transformers
-    import vllm
-    import vllm.config as vllm_config
-    import vllm.inputs as vllm_inputs
-    from transformers import PreTrainedTokenizerBase
-    from vllm import LLM
-    from vllm.config import PoolerConfig
-    from vllm.inputs import TokensPrompt
 
     from codeintel_rev.config.settings import VLLMConfig
+
+    transformers = cast("Any", None)
+    vllm = cast("Any", None)
+    vllm_config = cast("Any", None)
+    vllm_inputs = cast("Any", None)
+
 else:  # pragma: no cover - runtime imports
     try:
         import numpy as np
@@ -51,7 +83,7 @@ class _InprocessVLLMRuntime:
     __slots__ = ("engine", "tokenizer")
 
     def __init__(self) -> None:
-        self.tokenizer: PreTrainedTokenizerBase | None = None
+        self.tokenizer: TokenizerProtocol | None = None
         self.engine: LLM | None = None
 
     def close(self) -> None:  # pragma: no cover - exercised during shutdown
@@ -69,7 +101,7 @@ class _InprocessVLLMRuntime:
 class InprocessVLLMContext:
     """Dependency providers for in-process vLLM embeddings."""
 
-    tokenizer_factory: Callable[[str], PreTrainedTokenizerBase]
+    tokenizer_factory: Callable[[str], TokenizerProtocol]
     llm_factory: Callable[[VLLMConfig], LLM]
     tokens_prompt_factory: Callable[[Sequence[int]], TokensPrompt]
 
@@ -83,18 +115,18 @@ class InprocessVLLMContext:
             Context configured with real tokenizer/LLM factories.
         """
 
-        def _tokenizer(model_id: str) -> PreTrainedTokenizerBase:
+        def _tokenizer(model_id: str) -> TokenizerProtocol:
             transformers_mod = cast("Any", transformers)
             tokenizer = transformers_mod.AutoTokenizer.from_pretrained(
                 model_id,
                 trust_remote_code=True,
             )
-            return cast("PreTrainedTokenizerBase", tokenizer)
+            return cast("TokenizerProtocol", tokenizer)
 
         def _llm(cfg: VLLMConfig) -> LLM:
-            llm_cls = cast("type[LLM]", vllm.LLM)
-            pooler_config_cls = cast("type[PoolerConfig]", vllm_config.PoolerConfig)
-            return llm_cls(
+            llm_cls = cast("type[Any]", vllm.LLM)
+            pooler_config_cls = cast("type[Any]", vllm_config.PoolerConfig)
+            instance = llm_cls(
                 model=cfg.model,
                 trust_remote_code=True,
                 enforce_eager=True,
@@ -102,10 +134,12 @@ class InprocessVLLMContext:
                 max_num_batched_tokens=cfg.max_num_batched_tokens,
                 override_pooler_config=pooler_config_cls(**cfg.pooler_kwargs()),
             )
+            return cast("LLM", instance)
 
         def _tokens_prompt(token_ids: Sequence[int]) -> TokensPrompt:
-            tokens_prompt_cls = cast("type[TokensPrompt]", vllm_inputs.TokensPrompt)
-            return tokens_prompt_cls(prompt_token_ids=list(map(int, token_ids)))
+            tokens_prompt_cls = cast("type[Any]", vllm_inputs.TokensPrompt)
+            prompt = tokens_prompt_cls(prompt_token_ids=list(map(int, token_ids)))
+            return cast("TokensPrompt", prompt)
 
         return cls(
             tokenizer_factory=_tokenizer,

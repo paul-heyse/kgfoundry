@@ -10,7 +10,7 @@ from codeintel_rev.retrieval.types import SearchHit
 
 if TYPE_CHECKING:
     from codeintel_rev.app.capabilities import Capabilities
-    from codeintel_rev.app.config_context import ResolvedPaths
+    from codeintel_rev.config.paths import ResolvedPaths
     from codeintel_rev.config.settings import Settings
 else:  # pragma: no cover - runtime values supplied by the app context
     Capabilities = Any

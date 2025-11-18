@@ -263,17 +263,13 @@ class RuntimeCell[T]:
         generation numbers to detect stale values. Time complexity: O(1) when cached,
         O(init_time) when initialization is needed.
 
-        Exception Re-raising:
-            When a cooldown period is active after a previous initialization failure,
-            the original exception (e.g., RuntimeError, OSError, ImportError) is
-            re-raised via ``raise cooldown_error`` (where ``cooldown_error`` is a
-            variable containing the previous exception). The exception type matches
-            the original failure and is preserved from the previous initialization
-            attempt. Any exception type from the previous failure can be re-raised
-            this way. Callers should handle this to implement retry logic with
-            backoff. Additionally, exceptions raised by the factory function
-            during initialization are re-raised to preserve the original exception
-            type and stack trace.
+        When a cooldown period is active after a previous initialization failure,
+        the original exception from the previous attempt is re-raised via
+        ``raise cooldown_error``. The exception type matches the original failure
+        (could be RuntimeError, OSError, ImportError, or any other BaseException).
+        Callers should handle this to implement retry logic with backoff. Additionally,
+        exceptions raised by the factory function during initialization are re-raised
+        to preserve the original exception type and stack trace.
         """
         adjusted_factory = self._adjust_factory(factory)
         deadline = time.monotonic() + (self._wait_timeout_s or 0)
@@ -360,18 +356,15 @@ class RuntimeCell[T]:
         Notes
         -----
         When ``silent`` is ``False`` the payload's ``close`` or cleanup hooks are invoked
-        without suppression so AttributeError/OSError/RuntimeError bubble up directly.
-        The default ``silent=True`` mode catches and swallows those exceptions.
+        without suppression so exceptions bubble up directly. The default ``silent=True``
+        mode catches and swallows all exceptions.
 
-        Exception Re-raising:
-            When ``silent=False`` and an unexpected exception occurs during payload
-            disposal (not AttributeError, OSError, or RuntimeError), it is re-raised
-            via ``raise exc`` (where ``exc`` is a variable containing the caught exception)
-            to preserve the original exception type and stack trace. This defensive
-            catch-all ensures all exceptions propagate correctly when silent mode
-            is disabled. Any exception type not explicitly handled (AttributeError,
-            OSError, RuntimeError) can be re-raised this way, though the specific
-            exception type is determined by the payload being closed.
+        When ``silent=False`` and an unexpected exception occurs during payload disposal
+        (not AttributeError, OSError, or RuntimeError), it is re-raised via ``raise exc``
+        to preserve the original exception type and stack trace. This defensive catch-all
+        ensures all exceptions propagate correctly when silent mode is disabled. The
+        specific exception type is determined by the payload being closed and can be
+        any Exception subclass.
         """
         with self._condition:
             current = self._value

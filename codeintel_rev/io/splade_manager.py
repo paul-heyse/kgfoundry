@@ -53,10 +53,13 @@ if TYPE_CHECKING:
         def encode_document(self, sentences: Sequence[str]) -> Sequence[object]:
             """Encode document texts into sparse vector embeddings.
 
+            Extended Summary
+            ----------------
             This method processes a batch of document texts and produces sparse
             vector embeddings suitable for retrieval. The embeddings are typically
             high-dimensional sparse vectors where each dimension corresponds to a
             vocabulary token and the value represents the token's importance weight.
+            The embeddings produced are optimized for document indexing and retrieval.
 
             Parameters
             ----------
@@ -65,14 +68,20 @@ if TYPE_CHECKING:
                 document from the corpus. The encoder processes the batch together
                 for efficiency.
 
+            Returns
+            -------
+            Sequence[object]
+                Sparse vector embeddings for the input documents. The exact type
+                depends on the encoder implementation (typically numpy arrays or
+                PyTorch tensors). Each embedding represents one input document and
+                can be decoded into token-weight pairs using decode(). This protocol
+                method raises NotImplementedError and must be implemented by concrete
+                classes.
+
             Raises
             ------
             NotImplementedError
                 This is a protocol stub method that must be implemented by concrete classes.
-                When implemented, returns Sequence[object] sparse vector embeddings for the
-                input documents. The exact type depends on the encoder implementation
-                (typically numpy arrays or PyTorch tensors). Each embedding represents one
-                input document and can be decoded into token-weight pairs using decode().
 
             Notes
             -----
@@ -88,6 +97,8 @@ if TYPE_CHECKING:
         def encode_query(self, queries: Sequence[str]) -> Sequence[object]:
             """Encode query texts into sparse vector embeddings.
 
+            Extended Summary
+            ----------------
             This method processes a batch of query texts and produces sparse
             vector embeddings optimized for query-time retrieval. Query embeddings
             are designed to match against document embeddings produced by
@@ -99,14 +110,20 @@ if TYPE_CHECKING:
                 Batch of query texts to encode. Each string represents one search
                 query. The encoder processes the batch together for efficiency.
 
+            Returns
+            -------
+            Sequence[object]
+                Sparse vector embeddings for the input queries. The exact type
+                depends on the encoder implementation (typically numpy arrays or
+                PyTorch tensors). Each embedding represents one input query and
+                can be decoded into token-weight pairs using decode(). This protocol
+                method raises NotImplementedError and must be implemented by concrete
+                classes.
+
             Raises
             ------
             NotImplementedError
                 This is a protocol stub method that must be implemented by concrete classes.
-                When implemented, returns Sequence[object] sparse vector embeddings for the
-                input queries. The exact type depends on the encoder implementation
-                (typically numpy arrays or PyTorch tensors). Each embedding represents one
-                input query and can be decoded into token-weight pairs using decode().
 
             Notes
             -----
@@ -125,10 +142,15 @@ if TYPE_CHECKING:
         ) -> Sequence[Sequence[tuple[str, float]]]:
             """Decode sparse vector embeddings into token-weight pairs.
 
+            Extended Summary
+            ----------------
             This method converts sparse vector embeddings back into human-readable
             token-weight pairs. Each embedding is decoded into a sequence of
             (token, weight) tuples representing the most important tokens and their
-            relevance scores. Optionally filters to top-k tokens by weight.
+            relevance scores. Optionally filters to top-k tokens by weight. The decode
+            operation is typically used for inspecting which tokens contribute most to
+            an embedding, converting embeddings to quantized token dictionaries for
+            indexing, and debugging model behavior.
 
             Parameters
             ----------
@@ -142,15 +164,20 @@ if TYPE_CHECKING:
                 returns all non-zero tokens. If specified, returns only the
                 top-k tokens by weight (descending order). Defaults to None.
 
+            Returns
+            -------
+            Sequence[Sequence[tuple[str, float]]]
+                Decoded token-weight pairs for each input embedding. Outer sequence
+                has one entry per input embedding. Inner sequence contains (token, weight)
+                tuples sorted by weight (descending). Tokens are vocabulary strings;
+                weights are floating-point relevance scores (typically non-negative,
+                higher is more relevant). This protocol method raises NotImplementedError
+                and must be implemented by concrete classes.
+
             Raises
             ------
             NotImplementedError
                 This is a protocol stub method that must be implemented by concrete classes.
-                When implemented, returns Sequence[Sequence[tuple[str, float]]] decoded
-                token-weight pairs for each input embedding. Outer sequence has one entry
-                per input embedding. Inner sequence contains (token, weight) tuples sorted
-                by weight (descending). Tokens are vocabulary strings; weights are
-                floating-point relevance scores (typically non-negative, higher is more relevant).
 
             Notes
             -----

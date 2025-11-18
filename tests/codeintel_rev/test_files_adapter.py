@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from codeintel_rev.app.config_context import ResolvedPaths
+from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.errors import (
     FileReadError,
     InvalidLineRangeError,
@@ -22,6 +22,7 @@ from codeintel_rev.mcp_server.adapters.files import list_paths, open_file
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from tests._helpers import assertions
+from tests._helpers.settings import build_settings_for_repo
 
 
 @pytest.fixture
@@ -51,20 +52,10 @@ def mock_context(tmp_path: Path) -> Mock:
     (repo_root / "tests" / "test_main.py").write_text("def test_main():\n    assert True\n")
     (repo_root / "README.md").write_text("# Documentation\n")
 
-    paths = ResolvedPaths(
-        repo_root=repo_root,
-        data_dir=repo_root / "data",
-        vectors_dir=repo_root / "data" / "vectors",
-        faiss_index=repo_root / "data" / "faiss" / "code.ivfpq.faiss",
-        faiss_idmap_path=repo_root / "data" / "faiss" / "faiss_idmap.parquet",
-        duckdb_path=repo_root / "data" / "catalog.duckdb",
-        scip_index=repo_root / "index.scip",
-        coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
-        coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
-        warp_index_dir=repo_root / "indexes" / "warp_xtr",
-        xtr_dir=repo_root / "data" / "xtr",
-    )
-    context.paths = paths
+    settings = build_settings_for_repo(repo_root)
+    context.paths = resolve_application_paths(settings)
+    context.settings = Mock()
+    context.settings.paths = settings.paths
 
     return context
 

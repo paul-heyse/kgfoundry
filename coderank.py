@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import typer
+from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
@@ -28,6 +29,7 @@ def build_index() -> None:
     """
     settings: Settings = load_settings()
     paths = resolve_application_paths(settings)
+    fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     cfg = settings.coderank
 
     embedder = CodeRankEmbedder(settings=cfg)

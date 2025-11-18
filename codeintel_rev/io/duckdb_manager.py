@@ -58,7 +58,9 @@ class DuckDBConfig:
 class DuckDBConnector(Protocol):
     """Callable protocol describing DuckDB connection factories."""
 
-    def __call__(self, database: str, *, read_only: bool) -> duckdb.DuckDBPyConnection:  # pragma: no cover - protocol
+    def __call__(
+        self, database: str, *, read_only: bool
+    ) -> duckdb.DuckDBPyConnection:  # pragma: no cover - protocol
         ...
 
 
