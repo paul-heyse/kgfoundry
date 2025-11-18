@@ -395,7 +395,7 @@ def handle_adapter_errors(
         @wraps(func)
         def wrapper(*args: object, **kwargs: object) -> dict:
             try:
-                return func(*args, **kwargs)  # type: ignore[return-value]
+                return func(*args, **kwargs)
             except (KeyboardInterrupt, SystemExit, GeneratorExit):
                 # Re-raise system-level exceptions - these should propagate
                 raise

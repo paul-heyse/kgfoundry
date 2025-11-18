@@ -1,4 +1,3 @@
-# ruff: noqa: D103,S101
 """Tests covering the DuckDB DAO helpers."""
 
 import hashlib
@@ -16,6 +15,8 @@ from codeintel_rev.io.duckdb_dao import (
     relation_exists,
 )
 
+from tests._helpers import assertions
+
 
 def _write_parquet(path: Path, select_sql: str) -> None:
     conn = duckdb.connect(database=":memory:")
@@ -29,10 +30,23 @@ def _write_parquet(path: Path, select_sql: str) -> None:
 
 
 def _parquet_checksum(path: Path) -> str:
+    """Compute SHA256 checksum of a Parquet file.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the Parquet file.
+
+    Returns
+    -------
+    str
+        Hexadecimal SHA256 checksum string.
+    """
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_ensure_chunks_creates_view(tmp_path: Path) -> None:
+    """Verify that ensure_chunks creates a view when materialize is False."""
     parquet = tmp_path / "chunks.parquet"
     _write_parquet(
         parquet,
@@ -56,21 +70,23 @@ def test_ensure_chunks_creates_view(tmp_path: Path) -> None:
             materialize=False,
             parquet_exists=True,
         )
-        assert relation_exists(conn, "chunks")
+        assertions.expect_true(relation_exists(conn, "chunks"))
     finally:
         conn.close()
 
 
 def test_ensure_faiss_idmap_view_falls_back() -> None:
+    """Verify that ensure_faiss_idmap_view creates empty view when idmap_parquet is None."""
     conn = duckdb.connect(database=":memory:")
     try:
         ensure_faiss_idmap_view(conn, idmap_parquet=None)
-        assert relation_exists(conn, "faiss_idmap")
+        assertions.expect_true(relation_exists(conn, "faiss_idmap"))
     finally:
         conn.close()
 
 
 def test_materialize_and_refresh(tmp_path: Path) -> None:
+    """Verify materialization and refresh logic for chunks and ID map views."""
     conn = duckdb.connect(database=":memory:")
     chunk_path = tmp_path / "chunks.parquet"
     idmap_path = tmp_path / "idmap.parquet"
@@ -108,23 +124,24 @@ def test_materialize_and_refresh(tmp_path: Path) -> None:
             idmap_parquet=idmap_path,
             checksum=checksum,
         )
-        assert meta.rows == 1
-        assert meta.refreshed
+        assertions.expect_equal(meta.rows, 1)
+        assertions.expect_true(meta.refreshed)
 
         second = refresh_faiss_idmap_materialized(
             conn,
             idmap_parquet=idmap_path,
             checksum=checksum,
         )
-        assert not second.refreshed
+        assertions.expect_false(second.refreshed)
 
         rows = materialize_v_faiss_join(conn)
-        assert rows == 1
+        assertions.expect_equal(rows, 1)
     finally:
         conn.close()
 
 
 def test_query_builder_options() -> None:
+    """Verify that DuckDBQueryBuilder respects DuckDBQueryOptions filters."""
     builder = DuckDBQueryBuilder()
     options = DuckDBQueryOptions(
         include_globs=["src/**"],
@@ -132,5 +149,5 @@ def test_query_builder_options() -> None:
         preserve_order=True,
     )
     sql, params = builder.build_filter_query(chunk_ids=[1], options=options)
-    assert "ORDER BY ids.position" in sql
-    assert params["ids"] == [1]
+    assertions.expect_in("ORDER BY ids.position", sql)
+    assertions.expect_equal(params["ids"], [1])

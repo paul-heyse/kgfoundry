@@ -199,6 +199,7 @@ class FAISSManager:
         self.hnsw_ef_search = opts.hnsw_ef_search
         self.refine_k_factor = opts.refine_k_factor
         self.autotune_on_start = opts.autotune_on_start
+        self.faiss_family: str | None = opts.faiss_family
 
         # Live indexes
         self.cpu_index: FaissIndex | None = None
@@ -245,6 +246,7 @@ class FAISSManager:
         self.cpu_index = index
         self.secondary_index = None
         self.incremental_ids.clear()
+        self.faiss_family = resolved_family
         self._faiss_factory = factory
         self._vector_count = int(vectors.shape[0])
         self._write_meta_snapshot(vector_count=self._vector_count, factory=factory)
@@ -330,6 +332,7 @@ class FAISSManager:
         self.cpu_index = builder_load_index(self.index_path)
         self.secondary_index = None
         self.incremental_ids.clear()
+        self.faiss_family = self.runtime_opts.faiss_family
         if export_idmap is not None:
             self.export_idmap(export_idmap)
         self._sync_runtime_from_meta()
@@ -384,7 +387,7 @@ class FAISSManager:
         *,
         nprobe: int | None = None,
         runtime: SearchRuntimeOverrides | None = None,
-        catalog: DuckDBCatalog | None = None,
+        catalog: object | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Execute dual-index search with optional exact rerank.
 
@@ -409,6 +412,7 @@ class FAISSManager:
         if runtime is not None and runtime.k_factor is not None:
             k_factor = runtime.k_factor
 
+        catalog_obj = cast("DuckDBCatalog | None", catalog)
         return runtime_search_dual(
             primary=self.cpu_index,
             secondary=self.secondary_index,
@@ -416,7 +420,7 @@ class FAISSManager:
             k=eff_k,
             nprobe=eff_nprobe,
             refine_k_factor=k_factor,
-            catalog=catalog,
+            catalog=catalog_obj,
         )
 
     def search_with_refine(
@@ -555,6 +559,7 @@ class FAISSManager:
         """Mutable runtime override dictionary."""
         return self._runtime_overrides
 
+
     def autotune(
         self,
         queries: NDArrayF32,
@@ -602,16 +607,12 @@ class FAISSManager:
             )
             recall = estimate_recall(cand_ids, truth_ids)
             if recall > best_recall or (recall == best_recall and latency_ms < best_latency):
-                overrides, normalized = self._parse_parameter_string(param_str)
-                profile = {
-                    "param_str": normalized,
-                    "recall_at_k": recall,
-                    "latency_ms": latency_ms,
-                    "k": k,
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "refine_k_factor": self.refine_k_factor,
-                }
-                profile.update(dict(overrides))
+                profile = self._build_autotune_profile(
+                    param_str=param_str,
+                    recall=recall,
+                    latency_ms=latency_ms,
+                    k=k,
+                )
                 best_profile = profile
                 best_recall = recall
                 best_latency = latency_ms
@@ -780,6 +781,33 @@ class FAISSManager:
             "quantizer_efSearch": self._runtime_overrides.get("quantizer_efSearch"),
             "k_factor": self._runtime_overrides.get("k_factor", self.refine_k_factor),
         }
+
+    def _build_autotune_profile(
+        self,
+        *,
+        param_str: str,
+        recall: float,
+        latency_ms: float,
+        k: int,
+    ) -> dict[str, object]:
+        """Compose the persisted profile metadata for an autotune candidate.
+
+        Returns
+        -------
+        dict[str, object]
+            Profile dictionary persisted to disk for the candidate sweep value.
+        """
+        overrides, normalized = self._parse_parameter_string(param_str)
+        profile: dict[str, object] = {
+            "param_str": normalized,
+            "recall_at_k": recall,
+            "latency_ms": latency_ms,
+            "k": k,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "refine_k_factor": self.refine_k_factor,
+        }
+        profile.update(dict(overrides))
+        return profile
 
     def _normalize_runtime_payload(
         self,

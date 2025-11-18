@@ -44,6 +44,28 @@ def _warn_vllm_task_deprecated(_: str) -> None:
 
 @dataclass(frozen=True)
 class _HybridChannelSettings:
+    """Internal settings container for hybrid retrieval channel configuration.
+
+    This dataclass holds configuration for hybrid retrieval channels (BM25 and SPLADE),
+    including enable flags and BM25 tuning parameters. Used internally during settings
+    construction to pass channel configuration between builder functions.
+
+    Attributes
+    ----------
+    bm25_enabled : bool
+        Flag indicating whether the BM25 channel is enabled in hybrid retrieval.
+        When True, BM25 search results are included in RRF fusion.
+    splade_enabled : bool
+        Flag indicating whether the SPLADE channel is enabled in hybrid retrieval.
+        When True, SPLADE search results are included in RRF fusion.
+    bm25_k1 : float
+        BM25 k1 parameter controlling term frequency saturation. Higher values
+        increase the impact of term frequency on scores. Defaults to 0.9.
+    bm25_b : float
+        BM25 b parameter controlling length normalization. Higher values increase
+        the penalty for longer documents. Defaults to 0.4.
+    """
+
     bm25_enabled: bool
     splade_enabled: bool
     bm25_k1: float
@@ -198,6 +220,26 @@ def _optional_int(raw: str | None) -> int | None:
 
 
 def _build_vllm_config() -> VLLMConfig:
+    """Build VLLM configuration from environment variables.
+
+    This function constructs a VLLMConfig instance by reading environment variables
+    and applying defaults. The function handles deprecated VLLM_TASK configuration
+    and emits warnings when legacy settings are detected.
+
+    Returns
+    -------
+    VLLMConfig
+        Configured VLLM config instance with connection details, model selection,
+        batching parameters, and runtime mode. All values are read from environment
+        variables with sensible defaults for local development.
+
+    Notes
+    -----
+    VLLM configuration enables embedding generation via vLLM service. The function
+    supports both HTTP and in-process execution modes, with HTTP mode for remote
+    services and in-process mode for local development. Deprecated VLLM_TASK
+    configuration is handled with warnings to support migration to embedding_mode.
+    """
     run_mode_env = os.environ.get("VLLM_RUN_MODE", "inprocess").lower()
     run_mode = VLLMRunMode(mode="http" if run_mode_env == "http" else "inprocess")
     pooling_env = os.environ.get("VLLM_POOLING_TYPE", "last")
@@ -229,6 +271,27 @@ def _build_vllm_config() -> VLLMConfig:
 
 
 def _build_embeddings_config() -> EmbeddingsConfig:
+    """Build embeddings configuration from environment variables.
+
+    This function constructs an EmbeddingsConfig instance by reading environment
+    variables and applying defaults. The function handles provider selection,
+    batch sizing, normalization, and retry configuration.
+
+    Returns
+    -------
+    EmbeddingsConfig
+        Configured embeddings config instance with provider selection, model name,
+        device, batch sizes, normalization, token limits, and retry settings. All
+        values are read from environment variables with sensible defaults.
+
+    Notes
+    -----
+    Embeddings configuration enables runtime-agnostic embedding generation via
+    multiple provider backends (vLLM, Hugging Face). The function computes
+    micro_batch_size as a fraction of batch_size to enable efficient batching
+    for small requests. Normalization defaults are inherited from VLLM settings
+    for backward compatibility.
+    """
     provider_env = os.environ.get("EMBED_PROVIDER", "vllm").strip().lower()
     provider: Literal["vllm", "hf"] = "hf" if provider_env == "hf" else "vllm"
     model_name = os.environ.get(
@@ -266,6 +329,26 @@ def _build_embeddings_config() -> EmbeddingsConfig:
 
 
 def _build_xtr_config() -> XTRConfig:
+    """Build XTR configuration from environment variables.
+
+    This function constructs an XTRConfig instance by reading environment variables
+    and applying defaults. The function handles dtype selection, mode selection,
+    and enable flag parsing.
+
+    Returns
+    -------
+    XTRConfig
+        Configured XTR config instance with model ID, device, token limits,
+        candidate K, dimension, dtype, enable flag, and mode. All values are
+        read from environment variables with sensible defaults.
+
+    Notes
+    -----
+    XTR configuration enables token-level late-interaction rescoring. The function
+    supports both "narrow" and "wide" modes, with narrow mode for focused rescoring
+    and wide mode for broader candidate evaluation. Dtype defaults to float16 for
+    memory efficiency but can be overridden to float32 for precision.
+    """
     dtype_env = (os.environ.get("XTR_DTYPE") or "float16").lower()
     mode_env = os.environ.get("XTR_MODE", "narrow").lower()
     mode: Literal["narrow", "wide"] = "wide" if mode_env == "wide" else "narrow"
@@ -282,6 +365,26 @@ def _build_xtr_config() -> XTRConfig:
 
 
 def _build_rerank_config() -> RerankConfig:
+    """Build rerank configuration from environment variables.
+
+    This function constructs a RerankConfig instance by reading environment
+    variables and applying defaults. The function currently only supports XTR
+    as a reranking provider.
+
+    Returns
+    -------
+    RerankConfig
+        Configured rerank config instance with enabled flag, top_k limit,
+        provider selection, and explain flag. All values are read from
+        environment variables with sensible defaults.
+
+    Notes
+    -----
+    Rerank configuration enables late-interaction reranking of search results.
+    The function currently only supports XTR as a provider, with other providers
+    defaulting to XTR. The explain flag enables detailed scoring explanations
+    for debugging and analysis.
+    """
     provider = os.environ.get("RERANK_PROVIDER", "xtr").lower()
     provider_literal: Literal["xtr"] = "xtr"
     return RerankConfig(
@@ -1245,6 +1348,34 @@ def load_settings() -> Settings:
 
 
 def _build_paths_config(repo_root: str) -> PathsConfig:
+    """Build paths configuration from environment variables.
+
+    This function constructs a PathsConfig instance by reading environment variables
+    and applying defaults. All paths are resolved relative to repo_root when
+    relative paths are provided.
+
+    Parameters
+    ----------
+    repo_root : str
+        Repository root directory path. Used as the base for resolving relative
+        paths. Typically set via REPO_ROOT environment variable or defaults to
+        current working directory.
+
+    Returns
+    -------
+    PathsConfig
+        Configured paths config instance with all file system paths for data
+        storage, indexes, vectors, databases, and source code locations. All
+        paths are read from environment variables with sensible defaults relative
+        to repo_root.
+
+    Notes
+    -----
+    Paths configuration centralizes all file system paths used by the code
+    intelligence system. The function supports both relative and absolute paths,
+    with relative paths resolved relative to repo_root. This enables flexible
+    deployment configurations while maintaining sensible defaults for development.
+    """
     return PathsConfig(
         repo_root=repo_root,
         data_dir=os.environ.get("DATA_DIR", "data"),
@@ -1266,6 +1397,27 @@ def _build_paths_config(repo_root: str) -> PathsConfig:
 
 
 def _load_rrf_weights() -> dict[str, float]:
+    """Load RRF fusion weights from environment variable.
+
+    This function loads Reciprocal Rank Fusion (RRF) weights from the
+    RRF_WEIGHTS_JSON environment variable, falling back to default weights
+    if not provided or invalid. The function validates JSON format and
+    type conversions, gracefully handling errors.
+
+    Returns
+    -------
+    dict[str, float]
+        Dictionary mapping channel names to RRF weights. Defaults to
+        DEFAULT_RRF_WEIGHTS if RRF_WEIGHTS_JSON is not set or invalid.
+        Only valid channel-weight pairs are included in the result.
+
+    Notes
+    -----
+    RRF weights control the relative importance of different retrieval channels
+    (semantic, BM25, SPLADE, WARP) in hybrid search fusion. The function loads
+    weights from JSON format, enabling flexible configuration without code changes.
+    Invalid entries are skipped, ensuring robust operation even with malformed input.
+    """
     weights = dict(DEFAULT_RRF_WEIGHTS)
     payload = os.environ.get("RRF_WEIGHTS_JSON")
     if not payload:
@@ -1287,6 +1439,27 @@ def _load_rrf_weights() -> dict[str, float]:
 
 
 def _load_hybrid_prefetch() -> dict[str, int]:
+    """Load hybrid retrieval prefetch limits from environment variable.
+
+    This function loads prefetch limits for hybrid retrieval channels from the
+    HYBRID_PREFETCH_JSON environment variable, falling back to default limits
+    if not provided or invalid. Prefetch limits control how many candidates
+    each channel retrieves before RRF fusion.
+
+    Returns
+    -------
+    dict[str, int]
+        Dictionary mapping channel names to prefetch limits. Defaults to
+        {"semantic": 200, "bm25": 200, "splade": 200} if HYBRID_PREFETCH_JSON
+        is not set or invalid. Only valid channel-limit pairs are included.
+
+    Notes
+    -----
+    Prefetch limits enable fine-grained control over hybrid retrieval fan-out
+    by specifying how many candidates each channel should retrieve before fusion.
+    Higher limits improve recall but increase latency and memory usage. The
+    function loads limits from JSON format, enabling flexible configuration.
+    """
     default_prefetch = {"semantic": 200, "bm25": 200, "splade": 200}
     payload = os.environ.get("HYBRID_PREFETCH_JSON")
     if not payload:
@@ -1308,6 +1481,27 @@ def _load_hybrid_prefetch() -> dict[str, int]:
 
 
 def _load_hybrid_weights_override() -> dict[str, float]:
+    """Load hybrid retrieval weight overrides from environment variable.
+
+    This function loads weight overrides for hybrid retrieval channels from the
+    HYBRID_WEIGHTS_OVERRIDE_JSON environment variable, returning an empty dictionary
+    if not provided or invalid. Weight overrides replace default RRF weights for
+    specific channels.
+
+    Returns
+    -------
+    dict[str, float]
+        Dictionary mapping channel names to weight overrides. Returns empty
+        dictionary if HYBRID_WEIGHTS_OVERRIDE_JSON is not set or invalid.
+        Only valid channel-weight pairs are included in the result.
+
+    Notes
+    -----
+    Weight overrides enable runtime adjustment of RRF fusion weights without
+    modifying default configuration. Overrides take precedence over default
+    weights, enabling fine-tuning for specific use cases or deployments. The
+    function loads overrides from JSON format, gracefully handling errors.
+    """
     payload = os.environ.get("HYBRID_WEIGHTS_OVERRIDE_JSON")
     if not payload:
         return {}
@@ -1327,6 +1521,28 @@ def _load_hybrid_weights_override() -> dict[str, float]:
 
 
 def _build_prf_config() -> PRFConfig:
+    """Build pseudo-relevance feedback (PRF/RM3) configuration from environment variables.
+
+    This function constructs a PRFConfig instance by reading environment variables
+    and applying defaults. PRF configuration controls query expansion behavior
+    for BM25 search, enabling automatic query refinement based on top results.
+
+    Returns
+    -------
+    PRFConfig
+        Configured PRF config instance with enable flag, feedback document/term
+        counts, original query weight, short query handling, and optional regex/CSV
+        overrides. All values are read from environment variables with sensible
+        defaults.
+
+    Notes
+    -----
+    PRF configuration enables automatic query expansion for BM25 search by
+    analyzing top results and extracting relevant terms. The function supports
+    both automatic PRF (based on query characteristics) and manual configuration
+    via regex patterns and CSV term lists. Defaults favor automatic PRF with
+    conservative expansion parameters.
+    """
     return PRFConfig(
         enable_auto=_env_bool("BM25_PRF_ENABLE_AUTO", default=True),
         fb_docs=int(os.environ.get("BM25_PRF_FB_DOCS", "10")),
@@ -1339,6 +1555,28 @@ def _build_prf_config() -> PRFConfig:
 
 
 def _load_hybrid_channel_settings() -> _HybridChannelSettings:
+    """Load hybrid retrieval channel settings from environment variables.
+
+    This function constructs a _HybridChannelSettings instance by reading
+    environment variables for channel enable flags and BM25 parameters. The
+    settings are used to configure hybrid retrieval channels during index
+    configuration.
+
+    Returns
+    -------
+    _HybridChannelSettings
+        Channel settings instance with BM25 and SPLADE enable flags, and BM25
+        tuning parameters (k1, b). All values are read from environment
+        variables with sensible defaults (channels enabled, k1=0.9, b=0.4).
+
+    Notes
+    -----
+    Channel settings enable fine-grained control over hybrid retrieval channels
+    by allowing individual channels to be enabled or disabled. BM25 parameters
+    are loaded here to ensure consistency between channel configuration and
+    BM25-specific settings. Defaults favor enabling both channels for maximum
+    retrieval coverage.
+    """
     return _HybridChannelSettings(
         bm25_enabled=_env_bool("HYBRID_ENABLE_BM25", default=True),
         splade_enabled=_env_bool("HYBRID_ENABLE_SPLADE", default=True),
@@ -1355,6 +1593,47 @@ def _build_index_config(
     prf_config: PRFConfig,
     channel_settings: _HybridChannelSettings,
 ) -> IndexConfig:
+    """Build index configuration from environment variables and parameters.
+
+    This function constructs an IndexConfig instance by reading environment
+    variables and combining them with pre-loaded configuration (RRF weights,
+    prefetch limits, PRF config, channel settings). The function handles
+    both legacy FAISS parameters and modern FAISS family configuration.
+
+    Parameters
+    ----------
+    rrf_weights : dict[str, float]
+        RRF fusion weights for hybrid retrieval channels. Used to configure
+        relative importance of semantic, BM25, SPLADE, and WARP channels.
+    hybrid_prefetch : dict[str, int]
+        Prefetch limits for hybrid retrieval channels. Controls how many
+        candidates each channel retrieves before RRF fusion.
+    hybrid_weights_override : dict[str, float]
+        Weight overrides for hybrid retrieval channels. Takes precedence over
+        default RRF weights for fine-tuning.
+    prf_config : PRFConfig
+        Pseudo-relevance feedback configuration for BM25 query expansion.
+        Controls automatic query refinement behavior.
+    channel_settings : _HybridChannelSettings
+        Channel enable flags and BM25 tuning parameters. Used to configure
+        which channels are active and BM25 scoring parameters.
+
+    Returns
+    -------
+    IndexConfig
+        Configured index config instance with chunking parameters, FAISS
+        configuration, BM25 settings, hybrid retrieval parameters, PRF config,
+        and recency boosting settings. All values are read from environment
+        variables with sensible defaults.
+
+    Notes
+    -----
+    Index configuration centralizes all indexing and search algorithm parameters.
+    The function combines environment variable reading with pre-loaded configuration
+    to enable flexible hybrid retrieval setup. Legacy FAISS parameters (faiss_nlist,
+    faiss_nprobe) are supported alongside modern FAISS family configuration for
+    backward compatibility.
+    """
     recency_enabled = _env_bool("INDEX_RECENCY_ENABLED")
     recency_half_life_days = float(os.environ.get("INDEX_RECENCY_HALF_LIFE_DAYS", "30.0"))
     recency_max_boost = float(os.environ.get("INDEX_RECENCY_MAX_BOOST", "0.15"))
@@ -1387,6 +1666,29 @@ def _build_index_config(
 
 
 def _build_server_limits() -> ServerLimits:
+    """Build server resource limits configuration from environment variables.
+
+    This function constructs a ServerLimits instance by reading environment
+    variables and applying defaults. Server limits protect against resource
+    exhaustion and provide basic rate limiting for API access.
+
+    Returns
+    -------
+    ServerLimits
+        Configured server limits instance with max results, query timeout,
+        rate limiting (QPS and burst), and semantic overfetch multiplier.
+        All values are read from environment variables with conservative
+        defaults suitable for production.
+
+    Notes
+    -----
+    Server limits enable resource protection by preventing individual queries
+    from consuming excessive resources and providing basic rate limiting.
+    Defaults are conservative and suitable for production deployments, but
+    can be adjusted based on hardware capabilities and expected load patterns.
+    The semantic overfetch multiplier compensates for scope filtering by
+    fetching additional candidates.
+    """
     return ServerLimits(
         max_results=int(os.environ.get("MAX_RESULTS", "1000")),
         query_timeout_s=float(os.environ.get("QUERY_TIMEOUT_S", "30.0")),
@@ -1397,6 +1699,26 @@ def _build_server_limits() -> ServerLimits:
 
 
 def _build_redis_config() -> RedisConfig:
+    """Build Redis configuration from environment variables.
+
+    This function constructs a RedisConfig instance by reading environment
+    variables and applying defaults. Redis configuration controls scope
+    storage caching with L1 (in-process) and L2 (Redis) cache layers.
+
+    Returns
+    -------
+    RedisConfig
+        Configured Redis config instance with connection URL, L1 cache size
+        and TTL, and L2 cache TTL. All values are read from environment
+        variables with sensible defaults for local development.
+
+    Notes
+    -----
+    Redis configuration enables efficient scope storage by providing two-tier
+    caching: L1 cache (in-process) for fast access and L2 cache (Redis) for
+    distributed access. Defaults favor local development with localhost Redis,
+    but can be configured for production deployments with remote Redis instances.
+    """
     defaults = RedisConfig()
     return RedisConfig(
         url=os.environ.get("REDIS_URL", defaults.url),
@@ -1411,6 +1733,27 @@ def _build_redis_config() -> RedisConfig:
 
 
 def _build_duckdb_config() -> DuckDBConfig:
+    """Build DuckDB configuration from environment variables.
+
+    This function constructs a DuckDBConfig instance by reading environment
+    variables and applying defaults. DuckDB configuration controls connection
+    pooling, threading, object caching, and query logging.
+
+    Returns
+    -------
+    DuckDBConfig
+        Configured DuckDB config instance with thread count, object cache
+        enable flag, query logging flag, and optional connection pool size.
+        All values are read from environment variables with sensible defaults.
+
+    Notes
+    -----
+    DuckDB configuration enables efficient database access by controlling
+    connection pooling, threading, and caching behavior. The function supports
+    optional connection pooling (disabled by default) and enables object cache
+    by default for improved performance. Query logging can be enabled for
+    debugging and performance analysis.
+    """
     defaults = DuckDBConfig()
     pool_env = os.environ.get("DUCKDB_POOL_SIZE")
     pool_size = (
@@ -1427,6 +1770,28 @@ def _build_duckdb_config() -> DuckDBConfig:
 
 
 def _build_eval_config() -> EvalConfig:
+    """Build evaluation configuration from environment variables.
+
+    This function constructs an EvalConfig instance by reading environment
+    variables and applying defaults. Evaluation configuration controls offline
+    recall/coverage evaluation with query sets and oracle reranking.
+
+    Returns
+    -------
+    EvalConfig
+        Configured eval config instance with enable flag, queries path, output
+        directory, K values, max queries limit, oracle top-K, and XTR oracle flag.
+        All values are read from environment variables with sensible defaults.
+
+    Notes
+    -----
+    Evaluation configuration enables offline evaluation of retrieval quality
+    by running queries against indexes and comparing results to ground truth.
+    The function supports optional XTR oracle reranking for more accurate
+    evaluation, and limits evaluation to a maximum number of queries for
+    efficiency. K values specify recall evaluation points (e.g., recall@5,
+    recall@10, recall@20).
+    """
     return EvalConfig(
         enabled=_env_bool("EVAL_ENABLED"),
         queries_path=os.environ.get("EVAL_QUERIES_PATH"),
@@ -1439,6 +1804,32 @@ def _build_eval_config() -> EvalConfig:
 
 
 def _resolve_bm25_analyzer(raw: str | None) -> Literal["code", "standard"]:
+    """Resolve BM25 analyzer type from environment variable.
+
+    This function normalizes BM25 analyzer configuration by parsing the
+    BM25_ANALYZER environment variable and returning a valid analyzer type.
+    The function defaults to "code" analyzer for code-aware tokenization.
+
+    Parameters
+    ----------
+    raw : str | None
+        Raw analyzer string from environment variable. If None or empty,
+        defaults to "code". Valid values are "code" or "standard".
+
+    Returns
+    -------
+    Literal["code", "standard"]
+        Resolved analyzer type. Returns "standard" only if raw value is
+        explicitly "standard", otherwise returns "code".
+
+    Notes
+    -----
+    Analyzer resolution enables flexible BM25 tokenization by supporting
+    both code-aware ("code") and standard ("standard") analyzers. The code
+    analyzer is optimized for source code tokenization, while the standard
+    analyzer uses standard Lucene tokenization. Defaults to code analyzer
+    for better code search results.
+    """
     normalized = (raw or "code").strip().lower()
     if normalized == "standard":
         return "standard"
@@ -1446,6 +1837,33 @@ def _resolve_bm25_analyzer(raw: str | None) -> Literal["code", "standard"]:
 
 
 def _resolve_splade_analyzer(raw: str | None) -> Literal["wordpiece", "code"]:
+    """Resolve SPLADE analyzer type from environment variable.
+
+    This function normalizes SPLADE analyzer configuration by parsing the
+    SPLADE_ANALYZER environment variable and returning a valid analyzer type.
+    The function defaults to "wordpiece" analyzer for standard WordPiece
+    tokenization.
+
+    Parameters
+    ----------
+    raw : str | None
+        Raw analyzer string from environment variable. If None or empty,
+        defaults to "wordpiece". Valid values are "wordpiece" or "code".
+
+    Returns
+    -------
+    Literal["wordpiece", "code"]
+        Resolved analyzer type. Returns "code" only if raw value is
+        explicitly "code", otherwise returns "wordpiece".
+
+    Notes
+    -----
+    Analyzer resolution enables flexible SPLADE tokenization by supporting
+    both WordPiece ("wordpiece") and code-aware ("code") analyzers. The
+    WordPiece analyzer uses standard BERT-style tokenization, while the
+    code analyzer uses code-aware tokenization for better code search.
+    Defaults to WordPiece analyzer for compatibility with SPLADE models.
+    """
     normalized = (raw or "wordpiece").strip().lower()
     if normalized == "code":
         return "code"
@@ -1459,6 +1877,44 @@ def _build_bm25_config(
     bm25_b: float,
     prf_config: PRFConfig,
 ) -> BM25Config:
+    """Build BM25 configuration from environment variables and parameters.
+
+    This function constructs a BM25Config instance by reading environment
+    variables and combining them with pre-loaded configuration (enable flag,
+    BM25 parameters, PRF config). The function handles analyzer resolution,
+    RM3 configuration, and stopword parsing.
+
+    Parameters
+    ----------
+    enabled : bool
+        Flag indicating whether BM25 channel is enabled. Controls whether
+        BM25 search is performed during hybrid retrieval.
+    bm25_k1 : float
+        BM25 k1 parameter for term frequency saturation. Used to configure
+        BM25 scoring behavior.
+    bm25_b : float
+        BM25 b parameter for length normalization. Used to configure BM25
+        scoring behavior.
+    prf_config : PRFConfig
+        Pseudo-relevance feedback configuration. Used to configure RM3
+        query expansion defaults.
+
+    Returns
+    -------
+    BM25Config
+        Configured BM25 config instance with corpus directory, index directory,
+        thread count, enable flag, BM25 parameters, RM3 settings, analyzer type,
+        and stopwords. All values are read from environment variables with
+        sensible defaults.
+
+    Notes
+    -----
+    BM25 configuration enables keyword-based sparse retrieval by configuring
+    Lucene BM25 indexing and search. The function combines environment variable
+    reading with pre-loaded PRF configuration to ensure consistency between
+    BM25 and PRF settings. Analyzer type defaults to "code" for code-aware
+    tokenization, but can be overridden to "standard" for general text search.
+    """
     analyzer_value = _resolve_bm25_analyzer(os.environ.get("BM25_ANALYZER", "code"))
     return BM25Config(
         corpus_json_dir=os.environ.get("BM25_JSONL_DIR", "data/jsonl"),
@@ -1484,6 +1940,34 @@ def _build_bm25_config(
 
 
 def _build_splade_config(*, enabled: bool) -> SpladeConfig:
+    """Build SPLADE configuration from environment variables and parameters.
+
+    This function constructs a SpladeConfig instance by reading environment
+    variables and combining them with the enable flag. The function handles
+    analyzer resolution, model paths, ONNX configuration, and indexing parameters.
+
+    Parameters
+    ----------
+    enabled : bool
+        Flag indicating whether SPLADE channel is enabled. Controls whether
+        SPLADE search is performed during hybrid retrieval.
+
+    Returns
+    -------
+    SpladeConfig
+        Configured SPLADE config instance with model ID, directories, ONNX
+        configuration, indexing parameters, thread count, enable flag, query
+        expansion settings, analyzer type, and pruning parameters. All values
+        are read from environment variables with sensible defaults.
+
+    Notes
+    -----
+    SPLADE configuration enables learned sparse retrieval by configuring SPLADE
+    v3 model artifacts, ONNX execution, and Lucene impact indexing. The function
+    supports both WordPiece and code-aware analyzers, with WordPiece as the
+    default for compatibility with SPLADE models. Query expansion parameters
+    control how many terms are retained and pruned during query processing.
+    """
     analyzer_value = _resolve_splade_analyzer(os.environ.get("SPLADE_ANALYZER", "wordpiece"))
     return SpladeConfig(
         model_id=os.environ.get("SPLADE_MODEL_ID", "naver/splade-v3"),
@@ -1507,6 +1991,28 @@ def _build_splade_config(*, enabled: bool) -> SpladeConfig:
 
 
 def _build_coderank_config() -> CodeRankConfig:
+    """Build CodeRank configuration from environment variables.
+
+    This function constructs a CodeRankConfig instance by reading environment
+    variables and applying defaults. CodeRank configuration controls dense
+    bi-encoder retrieval for Stage-A candidate generation.
+
+    Returns
+    -------
+    CodeRankConfig
+        Configured CodeRank config instance with model ID, trust_remote_code
+        flag, device, batch size, normalization flag, query prefix, top-K limit,
+        budget, and Stage-2 thresholds. All values are read from environment
+        variables with sensible defaults.
+
+    Notes
+    -----
+    CodeRank configuration enables dense bi-encoder retrieval by configuring
+    CodeRankEmbed model for query and document encoding. The function supports
+    both CPU and CUDA devices, with CPU as the default. Stage-2 thresholds
+    control when to skip Stage-B reranking based on confidence margins and
+    candidate counts.
+    """
     return CodeRankConfig(
         model_id=os.environ.get("CODERANK_MODEL_ID", "nomic-ai/CodeRankEmbed"),
         trust_remote_code=_env_bool("CODERANK_TRUST_REMOTE_CODE", default=True),
@@ -1525,6 +2031,27 @@ def _build_coderank_config() -> CodeRankConfig:
 
 
 def _build_warp_config() -> WarpConfig:
+    """Build WARP configuration from environment variables.
+
+    This function constructs a WarpConfig instance by reading environment
+    variables and applying defaults. WARP configuration controls late-interaction
+    reranking using multivector embeddings and XTR indexes.
+
+    Returns
+    -------
+    WarpConfig
+        Configured WARP config instance with index directory, model ID reference,
+        device, top-K limit, enable flag, and budget. All values are read from
+        environment variables with sensible defaults.
+
+    Notes
+    -----
+    WARP configuration enables late-interaction reranking by configuring WARP/XTR
+    index access and execution parameters. The function supports both CPU and CUDA
+    devices, with CPU as the default. WARP is disabled by default and must be
+    explicitly enabled via WARP_ENABLED environment variable. Budget controls
+    latency constraints for WARP execution.
+    """
     return WarpConfig(
         index_dir=os.environ.get("WARP_INDEX_DIR", "indexes/warp_xtr"),
         model_id=os.environ.get("WARP_MODEL_ID", "intfloat/e5-multivector-large"),
@@ -1536,6 +2063,28 @@ def _build_warp_config() -> WarpConfig:
 
 
 def _build_coderank_llm_config() -> CodeRankLLMConfig:
+    """Build CodeRank LLM configuration from environment variables.
+
+    This function constructs a CodeRankLLMConfig instance by reading environment
+    variables and applying defaults. CodeRank LLM configuration controls listwise
+    reranking using a language model for final result ordering.
+
+    Returns
+    -------
+    CodeRankLLMConfig
+        Configured CodeRank LLM config instance with model ID, device, max new
+        tokens, temperature, top-p, enable flag, and budget. All values are read
+        from environment variables with sensible defaults.
+
+    Notes
+    -----
+    CodeRank LLM configuration enables listwise reranking by configuring a
+    language model for final result ordering. The function supports both CPU
+    and CUDA devices, with CPU as the default. Temperature and top-p parameters
+    control generation diversity, with defaults favoring deterministic output
+    (temperature=0.0, top_p=1.0). CodeRank LLM is disabled by default and must
+    be explicitly enabled via CODERANK_LLM_ENABLED environment variable.
+    """
     return CodeRankLLMConfig(
         model_id=os.environ.get("CODERANK_LLM_MODEL_ID", "nomic-ai/CodeRankLLM"),
         device=os.environ.get("CODERANK_LLM_DEVICE", "cpu"),

@@ -85,8 +85,13 @@ MAX_FILE_BYTES_OPTION = typer.Option(
     "--max-file-bytes",
     help="Skip files larger than this many bytes (default: 2MB).",
 )
+_DEFAULT_ENABLE_OWNERS = True
+_DEFAULT_EMIT_SLICES = False
+_DEFAULT_EMIT_AST = True
+_DEFAULT_DRY_RUN = False
+
 OWNERS_OPTION = typer.Option(
-    True,
+    _DEFAULT_ENABLE_OWNERS,
     "--owners/--no-owners",
     help="Compute ownership information prior to exports.",
 )
@@ -101,7 +106,7 @@ COMMITS_WINDOW_OPTION = typer.Option(
     help="Number of commits inspected for ownership.",
 )
 EMIT_SLICES_OPTION = typer.Option(
-    False,
+    _DEFAULT_EMIT_SLICES,
     "--emit-slices/--no-emit-slices",
     help="Emit Markdown slices for tag groups.",
 )
@@ -121,12 +126,12 @@ OVERLAYS_SET_OPTION = typer.Option(
     help="Override overlay option (repeatable KEY=VALUE).",
 )
 EMIT_AST_OPTION = typer.Option(
-    True,
+    _DEFAULT_EMIT_AST,
     "--emit-ast/--no-emit-ast",
     help="Emit AST nodes/metrics alongside exports.",
 )
 DRY_RUN_OPTION = typer.Option(
-    False,
+    _DEFAULT_DRY_RUN,
     "--dry-run",
     help="Run computations and log counts without writing artifacts.",
 )
@@ -198,7 +203,7 @@ def normalize_global_cli_args(argv: Sequence[str]) -> list[str]:
     return [script, *globals_segment, *remaining]
 
 
-def shared_options(
+def shared_options(  # noqa: PLR0913, PLR0917
     # pragma: no cover - Typer wiring
     ctx: typer.Context,
     root: Path = ROOT_OPTION,

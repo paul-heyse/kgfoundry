@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from numbers import Integral, Real
 from time import perf_counter
@@ -31,6 +32,13 @@ except (ImportError, ModuleNotFoundError):  # pragma: no cover - rerank path opt
     exact_rerank = None
 
 _faiss = LazyModule("faiss", "FAISS runtime operations")
+
+
+def _noop_parameter_space(_index: FaissIndex, _params: list[str]) -> bool:
+    return False
+
+
+_PARAMETER_SPACE_APPLIER_REF: list[Callable[[FaissIndex, list[str]], bool]] = [_noop_parameter_space]
 _SEARCH_RESULT_DIM = 2
 
 
@@ -177,7 +185,8 @@ def apply_runtime_parameters(
         ef_search=ef_search,
         quantizer_ef_search=quantizer_ef_search,
     )
-    if params and _set_parameter_space(index, params):
+    applier = _PARAMETER_SPACE_APPLIER_REF[0]
+    if params and applier(index, params):
         return
     _apply_attribute_fallbacks(
         index,
@@ -253,6 +262,22 @@ def _set_parameter_space(index: FaissIndex, params: list[str]) -> bool:
         ps.set_index_parameters(index, ",".join(params))
         return True
     return False
+
+
+_PARAMETER_SPACE_APPLIER_REF[0] = _set_parameter_space
+
+
+@contextmanager
+def override_parameter_application(
+    applier: Callable[[FaissIndex, list[str]], bool] | None,
+) -> Iterator[None]:
+    """Temporarily override the ParameterSpace application helper."""
+    original = _PARAMETER_SPACE_APPLIER_REF[0]
+    _PARAMETER_SPACE_APPLIER_REF[0] = applier or _noop_parameter_space
+    try:
+        yield
+    finally:
+        _PARAMETER_SPACE_APPLIER_REF[0] = original
 
 
 def _assign_attr(target: object, attr: str, value: int | None) -> bool:

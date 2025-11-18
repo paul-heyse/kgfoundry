@@ -364,7 +364,7 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
         populated ``ScanInputs`` objects.
     """
 
-    def build(
+    def build(  # noqa: PLR0913
         *,
         repo_root: Path | None = None,
         scip_index: SCIPIndex | None = None,
@@ -402,7 +402,7 @@ def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., OverlayCont
         Builder for ``OverlayContext`` objects rooted in temporary directories.
     """
 
-    def build(
+    def build(  # noqa: PLR0913
         *,
         repo_root: Path | None = None,
         overlays_root: Path | None = None,

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from types import ModuleType
+
 import numpy as np
 import pytest
 from codeintel_rev.io import faiss_runtime
 
+from kgfoundry_common.typing import override_gate_import
 from tests._helpers import assertions
 
 _PRIMARY_NPROBE = 64
@@ -73,17 +77,21 @@ class _FlatIndexStub(_BaseStubIndex):
 
 
 @pytest.fixture(autouse=True)
-def _skip_parameter_space(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Avoid touching real FAISS by patching parameter space helpers."""
+def _skip_parameter_space() -> Iterator[None]:
+    """Avoid touching real FAISS by overriding gate/parameter helpers.
 
-    def _no_parameter_space(*_args: object, **_kwargs: object) -> bool:
-        return False
-
-    def _fake_gate_import(*_args: object, **_kwargs: object) -> object:
-        return object()
-
-    monkeypatch.setattr(faiss_runtime, "gate_import", _fake_gate_import)
-    monkeypatch.setattr(faiss_runtime, "_set_parameter_space", _no_parameter_space)
+    Yields
+    ------
+    None
+        Fixture yields control to test execution with mocked FAISS module
+        and parameter application overrides active.
+    """
+    fake_faiss = ModuleType("faiss")
+    with (
+        override_gate_import({"faiss": fake_faiss}),
+        faiss_runtime.override_parameter_application(lambda *_args: False),
+    ):
+        yield
 
 
 def test_apply_runtime_parameters_updates_all_supported_attributes() -> None:

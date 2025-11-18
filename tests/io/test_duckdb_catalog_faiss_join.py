@@ -13,6 +13,7 @@ from codeintel_rev.io.duckdb_catalog import (
     ensure_faiss_idmap_view,
     refresh_faiss_idmap_materialized,
 )
+from codeintel_rev.io.duckdb_dao import ensure_v_faiss_join
 
 from tests._helpers import assertions
 
@@ -48,11 +49,9 @@ def test_ensure_faiss_idmap_view_registers_join(tmp_path: Path) -> None:
     _write_chunks(chunks)
     _write_idmap(idmap)
     conn = duckdb.connect(database=":memory:")
-    ensure_faiss_idmap_view(
-        conn,
-        idmap_parquet=str(idmap),
-        chunks_parquet=str(chunks),
-    )
+    conn.execute("CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet(?)", [str(chunks)])
+    ensure_faiss_idmap_view(conn, idmap_parquet=idmap)
+    ensure_v_faiss_join(conn)
     count = conn.execute("SELECT COUNT(*) FROM v_faiss_join").fetchone()
     assertions.expect_true(count is not None, reason="query should return a result")
     if count is None:  # pragma: no cover - defensive

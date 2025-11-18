@@ -107,7 +107,7 @@ def _norm(path: Path) -> Path:
     except (OSError, RuntimeError):
         resolved = expanded
     if sys.platform.startswith("win"):
-        return Path(os.normcase(str(resolved)))
+        return Path(os.path.normcase(str(resolved)))
     return resolved
 
 

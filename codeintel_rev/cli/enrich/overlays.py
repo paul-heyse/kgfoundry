@@ -9,6 +9,7 @@ from pathlib import Path
 import typer
 
 from codeintel_rev.cli.enrich import app, common
+from codeintel_rev.cli.enrich.__main__ import main as enrich_main
 from codeintel_rev.enrich.output_writers import write_json
 from codeintel_rev.enrich.stubs_overlay import (
     activate_overlays,
@@ -110,8 +111,6 @@ def overlays(
 
 def main() -> None:  # pragma: no cover - entrypoint shim
     """Invoke the enrichment CLI (overlays shim)."""
-    from codeintel_rev.cli.enrich.__main__ import main as enrich_main
-
     enrich_main()
 
 

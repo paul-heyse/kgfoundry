@@ -40,7 +40,7 @@ def _default_paths() -> tuple[Path, Path]:
     return augment_path, registry_path
 
 
-def _register_test_cli(
+def _register_test_cli(  # noqa: PLR0913
     *,
     command: str,
     title: str = "Test CLI",

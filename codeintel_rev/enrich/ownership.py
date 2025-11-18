@@ -331,6 +331,36 @@ def _top_k(items: Sequence[str], k: int) -> list[str]:
 
 
 def _bus_factor(authors: Sequence[str]) -> float:
+    """Calculate bus factor metric measuring code ownership concentration.
+
+    The bus factor measures how concentrated code ownership is by computing the
+    ratio of the most frequent contributor's commits to total commits. A higher
+    bus factor (closer to 1.0) indicates more concentrated ownership (higher risk
+    if that person leaves), while a lower value indicates more distributed ownership
+    (lower risk). The metric ranges from 0.0 (perfectly distributed) to 1.0
+    (single contributor).
+
+    Parameters
+    ----------
+    authors : Sequence[str]
+        Sequence of author names from commit history. Each occurrence represents
+        a commit by that author, enabling frequency analysis.
+
+    Returns
+    -------
+    float
+        Bus factor value between 0.0 and 1.0, rounded to 3 decimal places. Returns
+        0.0 if the authors sequence is empty. Higher values indicate more
+        concentrated ownership.
+
+    Notes
+    -----
+    The bus factor is a critical metric for assessing code health and maintenance
+    risk. Files with high bus factors (close to 1.0) are at risk if the primary
+    contributor becomes unavailable. This metric helps teams identify files that
+    may need knowledge sharing or documentation efforts to reduce single points
+    of failure.
+    """
     if not authors:
         return 0.0
     counter = Counter(authors)
@@ -338,6 +368,38 @@ def _bus_factor(authors: Sequence[str]) -> float:
 
 
 def _codeowners_lookup(repo_root: Path, rel_path: str) -> str | None:
+    """Look up file owner from CODEOWNERS file using pattern matching.
+
+    This function searches for CODEOWNERS files in standard locations (.github/CODEOWNERS,
+    CODEOWNERS, .gitlab/CODEOWNERS) and matches the given file path against patterns
+    in the CODEOWNERS file. Returns the first matching owner for the file path.
+    CODEOWNERS files use glob-like patterns to specify ownership rules, enabling
+    declarative ownership assignment.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Root directory of the repository where CODEOWNERS files are located. The
+        function checks multiple standard locations relative to this root.
+    rel_path : str
+        Repository-relative file path to look up ownership for. The path is matched
+        against patterns in the CODEOWNERS file to determine ownership.
+
+    Returns
+    -------
+    str | None
+        Owner name (typically GitHub username) if a matching CODEOWNERS entry is
+        found, or None if no CODEOWNERS file exists, cannot be read, or no pattern
+        matches the file path.
+
+    Notes
+    -----
+    CODEOWNERS files provide a declarative way to assign code ownership, which is
+    particularly useful for large codebases with clear module boundaries. This
+    function supports the standard CODEOWNERS format used by GitHub and GitLab,
+    enabling integration with platform-native ownership features. Pattern matching
+    follows glob-like rules, with support for leading slashes and wildcards.
+    """
     for candidate in (".github/CODEOWNERS", "CODEOWNERS", ".gitlab/CODEOWNERS"):
         path = repo_root / candidate
         if not path.exists():
@@ -358,6 +420,38 @@ def _codeowners_lookup(repo_root: Path, rel_path: str) -> str | None:
 
 
 def _glob_like_match(path: str, pattern: str) -> bool:
+    """Match a file path against a glob-like pattern from CODEOWNERS.
+
+    This function performs pattern matching compatible with CODEOWNERS file format,
+    which uses glob-like patterns (e.g., "*.py", "src/**", "/docs/"). The function
+    handles leading slashes in patterns (which indicate root-relative matching) and
+    supports both direct path matching and matching with a leading "./" prefix for
+    compatibility with different path formats.
+
+    Parameters
+    ----------
+    path : str
+        Repository-relative file path to match against the pattern. The path should
+        not include a leading slash.
+    pattern : str
+        Glob-like pattern from CODEOWNERS file (e.g., "*.py", "src/**", "/docs/").
+        Leading slashes are stripped to enable root-relative matching, and the pattern
+        is matched against both the path and "./{path}" variants.
+
+    Returns
+    -------
+    bool
+        True if the path matches the pattern, False otherwise. Empty patterns
+        always return False.
+
+    Notes
+    -----
+    This function implements CODEOWNERS pattern matching semantics, which are similar
+    to shell glob patterns but with some differences. The function handles common
+    edge cases like leading slashes and path format variations to ensure reliable
+    ownership lookup. Pattern matching uses Python's fnmatch module, which provides
+    glob-compatible matching.
+    """
     normalized_pattern = pattern.strip()
     if not normalized_pattern:
         return False

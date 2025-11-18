@@ -1,10 +1,12 @@
-# ruff: noqa: D103,S101
 """Tests covering the DuckDB catalog refactor."""
 
 from pathlib import Path
 
 import duckdb
+import pytest
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogOptions
+
+from tests._helpers import assertions
 
 
 def _write_parquet(path: Path, select_sql: str) -> None:
@@ -62,26 +64,42 @@ def _build_catalog(tmp_path: Path) -> tuple[DuckDBCatalog, Path]:
     return catalog, idmap_parquet
 
 
+def _fetch_single_value(conn: duckdb.DuckDBPyConnection, sql: str, *, reason: str) -> int:
+    row = conn.execute(sql).fetchone()
+    if row is None:
+        pytest.fail(f"{reason}: query returned no rows")
+    return int(row[0])
+
+
 def test_register_idmap_creates_views(tmp_path: Path) -> None:
+    """Verify that registering an ID map creates required views without materialization."""
     catalog, idmap_parquet = _build_catalog(tmp_path)
     stats = catalog.register_idmap_parquet(idmap_parquet, materialize=False)
-    assert stats["rows"] == 1
-    assert stats["refreshed"] is True
+    assertions.expect_equal(stats["rows"], 1)
+    assertions.expect_true(stats["refreshed"])
 
     with catalog.connection() as conn:
-        assert conn.execute("SELECT COUNT(*) FROM faiss_idmap").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM v_faiss_join").fetchone()[0] == 1
+        count = _fetch_single_value(conn, "SELECT COUNT(*) FROM faiss_idmap", reason="faiss_idmap count")
+        assertions.expect_equal(count, 1)
+        join_count = _fetch_single_value(conn, "SELECT COUNT(*) FROM v_faiss_join", reason="v_faiss_join count")
+        assertions.expect_equal(join_count, 1)
 
 
 def test_register_idmap_materializes_join(tmp_path: Path) -> None:
+    """Verify that registering an ID map with materialization creates materialized join view."""
     catalog, idmap_parquet = _build_catalog(tmp_path)
     first = catalog.register_idmap_parquet(idmap_parquet, materialize=True)
-    assert first["rows"] == 1
-    assert first["refreshed"] is True
+    assertions.expect_equal(first["rows"], 1)
+    assertions.expect_true(first["refreshed"])
 
     with catalog.connection() as conn:
-        assert conn.execute("SELECT COUNT(*) FROM faiss_join_mat").fetchone()[0] == 1
+        join_count = _fetch_single_value(
+            conn,
+            "SELECT COUNT(*) FROM faiss_join_mat",
+            reason="faiss_join_mat count",
+        )
+        assertions.expect_equal(join_count, 1)
 
     second = catalog.register_idmap_parquet(idmap_parquet, materialize=True)
-    assert second["rows"] == 1
-    assert second["refreshed"] is False
+    assertions.expect_equal(second["rows"], 1)
+    assertions.expect_false(second["refreshed"])

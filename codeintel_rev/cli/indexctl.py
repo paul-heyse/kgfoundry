@@ -58,6 +58,26 @@ app.add_typer(embeddings_app, name="embeddings")
 
 @lru_cache(maxsize=1)
 def _cached_settings() -> Settings:
+    """Load and cache application settings.
+
+    This function loads application settings using load_settings() and caches
+    the result using lru_cache to avoid repeated file I/O and parsing. The
+    cache has maxsize=1, ensuring only one settings instance is cached.
+
+    Returns
+    -------
+    Settings
+        Loaded application settings object containing configuration for paths,
+        index parameters, and embedding providers. The settings are cached
+        after first load for subsequent calls.
+
+    Notes
+    -----
+    Settings caching improves performance by avoiding repeated configuration
+    file reads and parsing. The lru_cache decorator ensures settings are
+    loaded once and reused across CLI command invocations, reducing overhead
+    for commands that access settings multiple times.
+    """
     return load_settings()
 
 
@@ -65,6 +85,37 @@ def _default_faiss_manager_factory(
     settings: Settings,
     index_override: Path | None,
 ) -> FAISSManager:
+    """Create and load a FAISS manager instance from settings.
+
+    This function creates a FAISSManager instance using settings configuration
+    and optional index path override. The manager is configured with vector
+    dimension and nlist parameters from settings, and the CPU index is loaded
+    immediately for use.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing FAISS index path, vector dimension,
+        and nlist configuration. Used to configure the manager and determine
+        default index path.
+    index_override : Path | None
+        Optional path override for the FAISS index file. If provided, this
+        path is used instead of the settings path. The path is expanded and
+        resolved to absolute form.
+
+    Returns
+    -------
+    FAISSManager
+        Configured FAISS manager instance with CPU index loaded. The manager
+        is ready for search operations and index management.
+
+    Notes
+    -----
+    FAISS manager creation enables index access for CLI commands that need to
+    interact with FAISS indexes. The function handles path resolution and
+    index loading, providing a ready-to-use manager instance. The CPU index
+    is loaded immediately to ensure it's available for operations.
+    """
     index_path = (index_override or Path(settings.paths.faiss_index)).expanduser().resolve()
     nlist = int(settings.index.nlist or settings.index.faiss_nlist)
     manager = FAISSManager(
@@ -80,6 +131,38 @@ def _default_duckdb_catalog_factory(
     settings: Settings,
     path_override: Path | None,
 ) -> DuckDBCatalog:
+    """Create and configure a DuckDB catalog instance from settings.
+
+    This function creates a DuckDBCatalog instance using settings configuration
+    and optional path override. The catalog is configured with database path,
+    vectors directory, repository root, materialization settings, and FAISS
+    ID map path.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing DuckDB catalog path, vectors directory,
+        repository root, materialization settings, and FAISS ID map path. Used
+        to configure the catalog instance.
+    path_override : Path | None
+        Optional path override for the DuckDB catalog file. If provided, this
+        path is used instead of the settings path. The path is expanded and
+        resolved to absolute form.
+
+    Returns
+    -------
+    DuckDBCatalog
+        Configured DuckDB catalog instance ready for querying chunk metadata
+        and structure annotations. The catalog is configured with all necessary
+        paths and settings from the application configuration.
+
+    Notes
+    -----
+    DuckDB catalog creation enables metadata access for CLI commands that need
+    to query chunk information, structure annotations, and embedding metadata.
+    The function handles path resolution and catalog configuration, providing a
+    ready-to-use catalog instance with proper ID map and materialization settings.
+    """
     db_path = (path_override or Path(settings.paths.duckdb_path)).expanduser().resolve()
     vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
     catalog = DuckDBCatalog(
@@ -93,6 +176,33 @@ def _default_duckdb_catalog_factory(
 
 
 def _default_duckdb_embedding_dim(catalog: DuckDBCatalog) -> int:
+    """Determine embedding dimension from DuckDB catalog.
+
+    This function queries the DuckDB catalog to determine the embedding dimension
+    by fetching a sample embedding from the chunks table and computing its length.
+    The function handles missing or invalid embeddings gracefully by returning 0.
+
+    Parameters
+    ----------
+    catalog : DuckDBCatalog
+        DuckDB catalog instance to query for embedding dimension. The catalog
+        must have a chunks table with an embedding column.
+
+    Returns
+    -------
+    int
+        Embedding dimension (number of elements in embedding vector) if a valid
+        embedding is found, otherwise 0. Returns 0 if no chunks exist, embeddings
+        are None, or dimension cannot be determined.
+
+    Notes
+    -----
+    Embedding dimension detection enables validation and compatibility checking
+    by determining the expected vector size from stored embeddings. The function
+    samples the first chunk's embedding to infer dimension, assuming all embeddings
+    have the same dimension. This supports embedding validation and FAISS index
+    compatibility checks.
+    """
     with catalog.connection() as conn:
         row = conn.execute("SELECT embedding FROM chunks LIMIT 1").fetchone()
     if not row or row[0] is None:
@@ -105,6 +215,40 @@ def _default_duckdb_embedding_dim(catalog: DuckDBCatalog) -> int:
 
 
 def _default_count_idmap_rows(path: Path) -> int:
+    """Count rows in FAISS ID map Parquet file.
+
+    This function reads Parquet file metadata to determine the number of rows
+    in a FAISS ID map file without loading the entire file. The function
+    requires pyarrow to be available for Parquet metadata access.
+
+    Parameters
+    ----------
+    path : Path
+        Path to FAISS ID map Parquet file. The file must exist and be a valid
+        Parquet file for row counting to succeed.
+
+    Returns
+    -------
+    int
+        Number of rows in the Parquet file if file exists and metadata is
+        available, otherwise 0. Returns 0 if file doesn't exist or metadata
+        is None.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when pyarrow is not available, which is required for Parquet
+        metadata access. The error message indicates that pyarrow must be
+        installed to inspect ID map sidecars.
+
+    Notes
+    -----
+    ID map row counting enables validation and statistics reporting by determining
+    the number of ID mappings without loading the entire file. The function uses
+    Parquet metadata for efficient row counting, avoiding full file reads. This
+    supports index validation and compatibility checks between FAISS indexes and
+    ID maps.
+    """
     if not path.exists():
         return 0
     if pyarrow_parquet is None:
@@ -115,6 +259,32 @@ def _default_count_idmap_rows(path: Path) -> int:
 
 
 def _default_embedding_provider_factory(settings: Settings) -> EmbeddingProvider:
+    """Create an embedding provider instance from settings.
+
+    This function creates an EmbeddingProvider instance using settings configuration,
+    delegating to get_embedding_provider to instantiate the appropriate provider
+    based on settings (e.g., OpenAI, VLLM, local models).
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing embedding provider configuration (provider
+        type, model name, API keys, etc.). Used to instantiate the appropriate
+        embedding provider.
+
+    Returns
+    -------
+    EmbeddingProvider
+        Configured embedding provider instance ready for generating embeddings.
+        The provider type and configuration are determined from settings.
+
+    Notes
+    -----
+    Embedding provider creation enables embedding generation for CLI commands that
+    need to create embeddings from text. The function delegates to get_embedding_provider
+    which handles provider selection and instantiation based on settings, supporting
+    multiple provider backends (OpenAI, VLLM, local models).
+    """
     return get_embedding_provider(settings)
 
 
@@ -152,6 +322,38 @@ _DEFAULT_CONTEXT = IndexctlCliContext.production()
 
 
 def _cli_context(ctx: click.Context | None = None) -> IndexctlCliContext:
+    """Retrieve or create indexctl CLI context from Click context.
+
+    This function retrieves the IndexctlCliContext from the Click context state,
+    creating and caching it if it doesn't exist. The context provides dependency
+    injection for CLI commands, enabling testing with mock factories. The function
+    handles both explicit context passing and implicit context retrieval from
+    Click's current context.
+
+    Parameters
+    ----------
+    ctx : click.Context | None, optional
+        Optional Click context to retrieve context from. If None, attempts to
+        retrieve the current Click context using click.get_current_context.
+        If no context is available, returns the default production context.
+
+    Returns
+    -------
+    IndexctlCliContext
+        CLI context object containing factories for FAISS manager, DuckDB catalog,
+        embedding provider, and other dependencies. The context is cached in the
+        Click context state after first creation, ensuring consistent context
+        usage across a command invocation.
+
+    Notes
+    -----
+    CLI context retrieval enables dependency injection for CLI commands, allowing
+    commands to use configurable factories for FAISS managers, DuckDB catalogs,
+    and embedding providers. The context is cached in the Click context state to
+    avoid repeated creation and ensure consistent behavior throughout command
+    execution. The function gracefully handles missing contexts by returning the
+    default production context.
+    """
     active = ctx or click.get_current_context(silent=True)
     if active is None:
         return _DEFAULT_CONTEXT
@@ -164,6 +366,26 @@ def _cli_context(ctx: click.Context | None = None) -> IndexctlCliContext:
 
 
 def _get_settings() -> Settings:
+    """Retrieve application settings from CLI context.
+
+    This function retrieves application settings by accessing the settings factory
+    from the CLI context. The settings are loaded using the factory function
+    (typically _cached_settings) which caches the result.
+
+    Returns
+    -------
+    Settings
+        Application settings object containing configuration for paths, index
+        parameters, and embedding providers. The settings are loaded from the
+        CLI context's settings factory.
+
+    Notes
+    -----
+    Settings retrieval enables commands to access application configuration
+    without directly importing settings loaders. The function uses the CLI context's
+    settings factory, enabling dependency injection and testing with mock settings.
+    The factory typically uses caching to avoid repeated file I/O.
+    """
     return _cli_context().settings_factory()
 
 
@@ -286,6 +508,27 @@ def global_options(ctx: click.Context, root: RootOption = None) -> None:
 
 
 def _default_root() -> Path:
+    """Determine the default index lifecycle root directory.
+
+    This function computes the default root directory for index lifecycle operations
+    by checking the CODEINTEL_INDEXES_DIR environment variable. If the environment
+    variable is set, it is used; otherwise, the default "indexes" directory is
+    returned relative to the current working directory.
+
+    Returns
+    -------
+    Path
+        Default root directory path for index lifecycle operations. The path is
+        resolved to absolute form. Returns the value of CODEINTEL_INDEXES_DIR if
+        set, otherwise returns "indexes" resolved from the current directory.
+
+    Notes
+    -----
+    Root directory resolution enables flexible configuration of where index assets
+    are stored. The environment variable allows users to override the default
+    location without modifying code, supporting different deployment environments
+    and user preferences. The path is resolved to absolute form for consistency.
+    """
     env = os.getenv("CODEINTEL_INDEXES_DIR")
     if env:
         return Path(env).expanduser().resolve()
@@ -293,12 +536,71 @@ def _default_root() -> Path:
 
 
 def _resolve_root(ctx: click.Context, explicit_root: Path | None = None) -> Path:
+    """Resolve index lifecycle root directory from context or defaults.
+
+    This function determines the root directory to use for index lifecycle operations
+    by checking explicit parameter, context state, and default values in order of
+    precedence. The function handles None contexts gracefully and resolves paths
+    to absolute form.
+
+    Parameters
+    ----------
+    ctx : click.Context
+        Click context containing stored root directory state. The context may
+        contain a "root" entry from global options.
+    explicit_root : Path | None, optional
+        Explicit root directory path to use. If provided, takes precedence over
+        context state and defaults. The path is resolved to absolute form.
+
+    Returns
+    -------
+    Path
+        Resolved root directory path. Either explicit_root (if provided), root
+        from context state (if available), or default root directory. The path
+        is guaranteed to be resolved to absolute form.
+
+    Notes
+    -----
+    Root resolution enables flexible configuration of index lifecycle root directory
+    through multiple mechanisms: explicit parameters, context state (from global
+    options), and environment-based defaults. The function ensures consistent path
+    resolution across all commands, enabling predictable index asset locations.
+    """
     root_from_ctx = ctx.obj.get("root") if ctx.obj else None
     resolved_root = explicit_root or root_from_ctx or _default_root()
     return resolved_root.resolve()
 
 
 def _manager(explicit_root: Path | None = None) -> IndexLifecycleManager:
+    """Create an IndexLifecycleManager instance for the resolved root directory.
+
+    This function creates an IndexLifecycleManager instance using the resolved
+    root directory from the current Click context and optional explicit override.
+    The manager provides operations for staging, publishing, and managing versioned
+    index assets.
+
+    Parameters
+    ----------
+    explicit_root : Path | None, optional
+        Optional explicit root directory override. If provided, this path is used
+        instead of resolving from context. The path is resolved to absolute form
+        before creating the manager.
+
+    Returns
+    -------
+    IndexLifecycleManager
+        Index lifecycle manager instance configured for the resolved root directory.
+        The manager provides methods for staging assets, publishing versions, and
+        managing index lifecycle operations.
+
+    Notes
+    -----
+    Manager creation enables index lifecycle operations by providing a manager
+    instance configured for the appropriate root directory. The function resolves
+    the root directory using _resolve_root, which handles explicit parameters,
+    context state, and defaults. This ensures consistent manager configuration
+    across CLI commands.
+    """
     ctx = click.get_current_context()
     return IndexLifecycleManager(_resolve_root(ctx, explicit_root))
 
@@ -308,6 +610,40 @@ def _build_assets(
     channels: dict[str, Path],
     sidecars: dict[str, Path],
 ) -> IndexAssets:
+    """Construct IndexAssets object from primary assets, channels, and sidecars.
+
+    This function creates an IndexAssets object by combining primary assets
+    (FAISS index, DuckDB catalog, SCIP index), optional channel directories
+    (BM25, SPLADE, XTR), and optional sidecar files (FAISS ID map, tuning profile).
+    The function maps channel and sidecar dictionaries to the appropriate asset
+    fields.
+
+    Parameters
+    ----------
+    primaries : tuple[Path, Path, Path]
+        Tuple containing (faiss_index, duckdb_path, scip_index) paths for the
+        three primary index assets. These are required assets for index staging.
+    channels : dict[str, Path]
+        Dictionary mapping channel names to directory paths. Supported channels
+        include "bm25", "splade", and "xtr". Unrecognized channels are ignored.
+    sidecars : dict[str, Path]
+        Dictionary mapping sidecar names to file paths. Supported sidecars include
+        "faiss_idmap" and "tuning". Unrecognized sidecars are ignored.
+
+    Returns
+    -------
+    IndexAssets
+        Complete IndexAssets object containing all primary assets, channel
+        directories, and sidecar files. The object is ready for staging and
+        publishing operations.
+
+    Notes
+    -----
+    Asset construction enables index staging by combining all asset types into
+    a single IndexAssets object. The function handles optional channels and
+    sidecars gracefully by extracting only recognized entries, ensuring robust
+    asset construction even when optional components are missing.
+    """
     faiss_index, duckdb_path, scip_index = primaries
     return IndexAssets(
         faiss_index=faiss_index,
@@ -322,6 +658,34 @@ def _build_assets(
 
 
 def _parse_extras(extras: list[str]) -> dict[str, Path]:
+    """Parse channel entries from command-line extra options.
+
+    This function parses a list of channel entry strings in "name=/path" format
+    into a dictionary mapping channel names to resolved paths. Entries without
+    "=" separators are skipped, and paths are expanded and resolved to absolute
+    form.
+
+    Parameters
+    ----------
+    extras : list[str]
+        List of channel entry strings in "name=/path" format (e.g., "bm25=/tmp/bm25").
+        Entries are parsed by splitting on "=" and extracting channel name and path.
+        Invalid entries (missing "=") are skipped.
+
+    Returns
+    -------
+    dict[str, Path]
+        Dictionary mapping channel names (lowercased, stripped) to resolved Path
+        objects. Channel names are normalized to lowercase for consistency. Paths
+        are expanded (handling ~) and resolved to absolute form.
+
+    Notes
+    -----
+    Channel parsing enables flexible specification of optional channel directories
+    via command-line options. The function handles malformed entries gracefully by
+    skipping them, ensuring robust parsing even when users provide invalid formats.
+    Path normalization ensures consistent path handling across different input formats.
+    """
     parsed: dict[str, Path] = {}
     for entry in extras:
         if "=" not in entry:
@@ -332,6 +696,35 @@ def _parse_extras(extras: list[str]) -> dict[str, Path]:
 
 
 def _parse_sidecars(entries: list[str]) -> dict[str, Path]:
+    """Parse sidecar entries from command-line sidecar options.
+
+    This function parses a list of sidecar entry strings in "name=/path" format
+    into a dictionary mapping sidecar names to resolved paths. Only recognized
+    sidecars ("faiss_idmap", "tuning") are included, and paths are expanded and
+    resolved to absolute form.
+
+    Parameters
+    ----------
+    entries : list[str]
+        List of sidecar entry strings in "name=/path" format (e.g., "faiss_idmap=/tmp/idmap.parquet").
+        Entries are parsed by splitting on "=" and extracting sidecar name and path.
+        Invalid entries (missing "=") and unrecognized sidecar names are skipped.
+
+    Returns
+    -------
+    dict[str, Path]
+        Dictionary mapping recognized sidecar names (lowercased, stripped) to
+        resolved Path objects. Only "faiss_idmap" and "tuning" sidecars are included.
+        Paths are expanded (handling ~) and resolved to absolute form.
+
+    Notes
+    -----
+    Sidecar parsing enables flexible specification of optional sidecar files via
+    command-line options. The function validates sidecar names against an allowlist,
+    ensuring only recognized sidecars are processed. This prevents errors from
+    typos or unsupported sidecar types while maintaining flexibility for future
+    extensions.
+    """
     parsed: dict[str, Path] = {}
     allowed = {"faiss_idmap", "tuning"}
     for entry in entries:
@@ -346,6 +739,45 @@ def _parse_sidecars(entries: list[str]) -> dict[str, Path]:
 
 
 def _resolve_version_dir(manager: IndexLifecycleManager, version: str | None) -> Path | None:
+    """Resolve version directory path from version identifier or current version.
+
+    This function determines the version directory to use for index operations
+    by checking if an explicit version is provided or using the current version
+    directory. The function validates that explicit versions exist before returning
+    their paths.
+
+    Parameters
+    ----------
+    manager : IndexLifecycleManager
+        Index lifecycle manager instance providing access to versions directory
+        and current version resolution. Used to resolve version paths.
+    version : str | None
+        Optional version identifier string. If provided, the version directory
+        is resolved and validated. If None, the current version directory is
+        returned.
+
+    Returns
+    -------
+    Path | None
+        Version directory path if version is provided and exists, or current
+        version directory if version is None. Returns None if version is None
+        and no current version exists.
+
+    Raises
+    ------
+    typer.BadParameter
+        Raised when an explicit version is provided but the version directory
+        does not exist. The error message includes the version identifier and
+        versions directory path for debugging.
+
+    Notes
+    -----
+    Version directory resolution enables version-specific index operations by
+    determining which version directory to use for staging, publishing, or querying.
+    The function validates explicit versions to prevent errors from typos or
+    non-existent versions, while gracefully handling None versions by using the
+    current version.
+    """
     if version:
         candidate = manager.versions_dir / version
         if not candidate.exists():
@@ -356,10 +788,62 @@ def _resolve_version_dir(manager: IndexLifecycleManager, version: str | None) ->
 
 
 def _manifest_path_for(output_path: Path) -> Path:
+    """Generate manifest file path for an output file.
+
+    This function creates a manifest file path by replacing the output file's
+    extension with ".manifest.json". The manifest path is co-located with the
+    output file, enabling easy discovery and association.
+
+    Parameters
+    ----------
+    output_path : Path
+        Output file path to generate a manifest path for. The path's extension
+        is replaced with ".manifest.json" to create the manifest path.
+
+    Returns
+    -------
+    Path
+        Manifest file path with ".manifest.json" extension. The path is co-located
+        with the output file, sharing the same directory and base name.
+
+    Notes
+    -----
+    Manifest path generation enables consistent manifest file naming by deriving
+    manifest paths from output file paths. The function uses pathlib's with_suffix
+    to replace extensions, ensuring manifest files are easily discoverable alongside
+    their associated output files.
+    """
     return output_path.with_suffix(".manifest.json")
 
 
 def _load_manifest(path: Path) -> dict[str, object]:
+    """Load manifest JSON file or return empty dictionary if missing.
+
+    This function attempts to load a manifest JSON file from the specified path,
+    returning an empty dictionary if the file doesn't exist or contains invalid
+    JSON. The function handles file I/O and JSON parsing errors gracefully.
+
+    Parameters
+    ----------
+    path : Path
+        Path to manifest JSON file to load. The file is read with UTF-8 encoding
+        and parsed as JSON.
+
+    Returns
+    -------
+    dict[str, object]
+        Parsed manifest dictionary if file exists and contains valid JSON,
+        otherwise empty dictionary. Returns empty dict if file is missing or
+        JSON parsing fails.
+
+    Notes
+    -----
+    Manifest loading enables reading existing manifest metadata for comparison
+    and updates. The function handles missing or corrupted manifests gracefully
+    by returning empty dictionaries, ensuring robust operation even when manifests
+    are not yet created or have been corrupted. This supports incremental manifest
+    updates and validation.
+    """
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -369,11 +853,66 @@ def _load_manifest(path: Path) -> dict[str, object]:
 
 
 def _write_manifest(path: Path, payload: dict[str, object]) -> None:
+    """Write manifest JSON file with pretty-printed formatting.
+
+    This function writes a manifest dictionary to a JSON file with indented
+    formatting and sorted keys for readability. The file is written with UTF-8
+    encoding, ensuring consistent encoding across platforms.
+
+    Parameters
+    ----------
+    path : Path
+        File path where the manifest should be written. The file is created or
+        overwritten with the manifest content.
+    payload : dict[str, object]
+        Manifest dictionary to serialize to JSON. The dictionary contains metadata
+        about generated assets (provider, model, checksums, paths, etc.). Keys
+        are sorted alphabetically in the output.
+
+    Notes
+    -----
+    Manifest writing enables persistence of asset metadata for tracking and
+    validation. The function uses pretty-printed JSON with sorted keys for
+    readability and version control friendliness. This supports manifest-based
+    validation and tracking of asset generation metadata.
+    """
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
 @dataclass(slots=True, frozen=False)
 class _EmbeddingBuildContext:
+    """Context object for embedding build operations.
+
+    This dataclass holds configuration and paths needed for embedding generation
+    operations, including settings, lifecycle manager, version information, and
+    input/output paths. The context is mutable to allow updates during build
+    operations.
+
+    Attributes
+    ----------
+    settings : Settings
+        Application settings containing embedding provider configuration and
+        batch size parameters. Used to configure embedding generation.
+    manager : IndexLifecycleManager
+        Index lifecycle manager for accessing version directories and staging
+        operations. Used to resolve version-specific paths.
+    version : str | None
+        Version identifier string if building for a specific version, otherwise
+        None for current version. Used to determine version directory.
+    version_dir : Path | None
+        Resolved version directory path if version is specified, otherwise None.
+        Used to locate version-specific assets.
+    duck_path : Path
+        Path to DuckDB catalog file containing chunks to embed. Used as input
+        for embedding generation.
+    output_path : Path
+        Path where generated embeddings Parquet file should be written. Used as
+        output destination for embedding generation.
+    manifest_path : Path
+        Path where embedding manifest JSON should be written. Used to persist
+        metadata about generated embeddings.
+    """
+
     settings: Settings
     manager: IndexLifecycleManager
     version: str | None
@@ -391,6 +930,49 @@ def _build_context(
     duckdb_path: Path | None,
     output: Path | None,
 ) -> _EmbeddingBuildContext:
+    """Construct embedding build context from settings and parameters.
+
+    This function creates an _EmbeddingBuildContext object by resolving version
+    directory, DuckDB catalog path, output path, and manifest path from settings
+    and optional overrides. The context provides all paths and configuration needed
+    for embedding generation operations.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing default paths and configuration. Used to
+        determine default DuckDB catalog and output paths when overrides are not
+        provided.
+    manager : IndexLifecycleManager
+        Index lifecycle manager for resolving version directories. Used to determine
+        version-specific paths when version is specified.
+    version : str | None, optional
+        Optional version identifier for version-specific builds. If provided,
+        version directory is resolved and used for path resolution.
+    duckdb_path : Path | None, optional
+        Optional DuckDB catalog path override. If provided, this path is used
+        instead of resolving from settings or version directory.
+    output : Path | None, optional
+        Optional output path override for embeddings Parquet file. If provided,
+        this path is used instead of resolving from settings or version directory.
+
+    Returns
+    -------
+    _EmbeddingBuildContext
+        Complete embedding build context containing all resolved paths and
+        configuration. The context is ready for embedding generation operations.
+
+    Notes
+    -----
+    Context construction enables embedding generation by providing all necessary
+    paths and configuration in a single object. The function handles path resolution
+    with precedence: explicit overrides > version-specific paths > settings defaults.
+    This enables flexible configuration while maintaining sensible defaults.
+
+    The function may propagate typer.BadParameter from _resolve_version_dir when
+    explicit version doesn't exist, or from _resolve_duck_path when DuckDB catalog
+    file is not found.
+    """
     version_dir = _resolve_version_dir(manager, version)
     duck_path = _resolve_duck_path(settings, version_dir, duckdb_path)
     output_path = _resolve_output_path(
@@ -416,6 +998,44 @@ def _resolve_duck_path(
     version_dir: Path | None,
     override: Path | None,
 ) -> Path:
+    """Resolve DuckDB catalog path from settings, version directory, or override.
+
+    This function determines the DuckDB catalog path to use for embedding operations
+    by checking override parameter, version directory, and settings defaults in order
+    of precedence. The function validates that the resolved path exists before returning.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing default DuckDB catalog path. Used when
+        override and version_dir are None.
+    version_dir : Path | None
+        Optional version directory path. If provided and override is None, the
+        catalog path is resolved as version_dir / "catalog.duckdb".
+    override : Path | None
+        Optional explicit path override. If provided, this path takes precedence
+        over version directory and settings defaults.
+
+    Returns
+    -------
+    Path
+        Resolved DuckDB catalog path. The path is expanded (handling ~) and
+        resolved to absolute form. Path resolution follows precedence: override >
+        version_dir / "catalog.duckdb" > settings.paths.duckdb_path.
+
+    Raises
+    ------
+    typer.BadParameter
+        Raised when the resolved DuckDB catalog file does not exist. The error
+        message includes the resolved path for debugging.
+
+    Notes
+    -----
+    DuckDB path resolution enables flexible catalog access by supporting multiple
+    path sources: explicit overrides, version-specific catalogs, and default settings.
+    The function validates path existence to prevent errors from missing catalogs,
+    ensuring robust operation even when paths are misconfigured.
+    """
     if override is not None:
         duck_path = override.expanduser().resolve()
     elif version_dir is not None:
@@ -435,6 +1055,42 @@ def _resolve_output_path(
     *,
     ensure_parent: bool,
 ) -> Path:
+    """Resolve embeddings output path from settings, version directory, or override.
+
+    This function determines the output path for embeddings Parquet file by checking
+    override parameter, version directory, and settings defaults in order of precedence.
+    The function optionally ensures the parent directory exists before returning.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing default vectors directory. Used when override
+        and version_dir are None. The output path is resolved as vectors_dir / "embeddings.parquet".
+    version_dir : Path | None
+        Optional version directory path. If provided and override is None, the
+        output path is resolved as version_dir / "embeddings.parquet".
+    override : Path | None
+        Optional explicit path override. If provided, this path takes precedence
+        over version directory and settings defaults.
+    ensure_parent : bool
+        Flag indicating whether to create the parent directory if it doesn't exist.
+        When True, parent directories are created using mkdir(parents=True, exist_ok=True).
+
+    Returns
+    -------
+    Path
+        Resolved embeddings output path. The path is expanded (handling ~) and
+        resolved to absolute form. Path resolution follows precedence: override >
+        version_dir / "embeddings.parquet" > settings.paths.vectors_dir / "embeddings.parquet".
+
+    Notes
+    -----
+    Output path resolution enables flexible embedding storage by supporting multiple
+    path sources: explicit overrides, version-specific outputs, and default settings.
+    The function optionally ensures parent directories exist, preventing errors
+    from missing directories during file writing. This supports both user-specified
+    and default output locations.
+    """
     if override is not None:
         output_path = override.expanduser().resolve()
     elif version_dir is not None:
@@ -449,6 +1105,36 @@ def _resolve_output_path(
 
 
 def _parquet_meta(provider: EmbeddingProvider) -> dict[str, str]:
+    """Extract embedding provider metadata for Parquet file metadata.
+
+    This function extracts metadata from an embedding provider and formats it as
+    a dictionary of string key-value pairs suitable for inclusion in Parquet file
+    metadata. The metadata includes provider type, model name, dimension, dtype,
+    normalization, device, and fingerprint.
+
+    Parameters
+    ----------
+    provider : EmbeddingProvider
+        Embedding provider instance to extract metadata from. The provider's
+        metadata and fingerprint are accessed to build the metadata dictionary.
+
+    Returns
+    -------
+    dict[str, str]
+        Dictionary containing embedding provider metadata as string key-value
+        pairs. Keys include "embedding_provider", "embedding_model", "embedding_dim",
+        "embedding_dtype", "embedding_normalize", "embedding_device", and
+        "embedding_fingerprint". All values are converted to strings for Parquet
+        metadata compatibility.
+
+    Notes
+    -----
+    Parquet metadata extraction enables embedding provenance tracking by storing
+    provider information in Parquet file metadata. This allows downstream tools
+    to identify which provider and model generated embeddings without requiring
+    separate manifest files. The metadata is stored as strings to ensure Parquet
+    compatibility across different metadata systems.
+    """
     meta = provider.metadata
     return {
         "embedding_provider": meta.provider,
@@ -469,6 +1155,47 @@ def _build_embedding_manifest(
     output_path: Path,
     settings: Settings,
 ) -> dict[str, object]:
+    """Build embedding manifest dictionary with generation metadata.
+
+    This function constructs a manifest dictionary containing embedding provider
+    metadata, generation parameters, checksum, vector count, output path, and
+    generation timestamp. The manifest provides comprehensive metadata about
+    generated embeddings for tracking and validation.
+
+    Parameters
+    ----------
+    provider : EmbeddingProvider
+        Embedding provider instance used for generation. Provider metadata and
+        fingerprint are included in the manifest.
+    checksum : str
+        SHA-256 checksum of chunk content used for embedding generation. The
+        checksum enables validation of embedding-to-chunk correspondence.
+    vector_count : int
+        Total number of vectors generated. Included in manifest for statistics
+        and validation.
+    output_path : Path
+        Path where embeddings Parquet file was written. Included in manifest
+        for reference and validation.
+    settings : Settings
+        Application settings containing batch size parameters. Batch sizes are
+        included in manifest to document generation parameters.
+
+    Returns
+    -------
+    dict[str, object]
+        Complete manifest dictionary containing provider metadata (provider,
+        model_name, dimension, dtype, normalize, device, fingerprint), generation
+        parameters (checksum, vectors, batch_size, micro_batch_size), output path,
+        and generation timestamp. The manifest is ready for JSON serialization.
+
+    Notes
+    -----
+    Manifest construction enables comprehensive tracking of embedding generation
+    by capturing all relevant metadata in a single dictionary. The manifest includes
+    provider information, generation parameters, and output details, enabling
+    validation, provenance tracking, and reproducibility. The timestamp enables
+    tracking of when embeddings were generated.
+    """
     meta = provider.metadata
     return {
         "provider": meta.provider,
@@ -488,6 +1215,36 @@ def _build_embedding_manifest(
 
 
 def _compute_chunk_checksum(manager: DuckDBManager, *, batch_size: int = 2048) -> tuple[str, int]:
+    """Compute SHA-256 checksum of chunk IDs and content hashes.
+
+    This function computes a deterministic checksum over all chunks in the DuckDB
+    catalog by hashing chunk IDs and content hashes in sorted order. The checksum
+    enables detection of changes to chunk content, supporting incremental embedding
+    generation and validation.
+
+    Parameters
+    ----------
+    manager : DuckDBManager
+        DuckDB manager instance providing database connection. The manager must
+        have a chunks table with id and content_hash columns.
+    batch_size : int, optional
+        Number of rows to fetch per batch when computing checksum. Defaults to 2048.
+        Larger batch sizes reduce database round-trips but increase memory usage.
+
+    Returns
+    -------
+    tuple[str, int]
+        Tuple containing (checksum_hexdigest, total_chunks). The checksum is a
+        SHA-256 hex digest computed over all chunk IDs and content hashes in
+        sorted order. Total chunks is the number of chunks processed.
+
+    Notes
+    -----
+    Checksum computation enables change detection by creating a deterministic
+    fingerprint of chunk content. The function processes chunks in batches to
+    handle large catalogs efficiently, and sorts by ID to ensure deterministic
+    checksum computation regardless of database storage order.
+    """
     digest = hashlib.sha256()
     total = 0
     with manager.connection() as conn:
@@ -508,6 +1265,42 @@ def _collect_chunks_and_embeddings(
     provider: EmbeddingProvider,
     batch_rows: int,
 ) -> tuple[list[Chunk], NDArrayF32]:
+    """Collect chunks from DuckDB and generate embeddings in batches.
+
+    This function reads chunks from the DuckDB catalog, generates embeddings
+    for chunk text in batches, and returns both chunks and their corresponding
+    embeddings. The function processes chunks in batches to manage memory usage
+    and enable efficient embedding generation for large catalogs.
+
+    Parameters
+    ----------
+    manager : DuckDBManager
+        DuckDB manager instance providing database connection. The manager must
+        have a chunks table with uri, start_byte, end_byte, start_line, end_line,
+        content, lang, and symbols columns.
+    provider : EmbeddingProvider
+        Embedding provider instance for generating embeddings from chunk text.
+        The provider must support batch embedding generation via embed_texts.
+    batch_rows : int
+        Number of chunks to process per batch. Larger batches reduce provider
+        overhead but increase memory usage. Must be positive.
+
+    Returns
+    -------
+    tuple[list[Chunk], NDArrayF32]
+        Tuple containing (chunks, embeddings). Chunks is a list of Chunk objects
+        with metadata and text. Embeddings is a NumPy array of shape (n_chunks,
+        embedding_dim) containing float32 embeddings. Returns empty chunks list
+        and empty embeddings array if no chunks exist.
+
+    Notes
+    -----
+    Batch processing enables efficient embedding generation for large catalogs by
+    processing chunks in manageable batches rather than loading all chunks into
+    memory. The function preserves chunk metadata (URI, line ranges, symbols,
+    language) while generating embeddings, enabling downstream tools to associate
+    embeddings with source locations.
+    """
     np_module = np
     chunks: list[Chunk] = []
     embeddings_parts: list[NDArrayF32] = []
@@ -591,6 +1384,51 @@ def _evaluate_drift(
     provider: EmbeddingProvider,
     epsilon: float,
 ) -> tuple[float, float, int]:
+    """Evaluate embedding drift by recomputing embeddings and comparing.
+
+    This function evaluates embedding drift by recomputing embeddings for
+    sampled chunks and comparing them to stored embeddings using cosine similarity.
+    The function computes maximum drift, total drift sum, and failure count
+    (drift exceeding epsilon threshold) across all sampled indices.
+
+    Parameters
+    ----------
+    indices : Sequence[int]
+        Sequence of chunk indices to evaluate. Indices correspond to positions
+        in embeddings and contents sequences. Used to sample chunks for drift
+        evaluation.
+    embeddings : NDArrayF32
+        Stored embeddings array of shape (n_chunks, embedding_dim) containing
+        previously generated embeddings. Used as baseline for drift comparison.
+    contents : Sequence[str]
+        Sequence of chunk text content corresponding to embeddings. Used to
+        recompute embeddings for drift evaluation. Must have same length as
+        embeddings first dimension.
+    provider : EmbeddingProvider
+        Embedding provider instance for recomputing embeddings. The provider
+        must match the provider used to generate stored embeddings for meaningful
+        drift evaluation.
+    epsilon : float
+        Maximum allowed drift threshold. Chunks with drift exceeding epsilon are
+        counted as failures. Drift is computed as 1 - cosine_similarity, so
+        epsilon represents maximum allowed cosine distance.
+
+    Returns
+    -------
+    tuple[float, float, int]
+        Tuple containing (max_drift, drift_sum, failure_count). Max drift is the
+        maximum drift value across all sampled chunks. Drift sum is the sum of
+        all drift values. Failure count is the number of chunks with drift
+        exceeding epsilon threshold.
+
+    Notes
+    -----
+    Drift evaluation enables validation of stored embeddings by detecting when
+    recomputed embeddings differ significantly from stored values. This helps
+    identify when embeddings need regeneration due to model changes, configuration
+    updates, or data corruption. Cosine similarity is used to measure drift,
+    providing a normalized comparison that accounts for embedding magnitude.
+    """
     max_drift = 0.0
     drift_sum = 0.0
     failure_count = 0
@@ -614,6 +1452,38 @@ def _execute_embeddings_build(
     chunk_size: int,
     force: bool,
 ) -> None:
+    """Execute embedding generation workflow with checksum validation.
+
+    This function orchestrates the embedding generation workflow by computing
+    chunk checksums, checking for existing embeddings, generating embeddings
+    if needed, writing Parquet files, and creating manifests. The function
+    skips generation if checksums match and force is False, enabling incremental
+    updates.
+
+    Parameters
+    ----------
+    context : _EmbeddingBuildContext
+        Embedding build context containing settings, manager, paths, and version
+        information. The context provides all configuration and paths needed
+        for embedding generation.
+    chunk_size : int
+        Number of chunks to process per batch during embedding generation.
+        Larger batch sizes reduce provider overhead but increase memory usage.
+        Must be positive.
+    force : bool
+        Flag indicating whether to force regeneration even when checksums match.
+        When True, embeddings are regenerated regardless of existing manifests.
+        When False, generation is skipped if checksum and fingerprint match.
+
+    Notes
+    -----
+    Embedding generation workflow enables efficient embedding creation with
+    incremental updates. The function checks existing manifests to avoid
+    redundant generation when chunk content and provider fingerprint haven't
+    changed. This supports fast iteration during development and efficient
+    updates in production. The function writes both Parquet files and manifests,
+    enabling downstream tools to access embeddings and metadata.
+    """
     settings = context.settings
     provider = _embedding_provider(settings)
     db_manager = DuckDBManager(context.duck_path, settings.duckdb)
@@ -677,6 +1547,45 @@ def _run_embedding_validation(
     epsilon: float,
     settings: Settings,
 ) -> None:
+    """Run embedding validation by sampling and recomputing embeddings.
+
+    This function validates stored embeddings by reading a Parquet file, sampling
+    chunks, recomputing embeddings using the current provider, and comparing
+    them to detect drift. The function reports drift statistics and validation
+    results, helping identify when embeddings need regeneration.
+
+    Parameters
+    ----------
+    parquet_path : Path
+        Path to Parquet file containing stored chunks and embeddings. The file
+        must contain chunks table with content column and embeddings array.
+    samples : int
+        Number of chunks to sample for validation. The function uses deterministic
+        sampling to ensure reproducible results. Must be positive.
+    epsilon : float
+        Maximum allowed drift threshold for validation. Chunks with drift
+        exceeding epsilon are reported as failures. Drift is computed as
+        1 - cosine_similarity.
+    settings : Settings
+        Application settings containing embedding provider configuration. Used
+        to instantiate the embedding provider for recomputing embeddings.
+
+    Raises
+    ------
+    typer.Exit
+        Raised with exit code 1 when validation failures exceed the epsilon
+        threshold. This indicates that stored embeddings have drifted beyond
+        acceptable limits and may need regeneration.
+
+    Notes
+    -----
+    Embedding validation enables quality assurance by detecting drift between
+    stored and recomputed embeddings. The function uses deterministic sampling
+    to ensure reproducible validation results, and reports comprehensive drift
+    statistics including maximum drift, average drift, and failure counts. This
+    helps identify when embeddings need regeneration due to model changes or
+    configuration updates.
+    """
     table = read_chunks_parquet(parquet_path)
     embeddings = extract_embeddings(table)
     total_rows = embeddings.shape[0]
@@ -713,6 +1622,34 @@ def _write_embedding_meta(
     *,
     version: str | None,
 ) -> None:
+    """Write embedding metadata to version directory.
+
+    This function writes embedding manifest metadata to the version directory
+    using the index lifecycle manager. The function suppresses RuntimeLifecycleError
+    to handle cases where version directories don't exist or metadata writing
+    fails, enabling graceful degradation.
+
+    Parameters
+    ----------
+    manager : IndexLifecycleManager
+        Index lifecycle manager instance for writing metadata. The manager
+        provides write_embedding_metadata method for persisting metadata.
+    payload : Mapping[str, object]
+        Embedding manifest dictionary containing provider metadata, checksums,
+        vector counts, and generation parameters. The payload is written to
+        version-specific metadata files.
+    version : str | None, optional
+        Optional version identifier for version-specific metadata writing.
+        If None, metadata is written to the current version directory.
+
+    Notes
+    -----
+    Metadata writing enables version tracking by persisting embedding generation
+    metadata alongside versioned index assets. The function suppresses errors
+    to handle cases where version directories don't exist or metadata writing
+    fails, ensuring embedding generation can complete even when metadata writing
+    is unavailable. This supports both versioned and non-versioned workflows.
+    """
     with suppress(RuntimeLifecycleError):
         manager.write_embedding_metadata(payload, version=version)
 
@@ -808,6 +1745,43 @@ def embeddings_validate_command(
 def _parse_tune_overrides(
     raw_args: Sequence[str],
 ) -> tuple[dict[str, float | int], SweepMode | None]:
+    """Parse FAISS tuning override arguments from command-line.
+
+    This function parses command-line arguments for FAISS tuning overrides and
+    sweep mode selection. The function validates argument formats, extracts
+    override values with type casting, and detects sweep mode flags. Invalid
+    arguments raise typer.BadParameter with descriptive error messages.
+
+    Parameters
+    ----------
+    raw_args : Sequence[str]
+        Sequence of command-line argument strings to parse. Arguments must be
+        in "--key=value" format for overrides or "--sweep" format for sweep mode.
+        Values are parsed and cast to appropriate types (int or float).
+
+    Returns
+    -------
+    tuple[dict[str, float | int], SweepMode | None]
+        Tuple containing (overrides, sweep_mode). Overrides is a dictionary
+        mapping parameter names (nprobe, ef_search, quantizer_ef_search, k_factor)
+        to their override values. Sweep mode is "quick" or "full" if specified,
+        otherwise None.
+
+    Raises
+    ------
+    typer.BadParameter
+        Raised when arguments are malformed (missing "--" prefix, empty option
+        names, missing values, invalid value types, conflicting sweep modes, or
+        unknown options). Error messages describe the specific validation failure.
+
+    Notes
+    -----
+    Tuning override parsing enables flexible FAISS parameter configuration via
+    command-line arguments. The function validates argument formats and types,
+    providing clear error messages for invalid inputs. Supported overrides include
+    nprobe, ef_search, quantizer_ef_search, and k_factor, with automatic type
+    casting to int or float based on parameter type.
+    """
     overrides: dict[str, float | int] = {}
     sweep_mode: SweepMode | None = None
     iterator = iter(raw_args)
@@ -846,11 +1820,66 @@ def _parse_tune_overrides(
 
 
 def _faiss_manager(index_override: Path | None = None) -> FAISSManager:
+    """Create FAISS manager instance using CLI context factory.
+
+    This function creates a FAISSManager instance by retrieving settings and
+    using the CLI context's FAISS manager factory. The function supports
+    optional index path override for flexible index access.
+
+    Parameters
+    ----------
+    index_override : Path | None, optional
+        Optional path override for FAISS index file. If provided, this path
+        is used instead of the settings path. The path is expanded and resolved
+        to absolute form.
+
+    Returns
+    -------
+    FAISSManager
+        Configured FAISS manager instance with CPU index loaded. The manager
+        is ready for search operations and index management.
+
+    Notes
+    -----
+    FAISS manager creation enables index access for CLI commands that need to
+    interact with FAISS indexes. The function uses the CLI context's factory
+    method, enabling dependency injection and testing with mock managers. The
+    manager is configured with settings and optional path override, providing
+    flexible index access.
+    """
     settings = _get_settings()
     return _cli_context().faiss_manager_factory(settings, index_override)
 
 
 def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
+    """Create DuckDB catalog instance using CLI context factory.
+
+    This function creates a DuckDBCatalog instance by retrieving settings and
+    using the CLI context's DuckDB catalog factory. The function supports
+    optional path override for flexible catalog access.
+
+    Parameters
+    ----------
+    path_override : Path | None, optional
+        Optional path override for DuckDB catalog file. If provided, this path
+        is used instead of the settings path. The path is expanded and resolved
+        to absolute form.
+
+    Returns
+    -------
+    DuckDBCatalog
+        Configured DuckDB catalog instance ready for querying chunk metadata
+        and structure annotations. The catalog is configured with all necessary
+        paths and settings from the application configuration.
+
+    Notes
+    -----
+    DuckDB catalog creation enables metadata access for CLI commands that need
+    to query chunk information, structure annotations, and embedding metadata.
+    The function uses the CLI context's factory method, enabling dependency
+    injection and testing with mock catalogs. The catalog is configured with
+    settings and optional path override, providing flexible catalog access.
+    """
     settings = _get_settings()
     return _cli_context().duckdb_catalog_factory(settings, path_override)
 
@@ -892,10 +1921,64 @@ def _count_idmap_rows(path: Path) -> int:
 
 
 def _embedding_provider(settings: Settings) -> EmbeddingProvider:
+    """Create embedding provider instance using CLI context factory.
+
+    This function creates an EmbeddingProvider instance by using the CLI context's
+    embedding provider factory with the provided settings. The function enables
+    dependency injection and testing with mock providers.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing embedding provider configuration (provider
+        type, model name, API keys, etc.). Used to instantiate the appropriate
+        embedding provider.
+
+    Returns
+    -------
+    EmbeddingProvider
+        Configured embedding provider instance ready for generating embeddings.
+        The provider type and configuration are determined from settings.
+
+    Notes
+    -----
+    Embedding provider creation enables embedding generation for CLI commands that
+    need to create embeddings from text. The function uses the CLI context's
+    factory method, enabling dependency injection and testing with mock providers.
+    The provider is configured with settings, supporting multiple provider backends
+    (OpenAI, VLLM, local models).
+    """
     return _cli_context().embedding_provider_factory(settings)
 
 
 def _load_xtr_index(settings: Settings) -> XTRIndex | None:
+    """Load XTR index if enabled and available.
+
+    This function attempts to load an XTR index from settings if XTR is enabled.
+    The function handles errors gracefully by returning None when the index
+    cannot be opened or is not ready, enabling optional XTR functionality.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing XTR configuration (enable flag, root
+        directory, config). Used to determine if XTR is enabled and locate the
+        index directory.
+
+    Returns
+    -------
+    XTRIndex | None
+        Loaded XTR index instance if XTR is enabled and index is available and
+        ready, otherwise None. Returns None if XTR is disabled, index cannot
+        be opened, or index is not ready.
+
+    Notes
+    -----
+    XTR index loading enables optional late-interaction rescoring functionality
+    when XTR indexes are available. The function handles errors gracefully by
+    returning None, ensuring commands can run even when XTR indexes are missing
+    or unavailable. This supports both XTR-enabled and XTR-disabled workflows.
+    """
     if not settings.xtr.enable:
         return None
     root = Path(settings.paths.xtr_dir).expanduser().resolve()
@@ -910,6 +1993,33 @@ def _load_xtr_index(settings: Settings) -> XTRIndex | None:
 
 
 def _eval_paths(settings: Settings) -> tuple[Path, Path]:
+    """Generate evaluation output paths with timestamp and run ID.
+
+    This function creates evaluation output paths by combining base directory,
+    timestamp, and random run ID. The function creates the output directory
+    if it doesn't exist and returns paths for Parquet and JSON output files.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing evaluation output directory configuration.
+        The output directory is expanded and resolved to absolute form.
+
+    Returns
+    -------
+    tuple[Path, Path]
+        Tuple containing (parquet_path, json_path). Parquet path is the output
+        path for evaluation results Parquet file. JSON path is the output path
+        for evaluation metrics JSON file. Both paths are in a timestamped
+        subdirectory with a random run ID prefix.
+
+    Notes
+    -----
+    Evaluation path generation enables organized evaluation output by creating
+    timestamped directories with unique run IDs. This prevents output file
+    conflicts and enables tracking of multiple evaluation runs. The function
+    creates directories automatically, ensuring output paths are ready for writing.
+    """
     base_dir = Path(settings.eval.output_dir).expanduser().resolve()
     timestamp = datetime.now(UTC).strftime("%y%m%d-%H%M")
     run_id = uuid.uuid4().hex[:8]
@@ -1233,6 +2343,35 @@ def show_profile_command(index: IndexOption = None) -> None:
 
 
 def _write_tuning_audit(manager: FAISSManager, tuning: dict[str, object]) -> Path:
+    """Write FAISS tuning audit file with JSON formatting.
+
+    This function writes a tuning audit file containing FAISS autotune results
+    and parameter configurations. The audit file is co-located with the FAISS
+    index file, using the same base name with ".audit.json" extension.
+
+    Parameters
+    ----------
+    manager : FAISSManager
+        FAISS manager instance providing index path for audit file location.
+        The audit file is written next to the index file.
+    tuning : dict[str, object]
+        Tuning dictionary containing autotune results, parameter configurations,
+        and performance metrics. The dictionary is serialized to JSON with
+        pretty-printed formatting.
+
+    Returns
+    -------
+    Path
+        Path where the audit file was written. The path is resolved to absolute
+        form and includes the ".audit.json" extension.
+
+    Notes
+    -----
+    Tuning audit writing enables tracking of FAISS autotune results and parameter
+    configurations. The audit file is co-located with the index file, enabling
+    easy discovery and association. The function creates parent directories if
+    needed and writes pretty-printed JSON for readability.
+    """
     audit_path = manager.index_path.with_suffix(".audit.json").expanduser().resolve()
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     audit_path.write_text(json.dumps(tuning, indent=2) + "\n", encoding="utf-8")
@@ -1244,6 +2383,39 @@ _AUTOTUNE_MIN_SAMPLES = 4
 
 
 def _run_autotune(manager: FAISSManager, mode: SweepMode) -> None:
+    """Run FAISS autotune with query sampling and parameter sweep.
+
+    This function runs FAISS autotune by sampling query vectors from the DuckDB
+    catalog, selecting sweep values based on mode, and invoking the manager's
+    autotune method. The function validates that sufficient vectors are available
+    before running autotune.
+
+    Parameters
+    ----------
+    manager : FAISSManager
+        FAISS manager instance to autotune. The manager must have an active index
+        and support autotune operations.
+    mode : SweepMode
+        Autotune sweep mode ("quick" or "full"). Quick mode uses fewer samples
+        and sweep values for faster execution. Full mode uses more samples and
+        sweep values for comprehensive tuning.
+
+    Raises
+    ------
+    typer.BadParameter
+        Raised when insufficient vectors are available in the DuckDB catalog for
+        autotune. The error message indicates the minimum required vectors and
+        the number found.
+
+    Notes
+    -----
+    Autotune execution enables automatic FAISS parameter optimization by testing
+    different parameter combinations and selecting optimal values. The function
+    samples query vectors from the catalog to use as autotune queries, ensuring
+    realistic performance evaluation. Sweep values are selected based on mode,
+    with quick mode using fewer values for faster execution and full mode using
+    more values for comprehensive tuning.
+    """
     settings = _get_settings()
     catalog = _duckdb_catalog()
     try:
@@ -1325,6 +2497,34 @@ def _execute_search(params: SearchCommandParams) -> None:
         summary: list[dict[str, object]] = []
 
         def _summarize_query(raw_line: str) -> dict[str, object] | None:
+            """Summarize search results for a single query.
+
+            This nested function processes a single query line by embedding it,
+            performing ANN search, refining results, and computing overlap statistics.
+            The function returns a summary dictionary containing query text, ANN results,
+            refined results, and overlap metrics.
+
+            Parameters
+            ----------
+            raw_line : str
+                Raw query line from input file. The line is stripped of whitespace
+                and used as the search query. Empty lines return None.
+
+            Returns
+            -------
+            dict[str, object] | None
+                Summary dictionary containing query text, ANN IDs and scores, refined
+                hits with metadata, and overlap count. Returns None if query line is
+                empty after stripping.
+
+            Notes
+            -----
+            Query summarization enables detailed search result analysis by capturing
+            both ANN and refined search results along with overlap metrics. The function
+            performs both ANN search and refined search to compare results, enabling
+            evaluation of refinement effectiveness. Overlap metrics help quantify
+            the agreement between ANN and refined results.
+            """
             query = raw_line.strip()
             if not query:
                 return None

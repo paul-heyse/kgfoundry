@@ -15,7 +15,9 @@ from codeintel_rev.io.hybrid_search import (
     HybridSearchTuning,
 )
 from codeintel_rev.io.vllm_client import VLLMClient
-from codeintel_rev.mcp_server.schemas import ScopeIn
+from codeintel_rev.mcp_server.method_metadata import normalize_stage0_method
+from codeintel_rev.mcp_server.schemas import ScopeIn, Stage0MethodInfo
+from codeintel_rev.retrieval.types import SearchHit
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.errors import EmbeddingError
 
@@ -30,11 +32,68 @@ else:
 
 
 @dataclass(slots=True, frozen=True)
+class Stage0ChannelHit:
+    """Minimal hit representation for injecting extra channels."""
+
+    doc_id: str
+    rank: int
+    score: float
+
+    @classmethod
+    def from_tuple(cls, payload: tuple[str | int, int, float]) -> Stage0ChannelHit:
+        """Return a normalized hit from tuple payloads.
+
+        Returns
+        -------
+        Stage0ChannelHit
+            Dataclass instance mirroring :class:`SearchHit` fields.
+        """
+        doc_id, rank, score = payload
+        return cls(doc_id=str(doc_id), rank=int(rank), score=float(score))
+
+
+type Stage0ChannelHitInput = Stage0ChannelHit | tuple[str | int, int, float]
+
+
+def _normalize_extra_channels(
+    extra_channels: Mapping[str, Sequence[Stage0ChannelHitInput]] | None,
+) -> Mapping[str, list[SearchHit]] | None:
+    """Return extra channels normalized to :class:`SearchHit` sequences.
+
+    Returns
+    -------
+    Mapping[str, list[SearchHit]] | None
+        Mapping keyed by channel name, or ``None`` when no extra channels
+        were provided.
+    """
+    if not extra_channels:
+        return None
+
+    normalized: dict[str, list[SearchHit]] = {}
+    for channel, hits in extra_channels.items():
+        normalized_hits: list[SearchHit] = []
+        for hit in hits:
+            candidate = (
+                hit if isinstance(hit, Stage0ChannelHit) else Stage0ChannelHit.from_tuple(hit)
+            )
+            normalized_hits.append(
+                SearchHit(
+                    doc_id=candidate.doc_id,
+                    rank=candidate.rank,
+                    score=candidate.score,
+                    source=channel,
+                )
+            )
+        normalized[channel] = normalized_hits
+    return normalized
+
+
+@dataclass(slots=True, frozen=True)
 class Stage0Options:
     """Optional knobs passed to the hybrid search engine."""
 
     weights: Mapping[str, float] | None = None
-    extra_channels: Mapping[str, Sequence[tuple[str, int, float]]] | None = None
+    extra_channels: Mapping[str, Sequence[Stage0ChannelHitInput]] | None = None
     tuning: HybridSearchTuning | None = None
     faiss_ready: bool = True
 
@@ -46,7 +105,7 @@ class Stage0Result:
     ids: list[int]
     scores: list[float]
     warnings: list[str]
-    method: Mapping[str, object] | None
+    method: Stage0MethodInfo | None
     channels: list[str]
     contributions: Mapping[int, list[tuple[str, int, float]]] | None
 
@@ -55,7 +114,7 @@ class Stage0Result:
 class Stage0Metadata:
     """Additional metadata surfaced alongside the Stage-0 result."""
 
-    limits: list[str]
+    limits: tuple[str, ...]
     effective_limit: int
     requested_limit: int
 
@@ -79,6 +138,18 @@ class _ScopeFilterFlags:
 
     @classmethod
     def from_scope(cls, scope: ScopeIn | None) -> _ScopeFilterFlags:
+        """Extract filter flags from a scope configuration.
+
+        Parameters
+        ----------
+        scope : ScopeIn | None
+            Scope configuration dictionary, or None if no scope is provided.
+
+        Returns
+        -------
+        _ScopeFilterFlags
+            Flags indicating which filter types are present in the scope.
+        """
         return cls(
             has_include_globs=bool(scope and scope.get("include_globs")),
             has_exclude_globs=bool(scope and scope.get("exclude_globs")),
@@ -87,6 +158,13 @@ class _ScopeFilterFlags:
 
     @property
     def has_filters(self) -> bool:
+        """Return True if any filter flags are set.
+
+        Returns
+        -------
+        bool
+            True if include_globs, exclude_globs, or languages filters are present.
+        """
         return self.has_include_globs or self.has_exclude_globs or self.has_languages
 
 
@@ -127,7 +205,7 @@ class _HybridResult:
     ids: list[int]
     scores: list[float]
     warnings: list[str]
-    method: Mapping[str, object] | None
+    method: Stage0MethodInfo | None
     channels: list[str]
     contributions: Mapping[int, list[tuple[str, int, float]]] | None
 
@@ -139,6 +217,15 @@ class _HybridResolveParams:
     plan: _SemanticSearchPlan
     limits_metadata: list[str]
     options: Stage0Options | None
+
+
+@dataclass(slots=True, frozen=True)
+class _FaissSearchConfig:
+    context: ApplicationContext
+    catalog: DuckDBCatalog
+    limit: int
+    nprobe: int
+    overrides: Mapping[str, float | int] | None
 
 
 def run_stage0(
@@ -171,7 +258,7 @@ def run_stage0(
     """
     opts = options or Stage0Options()
     hs_options = HybridSearchOptions(
-        extra_channels=opts.extra_channels,
+        extra_channels=_normalize_extra_channels(opts.extra_channels),
         weights=opts.weights,
         tuning=opts.tuning,
         faiss_ready=opts.faiss_ready,
@@ -186,7 +273,7 @@ def run_stage0(
         ids=[int(doc.doc_id) for doc in hybrid_result.docs],
         scores=[float(doc.score) for doc in hybrid_result.docs],
         warnings=list(hybrid_result.warnings or []),
-        method=dict(hybrid_result.method or {}),
+        method=normalize_stage0_method(hybrid_result.method),
         channels=list(hybrid_result.channels or []),
         contributions={
             int(chunk_id): value for chunk_id, value in hybrid_result.contributions.items()
@@ -233,8 +320,9 @@ def execute_semantic_stage0(request: SemanticStage0Request) -> tuple[Stage0Resul
             ),
         )
 
+    final_limits = tuple(limits_metadata)
     metadata = Stage0Metadata(
-        limits=limits_metadata,
+        limits=final_limits,
         effective_limit=plan.effective_limit,
         requested_limit=request.limit,
     )
@@ -260,6 +348,12 @@ def _run_faiss_stage(
 ) -> _FaissStageResult:
     """Execute the FAISS lookup stage for semantic search.
 
+    Extended Summary
+    ----------------
+    Runs the FAISS ANN search when embeddings are available and annotates
+    ``limits_metadata`` with fallback reasons when the search cannot run or
+    is suppressed due to low semantic scores.
+
     Parameters
     ----------
     request : SemanticStage0Request
@@ -281,13 +375,16 @@ def _run_faiss_stage(
     if not (plan.faiss_ready and query_vector is not None):
         return _FaissStageResult([], [], None)
 
-    result_ids, result_scores, search_exc = _run_faiss_search(
+    search_config = _FaissSearchConfig(
         context=request.context,
-        query_vector=query_vector,
+        catalog=catalog,
         limit=plan.fanout.faiss_k,
         nprobe=plan.nprobe,
-        tuning_overrides=plan.tuning_overrides,
-        catalog=catalog,
+        overrides=plan.tuning_overrides,
+    )
+    result_ids, result_scores, search_exc = _run_faiss_search(
+        config=search_config,
+        query_vector=query_vector,
     )
     if search_exc is not None:
         limits_metadata.append("faiss_fallback:unavailable")
@@ -307,6 +404,11 @@ def _resolve_hybrid_results(
 ) -> _HybridResult:
     """Fuse FAISS outputs with hybrid search engine results.
 
+    Extended Summary
+    ----------------
+    Hydrates FAISS hits, executes the HybridSearchEngine, records warnings,
+    and normalizes contribution maps to integer chunk IDs.
+
     Parameters
     ----------
     faiss_stage : _FaissStageResult
@@ -322,7 +424,6 @@ def _resolve_hybrid_results(
     """
     hydration_ids = list(faiss_stage.ids)
     hydration_scores = list(faiss_stage.scores)
-    contribution_map: dict[int, list[tuple[str, int, float]]] | None = None
     channels_out: list[str] = ["semantic", "faiss"]
 
     try:
@@ -335,23 +436,24 @@ def _resolve_hybrid_results(
             warnings=list(params.limits_metadata),
             method=None,
             channels=channels_out,
-            contributions=contribution_map,
+            contributions=None,
         )
 
-    semantic_hits = list(zip(faiss_stage.ids, faiss_stage.scores, strict=False))
     opts = params.options or Stage0Options()
     tuning = opts.tuning or HybridSearchTuning(
         k=params.plan.fanout.faiss_k, nprobe=params.plan.nprobe
     )
+    normalized_channels = _normalize_extra_channels(opts.extra_channels)
+    faiss_ready_flag = opts.faiss_ready if params.options is not None else params.plan.faiss_ready
     hybrid_result = hybrid_engine.search(
         query=params.query,
-        semantic_hits=semantic_hits,
+        semantic_hits=list(zip(faiss_stage.ids, faiss_stage.scores, strict=False)),
         limit=params.plan.effective_limit,
         options=HybridSearchOptions(
-            extra_channels=opts.extra_channels,
+            extra_channels=normalized_channels,
             weights=opts.weights,
             tuning=tuning,
-            faiss_ready=params.plan.faiss_ready if params.options is None else opts.faiss_ready,
+            faiss_ready=faiss_ready_flag,
         ),
     )
     if hybrid_result.warnings:
@@ -383,7 +485,7 @@ def _resolve_hybrid_results(
             ids=fused_ids[: params.plan.effective_limit],
             scores=fused_scores[: params.plan.effective_limit],
             warnings=list(params.limits_metadata),
-            method=hybrid_result.method,
+            method=normalize_stage0_method(hybrid_result.method),
             channels=channels_out,
             contributions=contributions,
         )
@@ -392,9 +494,9 @@ def _resolve_hybrid_results(
         ids=hydration_ids[: params.plan.effective_limit],
         scores=hydration_scores[: params.plan.effective_limit],
         warnings=list(params.limits_metadata),
-        method=hybrid_result.method,
+        method=normalize_stage0_method(hybrid_result.method),
         channels=channels_out,
-        contributions=contribution_map,
+        contributions=None,
     )
 
 
@@ -404,6 +506,12 @@ def _build_semantic_search_plan(
     requested_limit: int,
 ) -> _SemanticSearchPlan:
     """Derive tuning overrides, fan-out, and limits for Stage-0 retrieval.
+
+    Extended Summary
+    ----------------
+    Normalizes scope-provided FAISS tuning overrides, clamps requested limits
+    to the configured maxima, and describes fan-out/nprobe decisions needed
+    for the semantic stage.
 
     Parameters
     ----------
@@ -457,6 +565,11 @@ def _build_search_budget(
     requested_limit: int,
 ) -> _SearchBudget:
     """Clamp the requested limit and determine whether FAISS is ready.
+
+    Extended Summary
+    ----------------
+    Applies max-result clamps, consults ``ensure_faiss_ready()``, and captures
+    metadata describing clamp reasons and FAISS readiness.
 
     Parameters
     ----------
@@ -529,16 +642,31 @@ def _overfetch_bonus(effective_limit: int, scope_flags: _ScopeFilterFlags) -> in
 
 def _run_faiss_search(
     *,
-    context: ApplicationContext,
+    config: _FaissSearchConfig,
     query_vector: NDArrayF32,
-    limit: int,
-    nprobe: int,
-    tuning_overrides: Mapping[str, float | int] | None,
-    catalog: DuckDBCatalog,
 ) -> tuple[list[int], list[float], Exception | None]:
+    """Execute a FAISS search with runtime overrides applied.
+
+    Extended Summary
+    ----------------
+    Applies dynamic runtime overrides (nprobe/efSearch/k_factor) and proxies
+    the request to the shared ``FAISSManager`` instance.
+
+    Parameters
+    ----------
+    config : _FaissSearchConfig
+        Search configuration containing context, catalog, limits, and overrides.
+    query_vector : NDArrayF32
+        Normalized query embedding with shape ``(1, dim)``.
+
+    Returns
+    -------
+    tuple[list[int], list[float], Exception | None]
+        Tuple of result IDs, scores, and optional exception when FAISS search fails.
+    """
     try:
-        overrides = dict(tuning_overrides or {})
-        final_nprobe = int(overrides.get("nprobe", nprobe))
+        overrides = dict(config.overrides or {})
+        final_nprobe = int(overrides.get("nprobe", config.nprobe))
         runtime = SearchRuntimeOverrides(
             ef_search=int(overrides["ef_search"]) if "ef_search" in overrides else None,
             quantizer_ef_search=(
@@ -548,12 +676,12 @@ def _run_faiss_search(
             ),
             k_factor=float(overrides["k_factor"]) if "k_factor" in overrides else None,
         )
-        distances, ids = context.faiss_manager.search(
+        distances, ids = config.context.faiss_manager.search(
             query_vector,
-            k=limit,
+            k=config.limit,
             nprobe=final_nprobe,
             runtime=runtime,
-            catalog=catalog,
+            catalog=config.catalog,
         )
     except RuntimeError as exc:
         return [], [], exc
@@ -624,6 +752,7 @@ def _embed_query(client: VLLMClient, query: str) -> tuple[NDArrayF32 | None, str
 
 __all__ = [
     "SemanticStage0Request",
+    "Stage0ChannelHit",
     "Stage0Metadata",
     "Stage0Options",
     "Stage0Result",

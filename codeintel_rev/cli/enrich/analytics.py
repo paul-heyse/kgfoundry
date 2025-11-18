@@ -6,6 +6,7 @@ from __future__ import annotations
 import typer
 
 from codeintel_rev.cli.enrich import app, common
+from codeintel_rev.cli.enrich.__main__ import main as enrich_main
 from codeintel_rev.enrich.errors import StageError
 from codeintel_rev.services.enrich import exports as export_services
 
@@ -37,8 +38,6 @@ def analytics(
 
 def main() -> None:  # pragma: no cover - entrypoint shim
     """Invoke the enrichment CLI (analytics shim)."""
-    from codeintel_rev.cli.enrich.__main__ import main as enrich_main
-
     enrich_main()
 
 

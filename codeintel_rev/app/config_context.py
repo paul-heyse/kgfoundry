@@ -1420,6 +1420,7 @@ class ApplicationContext:
             "git_client",
             "async_git_client",
             "factory_adjuster",
+            "duckdb_catalog_factory",
         }
         unknown = set(components) - allowed
         if unknown:
@@ -1436,7 +1437,9 @@ class ApplicationContext:
             faiss_manager=_component_value("faiss_manager", self.faiss_manager),
             scope_store=_component_value("scope_store", self.scope_store),
             duckdb_manager=_component_value("duckdb_manager", self.duckdb_manager),
-            duckdb_catalog_factory=self.duckdb_catalog_factory,
+            duckdb_catalog_factory=_component_value(
+                "duckdb_catalog_factory", self.duckdb_catalog_factory
+            ),
             git_client=_component_value("git_client", self.git_client),
             async_git_client=_component_value("async_git_client", self.async_git_client),
             runtime_observer=self.runtime_observer,

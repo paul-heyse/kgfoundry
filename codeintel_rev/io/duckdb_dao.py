@@ -1,6 +1,5 @@
 """DAO helpers for the DuckDB catalog, executing schema SQL."""
 
-# ruff: noqa: S608
 # DuckDB refuses bind parameters inside CREATE VIEW / read_parquet statements,
 # so paths are safely quoted/escaped in this module instead.
 
@@ -17,7 +16,6 @@ from codeintel_rev.io.duckdb_schema import (
     TABLE_FAISS_IDMAP_MAT,
     TABLE_FAISS_JOIN_MAT,
     VIEW_CHUNKS,
-    VIEW_FAISS_IDMAP,
     IdMapMeta,
     sql_count,
     sql_create_chunks_materialized,
@@ -27,6 +25,7 @@ from codeintel_rev.io.duckdb_schema import (
     sql_create_empty_chunks_materialized,
     sql_create_empty_chunks_view,
     sql_create_empty_faiss_idmap_view,
+    sql_create_faiss_idmap_from_materialized,
     sql_create_faiss_idmap_view,
     sql_create_idmap_mat,
     sql_create_idmap_mat_meta,
@@ -83,26 +82,6 @@ def _apply_parquet_path(sql: str, parquet_path: Path) -> str:
         SQL statement with the literal substituted once.
     """
     return sql.replace("?", _quote_parquet_literal(parquet_path), 1)
-
-
-def _escape_identifier(identifier: str) -> str:
-    """Return a safely quoted identifier for view creation statements.
-
-    Parameters
-    ----------
-    identifier : str
-        Identifier name to quote and escape for SQL usage.
-
-    Returns
-    -------
-    str
-        Quoted identifier safe for inline usage.
-    """
-    escape_fn = cast("Callable[[str], str] | None", getattr(duckdb, "escape_identifier", None))
-    if callable(escape_fn):
-        return escape_fn(identifier)
-    escaped = identifier.replace('"', '""')
-    return f'"{escaped}"'
 
 
 def _is_valid_parquet_file(path: Path) -> bool:
@@ -201,17 +180,7 @@ def ensure_faiss_idmap_view(conn: duckdb.DuckDBPyConnection, *, idmap_parquet: P
 
     if relation_exists(conn, TABLE_FAISS_IDMAP_MAT):
         column = _choose_idmap_column(conn)
-        select_expr = (
-            f"{_escape_identifier(column)} AS external_id"
-            if column is not None
-            else "NULL AS external_id"
-        )
-        query = (
-            f"CREATE OR REPLACE VIEW {VIEW_FAISS_IDMAP} AS "
-            f"SELECT faiss_row, {select_expr} "
-            f"FROM {TABLE_FAISS_IDMAP_MAT}"
-        )
-        conn.execute(query)
+        conn.execute(sql_create_faiss_idmap_from_materialized(column))
         return
 
     conn.execute(sql_create_empty_faiss_idmap_view())

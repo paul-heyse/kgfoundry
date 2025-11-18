@@ -227,6 +227,50 @@ class Finding(TypedDict, total=False):
     explanations: ExplanationPayload
 
 
+class MethodGatingInfo(TypedDict, total=False):
+    """Secondary-stage gating metadata."""
+
+    should_run_secondary_stage: bool
+    reason: str
+    notes: list[str]
+
+
+class MethodRerankerInfo(TypedDict, total=False):
+    """Reranker execution metadata."""
+
+    provider: str | None
+    enabled: bool
+    reason: str | None
+    reordered: int | None
+
+
+class Stage0MethodInfo(TypedDict, total=False):
+    """Stage-0 hybrid search metadata emitted by the retrieval pipeline.
+
+    Attributes
+    ----------
+    retrieval : list[str]
+        Channels that participated in Stage-0 fusion (e.g., ["semantic", "bm25"]).
+    coverage : str
+        Human-readable description of the Stage-0 result coverage.
+    notes : list[str]
+        Optional warnings accumulated during fusion (channel failures, fallbacks).
+    explainability : dict[str, object]
+        Structured payload describing pool weights, thresholds, or diagnostics.
+    fusion : dict[str, object]
+        Optional fusion strategy metadata (type, parameters).
+    budget : dict[str, object]
+        Optional adaptive budget metadata returned by the fusion controller.
+    """
+
+    retrieval: list[str]
+    coverage: str
+    notes: list[str]
+    explainability: dict[str, object]
+    fusion: dict[str, object]
+    budget: dict[str, object]
+
+
 class MethodInfo(TypedDict, total=False):
     """Retrieval method metadata for search operations.
 
@@ -253,7 +297,11 @@ class MethodInfo(TypedDict, total=False):
         Optional free-form notes about retrieval decisions (e.g., gating reasons).
     explainability : dict[str, list[dict[str, object]]]
         Optional structured explainability payload keyed by channel.
-    rerank : dict[str, object]
+    stage0 : Stage0MethodInfo
+        Optional Stage-0 method metadata (tuning parameters, fanout info).
+    gating : MethodGatingInfo
+        Optional metadata describing secondary-stage gating decisions.
+    reranker : MethodRerankerInfo
         Optional metadata describing the reranker decision (provider, reason).
     """
 
@@ -262,7 +310,9 @@ class MethodInfo(TypedDict, total=False):
     stages: list[StageInfo]
     notes: list[str]
     explainability: dict[str, list[dict[str, object]]]
-    rerank: dict[str, object]
+    stage0: Stage0MethodInfo
+    gating: MethodGatingInfo
+    reranker: MethodRerankerInfo
 
 
 class StageInfo(TypedDict, total=False):
@@ -668,7 +718,9 @@ __all__ = [
     "ListPathsResponse",
     "Location",
     "Match",
+    "MethodGatingInfo",
     "MethodInfo",
+    "MethodRerankerInfo",
     "OpenFileResponse",
     "ScopeIn",
     "SearchExplainability",
@@ -678,5 +730,6 @@ __all__ = [
     "SearchStructuredContent",
     "SearchTextResponse",
     "SearchToolArgs",
+    "Stage0MethodInfo",
     "SymbolInfo",
 ]

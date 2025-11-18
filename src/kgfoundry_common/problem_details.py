@@ -391,11 +391,15 @@ def _coerce_exception_params(*args: object, **kwargs: object) -> ExceptionProble
 
 
 @overload
-def build_problem_details(params: ProblemDetailsParams, /) -> ProblemDetails: ...
+def build_problem_details(params: ProblemDetailsParams, /) -> ProblemDetails:  # noqa: D418
+    """Build Problem Details from a ProblemDetailsParams instance.
+
+    See the main :func:`build_problem_details` implementation for full documentation.
+    """
 
 
 @overload
-def build_problem_details(
+def build_problem_details(  # noqa: D418
     problem_type: str,
     title: str,
     status: int,
@@ -404,7 +408,11 @@ def build_problem_details(
     *,
     code: str | None = ...,
     extensions: Mapping[str, JsonValue] | None = ...,
-) -> ProblemDetails: ...
+) -> ProblemDetails:
+    """Build Problem Details from positional and keyword arguments.
+
+    See the main :func:`build_problem_details` implementation for full documentation.
+    """
 
 
 # [nav:anchor build_problem_details]
@@ -472,11 +480,15 @@ def build_problem_details(*args: object, **kwargs: object) -> ProblemDetails:
 
 
 @overload
-def problem_from_exception(params: ExceptionProblemDetailsParams) -> ProblemDetails: ...
+def problem_from_exception(params: ExceptionProblemDetailsParams) -> ProblemDetails:  # noqa: D418
+    """Build Problem Details from an ExceptionProblemDetailsParams instance.
+
+    See the main :func:`problem_from_exception` implementation for full documentation.
+    """
 
 
 @overload
-def problem_from_exception(
+def problem_from_exception(  # noqa: D418
     exc: Exception,
     problem_type: str,
     title: str,
@@ -485,7 +497,11 @@ def problem_from_exception(
     *,
     code: str | None = ...,
     extensions: Mapping[str, JsonValue] | None = ...,
-) -> ProblemDetails: ...
+) -> ProblemDetails:
+    """Build Problem Details from an exception and positional/keyword arguments.
+
+    See the main :func:`problem_from_exception` implementation for full documentation.
+    """
 
 
 # [nav:anchor problem_from_exception]

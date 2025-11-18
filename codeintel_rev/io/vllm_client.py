@@ -583,14 +583,50 @@ class _StubVLLMClient:
         return np_mod.zeros((count, self.config.embedding_dim), dtype=np_mod.float32)
 
     def embed_single(self, text: str) -> NDArrayF32:
+        """Return a zero vector for a single text (stub implementation).
+
+        Parameters
+        ----------
+        text : str
+            Text to embed (ignored in stub).
+
+        Returns
+        -------
+        NDArrayF32
+            Zero vector matching configured embedding dimension.
+        """
         del text
         return self._zeros(1)[0]
 
     def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
+        """Return zero vectors for a batch of texts (stub implementation).
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Texts to embed (ignored in stub).
+
+        Returns
+        -------
+        NDArrayF32
+            Zero matrix with shape (len(texts), embedding_dim).
+        """
         text_list = list(texts)
         return self._zeros(len(text_list))
 
     async def embed_batch_async(self, texts: Sequence[str]) -> NDArrayF32:
+        """Return zero vectors for a batch of texts (async stub implementation).
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Texts to embed (ignored in stub).
+
+        Returns
+        -------
+        NDArrayF32
+            Zero matrix with shape (len(texts), embedding_dim).
+        """
         return self.embed_batch(texts)
 
     def close(self) -> None:  # pragma: no cover - no resources to release

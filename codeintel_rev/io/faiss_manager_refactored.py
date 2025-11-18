@@ -22,6 +22,7 @@ from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.errors import VectorIndexStateError
 from codeintel_rev.io.faiss_build import (
     IndexBuildConfig,
+    IndexFamily,
     build_primary_index,
 )
 from codeintel_rev.io.faiss_build import (
@@ -135,6 +136,7 @@ class FAISSManager:
         self.refine_k_factor = opts.refine_k_factor
         self.autotune_on_start = opts.autotune_on_start
         self.runtime_opts = opts
+        self.faiss_family: str | None = opts.faiss_family
 
         # Live indexes (private)
         self.cpu_index: FaissIndex | None = None
@@ -146,7 +148,7 @@ class FAISSManager:
         self._tuning_lock = RLock()
         self._paths = IndexArtifactPaths(self.index_path)
 
-    def build_index(self, vectors: NDArrayF32, *, family: str | None = None) -> None:
+    def build_index(self, vectors: NDArrayF32, *, family: IndexFamily | None = None) -> None:
         """Build and train FAISS index with adaptive type selection.
 
         Chooses the optimal index type based on corpus size:
@@ -171,14 +173,21 @@ class FAISSManager:
             msg = "vectors must be a non-empty array"
             raise VectorIndexStateError(msg)
 
+        resolved_family: IndexFamily = family or "adaptive"
         cfg = IndexBuildConfig(
             vec_dim=self.vec_dim,
             default_nlist=self.nlist,
-            family=family or "adaptive",  # type: ignore[arg-type]
+            family=resolved_family,
         )
-        self.cpu_index = build_primary_index(vectors, cfg=cfg, override_family=family)
+        index, _factory = build_primary_index(
+            vectors,
+            cfg=cfg,
+            override_family=resolved_family,
+        )
+        self.cpu_index = index
         self.secondary_index = None
         self.incremental_ids.clear()
+        self.faiss_family = resolved_family
 
     def add_vectors(self, vectors: NDArrayF32, ids: NDArrayI64) -> None:
         """Add vectors to the primary index after build.
@@ -272,6 +281,7 @@ class FAISSManager:
         self.cpu_index = builder_load_index(self.index_path)
         self.secondary_index = None
         self.incremental_ids.clear()
+        self.faiss_family = self.runtime_opts.faiss_family
 
     def save_secondary_index(self) -> None:
         """Persist the secondary index to disk (.secondary suffix).
@@ -341,7 +351,7 @@ class FAISSManager:
         *,
         nprobe: int | None = None,
         runtime: SearchRuntimeOverrides | None = None,
-        catalog: DuckDBCatalog | None = None,
+        catalog: object | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Execute dual-index search with optional exact rerank.
 
@@ -375,14 +385,19 @@ class FAISSManager:
         eff_k = int(k or self.default_k)
         eff_nprobe = int(nprobe or self.default_nprobe)
 
+        k_factor = self.refine_k_factor
+        if runtime is not None and runtime.k_factor is not None:
+            k_factor = runtime.k_factor
+
+        catalog_obj = cast("DuckDBCatalog | None", catalog)
         return runtime_search_dual(
             primary=self.cpu_index,
             secondary=self.secondary_index,
             query=query,
             k=eff_k,
             nprobe=eff_nprobe,
-            runtime=runtime,
-            catalog=catalog,
+            refine_k_factor=k_factor,
+            catalog=catalog_obj,
         )
 
     def apply_runtime_parameters(self, overrides: dict[str, float | int]) -> None:
@@ -396,13 +411,14 @@ class FAISSManager:
         if self.cpu_index is None:
             return
 
+        nprobe_value = overrides.get("nprobe")
+        ef_search_value = overrides.get("efSearch")
+        quantizer_value = overrides.get("quantizer_efSearch")
         apply_runtime_parameters(
             self.cpu_index,
-            nprobe=int(overrides.get("nprobe")) if "nprobe" in overrides else None,
-            ef_search=int(overrides.get("efSearch")) if "efSearch" in overrides else None,
-            quantizer_ef_search=int(overrides.get("quantizer_efSearch"))
-            if "quantizer_efSearch" in overrides
-            else None,
+            nprobe=int(nprobe_value) if nprobe_value is not None else None,
+            ef_search=int(ef_search_value) if ef_search_value is not None else None,
+            quantizer_ef_search=int(quantizer_value) if quantizer_value is not None else None,
         )
 
     def merge_indexes(self) -> None:
@@ -473,6 +489,7 @@ class FAISSManager:
     def runtime_overrides(self) -> dict[str, float]:
         """Mutable runtime override dictionary."""
         return self._runtime_overrides
+
 
 
 __all__ = ["FAISSManager", "FAISSRuntimeOptions"]

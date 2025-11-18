@@ -26,6 +26,50 @@ def overlays(
     overrides: list[str] | None = pipeline.OVERLAYS_SET_OPTION,
     dry_run: bool = pipeline.DRY_RUN_OPTION,
 ) -> None:
+    """Generate type stub overlays for Python files with type errors.
+
+    This command generates type stub overlays (.pyi files) for Python files that
+    have type errors, creating overlay files that provide correct type annotations
+    without modifying the original source files. The command processes files in
+    the repository, generates overlays up to a configured maximum, optionally
+    activates them into the stubs directory, and writes a manifest of generated
+    overlays.
+
+    Parameters
+    ----------
+    ctx : typer.Context
+        Typer context containing shared CLI state and pipeline options. Used to
+        access pipeline configuration (root, scip index path) and build overlay
+        context.
+    config_path : Path | None, optional
+        Optional path to overlay configuration file. If None, uses default
+        configuration. The config file specifies overlay generation policy,
+        maximum overlays, and activation settings.
+    overrides : list[str] | None, optional
+        Optional list of configuration overrides in key=value format. Overrides
+        are applied on top of config file settings, enabling command-line
+        customization of overlay generation behavior.
+    dry_run : bool, optional
+        Flag indicating whether to perform a dry run without actually generating
+        or activating overlays. When True, the command reports what would be
+        generated without making changes.
+
+    Raises
+    ------
+    typer.BadParameter
+        Raised when the --scip option is missing, which is required for overlay
+        generation. The SCIP index is needed to analyze type errors and generate
+        appropriate overlays.
+
+    Notes
+    -----
+    Overlay generation enables type error correction without modifying source files
+    by creating companion stub files (.pyi) that provide correct type annotations.
+    The command iterates through Python files in the repository, generates overlays
+    for files with type errors, optionally activates them into the stubs directory,
+    and writes a manifest tracking generated overlays. The process respects maximum
+    overlay limits and can deactivate existing overlays before generation.
+    """
     state = pipeline.ensure_state(ctx)
     pipeline_opts = state.pipeline
     if pipeline_opts.scip is None:
@@ -113,6 +157,18 @@ app.command("overlays")(overlays)
 
 
 def main() -> None:  # pragma: no cover - entrypoint
+    """Entry point for the overlay CLI application.
+
+    This function serves as the main entry point for the overlay generation CLI,
+    invoking the Typer application to process command-line arguments and execute
+    overlay generation commands.
+
+    Notes
+    -----
+    The function delegates to the Typer app instance, which handles argument
+    parsing, command routing, and execution. This entry point is used when the
+    module is executed directly or invoked as a CLI command.
+    """
     app()
 
 

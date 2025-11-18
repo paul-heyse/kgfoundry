@@ -2,9 +2,57 @@
 
 from __future__ import annotations
 
-from codeintel_rev.retrieval.pipeline.gating import StageGateConfig, decide_secondary_stage
+import pytest
+from codeintel_rev.retrieval.pipeline.gating import (
+    StageGateConfig,
+    StageSignalFactory,
+    decide_secondary_stage,
+)
 
 from tests._helpers import assertions
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (
+            {"candidate_count": 5, "elapsed_ms": 12, "top_score": 0.5, "second_score": 0.4},
+            (5, 12.0, 0.5, 0.4),
+        ),
+        (
+            {"candidate_count": "7", "elapsed_ms": "1.5"},
+            (7, 1.5, None, None),
+        ),
+    ],
+)
+def test_stage_signal_factory_builds_structured_payload(
+    payload: dict[str, object], expected: tuple[int, float, float | None, float | None]
+) -> None:
+    """StageSignalFactory converts loose payloads to StageSignals."""
+    signals = StageSignalFactory(payload).build()
+    assertions.expect_equal(signals.candidate_count, expected[0])
+    assertions.expect_equal(signals.elapsed_ms, expected[1])
+    assertions.expect_equal(signals.best_score, expected[2])
+    assertions.expect_equal(signals.second_best_score, expected[3])
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({"candidate_count": None, "elapsed_ms": 0}, "candidate_count"),
+        ({"candidate_count": True, "elapsed_ms": 0}, "candidate_count"),
+        (
+            {"candidate_count": 1, "elapsed_ms": 0, "top_score": "nope"},
+            "top_score",
+        ),
+    ],
+)
+def test_stage_signal_factory_rejects_invalid_payload(
+    payload: dict[str, object], message: str
+) -> None:
+    """Invalid payloads raise descriptive ValueErrors."""
+    with pytest.raises(ValueError, match=message):
+        StageSignalFactory(payload).build()
 
 
 def test_decide_secondary_stage_requires_min_candidates() -> None:

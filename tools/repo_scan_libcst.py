@@ -122,7 +122,7 @@ if cst is not None:
             if self._is_type_check_guard(original_node.test):
                 self._type_check_guard_depth = max(0, self._type_check_guard_depth - 1)
 
-        def leave_If(  # noqa: N802 - LibCST callback
+        def leave_If(  # noqa: N802
             self,
             original_node: libcst_types.If,
         ) -> None:

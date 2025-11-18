@@ -1,6 +1,5 @@
 """Pure DuckDB schema helpers for catalog DDL and queries."""
 
-# ruff: noqa: S608
 # The SQL statements in this module only interpolate static relation names;
 # dynamic paths are always bound as parameters by the DAO layer.
 
@@ -79,6 +78,98 @@ SELECT
 WHERE 1 = 0
 """
 
+_SQL_CREATE_CHUNKS_VIEW_FROM_PARQUET = (
+    'CREATE OR REPLACE VIEW "chunks" AS SELECT * FROM read_parquet(?)'
+)
+_SQL_CREATE_EMPTY_CHUNKS_VIEW = 'CREATE OR REPLACE VIEW "chunks" AS ' + EMPTY_CHUNKS_SELECT
+_SQL_CREATE_CHUNKS_MATERIALIZED = (
+    'CREATE OR REPLACE TABLE "chunks_materialized" AS SELECT * FROM read_parquet(?)'
+)
+_SQL_CREATE_EMPTY_CHUNKS_MATERIALIZED = (
+    'CREATE OR REPLACE TABLE "chunks_materialized" AS ' + EMPTY_CHUNKS_SELECT
+)
+_SQL_CREATE_CHUNKS_VIEW_FROM_MAT = (
+    'CREATE OR REPLACE VIEW "chunks" AS SELECT * FROM "chunks_materialized"'
+)
+_SQL_CREATE_CHUNKS_MAT_INDEX = (
+    'CREATE INDEX IF NOT EXISTS "idx_chunks_materialized_uri" ON "chunks_materialized"(uri)'
+)
+_SQL_CREATE_FAISS_IDMAP_VIEW = """
+CREATE OR REPLACE VIEW "faiss_idmap" AS
+SELECT
+    faiss_row,
+    external_id
+FROM read_parquet(?)
+"""
+_SQL_CREATE_EMPTY_FAISS_IDMAP_VIEW = """
+CREATE OR REPLACE VIEW "faiss_idmap" AS
+SELECT
+    CAST(NULL AS BIGINT) AS faiss_row,
+    CAST(NULL AS BIGINT) AS external_id
+WHERE FALSE
+"""
+_SQL_FAISS_IDMAP_FROM_CHUNK = """
+CREATE OR REPLACE VIEW "faiss_idmap" AS
+SELECT
+    faiss_row,
+    chunk_id AS external_id
+FROM "faiss_idmap_mat"
+"""
+_SQL_FAISS_IDMAP_FROM_EXTERNAL = """
+CREATE OR REPLACE VIEW "faiss_idmap" AS
+SELECT
+    faiss_row,
+    external_id
+FROM "faiss_idmap_mat"
+"""
+_SQL_FAISS_IDMAP_FROM_NULL = """
+CREATE OR REPLACE VIEW "faiss_idmap" AS
+SELECT
+    faiss_row,
+    NULL AS external_id
+FROM "faiss_idmap_mat"
+"""
+_SQL_CREATE_V_FAISS_JOIN = """
+CREATE OR REPLACE VIEW "v_faiss_join" AS
+SELECT
+    f.faiss_row,
+    f.external_id AS chunk_id,
+    c.*
+FROM "faiss_idmap" AS f
+LEFT JOIN "chunks" AS c
+  ON c.id = f.external_id
+"""
+_SQL_MATERIALIZE_V_FAISS_JOIN = (
+    'CREATE OR REPLACE TABLE "faiss_join_mat" AS SELECT * FROM "v_faiss_join"'
+)
+_SQL_CREATE_IDMAP_MAT = """
+CREATE TABLE IF NOT EXISTS "faiss_idmap_mat" AS
+SELECT * FROM "v_faiss_join" LIMIT 0
+"""
+_SQL_CREATE_IDMAP_MAT_META = """
+CREATE TABLE IF NOT EXISTS "faiss_idmap_mat_meta" (
+    parquet_path TEXT,
+    parquet_hash TEXT,
+    checksum TEXT,
+    row_count BIGINT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+"""
+_SQL_SELECT_IDMAP_CHECKSUM = (
+    'SELECT checksum FROM "faiss_idmap_mat_meta" ORDER BY updated_at DESC LIMIT 1'
+)
+_SQL_DELETE_IDMAP_MAT = 'DELETE FROM "faiss_idmap_mat"'
+_SQL_INSERT_IDMAP_MAT = 'INSERT INTO "faiss_idmap_mat" SELECT * FROM "v_faiss_join"'
+_SQL_DELETE_IDMAP_META = 'DELETE FROM "faiss_idmap_mat_meta"'
+_SQL_INSERT_IDMAP_META = """
+INSERT INTO "faiss_idmap_mat_meta"(parquet_path, parquet_hash, checksum, row_count)
+VALUES (?, ?, ?, ?)
+"""
+_COUNTABLE_TABLES: Final[dict[str, str]] = {
+    TABLE_FAISS_JOIN_MAT: 'SELECT COUNT(*)::BIGINT FROM "faiss_join_mat"',
+    TABLE_FAISS_IDMAP_MAT: 'SELECT COUNT(*)::BIGINT FROM "faiss_idmap_mat"',
+}
+
 
 def sql_create_chunks_view_from_parquet() -> str:
     """Return SQL for creating chunks view from Parquet files.
@@ -88,7 +179,7 @@ def sql_create_chunks_view_from_parquet() -> str:
     str
         SQL statement with placeholder for Parquet path parameter.
     """
-    return f"CREATE OR REPLACE VIEW {VIEW_CHUNKS} AS SELECT * FROM read_parquet(?)"
+    return _SQL_CREATE_CHUNKS_VIEW_FROM_PARQUET
 
 
 def sql_create_empty_chunks_view() -> str:
@@ -99,7 +190,7 @@ def sql_create_empty_chunks_view() -> str:
     str
         SQL statement creating an empty view with correct schema.
     """
-    return f"CREATE OR REPLACE VIEW {VIEW_CHUNKS} AS {EMPTY_CHUNKS_SELECT}"
+    return _SQL_CREATE_EMPTY_CHUNKS_VIEW
 
 
 def sql_create_chunks_materialized() -> str:
@@ -110,7 +201,7 @@ def sql_create_chunks_materialized() -> str:
     str
         SQL statement with placeholder for Parquet path parameter.
     """
-    return f"CREATE OR REPLACE TABLE {TABLE_CHUNKS_MATERIALIZED} AS SELECT * FROM read_parquet(?)"
+    return _SQL_CREATE_CHUNKS_MATERIALIZED
 
 
 def sql_create_empty_chunks_materialized() -> str:
@@ -121,7 +212,7 @@ def sql_create_empty_chunks_materialized() -> str:
     str
         SQL statement creating an empty table with correct schema.
     """
-    return f"CREATE OR REPLACE TABLE {TABLE_CHUNKS_MATERIALIZED} AS {EMPTY_CHUNKS_SELECT}"
+    return _SQL_CREATE_EMPTY_CHUNKS_MATERIALIZED
 
 
 def sql_create_chunks_view_from_materialized() -> str:
@@ -132,7 +223,7 @@ def sql_create_chunks_view_from_materialized() -> str:
     str
         SQL statement creating a view over the materialized table.
     """
-    return f"CREATE OR REPLACE VIEW {VIEW_CHUNKS} AS SELECT * FROM {TABLE_CHUNKS_MATERIALIZED}"
+    return _SQL_CREATE_CHUNKS_VIEW_FROM_MAT
 
 
 def sql_create_chunks_materialized_index() -> str:
@@ -143,7 +234,7 @@ def sql_create_chunks_materialized_index() -> str:
     str
         SQL statement creating an index on the uri column.
     """
-    return f"CREATE INDEX IF NOT EXISTS idx_{TABLE_CHUNKS_MATERIALIZED}_uri ON {TABLE_CHUNKS_MATERIALIZED}(uri)"
+    return _SQL_CREATE_CHUNKS_MAT_INDEX
 
 
 def sql_create_faiss_idmap_view() -> str:
@@ -154,13 +245,7 @@ def sql_create_faiss_idmap_view() -> str:
     str
         SQL statement with placeholder for Parquet path parameter.
     """
-    return f"""
-CREATE OR REPLACE VIEW {VIEW_FAISS_IDMAP} AS
-SELECT
-    faiss_row,
-    external_id
-FROM read_parquet(?)
-"""
+    return _SQL_CREATE_FAISS_IDMAP_VIEW
 
 
 def sql_create_empty_faiss_idmap_view() -> str:
@@ -171,13 +256,29 @@ def sql_create_empty_faiss_idmap_view() -> str:
     str
         SQL statement creating an empty view with correct schema.
     """
-    return f"""
-CREATE OR REPLACE VIEW {VIEW_FAISS_IDMAP} AS
-SELECT
-    CAST(NULL AS BIGINT) AS faiss_row,
-    CAST(NULL AS BIGINT) AS external_id
-WHERE FALSE
-"""
+    return _SQL_CREATE_EMPTY_FAISS_IDMAP_VIEW
+
+
+def sql_create_faiss_idmap_from_materialized(column: str | None) -> str:
+    """Return SQL for creating FAISS ID map view from the materialized table.
+
+    Parameters
+    ----------
+    column : str | None
+        Column in the materialized table to project as ``external_id``. Supported
+        values are ``"chunk_id"`` and ``"external_id"``. Defaults to NULL when
+        column is None or unrecognized.
+
+    Returns
+    -------
+    str
+        SQL statement selecting the requested column (or NULL) as ``external_id``.
+    """
+    if column == "chunk_id":
+        return _SQL_FAISS_IDMAP_FROM_CHUNK
+    if column == "external_id":
+        return _SQL_FAISS_IDMAP_FROM_EXTERNAL
+    return _SQL_FAISS_IDMAP_FROM_NULL
 
 
 def sql_create_v_faiss_join() -> str:
@@ -188,16 +289,7 @@ def sql_create_v_faiss_join() -> str:
     str
         SQL statement creating a view joining FAISS ID map with chunks.
     """
-    return f"""
-CREATE OR REPLACE VIEW {VIEW_V_FAISS_JOIN} AS
-SELECT
-    f.faiss_row,
-    f.external_id AS chunk_id,
-    c.*
-FROM {VIEW_FAISS_IDMAP} AS f
-LEFT JOIN {VIEW_CHUNKS} AS c
-  ON c.id = f.external_id
-"""
+    return _SQL_CREATE_V_FAISS_JOIN
 
 
 def sql_materialize_v_faiss_join() -> str:
@@ -208,7 +300,7 @@ def sql_materialize_v_faiss_join() -> str:
     str
         SQL statement creating a table from the view.
     """
-    return f"CREATE OR REPLACE TABLE {TABLE_FAISS_JOIN_MAT} AS SELECT * FROM {VIEW_V_FAISS_JOIN}"
+    return _SQL_MATERIALIZE_V_FAISS_JOIN
 
 
 def sql_create_idmap_mat() -> str:
@@ -219,10 +311,7 @@ def sql_create_idmap_mat() -> str:
     str
         SQL statement creating an empty table with correct schema.
     """
-    return f"""
-CREATE TABLE IF NOT EXISTS {TABLE_FAISS_IDMAP_MAT} AS
-SELECT * FROM {VIEW_V_FAISS_JOIN} LIMIT 0
-"""
+    return _SQL_CREATE_IDMAP_MAT
 
 
 def sql_create_idmap_mat_meta() -> str:
@@ -233,15 +322,7 @@ def sql_create_idmap_mat_meta() -> str:
     str
         SQL statement creating the metadata table structure.
     """
-    return f"""
-    CREATE TABLE IF NOT EXISTS {TABLE_FAISS_IDMAP_META} (
-        parquet_path TEXT,
-        parquet_hash TEXT,
-        checksum TEXT,
-        row_count BIGINT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """
+    return _SQL_CREATE_IDMAP_MAT_META
 
 
 def sql_select_idmap_checksum() -> str:
@@ -252,7 +333,7 @@ def sql_select_idmap_checksum() -> str:
     str
         SQL statement selecting the most recent checksum value.
     """
-    return f"SELECT checksum FROM {TABLE_FAISS_IDMAP_META} ORDER BY updated_at DESC LIMIT 1"
+    return _SQL_SELECT_IDMAP_CHECKSUM
 
 
 def sql_delete_idmap_mat() -> str:
@@ -263,7 +344,7 @@ def sql_delete_idmap_mat() -> str:
     str
         SQL statement deleting all rows from the table.
     """
-    return f"DELETE FROM {TABLE_FAISS_IDMAP_MAT}"
+    return _SQL_DELETE_IDMAP_MAT
 
 
 def sql_insert_idmap_mat() -> str:
@@ -274,7 +355,7 @@ def sql_insert_idmap_mat() -> str:
     str
         SQL statement inserting rows from the view.
     """
-    return f"INSERT INTO {TABLE_FAISS_IDMAP_MAT} SELECT * FROM {VIEW_V_FAISS_JOIN}"
+    return _SQL_INSERT_IDMAP_MAT
 
 
 def sql_delete_idmap_meta() -> str:
@@ -285,7 +366,7 @@ def sql_delete_idmap_meta() -> str:
     str
         SQL statement deleting all rows from the metadata table.
     """
-    return f"DELETE FROM {TABLE_FAISS_IDMAP_META}"
+    return _SQL_DELETE_IDMAP_META
 
 
 def sql_insert_idmap_meta() -> str:
@@ -296,10 +377,7 @@ def sql_insert_idmap_meta() -> str:
     str
         SQL statement with placeholders for metadata values.
     """
-    return f"""
-    INSERT INTO {TABLE_FAISS_IDMAP_META}(parquet_path, parquet_hash, checksum, row_count)
-    VALUES (?, ?, ?, ?)
-    """
+    return _SQL_INSERT_IDMAP_META
 
 
 def sql_count(table: str) -> str:
@@ -314,8 +392,17 @@ def sql_count(table: str) -> str:
     -------
     str
         SQL statement returning row count as BIGINT.
+
+    Raises
+    ------
+    ValueError
+        If ``table`` is not part of the supported countable relations.
     """
-    return f"SELECT COUNT(*)::BIGINT FROM {table}"
+    try:
+        return _COUNTABLE_TABLES[table]
+    except KeyError as exc:  # pragma: no cover - defensive guard
+        msg = f"Unsupported table for row counting: {table}"
+        raise ValueError(msg) from exc
 
 
 def sql_relation_exists() -> str:

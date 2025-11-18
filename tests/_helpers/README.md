@@ -50,6 +50,22 @@ Reach for these helpers before writing new `monkeypatch` logic:
 | `RepoHandle` fixtures | `tests/codeintel_rev/test_integration_full.py`, `tests/codeintel_rev/test_app_lifespan.py`, etc. | Wrap the repo + `ApplicationContext.create` patch so tests can call `handle.configure(faiss_preload=True)` instead of tweaking env vars. |
 | `repo_scan_invoker` | `tests/conftest.py` | Executes `tools.repo_scan` with explicit argv and returns the parsed payload + DOT paths—no need to mutate `sys.argv`. |
 | CLI context builders | `tests/conftest.py` | Builders for orchestration, download, BM25, SPLADE, XTR CLIs. Pass them into Typer `obj` to inject stub managers/providers during tests. |
+| `context_with_catalog_records` | `tests/_helpers/adapters.py` | Returns an `ApplicationContext` whose catalog factory yields canned records—ideal for semantic adapter tests without monkeypatching `open_catalog`. |
+| `make_semantic_adapter_hooks` | `tests/_helpers/adapters.py` | Builds `SemanticAdapterHooks` with deterministic Stage-0 results and hydration payloads. |
+| `make_semantic_pro_hooks` | `tests/_helpers/adapters.py` | Produces `SemanticProHooks` that stub Stage-0, gating, reranker, and hydration behavior end-to-end. |
+
+### Typing gate helpers
+
+When a test needs to bypass heavy imports (FAISS, CuPy, etc.), use the typed
+context managers instead of patching modules directly:
+
+- `kgfoundry_common.typing.override_gate_import({"faiss": fake_module})`
+  returns deterministic shims for `gate_import`.
+- `codeintel_rev.io.faiss_runtime.override_parameter_application(lambda *_: False)`
+  disables `ParameterSpace` touching real FAISS state during unit tests.
+
+Prefer these helpers (or `LazyModule.__setattr__`) over `monkeypatch` so tests
+stay aligned with the Typing Gates policy in `AGENTS.md`.
 
 When adding a new CLI or configuration test, prefer cloning one of these fixtures
 instead of introducing new env-based scaffolding.

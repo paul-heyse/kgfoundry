@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import cast
 
+from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.retrieval.pipeline.late_interaction import (
     LateInteractionResult,
     XTRLateInteraction,
@@ -33,12 +35,19 @@ class _StubXTRIndex:
 
 def test_xtr_late_interaction_rescore() -> None:
     """Test XTR late-interaction rescoring produces correct results."""
-    triples = [
-        (1, 0.9, {"token_matches": [{"q_index": 0, "doc_index": 1, "similarity": 0.9}]}),
+    triples: list[tuple[int, float, dict[str, object] | None]] = [
+        (
+            1,
+            0.9,
+            cast(
+                "dict[str, object]",
+                {"token_matches": [{"q_index": 0, "doc_index": 1, "similarity": 0.9}]},
+            ),
+        ),
         (2, 0.8, None),
     ]
     index = _StubXTRIndex(triples=triples)
-    li = XTRLateInteraction(index=index)
+    li = XTRLateInteraction(index=cast("XTRIndex", index))
 
     result = li.rescore(
         query="vector search",

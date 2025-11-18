@@ -36,8 +36,24 @@ class _EmbeddingResult(Protocol):
 class LLM(Protocol):
     """Interface for the vLLM embedding runtime."""
 
-    def embed(self, prompts: Sequence[TokensPrompt]) -> Sequence[_EmbeddingResult]: ...
-    def shutdown(self) -> None: ...
+    def embed(self, prompts: Sequence[TokensPrompt]) -> Sequence[_EmbeddingResult]:
+        """Generate embeddings for tokenized prompts.
+
+        Parameters
+        ----------
+        prompts : Sequence[TokensPrompt]
+            Sequence of tokenized prompts to embed.
+
+        Returns
+        -------
+        Sequence[_EmbeddingResult]
+            Sequence of embedding results, one per prompt.
+        """
+        ...
+
+    def shutdown(self) -> None:
+        """Shutdown the LLM engine and release resources."""
+        ...
 
 
 class PoolerConfig(Protocol):

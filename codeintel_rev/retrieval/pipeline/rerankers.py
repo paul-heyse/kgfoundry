@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 
 @dataclass(slots=True, frozen=True)
@@ -37,7 +37,7 @@ class Reranker(Protocol):
 class NoopReranker:
     """No-op reranker that preserves ordering."""
 
-    def rerank(self, _query: str, docs: Sequence[Doc]) -> RerankResult:
+    def rerank(self, _query: str, docs: Sequence[Doc]) -> RerankResult:  # noqa: PLR6301
         """Preserve document ordering without reranking.
 
         Parameters
@@ -56,14 +56,27 @@ class NoopReranker:
         return RerankResult(ids=ids, scores=[0.0 for _ in ids])
 
 
+if TYPE_CHECKING:
+    from codeintel_rev.io.rerank_coderankllm import (
+        CodeRankListwiseReranker as _CodeRankListwiseReranker,
+    )
+else:  # pragma: no cover - typing only
+    _CodeRankListwiseReranker = Any
+
 try:
-    from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
+    from codeintel_rev.io.rerank_coderankllm import (
+        CodeRankListwiseReranker as _RuntimeCodeRankListwiseReranker,
+    )
+except (AttributeError, ImportError):  # pragma: no cover - optional dependency
+    _RuntimeCodeRankListwiseReranker = None
+
+if _RuntimeCodeRankListwiseReranker is not None:
 
     @dataclass(slots=True)
-    class CodeRankLLMAdapter:
+    class _CodeRankLLMAdapter:
         """Adapter around :class:`CodeRankListwiseReranker`."""
 
-        reranker: CodeRankListwiseReranker
+        reranker: _CodeRankListwiseReranker
 
         def rerank(self, query: str, docs: Sequence[Doc]) -> RerankResult:
             """Rerank documents using CodeRank LLM reranker.
@@ -101,8 +114,9 @@ try:
                 scores=[score for _, score in scored],
             )
 
-except Exception:  # pragma: no cover - optional dependency
-    CodeRankLLMAdapter = None  # type: ignore[assignment]
+    CodeRankLLMAdapter: type[_CodeRankLLMAdapter] | None = _CodeRankLLMAdapter
+else:  # pragma: no cover - dependency gated
+    CodeRankLLMAdapter = None
 
 
 __all__ = ["CodeRankLLMAdapter", "Doc", "NoopReranker", "RerankResult", "Reranker"]

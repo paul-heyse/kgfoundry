@@ -69,7 +69,7 @@ class XTRLateInteraction:
         ids = [int(row[0]) for row in triples]
         scores = [float(row[1]) for row in triples]
         explanations = (
-            [(int(row[0]), dict(row[2])) for row in triples if len(row) > 2 and row[2] is not None]
+            [(int(row[0]), dict(row[2])) for row in triples if len(row) > 2 and row[2] is not None]  # noqa: PLR2004
             if explain
             else None
         )

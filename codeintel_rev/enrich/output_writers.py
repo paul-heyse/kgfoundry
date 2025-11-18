@@ -158,6 +158,35 @@ def override_writer_env(env_resolver: Callable[[str, str | None], str | None]) -
 
 
 def _resolve_env(key: str, default: str | None = None) -> str | None:
+    """Resolve environment variable using current writer environment stack.
+
+    This function resolves environment variables by checking the current writer
+    environment stack for a custom resolver function. If a resolver is configured,
+    it is used; otherwise, the function falls back to os.getenv.
+
+    Parameters
+    ----------
+    key : str
+        Environment variable name to resolve. The key is passed to the resolver
+        function or os.getenv.
+    default : str | None, optional
+        Default value to return if the environment variable is not set. Passed
+        to the resolver function or os.getenv. Defaults to None.
+
+    Returns
+    -------
+    str | None
+        Resolved environment variable value, or default if not set. Returns
+        None if the variable is not set and default is None.
+
+    Notes
+    -----
+    Environment resolution enables flexible configuration by allowing custom
+    resolvers to override standard environment variable access. This supports
+    testing with mock environments and runtime configuration overrides. The
+    function uses the top of the writer environment stack, enabling nested
+    context managers to override resolution behavior.
+    """
     resolver = _WRITER_ENV_STACK[-1].env_resolver
     if resolver is not None:
         return resolver(key, default)
@@ -297,6 +326,31 @@ def _write_dataset_table(
 
 
 def _append_section(sections: list[str], title: str, lines: list[str]) -> None:
+    r"""Append a Markdown section to the sections list if lines are present.
+
+    This function conditionally appends a Markdown section header and content
+    to a sections list. The section is only added if lines is non-empty,
+    preventing empty sections in the output.
+
+    Parameters
+    ----------
+    sections : list[str]
+        List of Markdown lines to append to. The function appends a section
+        header, content lines, and a blank line separator.
+    title : str
+        Section title to use for the Markdown header. The title is formatted
+        as "## {title}\n".
+    lines : list[str]
+        List of content lines to include in the section. If empty, no section
+        is appended. Lines are added verbatim after the header.
+
+    Notes
+    -----
+    Section appending enables conditional Markdown generation by only including
+    sections that have content. This prevents empty sections from cluttering
+    the output and improves readability. The function adds a blank line after
+    the section for proper Markdown formatting.
+    """
     if not lines:
         return
     sections.append(f"## {title}\n")
@@ -305,6 +359,32 @@ def _append_section(sections: list[str], title: str, lines: list[str]) -> None:
 
 
 def _format_imports(record: dict[str, object]) -> list[str]:
+    """Format import statements from module record for Markdown output.
+
+    This function extracts import information from a module record and formats
+    it as a list of Markdown bullet points. Each import statement shows the
+    module name and imported names, with special handling for star imports.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing import information. The record should
+        have an "imports" key containing a list of import dictionaries.
+
+    Returns
+    -------
+    list[str]
+        List of formatted import statements as Markdown bullet points. Returns
+        empty list if imports are missing, not a list, or empty. Each line
+        follows the format "- from **{module}** import {names}".
+
+    Notes
+    -----
+    Import formatting enables readable Markdown output by converting structured
+    import data into human-friendly bullet points. The function handles star
+    imports, absolute imports, and module imports gracefully, extracting names
+    and module information from the record structure.
+    """
     formatted: list[str] = []
     imports_obj = record.get("imports")
     if not isinstance(imports_obj, list):
@@ -324,6 +404,32 @@ def _format_imports(record: dict[str, object]) -> list[str]:
 
 
 def _format_definitions(record: dict[str, object]) -> list[str]:
+    """Format symbol definitions from module record for Markdown output.
+
+    This function extracts definition information from a module record and formats
+    it as a list of Markdown bullet points. Each definition shows the kind (class,
+    function, etc.), name, and line number.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing definition information. The record
+        should have a "defs" key containing a list of definition dictionaries.
+
+    Returns
+    -------
+    list[str]
+        List of formatted definition statements as Markdown bullet points.
+        Returns empty list if definitions are missing, not a list, or empty.
+        Each line follows the format "- {kind}: `{name}` (line {lineno})".
+
+    Notes
+    -----
+    Definition formatting enables readable Markdown output by converting structured
+    definition data into human-friendly bullet points. The function extracts kind,
+    name, and line number information, enabling users to quickly identify symbols
+    and their locations in the source code.
+    """
     formatted: list[str] = []
     defs_obj = record.get("defs")
     if not isinstance(defs_obj, list):
@@ -340,6 +446,32 @@ def _format_definitions(record: dict[str, object]) -> list[str]:
 
 
 def _format_graph_metrics(record: dict[str, object]) -> list[str]:
+    """Format graph metrics from module record for Markdown output.
+
+    This function extracts graph metrics (fan_in, fan_out, cycle_group) from
+    a module record and formats them as Markdown bullet points. Graph metrics
+    describe the module's position in the dependency graph.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing graph metrics. The record should
+        have "fan_in", "fan_out", and/or "cycle_group" keys with integer values.
+
+    Returns
+    -------
+    list[str]
+        List of formatted graph metric statements as Markdown bullet points.
+        Returns empty list if no graph metrics are present. Each line follows
+        the format "- **{label}**: {value}".
+
+    Notes
+    -----
+    Graph metric formatting enables readable Markdown output by converting
+    structured graph data into human-friendly bullet points. The function
+    extracts fan-in (dependencies), fan-out (dependents), and cycle group
+    information, enabling users to understand module dependencies and structure.
+    """
     lines: list[str] = []
     for label in ("fan_in", "fan_out", "cycle_group"):
         value = record.get(label)
@@ -349,6 +481,34 @@ def _format_graph_metrics(record: dict[str, object]) -> list[str]:
 
 
 def _format_ownership(record: dict[str, object]) -> list[str]:
+    """Format ownership and churn metrics from module record for Markdown output.
+
+    This function extracts ownership information (owner, primary authors, bus factor)
+    and churn metrics from a module record and formats them as Markdown bullet
+    points. Ownership metrics describe code ownership and maintenance patterns.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing ownership and churn information.
+        The record should have "owner", "primary_authors", "bus_factor", and
+        churn keys (recent_churn_30, recent_churn_90, churn_30d, churn_90d).
+
+    Returns
+    -------
+    list[str]
+        List of formatted ownership and churn statements as Markdown bullet points.
+        Returns empty list if no ownership information is present. Each line
+        follows formats like "- owner: {owner}", "- primary authors: {authors}",
+        "- bus factor: {value:.2f}", or "- {churn_label}: {value}".
+
+    Notes
+    -----
+    Ownership formatting enables readable Markdown output by converting structured
+    ownership and churn data into human-friendly bullet points. The function
+    extracts owner, author, bus factor, and churn information, enabling users
+    to understand code ownership patterns and maintenance activity.
+    """
     lines: list[str] = []
     owner = record.get("owner")
     if isinstance(owner, str) and owner:
@@ -371,6 +531,32 @@ def _format_ownership(record: dict[str, object]) -> list[str]:
 
 
 def _format_usage(record: dict[str, object]) -> list[str]:
+    """Format usage metrics from module record for Markdown output.
+
+    This function extracts usage information (used_by_files, used_by_symbols)
+    from a module record and formats them as Markdown bullet points. Usage
+    metrics describe how widely the module is used across the codebase.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing usage information. The record should
+        have "used_by_files" and/or "used_by_symbols" keys with integer values.
+
+    Returns
+    -------
+    list[str]
+        List of formatted usage statements as Markdown bullet points. Returns
+        empty list if no usage information is present. Each line follows formats
+        like "- used by files: {count}" or "- used by symbols: {count}".
+
+    Notes
+    -----
+    Usage formatting enables readable Markdown output by converting structured
+    usage data into human-friendly bullet points. The function extracts file
+    and symbol usage counts, enabling users to understand module dependencies
+    and usage patterns across the codebase.
+    """
     lines: list[str] = []
     used_by_files = record.get("used_by_files")
     used_by_symbols = record.get("used_by_symbols")
@@ -382,6 +568,32 @@ def _format_usage(record: dict[str, object]) -> list[str]:
 
 
 def _format_exports(record: dict[str, object]) -> list[str]:
+    """Format declared exports (__all__) from module record for Markdown output.
+
+    This function extracts declared exports from a module record and formats
+    them as a comma-separated list. Declared exports are symbols listed in
+    the module's __all__ attribute.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing export information. The record
+        should have an "exports" key containing a list of export names.
+
+    Returns
+    -------
+    list[str]
+        List containing a single formatted export statement. Returns empty list
+        if exports are missing, not a list, or empty. The statement is a
+        comma-separated list of sorted export names.
+
+    Notes
+    -----
+    Export formatting enables readable Markdown output by converting structured
+    export data into a human-friendly comma-separated list. The function sorts
+    export names alphabetically for consistent output, enabling users to quickly
+    identify publicly exported symbols.
+    """
     exports = record.get("exports") or []
     if isinstance(exports, list) and exports:
         names = ", ".join(sorted(name for name in exports if isinstance(name, str)))
@@ -390,6 +602,34 @@ def _format_exports(record: dict[str, object]) -> list[str]:
 
 
 def _format_exports_resolved(record: dict[str, object]) -> list[str]:
+    """Format resolved star imports from module record for Markdown output.
+
+    This function extracts resolved star import information from a module record
+    and formats it as a list of Markdown bullet points. Resolved exports show
+    which symbols are actually exported via star imports.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing resolved export information. The
+        record should have an "exports_resolved" key containing a dictionary
+        mapping origin modules to lists of exported names.
+
+    Returns
+    -------
+    list[str]
+        List of formatted resolved export statements as Markdown bullet points.
+        Returns empty list if resolved exports are missing, not a dictionary,
+        or empty. Each line follows the format "- from **{origin}** import {names}".
+
+    Notes
+    -----
+    Resolved export formatting enables readable Markdown output by converting
+    structured resolved export data into human-friendly bullet points. The
+    function extracts origin modules and exported names, enabling users to
+    understand which symbols are actually exported via star imports and their
+    origins.
+    """
     exports_resolved = record.get("exports_resolved") or {}
     lines: list[str] = []
     if isinstance(exports_resolved, Mapping):
@@ -400,6 +640,33 @@ def _format_exports_resolved(record: dict[str, object]) -> list[str]:
 
 
 def _format_reexports(record: dict[str, object]) -> list[str]:
+    """Format re-export information from module record for Markdown output.
+
+    This function extracts re-export information from a module record and formats
+    it as a list of Markdown bullet points. Re-exports show symbols that are
+    imported and then re-exported by the module.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing re-export information. The record
+        should have a "reexports" key containing a dictionary mapping re-export
+        names to metadata dictionaries with "from" and "symbol" keys.
+
+    Returns
+    -------
+    list[str]
+        List of formatted re-export statements as Markdown bullet points.
+        Returns empty list if re-exports are missing, not a dictionary, or empty.
+        Each line follows the format "- `{name}` ← **{origin}** ({symbol})".
+
+    Notes
+    -----
+    Re-export formatting enables readable Markdown output by converting structured
+    re-export data into human-friendly bullet points. The function extracts
+    re-export names, origin modules, and symbol names, enabling users to understand
+    which symbols are re-exported and their origins.
+    """
     reexports = record.get("reexports") or {}
     lines: list[str] = []
     if isinstance(reexports, Mapping):
@@ -414,6 +681,34 @@ def _format_reexports(record: dict[str, object]) -> list[str]:
 
 
 def _format_doc_metrics(record: dict[str, object]) -> list[str]:
+    """Format documentation metrics from module record for Markdown output.
+
+    This function extracts documentation quality metrics from a module record
+    and formats them as Markdown bullet points. Documentation metrics include
+    summary presence, parameter parity, and examples presence.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing documentation metrics. The record
+        should have "doc_summary" and/or "doc_metrics" keys with summary text
+        and metrics dictionary (has_summary, param_parity, examples_present).
+
+    Returns
+    -------
+    list[str]
+        List of formatted documentation metric statements as Markdown bullet
+        points. Returns empty list if no documentation metrics are present.
+        Each line follows formats like "- **summary**: {text}" or
+        "- {metric_label}: yes/no".
+
+    Notes
+    -----
+    Documentation metric formatting enables readable Markdown output by converting
+    structured documentation quality data into human-friendly bullet points. The
+    function extracts summary text and quality flags, enabling users to quickly
+    assess documentation completeness and quality.
+    """
     lines: list[str] = []
     summary = record.get("doc_summary")
     if isinstance(summary, str) and summary.strip():
@@ -429,6 +724,35 @@ def _format_doc_metrics(record: dict[str, object]) -> list[str]:
 
 
 def _format_typedness(record: dict[str, object]) -> list[str]:
+    """Format type annotation metrics from module record for Markdown output.
+
+    This function extracts type annotation metrics from a module record and
+    formats them as Markdown bullet points. Typedness metrics include annotation
+    ratios, untyped definitions, and type error counts.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing typedness metrics. The record should
+        have "annotation_ratio" (with "params" and "returns" keys), "untyped_defs",
+        and/or "type_errors" keys with numeric values.
+
+    Returns
+    -------
+    list[str]
+        List of formatted typedness statements as Markdown bullet points.
+        Returns empty list if no typedness metrics are present. Each line
+        follows formats like "- params annotated: {ratio:.2f}",
+        "- returns annotated: {ratio:.2f}", "- untyped defs: {count}", or
+        "- type errors: {count}".
+
+    Notes
+    -----
+    Typedness formatting enables readable Markdown output by converting structured
+    type annotation data into human-friendly bullet points. The function extracts
+    annotation ratios, untyped definition counts, and type error counts, enabling
+    users to quickly assess type coverage and type safety.
+    """
     lines: list[str] = []
     ratio = record.get("annotation_ratio")
     if isinstance(ratio, Mapping):
@@ -448,6 +772,34 @@ def _format_typedness(record: dict[str, object]) -> list[str]:
 
 
 def _format_side_effects(record: dict[str, object]) -> list[str]:
+    """Format side effect flags from module record for Markdown output.
+
+    This function extracts side effect information from a module record and
+    formats it as a list of Markdown bullet points. Side effects indicate
+    operations that modify global state, perform I/O, or have external effects.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing side effect flags. The record
+        should have a "side_effects" key containing a dictionary mapping
+        side effect names to boolean values.
+
+    Returns
+    -------
+    list[str]
+        List of formatted side effect statements as Markdown bullet points.
+        Returns ["- none detected"] if no side effects are present, or a list
+        of side effect names if present. Each line follows the format
+        "- {effect_name}" with underscores replaced by spaces.
+
+    Notes
+    -----
+    Side effect formatting enables readable Markdown output by converting
+    structured side effect data into human-friendly bullet points. The function
+    extracts truthy side effect flags and formats them as readable names,
+    enabling users to quickly identify modules with side effects.
+    """
     flags = record.get("side_effects")
     if not isinstance(flags, Mapping):
         return []
@@ -458,6 +810,32 @@ def _format_side_effects(record: dict[str, object]) -> list[str]:
 
 
 def _format_raises(record: dict[str, object]) -> list[str]:
+    """Format exception information from module record for Markdown output.
+
+    This function extracts exception information from a module record and formats
+    it as a comma-separated list. Exception information shows which exceptions
+    the module may raise.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing exception information. The record
+        should have a "raises" key containing a list of exception names.
+
+    Returns
+    -------
+    list[str]
+        List containing a single formatted exception statement. Returns empty
+        list if exceptions are missing, not a list, or empty. The statement
+        is a comma-separated list of exception names.
+
+    Notes
+    -----
+    Exception formatting enables readable Markdown output by converting structured
+    exception data into a human-friendly comma-separated list. The function
+    extracts exception names, enabling users to quickly identify which exceptions
+    a module may raise.
+    """
     raises = record.get("raises")
     if isinstance(raises, list):
         entries = [name for name in raises if isinstance(name, str)]
@@ -467,6 +845,33 @@ def _format_raises(record: dict[str, object]) -> list[str]:
 
 
 def _format_complexity(record: dict[str, object]) -> list[str]:
+    """Format complexity metrics from module record for Markdown output.
+
+    This function extracts complexity metrics from a module record and formats
+    them as Markdown bullet points. Complexity metrics include branches,
+    cyclomatic complexity, and lines of code.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing complexity metrics. The record
+        should have a "complexity" key containing a dictionary with "branches",
+        "cyclomatic", and/or "loc" keys with integer values.
+
+    Returns
+    -------
+    list[str]
+        List of formatted complexity statements as Markdown bullet points.
+        Returns empty list if complexity metrics are missing, not a dictionary,
+        or empty. Each line follows the format "- {metric}: {value}".
+
+    Notes
+    -----
+    Complexity formatting enables readable Markdown output by converting
+    structured complexity data into human-friendly bullet points. The function
+    extracts branch count, cyclomatic complexity, and lines of code, enabling
+    users to quickly assess code complexity and maintainability.
+    """
     complexity = record.get("complexity")
     if not isinstance(complexity, Mapping):
         return []
@@ -479,6 +884,39 @@ def _format_complexity(record: dict[str, object]) -> list[str]:
 
 
 def _format_doc_items(record: dict[str, object], limit: int = 10) -> list[str]:
+    """Format documentation coverage items from module record for Markdown output.
+
+    This function extracts documentation coverage information for individual
+    symbols from a module record and formats it as a list of Markdown bullet
+    points. Each item shows symbol name, kind, and documentation quality metrics.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing documentation items. The record
+        should have a "doc_items" key containing a list of item dictionaries
+        with "name", "kind", "doc_summary", "doc_has_summary", "doc_param_parity",
+        and "doc_examples_present" keys.
+    limit : int, optional
+        Maximum number of items to include in the output. Defaults to 10.
+        Items beyond this limit are truncated.
+
+    Returns
+    -------
+    list[str]
+        List of formatted documentation item statements as Markdown bullet points.
+        Returns empty list if documentation items are missing, not a list, or empty.
+        Each line follows the format "- `{name}` ({kind}): {metrics} — {summary}".
+
+    Notes
+    -----
+    Documentation item formatting enables readable Markdown output by converting
+    structured documentation coverage data into human-friendly bullet points.
+    The function extracts symbol names, kinds, documentation quality metrics,
+    and summaries, enabling users to quickly assess documentation coverage for
+    individual symbols. The limit parameter prevents overwhelming output for
+    modules with many symbols.
+    """
     items = record.get("doc_items")
     if not isinstance(items, list):
         return []
@@ -506,6 +944,33 @@ def _format_doc_items(record: dict[str, object], limit: int = 10) -> list[str]:
 
 
 def _format_coverage(record: dict[str, object]) -> list[str]:
+    """Format test coverage metrics from module record for Markdown output.
+
+    This function extracts test coverage metrics from a module record and formats
+    them as Markdown bullet points. Coverage metrics include line coverage and
+    definition coverage ratios.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing coverage metrics. The record should
+        have "covered_lines_ratio" and/or "covered_defs_ratio" keys with numeric
+        values (typically floats between 0.0 and 1.0).
+
+    Returns
+    -------
+    list[str]
+        List of formatted coverage statements as Markdown bullet points.
+        Returns empty list if no coverage metrics are present. Each line follows
+        formats like "- lines covered: {ratio:.2%}" or "- defs covered: {ratio:.2%}".
+
+    Notes
+    -----
+    Coverage formatting enables readable Markdown output by converting structured
+    coverage data into human-friendly bullet points. The function extracts line
+    and definition coverage ratios, formatting them as percentages, enabling
+    users to quickly assess test coverage for the module.
+    """
     lines: list[str] = []
     covered_lines = record.get("covered_lines_ratio")
     covered_defs = record.get("covered_defs_ratio")
@@ -517,6 +982,32 @@ def _format_coverage(record: dict[str, object]) -> list[str]:
 
 
 def _format_config_refs(record: dict[str, object]) -> list[str]:
+    """Format configuration reference information from module record for Markdown output.
+
+    This function extracts configuration reference information from a module record
+    and formats it as a list of Markdown bullet points. Configuration references
+    show which configuration files or settings the module depends on.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing configuration references. The record
+        should have a "config_refs" key containing a list of reference strings.
+
+    Returns
+    -------
+    list[str]
+        List of formatted configuration reference statements as Markdown bullet
+        points. Returns empty list if configuration references are missing, not
+        a list, or empty. Each line follows the format "- {ref}".
+
+    Notes
+    -----
+    Configuration reference formatting enables readable Markdown output by
+    converting structured configuration reference data into human-friendly bullet
+    points. The function extracts reference strings, enabling users to quickly
+    identify which configuration files or settings the module depends on.
+    """
     refs = record.get("config_refs")
     if not isinstance(refs, list) or not refs:
         return []
@@ -524,6 +1015,32 @@ def _format_config_refs(record: dict[str, object]) -> list[str]:
 
 
 def _format_hotspot(record: dict[str, object]) -> list[str]:
+    """Format hotspot score from module record for Markdown output.
+
+    This function extracts hotspot score information from a module record and
+    formats it as a Markdown bullet point. Hotspot scores indicate modules that
+    are frequently changed and have high complexity, suggesting maintenance risk.
+
+    Parameters
+    ----------
+    record : dict[str, object]
+        Module record dictionary containing hotspot score. The record should
+        have a "hotspot_score" key with a numeric value (typically a float).
+
+    Returns
+    -------
+    list[str]
+        List containing a single formatted hotspot score statement. Returns empty
+        list if hotspot score is missing or not numeric. The statement follows
+        the format "- score: {score:.2f}".
+
+    Notes
+    -----
+    Hotspot formatting enables readable Markdown output by converting structured
+    hotspot data into a human-friendly bullet point. The function extracts the
+    hotspot score and formats it with two decimal places, enabling users to
+    quickly identify modules with high maintenance risk.
+    """
     score = record.get("hotspot_score")
     if not isinstance(score, (int, float)):
         return []

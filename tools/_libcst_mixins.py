@@ -67,7 +67,7 @@ class ImportFromTransformerMixin:
         return updated_node
 
     # Bridge CamelCase hook invoked by LibCST to the snake_case override.
-    def leave_ImportFrom(  # noqa: N802 - LibCST API requires CamelCase
+    def leave_ImportFrom(  # noqa: N802
         self,
         original_node: cst.ImportFrom,
         updated_node: cst.ImportFrom,
@@ -131,7 +131,7 @@ class CallTransformerMixin:
         del self, original_node
         return updated_node
 
-    def leave_Call(  # noqa: N802 - LibCST API requires CamelCase
+    def leave_Call(  # noqa: N802
         self,
         original_node: cst.Call,
         updated_node: cst.Call,
@@ -199,7 +199,7 @@ class ExceptHandlerTransformerMixin:
         del self, original_node
         return updated_node
 
-    def leave_ExceptHandler(  # noqa: N802 - LibCST API requires CamelCase
+    def leave_ExceptHandler(  # noqa: N802
         self,
         original_node: cst.ExceptHandler,
         updated_node: cst.ExceptHandler,
@@ -263,7 +263,7 @@ class WithTransformerMixin:
         del self, original_node
         return updated_node
 
-    def leave_With(  # noqa: N802 - LibCST API requires CamelCase
+    def leave_With(  # noqa: N802
         self,
         original_node: cst.With,
         updated_node: cst.With,
@@ -326,7 +326,7 @@ class IfTransformerMixin:
         del self, original_node
         return updated_node
 
-    def leave_If(  # noqa: N802 - LibCST API requires CamelCase
+    def leave_If(  # noqa: N802
         self,
         original_node: cst.If,
         updated_node: cst.If,

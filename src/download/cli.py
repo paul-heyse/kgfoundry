@@ -78,9 +78,29 @@ class HarvestHandler(Protocol):
 class ArtifactFS(Protocol):
     """Protocol describing filesystem interactions for CLI artifacts."""
 
-    def ensure_dir(self, directory: Path) -> None: ...
+    def ensure_dir(self, directory: Path) -> None:
+        """Ensure the specified directory exists.
 
-    def write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None: ...
+        Parameters
+        ----------
+        directory : Path
+            Directory path to create if it doesn't exist.
+        """
+        ...
+
+    def write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None:
+        """Write text content to a file.
+
+        Parameters
+        ----------
+        path : Path
+            File path to write to.
+        content : str
+            Text content to write.
+        encoding : str, optional
+            Text encoding to use. Defaults to "utf-8".
+        """
+        ...
 
 
 def _default_harvest_handler(request: HarvestRequest) -> str:
