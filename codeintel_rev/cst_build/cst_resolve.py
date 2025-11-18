@@ -57,6 +57,20 @@ class StitchCounters:
 
 @dataclass(slots=True, frozen=True)
 class _SymbolCandidate:
+    """Internal candidate structure for SCIP symbol matching.
+
+    Attributes
+    ----------
+    symbol : str
+        SCIP symbol identifier string (e.g., "scip-python python ...").
+    line : int
+        Line number where the symbol occurs (0-based).
+    name_hint : str | None
+        Extracted name hint from the symbol string (e.g., "function_name").
+    qname_hint : str | None
+        Extracted qualified name hint from the symbol string (e.g., "module.Class.method").
+    """
+
     symbol: str
     line: int
     name_hint: str | None
@@ -286,6 +300,23 @@ def stitch_nodes(
 
 
 def _normalize_path(path: str) -> str:
+    """Normalize a file path to a POSIX-style relative path.
+
+    Converts a file path to POSIX format (forward slashes) and removes leading
+    "./" prefixes. Used for consistent path matching in symbol resolution.
+
+    Parameters
+    ----------
+    path : str
+        File path to normalize. May be absolute, relative, or contain Windows-style
+        backslashes.
+
+    Returns
+    -------
+    str
+        Normalized POSIX-style path with forward slashes. Leading "./" prefixes
+        are removed. Returns empty string if path normalizes to ".".
+    """
     normalized = Path(path).as_posix()
     while normalized.startswith("./"):
         normalized = normalized[2:]
@@ -298,6 +329,28 @@ def _collect_candidates(
     file_map: Mapping[int, list[_SymbolCandidate]],
     base_line: int,
 ) -> list[_SymbolCandidate]:
+    """Collect symbol candidates from adjacent lines.
+
+    Searches for symbol candidates at the base line and its immediate neighbors
+    (base_line - 1, base_line, base_line + 1) to handle slight line number
+    mismatches between CST nodes and SCIP occurrences.
+
+    Parameters
+    ----------
+    file_map : Mapping[int, list[_SymbolCandidate]]
+        Dictionary mapping line numbers (0-based) to lists of symbol candidates
+        found at those lines.
+    base_line : int
+        Base line number (0-based) to search around. Candidates are collected
+        from base_line - 1, base_line, and base_line + 1.
+
+    Returns
+    -------
+    list[_SymbolCandidate]
+        List of all symbol candidates found at the base line and its immediate
+        neighbors. Returns an empty list if no candidates are found or base_line
+        is negative.
+    """
     candidates: list[_SymbolCandidate] = []
     for delta in (-1, 0, 1):
         line = base_line + delta
@@ -316,6 +369,34 @@ def _select_best_candidate(
     tuple[float, list[str], _SymbolCandidate, list[tuple[float, list[str], _SymbolCandidate]]]
     | None
 ):
+    """Select the best matching symbol candidate from a list of candidates.
+
+    Scores all candidates against the node's name and qualified names, filters
+    out zero-score candidates, and returns the highest-scoring candidate along
+    with all evaluated candidates for debugging.
+
+    Parameters
+    ----------
+    node : NodeRecord
+        CST node record to match against candidates. The node's name and qnames
+        are used for scoring.
+    base_line : int
+        Base line number (0-based) of the node, used for span-based scoring.
+    normalized_qnames : set[str | None]
+        Set of normalized qualified names from the node, used for qname matching.
+    candidates : list[_SymbolCandidate]
+        List of symbol candidates to evaluate and rank.
+
+    Returns
+    -------
+    tuple[float, list[str], _SymbolCandidate, list[tuple[float, list[str], _SymbolCandidate]]] | None
+        Tuple containing:
+        - Best score (float between 0.0 and 1.0)
+        - Best evidence list (e.g., ["qname"] or ["name", "span"])
+        - Best candidate (_SymbolCandidate)
+        - All evaluated candidates with scores (for debugging)
+        Returns None if no candidates score above 0.0.
+    """
     evaluated: list[tuple[float, list[str], _SymbolCandidate]] = []
     for candidate in candidates:
         score, evidence = _score_candidate(
@@ -335,6 +416,23 @@ def _select_best_candidate(
 
 
 def _symbol_name_hint(symbol: str) -> str | None:
+    """Extract a simple name hint from a SCIP symbol string.
+
+    Parses a SCIP symbol identifier to extract the leaf identifier name (e.g.,
+    function name, class name) by removing path separators, call signatures,
+    and other formatting tokens.
+
+    Parameters
+    ----------
+    symbol : str
+        SCIP symbol identifier string (e.g., "scip-python python pkg/module.py#Class.method()").
+
+    Returns
+    -------
+    str | None
+        Extracted name hint (e.g., "method") if parsing succeeds, or None if
+        the symbol string cannot be parsed to extract a name.
+    """
     tail = symbol.rsplit("/", 1)[-1]
     tail = tail.split("(", 1)[0]
     tail = tail.strip(".")
@@ -348,6 +446,23 @@ def _symbol_name_hint(symbol: str) -> str | None:
 
 
 def _symbol_qname_hint(symbol: str) -> str | None:
+    """Extract a qualified name hint from a SCIP symbol string.
+
+    Parses a SCIP symbol identifier to extract a fully qualified name (e.g.,
+    "module.Class.method") by combining module path and symbol path components.
+
+    Parameters
+    ----------
+    symbol : str
+        SCIP symbol identifier string (e.g., "scip-python python `pkg/module.py`#Class.method()").
+
+    Returns
+    -------
+    str | None
+        Extracted qualified name hint (e.g., "pkg.module.Class.method") if parsing
+        succeeds, or None if the symbol string cannot be parsed to extract a
+        qualified name.
+    """
     start = symbol.find("`")
     end = symbol.find("`", start + 1) if start != -1 else -1
     module_part = symbol[start + 1 : end] if start != -1 and end != -1 else None
@@ -361,6 +476,23 @@ def _symbol_qname_hint(symbol: str) -> str | None:
 
 
 def _normalize_qname(qname: str | None) -> str | None:
+    """Normalize a qualified name string for comparison.
+
+    Removes whitespace and trims the qualified name to enable consistent
+    matching between CST node qnames and SCIP symbol qname hints.
+
+    Parameters
+    ----------
+    qname : str | None
+        Qualified name string to normalize (e.g., "module.Class.method" or
+        " module . Class . method "), or None.
+
+    Returns
+    -------
+    str | None
+        Normalized qualified name with whitespace removed, or None if qname
+        is None or empty after normalization.
+    """
     if not qname:
         return None
     return qname.strip().replace(" ", "")
@@ -373,6 +505,31 @@ def _score_candidate(
     normalized_qnames: set[str | None],
     candidate: _SymbolCandidate,
 ) -> tuple[float, list[str]]:
+    """Score a symbol candidate against a CST node.
+
+    Computes a confidence score (0.0 to 1.0) and evidence list based on how
+    well the candidate matches the node's name, qualified names, and line position.
+    Higher scores indicate stronger matches.
+
+    Parameters
+    ----------
+    node_name : str | None
+        Name of the CST node to match (e.g., "function_name").
+    node_line : int
+        Line number (0-based) of the CST node.
+    normalized_qnames : set[str | None]
+        Set of normalized qualified names from the CST node (e.g., {"module.Class.method"}).
+    candidate : _SymbolCandidate
+        Symbol candidate to score against the node.
+
+    Returns
+    -------
+    tuple[float, list[str]]
+        Tuple containing:
+        - Score: float between 0.0 and 1.0 (1.0 = qname match, 0.8 = name+span match,
+          0.6 = name match, 0.5 = span match, 0.0 = no match)
+        - Evidence: list of match types (e.g., ["qname"], ["name", "span"], ["span"])
+    """
     evidence: list[str] = []
     candidate_qname = _normalize_qname(candidate.qname_hint)
     normalized_qnames_clean = {entry for entry in normalized_qnames if entry}

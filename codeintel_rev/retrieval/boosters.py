@@ -130,6 +130,24 @@ def _create_recency_view(
     chunk_col: str,
     commit_col: str,
 ) -> None:
+    """Create a temporary view for recency boost lookups.
+
+    Parameters
+    ----------
+    conn : DuckConnection
+        DuckDB connection for creating the view.
+    table_name : str
+        Name of the source table containing chunk and commit timestamp columns.
+    chunk_col : str
+        Column name for chunk identifiers in the source table.
+    commit_col : str
+        Column name for commit timestamps in the source table.
+
+    Notes
+    -----
+    Creates a view named "recency_source" with columns recency_chunk_id and
+    recency_commit_ts, replacing any existing view with the same name.
+    """
     relation = conn.table(table_name).project(
         f"{chunk_col} AS recency_chunk_id, {commit_col} AS recency_commit_ts"
     )
@@ -137,6 +155,21 @@ def _create_recency_view(
 
 
 def _populate_id_table(conn: DuckConnection, ids: Sequence[int]) -> None:
+    """Create and populate a temporary table with chunk IDs for recency lookups.
+
+    Parameters
+    ----------
+    conn : DuckConnection
+        DuckDB connection for creating and populating the table.
+    ids : Sequence[int]
+        Sequence of chunk IDs to insert into the temporary table.
+
+    Notes
+    -----
+    Creates a temporary table named "recency_ids" with a single BIGINT column
+    and inserts all provided chunk IDs. The table is used for efficient JOIN
+    operations in recency boost queries.
+    """
     conn.execute("CREATE TEMPORARY TABLE recency_ids(id BIGINT)")
     conn.executemany("INSERT INTO recency_ids VALUES (?)", [(identifier,) for identifier in ids])
 
@@ -146,6 +179,30 @@ def _fetch_commit_ts_duckdb(
     ids: Iterable[str],
     cfg: RecencyConfig,
 ) -> Mapping[str, float]:
+    """Fetch commit timestamps for chunk IDs from DuckDB.
+
+    Parameters
+    ----------
+    manager : DuckDBManagerType
+        DuckDB manager instance for database access. May be None if DuckDB
+        is not available.
+    ids : Iterable[str]
+        Iterable of chunk ID strings to look up commit timestamps for.
+    cfg : RecencyConfig
+        Recency configuration specifying table and column names for the lookup.
+
+    Returns
+    -------
+    Mapping[str, float]
+        Dictionary mapping chunk ID strings to commit timestamps (Unix timestamps).
+        Returns an empty dictionary if manager is None, ids is empty, normalization
+        fails, or database errors occur.
+
+    Notes
+    -----
+    Creates temporary views and tables for efficient lookups, then cleans them up.
+    Handles errors gracefully by returning an empty dictionary.
+    """
     if manager is None:
         return {}
     id_list = list(ids)
@@ -226,6 +283,18 @@ def apply_recency_boost(
         concrete_manager = duckdb_manager
 
         def _lookup(ids: Iterable[str]) -> Mapping[str, float]:
+            """Lookup commit timestamps for chunk IDs via DuckDB.
+
+            Parameters
+            ----------
+            ids : Iterable[str]
+                Iterable of chunk ID strings to look up.
+
+            Returns
+            -------
+            Mapping[str, float]
+                Dictionary mapping chunk IDs to commit timestamps.
+            """
             return _fetch_commit_ts_duckdb(concrete_manager, ids, cfg)
 
         lookup = _lookup

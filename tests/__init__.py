@@ -1,1 +1,1 @@
-"""Test suite package for kgfoundry."""
+"""Tests package."""

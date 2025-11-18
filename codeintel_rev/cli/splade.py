@@ -208,6 +208,18 @@ def export_onnx(
         *,
         options: SpladeExportOptions,
     ) -> None:
+        """Execute the ONNX export operation.
+
+        Parameters
+        ----------
+        ctx : CliContext
+            CLI context providing logging and operation tracking.
+        env : EnvelopeBuilder
+            Envelope builder for attaching artifacts and result metadata.
+        options : SpladeExportOptions
+            Export options containing model ID, optimization flags, and
+            quantization configuration.
+        """
         manager = _create_artifacts_manager()
         summary = manager.export_onnx(options)
 
@@ -299,6 +311,20 @@ def encode(
         source: Path,
         options: SpladeEncodeOptions,
     ) -> None:
+        """Execute the corpus encoding operation.
+
+        Parameters
+        ----------
+        ctx : CliContext
+            CLI context providing logging and operation tracking.
+        env : EnvelopeBuilder
+            Envelope builder for attaching artifacts and result metadata.
+        source : Path
+            Path to the JSONL corpus file with `id` and `contents`/`text` fields.
+        options : SpladeEncodeOptions
+            Encoding options containing output directory, batch size, quantization,
+            and shard size configuration.
+        """
         service = _create_encoder_service()
         summary = service.encode_corpus(source, options)
 
@@ -410,6 +436,18 @@ def build_index(
         *,
         options: SpladeBuildOptions,
     ) -> None:
+        """Execute the SPLADE index build operation.
+
+        Parameters
+        ----------
+        ctx : CliContext
+            CLI context providing logging and operation tracking.
+        env : EnvelopeBuilder
+            Envelope builder for attaching artifacts and result metadata.
+        options : SpladeBuildOptions
+            Build options containing vectors directory, index directory, thread
+            count, max clause count, and overwrite flag.
+        """
         manager = _create_index_manager()
         metadata = manager.build_index(options)
 
@@ -529,6 +567,19 @@ def bench(
         queries: tuple[str, ...],
         options: SpladeBenchmarkOptions,
     ) -> None:
+        """Execute the SPLADE benchmark operation.
+
+        Parameters
+        ----------
+        ctx : CliContext
+            CLI context providing logging and operation tracking.
+        env : EnvelopeBuilder
+            Envelope builder for attaching artifacts and result metadata.
+        queries : tuple[str, ...]
+            Tuple of query strings to benchmark. Must contain at least one query.
+        options : SpladeBenchmarkOptions
+            Benchmark options containing warmup and measurement iteration counts.
+        """
         service = _create_encoder_service()
         summary = service.benchmark_queries(list(queries), options)
 

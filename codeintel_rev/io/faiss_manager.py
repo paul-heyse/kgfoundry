@@ -908,6 +908,23 @@ class FAISSManager:
         return payload
 
     def _apply_runtime_overrides_public(self, overrides: Mapping[str, object]) -> dict[str, object]:
+        """Apply runtime overrides and return updated state description.
+
+        Parameters
+        ----------
+        overrides : Mapping[str, object]
+            Override values for nprobe, efSearch, quantizer_efSearch, k_factor.
+
+        Returns
+        -------
+        dict[str, object]
+            Updated runtime state description.
+
+        Raises
+        ------
+        ValueError
+            If no valid overrides are provided.
+        """
         normalized = self._normalize_runtime_payload(
             nprobe=overrides.get("nprobe"),
             ef_search=overrides.get("efSearch"),
@@ -921,15 +938,43 @@ class FAISSManager:
         return self._describe_runtime_state()
 
     def _reset_runtime_overrides_public(self) -> dict[str, object]:
+        """Reset runtime overrides to defaults and return updated state description.
+
+        Returns
+        -------
+        dict[str, object]
+            Updated runtime state description after reset.
+        """
         self._reset_runtime_overrides()
         return self._describe_runtime_state()
 
     def _set_parameter_string_public(self, param_str: str) -> dict[str, object]:
+        """Parse parameter string, apply overrides, and return updated state.
+
+        Parameters
+        ----------
+        param_str : str
+            Parameter string in format "key=value,key2=value2".
+
+        Returns
+        -------
+        dict[str, object]
+            Updated runtime state description.
+
+        """
         overrides, normalized = self._parse_parameter_string(param_str)
         self._apply_runtime_overrides(overrides, parameter_space=normalized)
         return self._describe_runtime_state()
 
     def _current_runtime_parameters(self) -> dict[str, object]:
+        """Get current runtime parameter values with overrides applied.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary of current parameter values (nprobe, efSearch,
+            quantizer_efSearch, k_factor).
+        """
         return {
             "nprobe": self._runtime_overrides.get("nprobe", self.default_nprobe),
             "efSearch": self._runtime_overrides.get("efSearch", self.hnsw_ef_search),
@@ -972,6 +1017,25 @@ class FAISSManager:
         quantizer_ef_search: object | None = None,
         k_factor: object | None = None,
     ) -> dict[str, float]:
+        """Normalize runtime parameter values to typed float dictionary.
+
+        Parameters
+        ----------
+        nprobe : object | None, optional
+            Number of probes override value.
+        ef_search : object | None, optional
+            HNSW ef_search override value.
+        quantizer_ef_search : object | None, optional
+            Quantizer ef_search override value.
+        k_factor : object | None, optional
+            Refinement k_factor override value.
+
+        Returns
+        -------
+        dict[str, float]
+            Normalized overrides dictionary with only non-None values included.
+
+        """
         overrides: dict[str, float] = {}
         if nprobe is not None:
             overrides["nprobe"] = float(self._coerce_positive_int(nprobe, "nprobe"))
@@ -992,6 +1056,17 @@ class FAISSManager:
         parameter_space: str | None = None,
         persist: bool = True,
     ) -> None:
+        """Apply runtime parameter overrides to index and manager state.
+
+        Parameters
+        ----------
+        overrides : Mapping[str, float]
+            Dictionary of parameter overrides to apply.
+        parameter_space : str | None, optional
+            Parameter space description string to store.
+        persist : bool, optional
+            Whether to persist changes to metadata snapshot. Defaults to True.
+        """
         if not overrides:
             return
         for key, value in overrides.items():
@@ -1006,6 +1081,7 @@ class FAISSManager:
             self._write_meta_snapshot(parameter_space=self._parameter_space)
 
     def _reset_runtime_overrides(self) -> None:
+        """Reset runtime overrides to defaults and update index parameters."""
         self._runtime_overrides.clear()
         self.refine_k_factor = self._default_refine_k_factor
         if self.cpu_index is not None:
@@ -1014,6 +1090,23 @@ class FAISSManager:
         self._write_meta_snapshot()
 
     def _parse_parameter_string(self, param_str: str) -> tuple[dict[str, float], str]:
+        """Parse parameter string into overrides dictionary and normalized string.
+
+        Parameters
+        ----------
+        param_str : str
+            Parameter string in format "key=value,key2=value2".
+
+        Returns
+        -------
+        tuple[dict[str, float], str]
+            Tuple of (overrides dictionary, normalized parameter string).
+
+        Raises
+        ------
+        ValueError
+            If parameter string is empty, invalid format, or contains unsupported keys.
+        """
         if not param_str or not param_str.strip():
             msg = "Parameter string cannot be empty"
             raise ValueError(msg)
@@ -1043,6 +1136,27 @@ class FAISSManager:
 
     @staticmethod
     def _coerce_positive_int(value: object, field: str) -> int:
+        """Coerce value to positive integer.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce (int, float, or str).
+        field : str
+            Field name for error messages.
+
+        Returns
+        -------
+        int
+            Positive integer value.
+
+        Raises
+        ------
+        TypeError
+            If value type is invalid (bool or other non-numeric type).
+        ValueError
+            If value is not positive.
+        """
         if isinstance(value, bool):
             msg = f"Invalid integer override for {field}"
             raise TypeError(msg)
@@ -1060,6 +1174,29 @@ class FAISSManager:
 
     @staticmethod
     def _coerce_positive_float(value: object, field: str, *, minimum: float = 0.0) -> float:
+        """Coerce value to positive float with optional minimum.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce (int, float, or str).
+        field : str
+            Field name for error messages.
+        minimum : float, optional
+            Minimum allowed value. Defaults to 0.0.
+
+        Returns
+        -------
+        float
+            Float value >= minimum.
+
+        Raises
+        ------
+        TypeError
+            If value type is invalid (bool or other non-numeric type).
+        ValueError
+            If value is less than minimum.
+        """
         if isinstance(value, bool):
             msg = f"Invalid float override for {field}"
             raise TypeError(msg)

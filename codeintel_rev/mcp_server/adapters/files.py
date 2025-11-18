@@ -191,6 +191,27 @@ def _normalize_list_paths_arguments(
     args: tuple[object, ...],
     kwargs: dict[str, object],
 ) -> tuple[str | None, list[str] | None, list[str] | None, list[str] | None, int]:
+    """Normalize positional and keyword arguments for list_paths.
+
+    Parameters
+    ----------
+    args : tuple[object, ...]
+        Positional arguments (up to 5): path, include_globs, exclude_globs,
+        languages, max_results.
+    kwargs : dict[str, object]
+        Keyword arguments overriding positional arguments.
+
+    Returns
+    -------
+    tuple[str | None, list[str] | None, list[str] | None, list[str] | None, int]
+        Tuple containing normalized (path, include_globs, exclude_globs,
+        languages, max_results).
+
+    Raises
+    ------
+    TypeError
+        If unexpected keyword arguments are provided.
+    """
     positions: list[object | None] = list(args[:5])
     positions.extend([None] * (5 - len(positions)))
 
@@ -387,6 +408,26 @@ def _prune_directories(
     repo_root: Path,
     excludes: list[str],
 ) -> None:
+    """Remove directory names from dirnames list if they match exclude patterns.
+
+    Parameters
+    ----------
+    dirnames : list[str]
+        Mutable list of directory names to prune (modified in-place).
+    resolved_root : Path
+        Resolved absolute path to the current directory being walked.
+    repo_root : Path
+        Repository root directory for computing relative paths.
+    excludes : list[str]
+        List of glob patterns to exclude. Directories matching any pattern
+        are removed from dirnames.
+
+    Notes
+    -----
+    This function modifies dirnames in-place to prevent os.walk from descending
+    into excluded directories. Checks multiple path formats (relative, with/without
+    leading dot, with/without trailing slash) to match exclude patterns.
+    """
     for dir_name in list(dirnames):
         dir_path = resolved_root / dir_name
         relative_dir = _relative_path_str(dir_path, repo_root)
@@ -614,11 +655,41 @@ def _resolve_search_root(repo_root: Path, requested: str | None) -> Path:
 
 
 def _matches_any(target: str, patterns: Sequence[str]) -> bool:
+    """Check if target string matches any glob pattern.
+
+    Parameters
+    ----------
+    target : str
+        String to check against patterns.
+    patterns : Sequence[str]
+        Sequence of glob patterns to match against.
+
+    Returns
+    -------
+    bool
+        True if target matches any pattern in patterns, False otherwise.
+        Backslashes in target are normalized to forward slashes before matching.
+    """
     normalized = target.replace("\\", "/")
     return any(fnmatch.fnmatch(normalized, pattern) for pattern in patterns)
 
 
 def _relative_path_str(path: Path, repo_root: Path) -> str | None:
+    """Compute relative path string from repo root.
+
+    Parameters
+    ----------
+    path : Path
+        Path to compute relative path for.
+    repo_root : Path
+        Repository root directory.
+
+    Returns
+    -------
+    str | None
+        Relative path string using forward slashes, or None if path cannot
+        be resolved or is outside the repository root.
+    """
     try:
         resolved = path.resolve()
     except OSError:
@@ -631,6 +702,18 @@ def _relative_path_str(path: Path, repo_root: Path) -> str | None:
 
 
 def _safe_stat(path: Path) -> os.stat_result | None:
+    """Get file statistics with error handling.
+
+    Parameters
+    ----------
+    path : Path
+        Path to stat.
+
+    Returns
+    -------
+    os.stat_result | None
+        File statistics if stat succeeds, None if OSError occurs.
+    """
     try:
         return path.stat()
     except OSError:

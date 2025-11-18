@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -22,15 +23,17 @@ from codeintel_rev.services.enrich.context import (
     OVERLAY_PARAM_THRESHOLD,
     AnalyticsArtifacts,
     ConfigReferenceState,
+    LegacyPipelineContext,
     PipelineContext,
     StageMeta,
     _stage,
 )
+from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
 from codeintel_rev.uses_builder import UseGraph, build_use_graph
 
 
 def compute_pipeline_analytics(
-    ctx: PipelineContext,
+    ctx: LegacyPipelineContext,
     module_rows: list[ModuleRecord],
 ) -> AnalyticsArtifacts:
     """Compute analytics artifacts for module rows.
@@ -206,6 +209,29 @@ def build_hotspot_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]
         }
         for row in rows
     ]
+
+
+def basic_stats(
+    ctx: PipelineContext,
+    records: list[SimpleModuleRecord],
+) -> Mapping[str, Any]:
+    """Return simple analytics for the refactored CLI commands.
+
+    Returns
+    -------
+    Mapping[str, Any]
+        Summary containing ``files``, ``loc_total``, and tag counts.
+    """
+    file_count = len(records)
+    loc_total = sum(record.loc for record in records)
+    tags = Counter(tag for record in records for tag in record.tags)
+    ctx.logger.info(
+        "Analytics summary: files=%d loc=%d distinct_tags=%d",
+        file_count,
+        loc_total,
+        len(tags),
+    )
+    return {"files": file_count, "loc_total": loc_total, "tags": dict(tags)}
 
 
 def group_configs_by_dir(records: list[dict[str, Any]]) -> dict[str, tuple[str, ...]]:

@@ -26,8 +26,7 @@ class ToThreadCallable(Protocol[TResult]):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Awaitable[TResult]:
-        ...
+    ) -> Awaitable[TResult]: ...
 
 
 @dataclass(slots=True, frozen=True)
@@ -41,7 +40,9 @@ class AsyncSearchDependencies:
 
 def build_async_dependencies(
     *,
-    scope_resolver: Callable[[ApplicationContext, str | None], Awaitable[ScopeIn | None]] = get_effective_scope,
+    scope_resolver: Callable[
+        [ApplicationContext, str | None], Awaitable[ScopeIn | None]
+    ] = get_effective_scope,
     session_provider: Callable[[], str | None] = get_session_id,
     to_thread: ToThreadCallable[Any] = asyncio.to_thread,
 ) -> AsyncSearchDependencies:

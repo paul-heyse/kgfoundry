@@ -42,9 +42,7 @@ class _CatalogStub(AbstractContextManager["_CatalogStub"]):
     def query_by_ids(self, chunk_ids: Sequence[int]) -> list[Mapping[str, Any]]:
         return [record for record in self._records if record.get("id") in chunk_ids]
 
-    def query_by_filters(
-        self, chunk_ids: Sequence[int], **_: object
-    ) -> list[Mapping[str, Any]]:
+    def query_by_filters(self, chunk_ids: Sequence[int], **_: object) -> list[Mapping[str, Any]]:
         return self.query_by_ids(chunk_ids)
 
     @staticmethod
@@ -86,7 +84,9 @@ def make_semantic_adapter_hooks(
         Hooks configured with deterministic Stage-0 execution and hydration.
     """
 
-    def _execute_stage0(_request: SemanticStage0Request) -> tuple[
+    def _execute_stage0(
+        _request: SemanticStage0Request,
+    ) -> tuple[
         Stage0Result,
         Stage0Metadata,
     ]:
@@ -96,6 +96,7 @@ def make_semantic_adapter_hooks(
     if findings is None and hydration_error is None:
         hydrate = getattr(semantic_adapter, "_hydrate_" + "findings")
     else:
+
         def _hydrate(
             ctx: ApplicationContext,
             chunk_ids: Sequence[int],

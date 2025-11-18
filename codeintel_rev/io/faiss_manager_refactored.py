@@ -491,5 +491,4 @@ class FAISSManager:
         return self._runtime_overrides
 
 
-
 __all__ = ["FAISSManager", "FAISSRuntimeOptions"]

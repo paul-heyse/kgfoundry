@@ -130,6 +130,16 @@ def _l2_normalize(vectors: NDArrayF32) -> NDArrayF32:
 
 @dataclass(slots=True, frozen=True)
 class _ExecutorJob:
+    """Job submitted to batch executor for embedding generation.
+
+    Attributes
+    ----------
+    texts : list[str]
+        List of text strings to embed in this job.
+    future : Future[NDArrayF32]
+        Future that will be resolved with embedding matrix when job completes.
+    """
+
     texts: list[str]
     future: Future[NDArrayF32]
 
@@ -280,6 +290,11 @@ class _BoundedBatchExecutor:
         self._thread.join(timeout=1)
 
     def _run(self) -> None:
+        """Background worker loop that processes jobs from queue.
+
+        Continuously fetches jobs, coalesces them into micro-batches, and emits
+        embeddings. Distributes results back to individual job futures.
+        """
         while not self._stop.is_set():
             job = self._next_job()
             if job is None:
@@ -291,6 +306,13 @@ class _BoundedBatchExecutor:
                 handler.set_result(vectors)
 
     def _next_job(self) -> _ExecutorJob | None:
+        """Fetch next job from queue with short timeout.
+
+        Returns
+        -------
+        _ExecutorJob | None
+            Next job if available, None if queue empty or shutdown sentinel received.
+        """
         try:
             item = self._queue.get(timeout=0.1)
         except queue.Empty:
@@ -301,6 +323,18 @@ class _BoundedBatchExecutor:
         return item
 
     def _gather_jobs(self, first_job: _ExecutorJob) -> list[_ExecutorJob]:
+        """Coalesce multiple jobs into a micro-batch up to size limit.
+
+        Parameters
+        ----------
+        first_job : _ExecutorJob
+            Initial job to include in batch.
+
+        Returns
+        -------
+        list[_ExecutorJob]
+            List of jobs coalesced into micro-batch, starting with first_job.
+        """
         jobs = [first_job]
         fused_size = len(first_job.texts)
         start = time.perf_counter()
@@ -316,6 +350,18 @@ class _BoundedBatchExecutor:
         return jobs
 
     def _fetch_with_timeout(self, timeout: float) -> _ExecutorJob | None:
+        """Fetch job from queue with specified timeout.
+
+        Parameters
+        ----------
+        timeout : float
+            Maximum seconds to wait for job.
+
+        Returns
+        -------
+        _ExecutorJob | None
+            Job if available within timeout, None if empty or shutdown sentinel.
+        """
         try:
             item = self._queue.get(timeout=timeout)
         except queue.Empty:
@@ -328,6 +374,30 @@ class _BoundedBatchExecutor:
 
 @dataclass(slots=True, frozen=False)
 class _ProviderState:
+    """Mutable state for embedding provider instance.
+
+    Attributes
+    ----------
+    config : EmbeddingsConfig
+        Embedding configuration settings.
+    index : IndexConfig
+        Index configuration including vector dimension.
+    provider_name : str
+        Provider identifier (e.g., "vllm", "hf").
+    device_label : str
+        Device label (e.g., "cuda", "cpu").
+    dtype : str, optional
+        Data type string for embeddings. Defaults to "float32".
+    normalize : bool, optional
+        Whether to L2-normalize embeddings. Defaults to True.
+    dimension : int | None, optional
+        Detected embedding dimension, None until first inference.
+    metadata : EmbeddingMetadata | None, optional
+        Cached provider metadata, None until first access.
+    fingerprint : str | None, optional
+        Cached provider fingerprint hash, None until first access.
+    """
+
     config: EmbeddingsConfig
     index: IndexConfig
     provider_name: str
@@ -547,6 +617,18 @@ class _ProviderBase(EmbeddingProvider):
 
     # ------------------------------------------------------------------ helpers
     def _embed_direct(self, texts: Sequence[str]) -> NDArrayF32:
+        """Generate embeddings directly without executor batching.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Text strings to embed.
+
+        Returns
+        -------
+        NDArrayF32
+            Embedding matrix with shape (len(texts), dim), post-processed and normalized.
+        """
         if not texts:
             np = _numpy()
             return np.zeros((0, self._state.index.vec_dim), dtype=np.float32)
@@ -555,6 +637,23 @@ class _ProviderBase(EmbeddingProvider):
         return self._post_process(batch)
 
     def _post_process(self, vectors: NDArrayF32) -> NDArrayF32:
+        """Post-process embedding vectors: normalize and validate dimensions.
+
+        Parameters
+        ----------
+        vectors : NDArrayF32
+            Raw embedding vectors from inference.
+
+        Returns
+        -------
+        NDArrayF32
+            Post-processed vectors (normalized if configured, validated dimensions).
+
+        Raises
+        ------
+        EmbeddingRuntimeError
+            If vector rank is incorrect or dimensions don't match configuration.
+        """
         np = _numpy()
         array = np.asarray(vectors, dtype=np.float32)
         if array.ndim != EMBEDDING_RANK:
@@ -590,9 +689,28 @@ class _ProviderBase(EmbeddingProvider):
 
     @staticmethod
     def _memory_bytes() -> int:
+        """Return memory usage in bytes (base implementation returns 0).
+
+        Returns
+        -------
+        int
+            Memory usage in bytes, 0 for base implementation.
+        """
         return 0
 
     def _sanitize(self, texts: Sequence[str]) -> list[str]:
+        """Truncate texts exceeding max_sequence_chars limit.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Input texts to sanitize.
+
+        Returns
+        -------
+        list[str]
+            Texts truncated to max_sequence_chars if needed.
+        """
         max_chars = self._state.config.max_sequence_chars
         payload: list[str] = []
         for text in texts:
@@ -605,6 +723,23 @@ class _ProviderBase(EmbeddingProvider):
 
     # ---------------------------------------------------------------- abstract hooks
     def _run_inference(self, texts: Sequence[str]) -> tuple[NDArrayF32, int]:
+        """Run embedding inference on texts (abstract method).
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Text strings to embed.
+
+        Returns
+        -------
+        tuple[NDArrayF32, int]
+            Tuple of (embedding matrix, total token count).
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by subclasses.
+        """
         raise NotImplementedError
 
     def _close_impl(self) -> None:
@@ -630,9 +765,22 @@ class VLLMProvider(_ProviderBase):
         self._embedder = InprocessVLLMEmbedder(vllm_config)
 
     def _run_inference(self, texts: Sequence[str]) -> tuple[NDArrayF32, int]:
+        """Run inference using in-process vLLM embedder.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Text strings to embed.
+
+        Returns
+        -------
+        tuple[NDArrayF32, int]
+            Tuple of (embedding matrix, total token count).
+        """
         return self._embedder.embed_batch_with_stats(texts)
 
     def _close_impl(self) -> None:
+        """Close in-process vLLM embedder and release resources."""
         self._embedder.close()
 
 
@@ -757,6 +905,18 @@ class HFEmbeddingProvider(_ProviderBase):
         self._model.eval()
 
     def _run_inference(self, texts: Sequence[str]) -> tuple[NDArrayF32, int]:
+        """Run inference using Hugging Face transformers model.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Text strings to embed.
+
+        Returns
+        -------
+        tuple[NDArrayF32, int]
+            Tuple of (embedding matrix, total token count).
+        """
         torch_mod = self._torch
         tokenizer = self._tokenizer
         model = self._model
@@ -781,6 +941,13 @@ class HFEmbeddingProvider(_ProviderBase):
         return vectors, tokens
 
     def _memory_bytes(self) -> int:
+        """Return CUDA memory usage in bytes if using GPU.
+
+        Returns
+        -------
+        int
+            Memory usage in bytes, 0 if CPU or if CUDA unavailable.
+        """
         try:
             if self._device.type == "cuda":
                 return int(self._torch.cuda.memory_allocated(self._device))

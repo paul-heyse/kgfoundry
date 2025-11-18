@@ -55,6 +55,24 @@ class ServerLaunchOptions:
 
 
 def _infer_host_port(base_url: str) -> tuple[str, int]:
+    """Extract host and port from a base URL string.
+
+    Parameters
+    ----------
+    base_url : str
+        Base URL string (e.g., "http://127.0.0.1:8001/v1" or "http://localhost/v1").
+
+    Returns
+    -------
+    tuple[str, int]
+        Tuple containing (host, port). If no port is specified in the URL,
+        returns DEFAULT_PORT (8001).
+
+    Raises
+    ------
+    ValueError
+        Raised if the base_url does not contain a "://" separator (invalid URL format).
+    """
     if "://" not in base_url:
         msg = f"Invalid base URL: {base_url}"
         raise ValueError(msg)
@@ -67,12 +85,40 @@ def _infer_host_port(base_url: str) -> tuple[str, int]:
 
 
 def _health_url(base_url: str) -> str:
+    """Construct the health check URL from a base URL.
+
+    Parameters
+    ----------
+    base_url : str
+        Base URL string (e.g., "http://127.0.0.1:8001/v1" or "http://localhost").
+
+    Returns
+    -------
+    str
+        Health check URL path. If base_url ends with "/v1", appends "/health".
+        Otherwise, appends "/v1/health" to ensure the correct path.
+    """
     if base_url.rstrip("/").endswith("/v1"):
         return base_url.rstrip("/") + "/health"
     return base_url.rstrip("/") + "/v1/health"
 
 
 def _build_server_argv(options: ServerLaunchOptions) -> list[str]:
+    """Build command-line arguments for launching the vLLM server.
+
+    Parameters
+    ----------
+    options : ServerLaunchOptions
+        Server launch configuration containing model path, host, port, and
+        optional tensor parallel size, memory utilization, and other settings.
+
+    Returns
+    -------
+    list[str]
+        Command-line argument list suitable for subprocess execution. Includes
+        Python executable, vLLM module path, model configuration, and all
+        optional flags based on the options.
+    """
     argv = [
         sys.executable,
         "-m",
@@ -101,6 +147,24 @@ def _build_server_argv(options: ServerLaunchOptions) -> list[str]:
 
 
 def _env_for_cache(cache_root: Path, *, offline: bool) -> dict[str, str]:
+    """Build environment variables for HuggingFace cache configuration.
+
+    Parameters
+    ----------
+    cache_root : Path
+        Root directory for HuggingFace model cache. Used to set HF_HOME and
+        HUGGINGFACE_HUB_CACHE environment variables.
+    offline : bool
+        If True, sets HF_HUB_OFFLINE=1 to prevent downloads. If False, allows
+        online access to HuggingFace Hub.
+
+    Returns
+    -------
+    dict[str, str]
+        Environment variable dictionary with HuggingFace cache settings and
+        VLLM_USE_FLASHINFER flag. Includes a copy of the current environment
+        with cache variables overridden.
+    """
     env = os.environ.copy()
     env["HF_HOME"] = str(cache_root)
     env["HUGGINGFACE_HUB_CACHE"] = str(cache_root)
@@ -111,6 +175,25 @@ def _env_for_cache(cache_root: Path, *, offline: bool) -> dict[str, str]:
 
 
 def _wait_until_ready(base_url: str, timeout_s: float) -> None:
+    """Wait for the vLLM server to become healthy.
+
+    Polls the health check endpoint at regular intervals until the server
+    responds with HTTP 200 or the timeout expires.
+
+    Parameters
+    ----------
+    base_url : str
+        Base URL of the vLLM server (e.g., "http://127.0.0.1:8001/v1").
+    timeout_s : float
+        Maximum time in seconds to wait for the server to become ready.
+
+    Raises
+    ------
+    RuntimeError
+        Raised if httpx is not available (dependency not installed).
+    TimeoutError
+        Raised if the server does not become healthy within the timeout period.
+    """
     if httpx is None:  # pragma: no cover - dependency guard
         msg = "httpx is required for readiness checks (pip install httpx)."
         raise RuntimeError(msg)
@@ -176,6 +259,24 @@ def cmd_serve_http(args: argparse.Namespace) -> int:
 
 
 def _wait_for_exit(pid: int, timeout: float) -> bool:
+    """Wait for a process to exit by polling its PID.
+
+    Checks if the process exists by sending signal 0 (no-op signal) at regular
+    intervals. Returns True if the process exits within the timeout, False otherwise.
+
+    Parameters
+    ----------
+    pid : int
+        Process ID to monitor.
+    timeout : float
+        Maximum time in seconds to wait for the process to exit.
+
+    Returns
+    -------
+    bool
+        True if the process exited within the timeout (os.kill raises OSError),
+        False if the timeout expired and the process is still running.
+    """
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:

@@ -26,10 +26,14 @@ class TokensPrompt(Protocol):
 
 
 class _EmbeddingOutput(Protocol):
+    """Protocol for embedding output containing vector sequence."""
+
     embedding: Sequence[float]
 
 
 class _EmbeddingResult(Protocol):
+    """Protocol for embedding result containing output wrapper."""
+
     outputs: _EmbeddingOutput
 
 
@@ -132,6 +136,18 @@ class InprocessVLLMContext:
         """
 
         def _tokenizer(model_id: str) -> TokenizerProtocol:
+            """Create AutoTokenizer instance from model ID.
+
+            Parameters
+            ----------
+            model_id : str
+                HuggingFace model identifier.
+
+            Returns
+            -------
+            TokenizerProtocol
+                Tokenizer instance loaded from model_id.
+            """
             transformers_mod = cast("Any", transformers)
             tokenizer = transformers_mod.AutoTokenizer.from_pretrained(
                 model_id,
@@ -140,6 +156,18 @@ class InprocessVLLMContext:
             return cast("TokenizerProtocol", tokenizer)
 
         def _llm(cfg: VLLMConfig) -> LLM:
+            """Create vLLM LLM instance from configuration.
+
+            Parameters
+            ----------
+            cfg : VLLMConfig
+                vLLM configuration for model initialization.
+
+            Returns
+            -------
+            LLM
+                vLLM LLM instance configured with cfg.
+            """
             llm_cls = cast("type[Any]", vllm.LLM)
             pooler_config_cls = cast("type[Any]", vllm_config.PoolerConfig)
             instance = llm_cls(
@@ -153,6 +181,18 @@ class InprocessVLLMContext:
             return cast("LLM", instance)
 
         def _tokens_prompt(token_ids: Sequence[int]) -> TokensPrompt:
+            """Create TokensPrompt instance from token ID sequence.
+
+            Parameters
+            ----------
+            token_ids : Sequence[int]
+                Sequence of token IDs to wrap in prompt.
+
+            Returns
+            -------
+            TokensPrompt
+                Prompt instance containing token IDs.
+            """
             tokens_prompt_cls = cast("type[Any]", vllm_inputs.TokensPrompt)
             prompt = tokens_prompt_cls(prompt_token_ids=list(map(int, token_ids)))
             return cast("TokensPrompt", prompt)
@@ -296,6 +336,13 @@ class InprocessVLLMEmbedder:
         self._cell.close()
 
     def _initialize_runtime(self) -> _InprocessVLLMRuntime:
+        """Initialize vLLM runtime with tokenizer and engine.
+
+        Returns
+        -------
+        _InprocessVLLMRuntime
+            Initialized runtime instance with tokenizer and engine loaded.
+        """
         runtime = _InprocessVLLMRuntime()
         context = self._context()
         runtime.tokenizer = context.tokenizer_factory(self.config.model)
@@ -303,6 +350,18 @@ class InprocessVLLMEmbedder:
         return runtime
 
     def _runtime(self) -> _InprocessVLLMRuntime:
+        """Get or initialize vLLM runtime instance.
+
+        Returns
+        -------
+        _InprocessVLLMRuntime
+            Runtime instance with tokenizer and engine initialized.
+
+        Raises
+        ------
+        RuntimeError
+            If runtime initialization fails or tokenizer/engine are None.
+        """
         runtime = self._cell.get_or_initialize(self._initialize_runtime)
         if runtime.tokenizer is None or runtime.engine is None:  # pragma: no cover - defensive
             msg = "vLLM runtime not initialized"
@@ -310,6 +369,18 @@ class InprocessVLLMEmbedder:
         return runtime
 
     def _context(self) -> InprocessVLLMContext:
+        """Get in-process vLLM context instance.
+
+        Returns
+        -------
+        InprocessVLLMContext
+            Context instance with tokenizer/LLM factories.
+
+        Raises
+        ------
+        RuntimeError
+            If context is None.
+        """
         context = self.context
         if context is None:  # pragma: no cover - defensive
             msg = "In-process vLLM context not initialized"

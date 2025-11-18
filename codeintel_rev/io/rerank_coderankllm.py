@@ -46,6 +46,23 @@ class CoderankLLMRerankerContext:
         """
 
         def _tokenizer(model_id: str) -> PreTrainedTokenizerBase:
+            """Create AutoTokenizer instance from model ID.
+
+            Parameters
+            ----------
+            model_id : str
+                HuggingFace model identifier.
+
+            Returns
+            -------
+            PreTrainedTokenizerBase
+                Tokenizer instance loaded from model_id.
+
+            Raises
+            ------
+            RuntimeError
+                If transformers module doesn't expose AutoTokenizer.
+            """
             transformers_module = gate_import(
                 "transformers",
                 "CodeRank listwise reranker (install `transformers`)",
@@ -58,6 +75,23 @@ class CoderankLLMRerankerContext:
             return cast("PreTrainedTokenizerBase", tokenizer)
 
         def _model(model_id: str) -> AutoModelForCausalLM:
+            """Create AutoModelForCausalLM instance from model ID.
+
+            Parameters
+            ----------
+            model_id : str
+                HuggingFace model identifier.
+
+            Returns
+            -------
+            AutoModelForCausalLM
+                Model instance loaded from model_id.
+
+            Raises
+            ------
+            RuntimeError
+                If transformers module doesn't expose AutoModelForCausalLM.
+            """
             transformers_module = gate_import(
                 "transformers",
                 "CodeRank listwise reranker (install `transformers`)",
@@ -160,6 +194,13 @@ class CodeRankListwiseReranker:
         return [cid for cid, _ in candidates]
 
     def _ensure_model(self) -> tuple[PreTrainedTokenizerBase, AutoModelForCausalLM]:
+        """Ensure tokenizer and model are loaded and cached for current model_id/device.
+
+        Returns
+        -------
+        tuple[PreTrainedTokenizerBase, AutoModelForCausalLM]
+            Cached or newly loaded (tokenizer, model) pair.
+        """
         cache_key = (self.model_id, self.device)
         with self._CACHE_LOCK:
             cached = self._CACHE.get(cache_key)
@@ -176,6 +217,20 @@ class CodeRankListwiseReranker:
 
     @staticmethod
     def _build_prompt(query: str, candidates: Sequence[tuple[int, str]]) -> str:
+        """Build prompt string for CodeRankLLM from query and candidates.
+
+        Parameters
+        ----------
+        query : str
+            Natural language search query.
+        candidates : Sequence[tuple[int, str]]
+            Sequence of (chunk_id, code_snippet) tuples.
+
+        Returns
+        -------
+        str
+            Formatted prompt string ready for tokenization.
+        """
         formatted_candidates = "\n\n".join(
             f"Chunk ID: {cid}\nCode:\n{(snippet or '')[:_MAX_PREVIEW_CHARS]}"
             for cid, snippet in candidates
@@ -184,6 +239,20 @@ class CodeRankListwiseReranker:
 
     @staticmethod
     def _parse_rankings(text: str, valid_ids: set[int]) -> list[int]:
+        """Parse ranked chunk IDs from LLM output text.
+
+        Parameters
+        ----------
+        text : str
+            LLM generation output text containing JSON array of chunk IDs.
+        valid_ids : set[int]
+            Set of valid chunk IDs to filter parsed results.
+
+        Returns
+        -------
+        list[int]
+            Ordered list of chunk IDs parsed from text, filtered to valid_ids.
+        """
         snippet = text.strip()
         start = snippet.find("[")
         end = snippet.rfind("]")

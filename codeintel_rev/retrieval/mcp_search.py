@@ -939,6 +939,28 @@ def _build_hit_reasons(
     metadata: Mapping[str, object],
     score: float,
 ) -> list[str]:
+    """Build a list of hit reason strings explaining why a result matched.
+
+    Parameters
+    ----------
+    request : SearchRequest
+        Search request containing filters and rerank configuration.
+    metadata : Mapping[str, object]
+        Chunk metadata dictionary containing symbols and other attributes.
+    score : float
+        Similarity score for the result.
+
+    Returns
+    -------
+    list[str]
+        List of reason strings describing match factors, including:
+        - "embedding:cosine" (always present)
+        - Language filter reasons (if languages filter is active)
+        - Path filter reasons (if include/exclude filters are active)
+        - Symbol match reasons (if symbols filter matched)
+        - Rerank reason (if reranking was enabled)
+        - Score reason with formatted score value
+    """
     reasons = ["embedding:cosine"]
     if request.filters.languages:
         reasons.append(f"filter:lang={'/'.join(request.filters.languages)}")

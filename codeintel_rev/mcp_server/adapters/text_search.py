@@ -276,6 +276,13 @@ async def search_text(
         raise TypeError(msg)
 
     def _run_sync() -> dict:
+        """Execute text search synchronously in thread pool.
+
+        Returns
+        -------
+        dict
+            Search results dictionary with matches, total, and truncated fields.
+        """
         return _search_text_sync(
             context=context,
             scope=scope,
@@ -290,6 +297,22 @@ def _resolve_glob_filters(
     scope: ScopeIn | None,
     options: TextSearchOptions,
 ) -> _ResolvedFilters:
+    """Merge scope and options filters into resolved filter configuration.
+
+    Parameters
+    ----------
+    scope : ScopeIn | None
+        Session scope filters (include_globs, exclude_globs).
+    options : TextSearchOptions
+        Explicit search options with include_globs, exclude_globs, and paths.
+
+    Returns
+    -------
+    _ResolvedFilters
+        Resolved filters with paths, include_globs, and exclude_globs.
+        Explicit options override session scope. If explicit paths are provided
+        and include_globs is None, include_globs is set to None (paths take precedence).
+    """
     merged_filters = merge_scope_filters(
         scope,
         {
@@ -321,6 +344,30 @@ def _search_text_sync(
     options: TextSearchOptions,
     runner: SubprocessRunner = run_subprocess,
 ) -> dict:
+    """Execute ripgrep text search synchronously.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing repo root and settings.
+    scope : ScopeIn | None
+        Session scope filters merged with options.
+    options : TextSearchOptions
+        Search configuration (query, regex, case_sensitive, max_results).
+    runner : SubprocessRunner, optional
+        Subprocess execution helper. Defaults to run_subprocess.
+
+    Returns
+    -------
+    dict
+        Search results dictionary with matches, total, and truncated fields.
+
+    Raises
+    ------
+    VectorSearchError
+        Raised when search times out, subprocess fails, or query is invalid.
+        Falls back to grep if ripgrep is not available (return code 127).
+    """
     repo_root = context.paths.repo_root
 
     query = options.query

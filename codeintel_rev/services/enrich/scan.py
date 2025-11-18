@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+import ast
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from codeintel_rev.enrich.tagging import load_rules
 from codeintel_rev.enrich.validators import ModuleRecordModel
 from codeintel_rev.services.enrich.analytics import compute_pipeline_analytics
 from codeintel_rev.services.enrich.context import (
+    LegacyPipelineContext,
     PipelineContext,
     PipelineOptions,
     PipelineResult,
@@ -30,6 +32,7 @@ from codeintel_rev.services.enrich.context import (
     StageMeta,
     _stage,
 )
+from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
 from codeintel_rev.typedness import FileTypeSignals, collect_type_signals
 
 _EXCLUDED_SCAN_SEGMENTS = {"stubs", "overlays"}
@@ -235,7 +238,7 @@ def prepare_pipeline(pipeline: PipelineOptions) -> PreparedPipeline:
     coverage_lookup = collect_coverage_map(root_resolved, pipeline.coverage_xml)
     config_records = index_config_records(root_resolved)
     tagging_rules = load_tagging_rules(pipeline.tags_yaml)
-    ctx = PipelineContext(
+    ctx = LegacyPipelineContext(
         root=root_resolved,
         repo_root=repo_root,
         scip_index=scip_index,
@@ -250,7 +253,7 @@ def prepare_pipeline(pipeline: PipelineOptions) -> PreparedPipeline:
 
 
 def scan_modules(
-    ctx: PipelineContext,
+    ctx: LegacyPipelineContext,
     pipeline: PipelineOptions,
     files: Sequence[Path],
 ) -> tuple[list[ModuleRecord], list[tuple[str, str]]]:
@@ -306,6 +309,96 @@ def run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
         hotspot_rows=analytics.hotspot_rows,
         tag_index=analytics.tag_index,
     )
+
+
+def _iter_source_files(
+    root: Path, include_globs: tuple[str, ...], exclude_globs: tuple[str, ...]
+) -> Iterator[Path]:
+    """Yield Python files honoring include/exclude globs.
+
+    Yields
+    ------
+    Path
+        Matched Python file path.
+    """
+    for file_path in root.rglob("*.py"):
+        rel = file_path.relative_to(root)
+        if include_globs and not any(rel.match(pattern) for pattern in include_globs):
+            continue
+        if exclude_globs and any(rel.match(pattern) for pattern in exclude_globs):
+            continue
+        yield file_path
+
+
+def _py_module_name(repo_root: Path, file_path: Path) -> str:
+    try:
+        rel = file_path.relative_to(repo_root)
+    except ValueError:
+        rel = file_path
+    parts = list(rel.with_suffix("").parts)
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
+
+
+def _loc(text: str) -> int:
+    """Return the number of lines of code in ``text``.
+
+    Parameters
+    ----------
+    text : str
+        Source code text to count lines in.
+
+    Returns
+    -------
+    int
+        Number of lines in the text (excluding empty lines if splitlines
+        filters them, but typically includes all lines).
+    """
+    return sum(1 for _ in text.splitlines())
+
+
+def scan_repo(
+    ctx: PipelineContext,
+    *,
+    include: tuple[str, ...] = (),
+    exclude: tuple[str, ...] = ("**/.venv/**", "**/build/**", "**/dist/**"),
+    infer_tags: bool = True,
+) -> list[SimpleModuleRecord]:
+    """Scan the repository and return lightweight module records.
+
+    Returns
+    -------
+    list[SimpleModuleRecord]
+        Sorted list of module records discovered under ``repo_root``.
+    """
+    ctx.logger.info("Scanning repo at %s", ctx.paths.repo_root)
+    records: list[SimpleModuleRecord] = []
+    for file_path in _iter_source_files(ctx.paths.repo_root, include, exclude):
+        text = file_path.read_text(encoding="utf-8", errors="ignore")
+        try:
+            ast.parse(text)
+        except SyntaxError:
+            ctx.logger.warning("Skipping parse failure: %s", file_path)
+            continue
+        tags: set[str] = set()
+        if infer_tags:
+            if "cli" in file_path.parts:
+                tags.add("cli")
+            if "tests" in file_path.parts:
+                tags.add("test")
+        records.append(
+            SimpleModuleRecord(
+                path=file_path.relative_to(ctx.paths.repo_root),
+                module=_py_module_name(ctx.paths.repo_root, file_path),
+                language="python",
+                loc=_loc(text),
+                tags=tuple(sorted(tags)),
+                meta={"mtime": file_path.stat().st_mtime},
+            )
+        )
+    ctx.logger.info("Scan complete: %d modules", len(records))
+    return records
 
 
 def _normalize_type_signal_map(

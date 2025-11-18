@@ -103,6 +103,24 @@ def _merge_candidates(
     sparse: list[tuple[int, float]] | None,
     k: int,
 ) -> list[tuple[int, float, str]]:
+    """Merge dense and sparse search candidates with deduplication.
+
+    Parameters
+    ----------
+    dense : list[tuple[int, float]] | None
+        Dense (FAISS) search results as (chunk_id, score) pairs, or None.
+    sparse : list[tuple[int, float]] | None
+        Sparse (BM25/SPLADE) search results as (chunk_id, score) pairs, or None.
+    k : int
+        Maximum number of results to return.
+
+    Returns
+    -------
+    list[tuple[int, float, str]]
+        Merged and ranked candidates as (chunk_id, score, channel) tuples.
+        Duplicate chunk_ids are deduplicated (keeps highest score). Results
+        are sorted by score descending and limited to k items.
+    """
     dense = dense or []
     sparse = sparse or []
     merged: list[tuple[int, float, str]] = []

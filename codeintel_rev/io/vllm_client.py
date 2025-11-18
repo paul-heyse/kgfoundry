@@ -33,12 +33,31 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _truthy_env(value: str | None) -> bool:
+    """Check if environment variable value is truthy.
+
+    Parameters
+    ----------
+    value : str | None
+        Environment variable value to check.
+
+    Returns
+    -------
+    bool
+        True if value is one of "1", "true", "yes", "on" (case-insensitive), False otherwise.
+    """
     if value is None:
         return False
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _use_stub_client() -> bool:
+    """Check if stub VLLM client should be used (for testing).
+
+    Returns
+    -------
+    bool
+        True if KGFOUNDRY_TEST_VLLM_STUB environment variable is truthy.
+    """
     return _truthy_env(os.getenv("KGFOUNDRY_TEST_VLLM_STUB"))
 
 
@@ -96,6 +115,18 @@ def _get_numpy() -> ModuleType:
 
 
 def _default_http_client_factory(config: VLLMConfig) -> httpx.Client:
+    """Create default synchronous HTTP client for vLLM requests.
+
+    Parameters
+    ----------
+    config : VLLMConfig
+        vLLM configuration containing timeout settings.
+
+    Returns
+    -------
+    httpx.Client
+        HTTP client with connection pooling configured.
+    """
     return httpx.Client(
         timeout=config.timeout_s,
         limits=httpx.Limits(
@@ -106,6 +137,18 @@ def _default_http_client_factory(config: VLLMConfig) -> httpx.Client:
 
 
 def _default_async_http_client_factory(config: VLLMConfig) -> httpx.AsyncClient:
+    """Create default asynchronous HTTP client for vLLM requests.
+
+    Parameters
+    ----------
+    config : VLLMConfig
+        vLLM configuration containing timeout settings.
+
+    Returns
+    -------
+    httpx.AsyncClient
+        Async HTTP client with connection pooling configured.
+    """
     return httpx.AsyncClient(
         timeout=config.timeout_s,
         limits=httpx.Limits(
@@ -116,6 +159,18 @@ def _default_async_http_client_factory(config: VLLMConfig) -> httpx.AsyncClient:
 
 
 def _default_inprocess_embedder_factory(config: VLLMConfig) -> InprocessVLLMEmbedder:
+    """Create default in-process vLLM embedder instance.
+
+    Parameters
+    ----------
+    config : VLLMConfig
+        vLLM configuration for embedder initialization.
+
+    Returns
+    -------
+    InprocessVLLMEmbedder
+        In-process embedder instance configured with config.
+    """
     engine_module = import_module("codeintel_rev.io.vllm_engine")
     engine_cls = engine_module.InprocessVLLMEmbedder
     return engine_cls(config)
@@ -302,9 +357,11 @@ class VLLMClient:
             self._initialize_http_client()
 
     def _initialize_local_engine(self) -> None:
+        """Initialize in-process vLLM engine from transport context."""
         self._local_engine = self._transport_context.inprocess_embedder_factory(self.config)
 
     def _initialize_http_client(self) -> None:
+        """Initialize HTTP client from transport context."""
         self._client = self._transport_context.http_client_factory(self.config)
 
     def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
@@ -353,6 +410,19 @@ class VLLMClient:
         return self._embed_batch_http(texts)
 
     def _embed_batch_http(self, texts: Sequence[str]) -> NDArrayF32:
+        """Embed batch of texts via HTTP POST to vLLM service.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Sequence of text strings to embed.
+
+        Returns
+        -------
+        NDArrayF32
+            Embedding matrix with shape (len(texts), embedding_dim).
+
+        """
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
         payload = self._encoder.encode(request)
 
@@ -550,6 +620,23 @@ class VLLMClient:
             self._local_engine = None
 
     async def _embed_batch_async_local(self, texts: Sequence[str]) -> NDArrayF32:
+        """Embed batch of texts using in-process vLLM engine with async semaphore.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Sequence of text strings to embed.
+
+        Returns
+        -------
+        NDArrayF32
+            Embedding matrix with shape (len(texts), embedding_dim).
+
+        Raises
+        ------
+        RuntimeError
+            If local engine is not initialized.
+        """
         if self._local_engine is None:
             msg = "Local vLLM engine not initialized."
             raise RuntimeError(msg)
@@ -561,11 +648,30 @@ class VLLMClient:
             return await loop.run_in_executor(None, self._local_engine.embed_batch, list(texts))
 
     def _ensure_async_http_client(self) -> httpx.AsyncClient:
+        """Ensure async HTTP client is initialized, creating if needed.
+
+        Returns
+        -------
+        httpx.AsyncClient
+            Initialized async HTTP client instance.
+        """
         if self._async_client is None:
             self._async_client = self._transport_context.async_client_factory(self.config)
         return self._async_client
 
     def _require_http_client(self) -> httpx.Client:
+        """Require HTTP client to be initialized, raising if missing.
+
+        Returns
+        -------
+        httpx.Client
+            Initialized HTTP client instance.
+
+        Raises
+        ------
+        RuntimeError
+            If HTTP client is not initialized.
+        """
         if self._client is None:
             msg = "HTTP transport not initialized; set VLLM run mode to 'http'."
             raise RuntimeError(msg)
@@ -579,6 +685,18 @@ class _StubVLLMClient:
         self.config = config
 
     def _zeros(self, count: int) -> NDArrayF32:
+        """Create zero-filled embedding matrix for stub client.
+
+        Parameters
+        ----------
+        count : int
+            Number of embeddings (rows) to create.
+
+        Returns
+        -------
+        NDArrayF32
+            Zero matrix with shape (count, embedding_dim).
+        """
         np_mod = _get_numpy()
         return np_mod.zeros((count, self.config.embedding_dim), dtype=np_mod.float32)
 

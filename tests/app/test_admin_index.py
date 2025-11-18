@@ -20,6 +20,7 @@ from tests.app._context_factory import build_application_context
 
 _REQUIRE_ADMIN_DEP = index_admin.__dict__["_require_admin"]
 
+
 class _ScopeStoreStub:
     def __init__(self) -> None:
         self.data: dict[str, dict] = {}

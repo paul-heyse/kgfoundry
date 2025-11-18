@@ -1,44 +1,38 @@
-# SPDX-License-Identifier: MIT
 """Analytics command."""
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import typer
 
-from codeintel_rev.cli.enrich import app, common
-from codeintel_rev.cli.enrich.__main__ import main as enrich_main
-from codeintel_rev.enrich.errors import StageError
-from codeintel_rev.services.enrich import exports as export_services
+from codeintel_rev.app.readiness import raise_on_errors, validate_paths
+from codeintel_rev.cli.enrich import app
+from codeintel_rev.config.paths import resolve_application_paths
+from codeintel_rev.services.enrich.analytics import basic_stats
+from codeintel_rev.services.enrich.context import PipelineContext
+from codeintel_rev.services.enrich.scan import scan_repo
+
+REPO_ROOT_OPTION = typer.Option(".", "--repo-root", help="Repository root")
+OUT_DIR_OPTION = typer.Option("./.enrich", "--out-dir", help="Output directory")
+PRETTY_OPTION = typer.Option(
+    default=True,
+    help="Pretty-print JSON output",
+    show_default=True,
+)
 
 
 @app.command("analytics")
 def analytics(
-    ctx: typer.Context,
     *,
-    dry_run: bool = common.DRY_RUN_OPTION,
+    repo_root: Path = REPO_ROOT_OPTION,
+    out_dir: Path = OUT_DIR_OPTION,
+    pretty: bool = PRETTY_OPTION,
 ) -> None:
-    """Emit enrichment analytics artifacts (graphs, typedness, coverage, etc.)."""
-    state = common.ensure_state(ctx)
-    try:
-        result = common.execute_pipeline(state)
-    except StageError as exc:  # pragma: no cover - defensive
-        common.handle_stage_error(exc)
-        return
-    if common.handle_dry_run("analytics", dry_run=dry_run, result=result):
-        return
-    export_services.write_graph_outputs(result, state.pipeline.out)
-    export_services.write_uses_output(result, state.pipeline.out)
-    export_services.write_typedness_output(result, state.pipeline.out)
-    export_services.write_doc_output(result, state.pipeline.out)
-    export_services.write_coverage_output(result, state.pipeline.out)
-    export_services.write_config_output(result, state.pipeline.out)
-    export_services.write_hotspot_output(result, state.pipeline.out)
-    typer.echo("[analytics] Wrote analytics artifacts.")
-
-
-def main() -> None:  # pragma: no cover - entrypoint shim
-    """Invoke the enrichment CLI (analytics shim)."""
-    enrich_main()
-
-
-__all__ = ["analytics", "main"]
+    """Compute and print summary analytics for a scan."""
+    paths = resolve_application_paths({"BASE_DIR": repo_root, "DATA_DIR": out_dir})
+    raise_on_errors(validate_paths(paths))
+    ctx = PipelineContext.from_paths(paths)
+    stats = basic_stats(ctx, scan_repo(ctx))
+    typer.echo(json.dumps(stats, indent=2 if pretty else None))

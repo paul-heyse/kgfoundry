@@ -283,6 +283,21 @@ def _analyze_docstring(
 
 
 def _iter_params(params: cst.Parameters) -> Iterator[cst.Param]:
+    """Iterate over all parameter nodes in a LibCST Parameters object.
+
+    Parameters
+    ----------
+    params : cst.Parameters
+        LibCST Parameters node containing function parameters. Includes
+        positional-only, regular, keyword-only, *args, and **kwargs parameters.
+
+    Yields
+    ------
+    cst.Param
+        Each parameter node found in the Parameters object, including
+        positional-only, regular, keyword-only, *args, and **kwargs parameters
+        if present. Only yields actual Param nodes, skipping None values.
+    """
     for collection in (
         params.posonly_params,
         params.params,
@@ -328,6 +343,39 @@ def _exception_name(expr: cst.BaseExpression | None) -> str | None:
 
 
 def _infer_side_effects(imports: set[str], code: str) -> dict[str, bool]:
+    """Infer side-effect categories from imported modules and code patterns.
+
+    Analyzes imported module names and code content to detect potential side
+    effects in four categories: filesystem operations, network operations,
+    subprocess execution, and database access. Uses heuristics based on module
+    name prefixes and code patterns (e.g., "open(" for filesystem, "requests."
+    for network).
+
+    Parameters
+    ----------
+    imports : set[str]
+        Set of imported module names (e.g., {"os", "pathlib", "requests"}).
+        Used to detect side-effect categories based on module name prefixes.
+    code : str
+        Source code content to analyze for side-effect patterns. The code is
+        lowercased for pattern matching (e.g., detecting "open(" or "requests.").
+
+    Returns
+    -------
+    dict[str, bool]
+        Dictionary with keys "filesystem", "network", "subprocess", "database"
+        and boolean values indicating whether each category of side effect is
+        detected. True means the category is likely present, False means it
+        is not detected.
+
+    Notes
+    -----
+    This function uses heuristics and may produce false positives or false
+    negatives. It checks module name prefixes (e.g., "os", "pathlib" for
+    filesystem) and code patterns (e.g., "open(" for filesystem, "requests."
+    for network). Time complexity: O(n + m) where n is the number of imports
+    and m is the length of the code string.
+    """
     lowered = code.lower()
 
     def has_any(prefixes: tuple[str, ...]) -> bool:
@@ -507,6 +555,34 @@ class _IndexVisitor(cst.CSTVisitor):
             self._class_depth = max(0, self._class_depth - 1)
 
     def _is_module_scope(self, node: cst.CSTNode) -> bool:
+        """Check if a node is at module scope (not nested in class/function).
+
+        Determines whether a LibCST node is at module scope by checking the
+        scope metadata provider. Falls back to depth counters if metadata is
+        unavailable. Module scope means the node is not nested inside a class
+        or function definition.
+
+        Parameters
+        ----------
+        node : cst.CSTNode
+            LibCST node to check for module scope. The node's scope metadata
+            is queried to determine if it's in a GlobalScope.
+
+        Returns
+        -------
+        bool
+            True if the node is at module scope (not nested in class/function),
+            False if it's nested inside a class or function definition. Returns
+            True if scope metadata is unavailable and depth counters indicate
+            module level.
+
+        Notes
+        -----
+        This method uses LibCST's ScopeProvider metadata when available, which
+        is more accurate than depth counters. Falls back to checking class_depth
+        and function_depth counters if metadata is unavailable (e.g., during
+        partial parsing or metadata errors). Time complexity: O(1).
+        """
         try:
             scope = self.get_metadata(cst_metadata.ScopeProvider, node)
             return isinstance(scope, cst_metadata.GlobalScope)
@@ -514,6 +590,34 @@ class _IndexVisitor(cst.CSTVisitor):
             return self._class_depth == 0 and self._function_depth == 0
 
     def _qualified_name(self, node: cst.CSTNode) -> str | None:
+        """Extract the qualified name of a LibCST node from metadata.
+
+        Retrieves the fully qualified name (e.g., "module.Class.method") of a
+        LibCST node using the QualifiedNameProvider metadata. Prefers LOCAL
+        source qualified names over imported ones. Returns the first available
+        qualified name if no LOCAL source is found.
+
+        Parameters
+        ----------
+        node : cst.CSTNode
+            LibCST node to extract qualified name from. The node's qualified
+            name metadata is queried to determine its fully qualified identifier.
+
+        Returns
+        -------
+        str | None
+            Fully qualified name (e.g., "module.Class.method") if available,
+            or None if metadata is unavailable or the node has no qualified name.
+            Prefers LOCAL source qualified names over imported ones.
+
+        Notes
+        -----
+        This method uses LibCST's QualifiedNameProvider metadata to resolve
+        fully qualified names. It prioritizes LOCAL source names (defined in
+        the current module) over imported names. Returns None if metadata is
+        unavailable or the node is not a named entity. Time complexity: O(n)
+        where n is the number of qualified names for the node (typically 1).
+        """
         try:
             qualnames = self.get_metadata(cst_metadata.QualifiedNameProvider, node)
         except KeyError:
@@ -568,6 +672,28 @@ class _IndexVisitor(cst.CSTVisitor):
             self.doc_metrics["has_summary"] = True
 
     def _handle_import(self, node: cst.Import) -> None:
+        """Process an import statement node and update visitor state.
+
+        Extracts imported module names and aliases from a LibCST Import node
+        (e.g., `import os` or `import os as operating_system`). Resolves import
+        aliases, tracks imported modules for side-effect inference, and appends
+        an ImportEntry to the visitor's imports list.
+
+        Parameters
+        ----------
+        node : cst.Import
+            LibCST Import node representing an import statement. Contains import
+            aliases specifying which modules are imported (e.g., `import os, sys`).
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Updates `_imported_modules` set with imported module names for side-effect
+          inference
+        - Appends an ImportEntry to the `imports` list with resolved names and aliases
+        Import statements have no module name (module=None) and level 0 (absolute imports).
+        Time complexity: O(n) where n is the number of import aliases in the node.
+        """
         names, aliases = self._resolve_import_aliases(node.names)
         for value in names:
             if value:
@@ -577,6 +703,32 @@ class _IndexVisitor(cst.CSTVisitor):
         )
 
     def _handle_import_from(self, node: cst.ImportFrom) -> None:
+        """Process an import-from statement node and update visitor state.
+
+        Extracts imported module name, imported symbols, and import level from
+        a LibCST ImportFrom node (e.g., `from os import path` or `from . import module`).
+        Handles both regular imports and star imports (`from module import *`).
+        Resolves import aliases, tracks imported modules for side-effect inference,
+        and appends an ImportEntry to the visitor's imports list.
+
+        Parameters
+        ----------
+        node : cst.ImportFrom
+            LibCST ImportFrom node representing an import-from statement. Contains
+            the source module name, import level (for relative imports), and imported
+            symbol aliases (or ImportStar for star imports).
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Updates `_imported_modules` set with source module name and fully qualified
+          imported symbol names (e.g., "os.path") for side-effect inference
+        - Appends an ImportEntry to the `imports` list with resolved module name,
+          imported names, aliases, star import flag, and import level
+        Import level is computed from the number of dots in relative imports (e.g.,
+        `from . import x` has level 1, `from .. import x` has level 2).
+        Time complexity: O(n) where n is the number of imported symbols.
+        """
         is_star = isinstance(node.names, cst.ImportStar)
         names: list[str] = []
         aliases: dict[str, str] = {}
@@ -601,11 +753,64 @@ class _IndexVisitor(cst.CSTVisitor):
         )
 
     def _handle_function_def(self, node: cst.FunctionDef) -> None:
+        """Process a function definition node and update visitor state.
+
+        Extracts function metadata (name, line number) from a LibCST FunctionDef
+        node and records it as a module-level definition. Also records function
+        documentation metrics (docstring, parameters, return type annotations).
+
+        Parameters
+        ----------
+        node : cst.FunctionDef
+            LibCST FunctionDef node representing a function definition. Contains
+            function name, parameters, return type annotation, decorators, and body.
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Appends a DefEntry to the `defs` list with function name and line number
+        - Calls `_record_function_doc()` to extract and analyze function docstring,
+          parameter documentation, and type annotations
+        Only processes top-level function definitions (called from handle_function_node
+        when is_top_level=True). Time complexity: O(1) plus O(n) for docstring analysis
+        where n is the number of parameters.
+        """
         lineno = _lineno(self, node)
         self.defs.append(DefEntry(kind="function", name=node.name.value, lineno=lineno))
         self._record_function_doc(node, lineno)
 
     def _record_function_doc(self, node: cst.FunctionDef, lineno: int) -> None:
+        """Record function documentation and type annotation metrics.
+
+        Analyzes a function definition to extract docstring, parameter documentation,
+        type annotations, and documentation quality metrics. Updates visitor state
+        with annotation ratios, untyped definition counts, and documentation metrics.
+        Appends a doc item entry to the visitor's doc_items list.
+
+        Parameters
+        ----------
+        node : cst.FunctionDef
+            LibCST FunctionDef node representing a function definition. Contains
+            function name, parameters, return type annotation, and body (including
+            docstring if present).
+        lineno : int
+            Line number where the function definition starts. Used for error
+            reporting and documentation item tracking.
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Updates `_annotation_counts` with parameter and return type annotation
+          statistics (total vs annotated)
+        - Increments `_untyped_defs` if the function is public and missing type
+          annotations
+        - Updates `doc_metrics` with documentation quality flags (has_summary,
+          param_parity, examples_present)
+        - Appends a doc item dictionary to `doc_items` with function metadata
+        Only public functions (not starting with "_") affect documentation metrics.
+        Time complexity: O(n) where n is the number of parameters for docstring
+        analysis and parameter extraction.
+        """
         name = node.name.value
         is_public = not name.startswith("_")
         params = list(_iter_params(node.params))
@@ -657,11 +862,57 @@ class _IndexVisitor(cst.CSTVisitor):
         )
 
     def _handle_class_def(self, node: cst.ClassDef) -> None:
+        """Process a class definition node and update visitor state.
+
+        Extracts class metadata (name, line number) from a LibCST ClassDef node
+        and records it as a module-level definition. Also records class documentation
+        metrics (docstring, examples).
+
+        Parameters
+        ----------
+        node : cst.ClassDef
+            LibCST ClassDef node representing a class definition. Contains class
+            name, base classes, decorators, and body (including docstring if present).
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Appends a DefEntry to the `defs` list with class name and line number
+        - Calls `_record_class_doc()` to extract and analyze class docstring and
+          documentation quality metrics
+        Only processes top-level class definitions (called from handle_class_node
+        when is_top_level=True). Time complexity: O(1) plus O(1) for docstring analysis.
+        """
         lineno = _lineno(self, node)
         self.defs.append(DefEntry(kind="class", name=node.name.value, lineno=lineno))
         self._record_class_doc(node, lineno)
 
     def _record_class_doc(self, node: cst.ClassDef, lineno: int) -> None:
+        """Record class documentation and quality metrics.
+
+        Analyzes a class definition to extract docstring and documentation quality
+        metrics (summary presence, examples). Updates visitor state with documentation
+        metrics and appends a doc item entry to the visitor's doc_items list.
+
+        Parameters
+        ----------
+        node : cst.ClassDef
+            LibCST ClassDef node representing a class definition. Contains class
+            name, base classes, and body (including docstring if present).
+        lineno : int
+            Line number where the class definition starts. Used for error reporting
+            and documentation item tracking.
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Updates `doc_metrics` with documentation quality flags (has_summary,
+          examples_present) for public classes
+        - Appends a doc item dictionary to `doc_items` with class metadata
+        Only public classes (not starting with "_") affect documentation metrics.
+        Parameter parity is not checked for classes (doc_param_parity is None).
+        Time complexity: O(1) for docstring extraction and analysis.
+        """
         name = node.name.value
         is_public = not name.startswith("_")
         docstring = _extract_def_docstring(node.body)
@@ -687,6 +938,30 @@ class _IndexVisitor(cst.CSTVisitor):
         )
 
     def _handle_assign(self, node: cst.Assign) -> None:
+        """Process an assignment node and update visitor state.
+
+        Extracts variable names from a LibCST Assign node and records them as
+        module-level variable definitions. Handles `__all__` assignments specially
+        to extract explicit export lists. Only processes public variable names
+        (not starting with "_").
+
+        Parameters
+        ----------
+        node : cst.Assign
+            LibCST Assign node representing an assignment statement. Contains
+            assignment targets and values used to extract variable names and
+            __all__ exports.
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Appends DefEntry objects to the `defs` list for public variable names
+        - Calls `_extend_exports_from_node()` for `__all__` assignments to extract
+          explicit export lists
+        Only processes top-level assignments (called from handle_assign_node when
+        is_top_level=True). Private variables (starting with "_") are skipped.
+        Time complexity: O(n) where n is the number of assignment targets.
+        """
         lineno = _lineno(self, node)
         for target in node.targets:
             assign_target = target.target
@@ -700,6 +975,27 @@ class _IndexVisitor(cst.CSTVisitor):
                 self.defs.append(DefEntry(kind="variable", name=name, lineno=lineno))
 
     def _handle_ann_assign(self, node: cst.AnnAssign) -> None:
+        """Process an annotated assignment node and update visitor state.
+
+        Extracts variable names from a LibCST AnnAssign node and records them
+        as module-level typed variable definitions. Skips `__all__` assignments
+        and private variable names (starting with "_").
+
+        Parameters
+        ----------
+        node : cst.AnnAssign
+            LibCST AnnAssign node representing an annotated assignment statement.
+            Contains assignment target, type annotation, and optional value used
+            to extract variable names.
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Appends a DefEntry to the `defs` list for public typed variable names
+        Only processes top-level annotated assignments (called from handle_ann_assign_node
+        when is_top_level=True). Private variables (starting with "_") and `__all__`
+        assignments are skipped. Time complexity: O(1).
+        """
         lineno = _lineno(self, node)
         target = node.target
         if isinstance(target, cst.Name):
@@ -709,6 +1005,30 @@ class _IndexVisitor(cst.CSTVisitor):
             self.defs.append(DefEntry(kind="variable", name=name, lineno=lineno))
 
     def _extend_exports_from_node(self, value: cst.BaseExpression) -> None:
+        """Extract export names from a LibCST expression node.
+
+        Recursively extracts literal string values from a LibCST expression node
+        representing an `__all__` assignment value. Handles binary operations
+        (e.g., `["a"] + ["b"]`), function calls (e.g., `list(["a"])`), and
+        literal containers (lists, tuples, sets). Adds extracted names to the
+        visitor's exports set.
+
+        Parameters
+        ----------
+        value : cst.BaseExpression
+            LibCST expression node representing the value assigned to `__all__`.
+            May be a literal container (list, tuple, set), a binary operation
+            (addition), or a function call (list, tuple, set, sorted).
+
+        Notes
+        -----
+        This method mutates the visitor's state:
+        - Adds extracted literal string values to the `exports` set
+        Recursively processes binary operations and function calls to extract
+        nested literal values. Only processes literal string values, ignoring
+        other expression types. Time complexity: O(n) where n is the number of
+        literal values in the expression tree.
+        """
         if isinstance(value, cst.BinaryOperation) and isinstance(value.operator, cst.Add):
             self._extend_exports_from_node(value.left)
             self._extend_exports_from_node(value.right)
@@ -1077,6 +1397,26 @@ class _IndexVisitor(cst.CSTVisitor):
     def _resolve_import_aliases(
         self, alias_nodes: Sequence[cst.ImportAlias]
     ) -> tuple[list[str], dict[str, str]]:
+        """Resolve import alias nodes to names and alias mappings.
+
+        Extracts imported symbol names and their aliases from LibCST ImportAlias
+        nodes. Handles both simple imports (`import os`) and aliased imports
+        (`import os as operating_system`).
+
+        Parameters
+        ----------
+        alias_nodes : Sequence[cst.ImportAlias]
+            Sequence of LibCST ImportAlias nodes from an import statement. Each
+            node contains the imported name and optional alias (asname).
+
+        Returns
+        -------
+        tuple[list[str], dict[str, str]]
+            Tuple containing:
+            - List of imported symbol names (resolved from ImportAlias.name)
+            - Dictionary mapping original names to aliases (only includes entries
+              where an alias is present, e.g., {"os": "operating_system"})
+        """
         names: list[str] = []
         aliases: dict[str, str] = {}
         for ref in alias_nodes:
@@ -1089,12 +1429,46 @@ class _IndexVisitor(cst.CSTVisitor):
 
     @staticmethod
     def _resolve_alias_name(asname: cst.AsName | None) -> str | None:
+        """Extract the alias name from a LibCST AsName node.
+
+        Parameters
+        ----------
+        asname : cst.AsName | None
+            LibCST AsName node representing an import alias (e.g., `as os` in
+            `import sys as os`), or None if no alias is present.
+
+        Returns
+        -------
+        str | None
+            Alias name string if asname is a valid AsName with a Name node,
+            or None if asname is None or the structure is invalid.
+        """
         if isinstance(asname, cst.AsName) and isinstance(asname.name, cst.Name):
             return asname.name.value
         return None
 
     @staticmethod
     def _resolve_alias_target(ident: cst.BaseExpression) -> str:
+        """Resolve an imported identifier expression to its name string.
+
+        Extracts the name of an imported symbol from a LibCST expression node.
+        Handles simple names (`os`), dotted names (`os.path`), and attribute
+        access patterns.
+
+        Parameters
+        ----------
+        ident : cst.BaseExpression
+            LibCST expression node representing an imported identifier. May be
+            a Name, Attribute, or other expression type.
+
+        Returns
+        -------
+        str
+            Resolved name string. For simple names, returns the name value.
+            For dotted names, uses LibCST's `get_full_name_for_node()` helper.
+            For Attribute nodes, returns the attribute name. Returns an empty
+            string if resolution fails.
+        """
         dotted = None
         with suppress(Exception):
             dotted = get_full_name_for_node(ident)
@@ -1108,6 +1482,24 @@ class _IndexVisitor(cst.CSTVisitor):
 
     @staticmethod
     def _resolve_module_name(module: cst.BaseExpression | None) -> str | None:
+        """Resolve a module expression to its fully qualified name string.
+
+        Extracts the module name from a LibCST expression node representing the
+        source module in an import-from statement (e.g., `os` in `from os import path`).
+
+        Parameters
+        ----------
+        module : cst.BaseExpression | None
+            LibCST expression node representing the source module name, or None
+            for relative imports without an explicit module name.
+
+        Returns
+        -------
+        str | None
+            Fully qualified module name string (e.g., "os.path") if resolution
+            succeeds, or None if module is None or resolution fails. Uses LibCST's
+            `get_full_name_for_node()` helper for dotted module names.
+        """
         if module is None:
             return None
         with suppress(Exception):  # pragma: no cover - LibCST helper may raise

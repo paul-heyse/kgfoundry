@@ -234,6 +234,31 @@ def _outline_with_query(
     tree: Tree,
     content: bytes,
 ) -> list[OutlineNode]:
+    """Extract outline nodes using Tree-sitter query patterns.
+
+    Uses Tree-sitter query syntax to efficiently extract function and class
+    definitions from a parsed tree. Queries are cached per language for
+    performance. Falls back to DFS traversal if query extraction fails.
+
+    Parameters
+    ----------
+    language_name : str
+        Language identifier (e.g., "python") used to select the appropriate
+        query pattern and for caching.
+    language : Language
+        Tree-sitter Language object for the source code language.
+    tree : Tree
+        Parsed Tree-sitter syntax tree containing the source code structure.
+    content : bytes
+        Source code bytes used to extract identifier names from captured nodes.
+
+    Returns
+    -------
+    list[OutlineNode]
+        List of outline nodes extracted via query captures. Returns an empty
+        list if query compilation fails, query has no captures method, or no
+        definitions are found.
+    """
     query = _get_outline_query(language_name, language)
     if query is None:
         return []
@@ -265,6 +290,27 @@ def _outline_with_query(
 
 
 def _outline_with_dfs(root_node: Node | None, content: bytes) -> list[OutlineNode]:
+    """Extract outline nodes using depth-first traversal.
+
+    Traverses the Tree-sitter syntax tree using iterative DFS to find function
+    and class definition nodes. This is a fallback method when query-based
+    extraction is unavailable or disabled.
+
+    Parameters
+    ----------
+    root_node : Node | None
+        Root node of the Tree-sitter syntax tree to traverse. If None, returns
+        an empty list.
+    content : bytes
+        Source code bytes used to extract identifier names from definition nodes.
+
+    Returns
+    -------
+    list[OutlineNode]
+        List of outline nodes found during traversal. Each node represents a
+        function or class definition with its name and byte offsets. Returns
+        an empty list if root_node is None or no definitions are found.
+    """
     if root_node is None:
         return []
     nodes: list[OutlineNode] = []
@@ -287,6 +333,28 @@ def _outline_with_dfs(root_node: Node | None, content: bytes) -> list[OutlineNod
 
 
 def _get_outline_query(language_name: str, language: Language) -> QueryProtocol | None:
+    """Get or compile a Tree-sitter query for outline extraction.
+
+    Retrieves a cached query for the language or compiles a new one from the
+    query pattern. Queries are cached per language to avoid recompilation.
+    Returns None if no pattern exists for the language or compilation fails.
+
+    Parameters
+    ----------
+    language_name : str
+        Language identifier (e.g., "python") used to look up the query pattern
+        and cache key.
+    language : Language
+        Tree-sitter Language object used to compile the query pattern.
+
+    Returns
+    -------
+    QueryProtocol | None
+        Compiled Tree-sitter query object if successful, or None if:
+        - No query pattern exists for the language
+        - Query compilation fails (invalid pattern syntax)
+        - Query was previously cached as None (failed compilation)
+    """
     if language_name in _OUTLINE_QUERY_CACHE:
         return _OUTLINE_QUERY_CACHE[language_name]
     pattern = _OUTLINE_QUERY_PATTERNS.get(language_name)
@@ -304,6 +372,23 @@ def _get_outline_query(language_name: str, language: Language) -> QueryProtocol 
 
 
 def _node_text(content: bytes, node: Node) -> str:
+    """Extract the text content of a Tree-sitter node from source bytes.
+
+    Parameters
+    ----------
+    content : bytes
+        Source code bytes containing the node's text. Must be valid UTF-8
+        encoded text (decoding errors are ignored).
+    node : Node
+        Tree-sitter node to extract text from. The node's start_byte and
+        end_byte attributes define the byte range to extract.
+
+    Returns
+    -------
+    str
+        Decoded text string for the node's byte range. Returns an empty string
+        if start_byte is 0 and end_byte is 0 (default values when unavailable).
+    """
     return content[getattr(node, "start_byte", 0) : getattr(node, "end_byte", 0)].decode(
         "utf-8", "ignore"
     )

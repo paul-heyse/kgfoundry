@@ -9,8 +9,9 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.enrich.errors import StageError
 from codeintel_rev.enrich.graph_builder import ImportGraph
 from codeintel_rev.enrich.models import ModuleRecord
@@ -18,6 +19,16 @@ from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
 from codeintel_rev.typedness import FileTypeSignals
 from codeintel_rev.uses_builder import UseGraph
+
+try:  # pragma: no cover - optional dependency
+    import duckdb  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - optional dependency
+    duckdb = None  # type: ignore[assignment]
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from duckdb import DuckDBPyConnection
+else:  # pragma: no cover - fallback when duckdb missing at runtime
+    DuckDBPyConnection = Any
 
 LOGGER = logging.getLogger(__name__)
 
@@ -241,7 +252,7 @@ class ScanInputs:
 
 
 @dataclass(slots=True, frozen=True)
-class PipelineContext:
+class LegacyPipelineContext:
     """Aggregated context derived from CLI inputs and repo state."""
 
     root: Path
@@ -275,7 +286,7 @@ class PipelineResult:
 class PreparedPipeline:
     """Resolved pipeline context plus discovered files."""
 
-    context: PipelineContext
+    context: LegacyPipelineContext
     files: list[Path]
 
 
@@ -300,6 +311,56 @@ class ConfigReferenceState:
     references: dict[str, set[str]]
 
 
+@dataclass(slots=True)
+class PipelineContext:
+    """Thin context used by the refactored enrich CLI."""
+
+    paths: ResolvedPaths
+    config: Mapping[str, Any]
+    logger: logging.Logger
+    db: DuckDBPyConnection | None = None
+
+    @classmethod
+    def from_paths(
+        cls,
+        paths: ResolvedPaths,
+        *,
+        config: Mapping[str, Any] | None = None,
+        enable_db: bool = False,
+        duckdb_path: str | None = None,
+    ) -> PipelineContext:
+        """Build a context from resolved application paths.
+
+        Returns
+        -------
+        PipelineContext
+            Newly constructed context.
+
+        Raises
+        ------
+        RuntimeError
+            Raised when ``enable_db`` is ``True`` but DuckDB is unavailable.
+        """
+        logger = logging.getLogger("enrich")
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            logger.addHandler(handler)
+        conn = None
+        if enable_db:
+            if duckdb is None:  # pragma: no cover - optional dependency
+                message = "DuckDB not available; install the duckdb extra."
+                raise RuntimeError(message)
+            target = duckdb_path or str(paths.data_dir / "enrich.duckdb")
+            conn = duckdb.connect(target)
+        return cls(paths=paths, config=config or {}, logger=logger, db=conn)
+
+    def close(self) -> None:
+        """Close the optional DuckDB connection."""
+        if self.db is not None:
+            self.db.close()
+
+
 __all__ = [
     "DEFAULT_ACTIVATE",
     "DEFAULT_COMMITS_WINDOW",
@@ -322,6 +383,7 @@ __all__ = [
     "AnalyticsOptions",
     "CLIContextState",
     "ConfigReferenceState",
+    "LegacyPipelineContext",
     "OverlayCLIOptions",
     "OverlayContext",
     "PipelineContext",

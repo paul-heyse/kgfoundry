@@ -227,6 +227,8 @@ if TYPE_CHECKING:
             raise NotImplementedError
 
     class _SparseEncoderFactory(Protocol):
+        """Protocol for SparseEncoder factory function."""
+
         def __call__(
             self,
             model_id: str,
@@ -236,12 +238,28 @@ if TYPE_CHECKING:
         ) -> _SparseEncoderProtocol: ...
 
     class _OptimizerKwargs(TypedDict):
+        """Keyword arguments for SPLADE optimizer function.
+
+        Attributes
+        ----------
+        optimization_config : str
+            Optimization configuration string.
+        model_name_or_path : str
+            Model name or path identifier.
+        push_to_hub : bool
+            Whether to push optimized model to HuggingFace Hub.
+        create_pr : bool
+            Whether to create a pull request when pushing to hub.
+        """
+
         optimization_config: str
         model_name_or_path: str
         push_to_hub: bool
         create_pr: bool
 
     class _OptimizerFunction(Protocol):
+        """Protocol for SPLADE model optimization function."""
+
         def __call__(
             self,
             model: _SparseEncoderProtocol,
@@ -249,12 +267,28 @@ if TYPE_CHECKING:
         ) -> None: ...
 
     class _QuantizerKwargs(TypedDict):
+        """Keyword arguments for SPLADE quantizer function.
+
+        Attributes
+        ----------
+        quantization_config : str | None
+            Quantization configuration string, or None to skip quantization.
+        model_name_or_path : str
+            Model name or path identifier.
+        push_to_hub : bool
+            Whether to push quantized model to HuggingFace Hub.
+        create_pr : bool
+            Whether to create a pull request when pushing to hub.
+        """
+
         quantization_config: str | None
         model_name_or_path: str
         push_to_hub: bool
         create_pr: bool
 
     class _QuantizerFunction(Protocol):
+        """Protocol for SPLADE model quantization function."""
+
         def __call__(
             self,
             model: _SparseEncoderProtocol,
@@ -435,6 +469,18 @@ class _ExportContext:
 
 
 def _require_sparse_encoder() -> _SparseEncoderFactory:
+    """Require SparseEncoder class to be available, raising if missing.
+
+    Returns
+    -------
+    _SparseEncoderFactory
+        SparseEncoder factory function.
+
+    Raises
+    ------
+    RuntimeError
+        If sentence-transformers doesn't provide SparseEncoder support.
+    """
     if _SparseEncoderClass is None:  # pragma: no cover - defensive
         msg = (
             "sentence-transformers with SparseEncoder support is required for SPLADE "
@@ -445,6 +491,18 @@ def _require_sparse_encoder() -> _SparseEncoderFactory:
 
 
 def _require_export_helpers() -> tuple[_OptimizerFunction, _QuantizerFunction]:
+    """Require SPLADE export helper functions to be available, raising if missing.
+
+    Returns
+    -------
+    tuple[_OptimizerFunction, _QuantizerFunction]
+        Tuple of (optimizer function, quantizer function).
+
+    Raises
+    ------
+    RuntimeError
+        If sentence-transformers doesn't provide export helper functions.
+    """
     if _export_optimized_onnx_model is None or _export_dynamic_quantized_onnx_model is None:
         msg = (
             "SPLADE export helpers are unavailable. Upgrade sentence-transformers to a "
@@ -458,6 +516,15 @@ def _require_export_helpers() -> tuple[_OptimizerFunction, _QuantizerFunction]:
 
 
 def _write_struct(target: Path, payload: msgspec.Struct) -> None:
+    """Write msgspec struct to JSON file with UTF-8 encoding.
+
+    Parameters
+    ----------
+    target : Path
+        Target file path for JSON output.
+    payload : msgspec.Struct
+        Struct instance to serialize to JSON.
+    """
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         json.dumps(msgspec.to_builtins(payload), ensure_ascii=False, indent=2),
@@ -494,6 +561,13 @@ def _directory_size(path: Path) -> int:
 
 
 def _detect_pyserini_version() -> str:
+    """Detect pyserini package version, returning "unknown" if unavailable.
+
+    Returns
+    -------
+    str
+        Version string from pyserini.__version__, or "unknown" if module missing.
+    """
     try:
         module = importlib.import_module("pyserini")
     except ModuleNotFoundError:  # pragma: no cover - fallback
@@ -571,6 +645,20 @@ class SpladeIndexContext:
 
 
 def _serialize_relative(path: Path, base: Path) -> str:
+    """Serialize path relative to base, falling back to absolute string if not relative.
+
+    Parameters
+    ----------
+    path : Path
+        Path to serialize.
+    base : Path
+        Base path for relative calculation.
+
+    Returns
+    -------
+    str
+        Relative path string if path is relative to base, otherwise absolute path string.
+    """
     try:
         return str(path.relative_to(base))
     except ValueError:
@@ -619,6 +707,20 @@ def _percentile_value(sorted_values: Sequence[float], percentile: float) -> floa
 
 
 def _quantize_tokens(pairs: Sequence[tuple[str, float]], quantization: int) -> dict[str, int]:
+    """Quantize token weights to integer values using rounding.
+
+    Parameters
+    ----------
+    pairs : Sequence[tuple[str, float]]
+        Sequence of (token, weight) pairs to quantize.
+    quantization : int
+        Quantization factor (multiplier for weights).
+
+    Returns
+    -------
+    dict[str, int]
+        Dictionary mapping tokens to quantized integer weights (only positive weights included).
+    """
     vector: dict[str, int] = {}
     for token, weight in pairs:
         if weight <= 0:
@@ -630,6 +732,18 @@ def _quantize_tokens(pairs: Sequence[tuple[str, float]], quantization: int) -> d
 
 
 def _iter_corpus(path: Path) -> Iterable[dict[str, object]]:
+    """Iterate over JSONL corpus file, yielding parsed JSON objects.
+
+    Parameters
+    ----------
+    path : Path
+        Path to JSONL corpus file.
+
+    Yields
+    ------
+    dict[str, object]
+        Parsed JSON object from each non-empty line.
+    """
     with path.open("r", encoding="utf-8") as handle:
         for raw_line in handle:
             line = raw_line.strip()
@@ -1281,6 +1395,20 @@ class SpladeEncoderService:
         return encoder_instance, selected_relative
 
     def _build_encoder(self, *, provider: str, onnx_file: str | None) -> _SparseEncoderProtocol:
+        """Build sparse encoder instance from provider and optional ONNX file.
+
+        Parameters
+        ----------
+        provider : str
+            Encoder provider identifier.
+        onnx_file : str | None
+            Optional path to ONNX model file.
+
+        Returns
+        -------
+        _SparseEncoderProtocol
+            Initialized sparse encoder instance.
+        """
         encoder, _ = self._initialise_encoder(provider=provider, onnx_file=onnx_file)
         return encoder
 

@@ -89,7 +89,7 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
     repo_root.mkdir()
     config_dir = repo_root / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
-    (config_dir / "config.yaml").write_text("tests: true")
+    (config_dir / "app.yml").write_text("tests: true")
     for relative in ("logs", ".cache", ".tmp", "plugins"):
         (repo_root / relative).mkdir(parents=True, exist_ok=True)
     default_data_dir = repo_root / "data"

@@ -122,6 +122,38 @@ def infer_tags(
 
 
 def _rule_matches(rule: Mapping[str, Any], path: str, traits: ModuleTraits) -> bool:
+    """Check if a tagging rule matches the given module path and traits.
+
+    Evaluates a rule dictionary against module traits to determine if the rule
+    should apply. Supports multiple matching criteria including imports, path
+    regex, trait flags, thresholds, and documentation quality checks.
+
+    Parameters
+    ----------
+    rule : Mapping[str, Any]
+        Rule dictionary containing matching criteria. Supported keys:
+        - "any_import": list of module names (matches if any imported)
+        - "path_regex": regex pattern to match against path
+        - "has_all": boolean flag for __all__ presence
+        - "is_reexport_hub": boolean flag for re-export hub status
+        - "type_errors_gt": integer threshold for type error count
+        - "fan_in_ge", "fan_out_ge": integer thresholds for dependency metrics
+        - "hotspot_ge": numeric threshold for hotspot score
+        - "coverage_lt": numeric threshold for coverage ratio
+        - "doc_summary_required", "doc_param_parity_required": boolean flags
+    path : str
+        Module file path used for path_regex matching.
+    traits : ModuleTraits
+        Module traits containing imports, flags, metrics, and documentation
+        quality indicators used for rule evaluation.
+
+    Returns
+    -------
+    bool
+        True if any rule condition matches, False if no conditions match or
+        all conditions evaluate to False. Returns True if at least one condition
+        is satisfied (OR logic across all conditions).
+    """
     impset = set(traits.imported_modules)
     conditions: list[bool] = []
 

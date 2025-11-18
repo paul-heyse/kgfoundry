@@ -158,6 +158,23 @@ def _normalize_channel_hits(
 
 
 def _to_int(value: str) -> int:
+    """Convert string value to integer, raising descriptive error on failure.
+
+    Parameters
+    ----------
+    value : str
+        String value to convert to integer.
+
+    Returns
+    -------
+    int
+        Integer representation of value.
+
+    Raises
+    ------
+    ValueError
+        If value cannot be converted to integer.
+    """
     try:
         return int(value)
     except (TypeError, ValueError) as exc:  # pragma: no cover - defensive path

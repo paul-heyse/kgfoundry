@@ -36,6 +36,19 @@ class EmbedJob:
 
 
 def _resolve_model_name(cli_value: str | None) -> str:
+    """Resolve the model name from CLI argument or settings.
+
+    Parameters
+    ----------
+    cli_value : str | None
+        Model name provided via CLI argument, or None.
+
+    Returns
+    -------
+    str
+        Model name resolved in priority order: CLI value, embeddings.model_name
+        from settings, or vllm.model from settings as fallback.
+    """
     settings = load_settings()
     if cli_value:
         return cli_value
@@ -45,6 +58,20 @@ def _resolve_model_name(cli_value: str | None) -> str:
 
 
 def _resolve_device(cli_value: str | None) -> str:
+    """Resolve the PyTorch device from CLI argument or auto-detect.
+
+    Parameters
+    ----------
+    cli_value : str | None
+        Device name provided via CLI argument (e.g., "cpu", "cuda", "mps"),
+        or None to auto-detect.
+
+    Returns
+    -------
+    str
+        Device name resolved in priority order: CLI value, "cuda" if CUDA is
+        available, "mps" if MPS is available (macOS), or "cpu" as fallback.
+    """
     if cli_value:
         return cli_value
     if torch.cuda.is_available():
@@ -55,6 +82,20 @@ def _resolve_device(cli_value: str | None) -> str:
 
 
 def _read_texts(path: Path) -> list[str]:
+    """Read non-empty lines from a text file.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the text file to read. Each line is treated as a separate text
+        sample. The file must be UTF-8 encoded.
+
+    Returns
+    -------
+    list[str]
+        List of non-empty lines from the file, with leading and trailing
+        whitespace stripped.
+    """
     texts: list[str] = []
     with path.open("r", encoding="utf-8") as handle:
         for raw in handle:
@@ -65,12 +106,38 @@ def _read_texts(path: Path) -> list[str]:
 
 
 def _dump_jsonl(texts: Iterable[str], embeddings: np.ndarray, path: Path) -> None:
+    """Write texts and embeddings to a JSONL file.
+
+    Parameters
+    ----------
+    texts : Iterable[str]
+        Iterable of text strings to write. Must match the number of embeddings.
+    embeddings : np.ndarray
+        NumPy array of embeddings, one per text. Each embedding is converted
+        to a list for JSON serialization.
+    path : Path
+        Output file path for the JSONL file. Each line contains a JSON object
+        with "text" and "embedding" keys.
+    """
     with path.open("w", encoding="utf-8") as handle:
         for text, vector in zip(texts, embeddings.tolist(), strict=False):
             handle.write(json.dumps({"text": text, "embedding": vector}) + "\n")
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
+    """Parse command-line arguments for the embedding CLI.
+
+    Parameters
+    ----------
+    argv : list[str] | None
+        Command-line arguments to parse. If None, argparse will use sys.argv.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed arguments containing input_path, output, model, batch_size,
+        device, normalize flag, and optional jsonl path.
+    """
     parser = argparse.ArgumentParser(
         description="Embed newline-delimited texts using sentence-transformers.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

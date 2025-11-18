@@ -35,6 +35,19 @@ class Document(msgspec.Struct, frozen=True, omit_defaults=True):
 
 
 class _SCIPPayload(msgspec.Struct, frozen=True, omit_defaults=True):
+    """Internal SCIP JSON payload structure for deserialization.
+
+    Attributes
+    ----------
+    documents : list[Document]
+        List of SCIP document entries, each representing a source file with
+        its occurrences and symbols.
+    external_symbols : list[SymbolInfo]
+        List of external symbol information entries for symbols defined outside
+        the indexed codebase (e.g., standard library, third-party packages).
+        Deserialized from the "externalSymbols" JSON field.
+    """
+
     documents: list[Document] = msgspec.field(default_factory=list)
     external_symbols: list[SymbolInfo] = msgspec.field(default_factory=list, name="externalSymbols")
 

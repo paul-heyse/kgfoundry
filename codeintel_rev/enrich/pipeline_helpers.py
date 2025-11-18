@@ -223,6 +223,22 @@ def _scip_symbols_and_edges(
     rel_path: str,
     inputs: ScanInputs,
 ) -> tuple[list[str], list[tuple[str, str]]]:
+    """Extract SCIP symbols and symbol edges for a file path.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the source file (must match keys in inputs.scip_ctx.by_file).
+    inputs : ScanInputs
+        Pipeline context containing SCIP index with symbol information indexed by file path.
+
+    Returns
+    -------
+    tuple[list[str], list[tuple[str, str]]]
+        Tuple containing:
+        - Sorted list of unique symbol identifiers found in the file
+        - List of (symbol_id, file_path) tuples representing symbol-to-file edges
+    """
     document = inputs.scip_ctx.by_file.get(rel_path)
     symbols = sorted(
         {symbol.symbol for symbol in (document.symbols if document else []) if symbol.symbol}
@@ -231,6 +247,27 @@ def _scip_symbols_and_edges(
 
 
 def _index_module_safe(rel_path: str, code: str) -> ModuleIndex:
+    """Index a module using LibCST with error handling.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the source file (used for error reporting).
+    code : str
+        Source code content to parse and index.
+
+    Returns
+    -------
+    ModuleIndex
+        Parsed module metadata containing imports, defs, exports, docstrings,
+        and other analysis results.
+
+    Raises
+    ------
+    IndexingError
+        Raised when LibCST parsing fails. The error reason is set to "libcst"
+        and includes the original exception detail.
+    """
     try:
         return index_module(rel_path, code)
     except Exception as exc:  # pragma: no cover - defensive
@@ -244,6 +281,29 @@ def _read_module_source(
     record: ModuleRecord,
     max_file_bytes: int,
 ) -> str | None:
+    """Read source code from a file with size and error checks.
+
+    Parameters
+    ----------
+    fp : Path
+        Absolute path to the source file to read.
+    rel_path : str
+        Relative path to the file (used for error reporting).
+    record : ModuleRecord
+        Module record to update with errors if reading fails or file is too large.
+    max_file_bytes : int
+        Maximum file size in bytes. Files exceeding this limit will not be read
+        and an error will be added to the record.
+
+    Returns
+    -------
+    str | None
+        Source code content as a string if successfully read, or None if:
+        - File stat fails (OSError)
+        - File size exceeds max_file_bytes
+        - File read fails (OSError)
+        In all error cases, an IndexingError is added to the record.
+    """
     try:
         file_size = fp.stat().st_size
     except OSError as exc:
@@ -270,6 +330,24 @@ def _collect_outline_nodes(
     code: str,
     record: ModuleRecord,
 ) -> list[dict[str, Any]]:
+    """Collect Tree-sitter outline nodes with error handling.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the source file (used for language detection and error reporting).
+    code : str
+        Source code content to parse for outline extraction.
+    record : ModuleRecord
+        Module record to update with errors if outline extraction fails.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        List of outline node dictionaries containing kind, name, start, and end
+        byte offsets. Returns an empty list if parsing fails (error is logged
+        and added to record).
+    """
     try:
         return outline_nodes_for(rel_path, code)
     except IndexingError as exc:
@@ -283,6 +361,31 @@ def _apply_index_results(
     idx: ModuleIndex,
     outline_nodes: list[dict[str, Any]],
 ) -> None:
+    """Apply LibCST indexing results to a module record.
+
+    Updates the module record with all metadata extracted from LibCST indexing,
+    including docstrings, imports, definitions, exports, type annotations, side
+    effects, complexity metrics, and parse status. Also merges Tree-sitter outline
+    nodes and any parsing errors.
+
+    Parameters
+    ----------
+    record : ModuleRecord
+        Module record to update with indexing results. Modified in-place.
+    idx : ModuleIndex
+        LibCST indexing results containing module metadata, docstrings, imports,
+        definitions, exports, and analysis metrics.
+    outline_nodes : list[dict[str, Any]]
+        Tree-sitter outline nodes to attach to the record. Each dict contains
+        kind, name, start, and end byte offsets.
+
+    Notes
+    -----
+    This function mutates the record in-place, updating all fields related to
+    documentation, imports, definitions, exports, type annotations, side effects,
+    complexity, and parse status. Errors from indexing are appended to the record's
+    errors list.
+    """
     doc_metrics = dict(idx.doc_metrics)
     record.doc_metrics = doc_metrics
     has_summary = doc_metrics.get("has_summary")
@@ -318,11 +421,60 @@ def _apply_index_results(
 
 
 def _coverage_value(rel_path: str, inputs: ScanInputs, key: str) -> float:
+    """Extract a coverage metric value for a file path.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the source file (must match keys in inputs.coverage_map).
+    inputs : ScanInputs
+        Pipeline context containing coverage data indexed by relative path.
+    key : str
+        Coverage metric key to retrieve (e.g., "covered_lines_ratio", "covered_defs_ratio").
+
+    Returns
+    -------
+    float
+        Coverage metric value for the specified key, or 0.0 if the path is not
+        in the coverage map or the key is not present in the entry.
+    """
     entry = inputs.coverage_map.get(rel_path, {})
     return float(entry.get(key, 0.0))
 
 
 def _traits_from_row(row: Mapping[str, Any]) -> ModuleTraits:
+    """Extract module traits from a module record dictionary.
+
+    Parses a module record dictionary to extract traits used for tagging decisions,
+    including imports, exports, coverage, type errors, fan-in/fan-out metrics,
+    hotspot scores, and documentation quality flags.
+
+    Parameters
+    ----------
+    row : Mapping[str, Any]
+        Module record dictionary containing fields like imports, exports, coverage,
+        type errors, fan metrics, and documentation flags.
+
+    Returns
+    -------
+    ModuleTraits
+        Extracted traits object containing:
+        - imported_modules: List of imported module names
+        - has_all: Whether __all__ is defined and non-empty
+        - is_reexport_hub: Whether the module is a re-export hub (has star imports
+          or many exports)
+        - type_error_count: Number of type errors
+        - fan_in, fan_out: Dependency metrics
+        - hotspot_score: Code churn/activity score
+        - covered_lines_ratio: Test coverage ratio (defaults to 1.0 if missing)
+        - doc_has_summary, doc_param_parity: Documentation quality flags
+
+    Notes
+    -----
+    This function performs defensive parsing with type coercion and defaults.
+    Missing or invalid values are handled gracefully (e.g., coverage defaults to
+    1.0, fan metrics default to 0, doc flags default to True if None).
+    """
     imports_field = row.get("imports") or []
     imported_modules: list[str] = []
     if isinstance(imports_field, list):

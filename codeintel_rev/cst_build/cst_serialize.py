@@ -117,6 +117,31 @@ class DatasetWriter:
         self._module_handles.clear()
 
     def _write_module_row(self, rel_path: str, payload: str) -> None:
+        """Write a node row to the per-module JSONL shard.
+
+        Writes a JSON-serialized node record to the appropriate per-module file
+        based on the node's path. Module files are created lazily and cached
+        in the writer's handle dictionary.
+
+        Parameters
+        ----------
+        rel_path : str
+            Relative file path of the module containing the node. Used to
+            determine which module shard file to write to.
+        payload : str
+            JSON-serialized node record string to write to the module file.
+
+        Raises
+        ------
+        RuntimeError
+            Raised if the writer is not initialized (not used as a context manager).
+
+        Notes
+        -----
+        This method mutates the writer's state by creating and caching file handles
+        for module shards. Each module gets its own JSONL file under the module_nodes
+        directory, with the filename derived from the module path slug.
+        """
         slug = _module_slug(rel_path)
         handle = self._module_handles.get(slug)
         if handle is None:
@@ -132,6 +157,25 @@ class DatasetWriter:
         handle.write("\n")
 
     def _maybe_sample(self, node: NodeRecord) -> None:
+        """Add a node to the sample collection if it's stitched.
+
+        Maintains a fixed-size sample of stitched nodes (nodes with SCIP symbols)
+        using reservoir sampling. The first `sample_size` stitched nodes are added
+        directly, then subsequent nodes replace existing samples probabilistically.
+
+        Parameters
+        ----------
+        node : NodeRecord
+            Node record to potentially add to the sample. Only nodes with stitch
+            information and a SCIP symbol are sampled.
+
+        Notes
+        -----
+        This method mutates the writer's `_samples` list. Uses reservoir sampling
+        to maintain a representative sample of stitched nodes for quality assurance
+        and debugging purposes. The sampling is deterministic based on node_id and
+        stitch sample count.
+        """
         if not node.stitch or not node.stitch.scip_symbol:
             return
         self._stitch_samples += 1
@@ -146,6 +190,18 @@ class DatasetWriter:
         self._samples[idx] = node
 
     def _ensure_writer(self) -> TextIO:
+        """Ensure the gzip writer is initialized and return it.
+
+        Returns
+        -------
+        TextIO
+            Open gzip file handle for writing node records.
+
+        Raises
+        ------
+        RuntimeError
+            Raised if the writer is not initialized (not used as a context manager).
+        """
         if self._gz is None:
             message = "DatasetWriter is not initialized; use context manager."
             raise RuntimeError(message)
@@ -213,6 +269,23 @@ def write_join_examples(out_dir: Path, samples: Sequence[NodeRecord]) -> None:
 
 
 def _module_slug(rel_path: str) -> str:
+    r"""Convert a file path to a module slug for shard naming.
+
+    Converts a relative file path to a module identifier slug suitable for
+    use in filenames. Removes the .py extension, normalizes separators, and
+    converts path separators to dots.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative file path (e.g., "src/pkg/module.py" or "src\\pkg\\module.py").
+
+    Returns
+    -------
+    str
+        Module slug string (e.g., "src.pkg.module") suitable for use in filenames.
+        Returns "__root__" if the path normalizes to an empty string.
+    """
     normalized = rel_path.replace("\\", "/")
     if normalized.endswith(".py"):
         normalized = normalized[:-3]

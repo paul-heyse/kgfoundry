@@ -37,6 +37,23 @@ class SliceRecord:
 
 
 def _slice_id(path: str, module_name: str | None) -> str:
+    """Generate a stable slice identifier from path and module name.
+
+    Parameters
+    ----------
+    path : str
+        File path used as the primary identifier component.
+    module_name : str | None
+        Optional module name to include in the hash. If provided, the identifier
+        incorporates both path and module name for uniqueness.
+
+    Returns
+    -------
+    str
+        Hexadecimal hash string (first 12 characters of BLAKE2s digest) used
+        as a stable slice identifier. The same path and module_name combination
+        always produces the same slice_id.
+    """
     digest = blake2s(path.encode("utf-8"))
     if module_name:
         digest.update(b"|")

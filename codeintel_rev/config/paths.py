@@ -256,7 +256,7 @@ def _build_from_mapping(settings: Mapping[str, Any]) -> ResolvedPaths:
         )
 
     config_dir = _setting("CONFIG_DIR", repo_root / "config")
-    config_file_default = config_dir / "config.yaml"
+    config_file_default = config_dir / "app.yml"
     return ResolvedPaths(
         repo_root=repo_root,
         config_dir=config_dir,
@@ -351,7 +351,7 @@ def _build_from_settings(settings: Settings) -> ResolvedPaths:
         return _resolve_relative(repo_root, value)
 
     config_dir = _norm(repo_root / "config")
-    config_file_default = _norm(config_dir / "config.yaml")
+    config_file_default = _norm(config_dir / "app.yml")
     return ResolvedPaths(
         repo_root=repo_root,
         config_dir=config_dir,

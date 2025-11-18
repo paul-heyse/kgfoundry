@@ -41,15 +41,51 @@ _SEMAPHORE = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
 
 
 def _pool_dir(data_dir: Path) -> Path:
+    """Return the pool directory path for evaluation traces.
+
+    Parameters
+    ----------
+    data_dir : Path
+        Base data directory for the application.
+
+    Returns
+    -------
+    Path
+        Path to the pool directory (data_dir/trace/mcp_pool).
+    """
     return data_dir / _TRACE_SUBDIR
 
 
 def _clamp_top_k(raw: int | None) -> int:
+    """Clamp top_k parameter to valid range.
+
+    Parameters
+    ----------
+    raw : int | None
+        Raw top_k value from MCP payload, or None to use default.
+
+    Returns
+    -------
+    int
+        Clamped top_k value between 1 and 50 (default: 12).
+    """
     value = raw if raw is not None else 12
     return max(1, min(50, int(value)))
 
 
 def _clamp_max_tokens(raw: int | None) -> int:
+    """Clamp max_tokens parameter to valid range.
+
+    Parameters
+    ----------
+    raw : int | None
+        Raw max_tokens value from MCP payload, or None to use default.
+
+    Returns
+    -------
+    int
+        Clamped max_tokens value between 256 and 16000 (default: 4000).
+    """
     value = raw if raw is not None else 4000
     return max(256, min(16000, int(value)))
 
@@ -190,6 +226,13 @@ async def search(
     )
 
     def _work() -> SearchStructuredContent:
+        """Execute search operation synchronously in thread pool.
+
+        Returns
+        -------
+        SearchStructuredContent
+            Serialized search results for MCP transport.
+        """
         with context.open_catalog() as catalog:
             try:
                 session_id = get_session_id()
@@ -249,6 +292,13 @@ async def fetch(
     )
 
     def _work() -> FetchStructuredContent:
+        """Execute fetch operation synchronously in thread pool.
+
+        Returns
+        -------
+        FetchStructuredContent
+            Serialized fetch results for MCP transport.
+        """
         with context.open_catalog() as catalog:
             deps = FetchDependencies(
                 catalog=catalog,

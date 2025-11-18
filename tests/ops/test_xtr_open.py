@@ -23,7 +23,7 @@ def _prepare_repo(repo_root: Path) -> None:
     repo_root.mkdir(parents=True, exist_ok=True)
     config_dir = repo_root / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
-    (config_dir / "config.yaml").write_text("tests: true", encoding="utf-8")
+    (config_dir / "app.yml").write_text("tests: true", encoding="utf-8")
     for relative in (
         "data",
         "data/vectors",

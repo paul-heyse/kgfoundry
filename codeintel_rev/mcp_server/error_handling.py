@@ -651,6 +651,21 @@ def _extract_context_from_args(
     args: tuple[object, ...],
     kwargs: Mapping[str, object],
 ) -> ApplicationContext | None:
+    """Extract ApplicationContext from function arguments or global getter.
+
+    Parameters
+    ----------
+    args : tuple[object, ...]
+        Positional arguments to search for ApplicationContext.
+    kwargs : Mapping[str, object]
+        Keyword arguments to search for ApplicationContext.
+
+    Returns
+    -------
+    ApplicationContext | None
+        ApplicationContext instance if found in kwargs, args, or via global
+        get_context() function, otherwise None.
+    """
     candidate = kwargs.get("context")
     if isinstance(candidate, ApplicationContext):
         return candidate

@@ -100,7 +100,7 @@ def scaffold_repo_root(repo_root: Path) -> None:
         "plugins",
     ):
         (repo_root / relative).mkdir(parents=True, exist_ok=True)
-    config_file = repo_root / "config" / "config.yaml"
+    config_file = repo_root / "config" / "app.yml"
     if not config_file.exists():
         config_file.write_text("tests: true", encoding="utf-8")
 

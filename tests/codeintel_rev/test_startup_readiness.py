@@ -26,7 +26,7 @@ def _prepare_paths(repo_root: Path) -> None:
         "plugins",
     ):
         (repo_root / relative).mkdir(parents=True, exist_ok=True)
-    (repo_root / "config" / "config.yaml").write_text("tests: true")
+    (repo_root / "config" / "app.yml").write_text("tests: true")
 
 
 def test_check_file_reports_missing(tmp_path: Path) -> None:

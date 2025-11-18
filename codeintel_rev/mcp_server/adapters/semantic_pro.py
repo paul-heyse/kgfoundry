@@ -1268,9 +1268,7 @@ _DEFAULT_RERANKER_DEPS = RerankerDependencies(
 
 def build_reranker_dependencies(
     *,
-    adapter_builder: Callable[
-        [_CoderankLLMConfig], RerankAdapter | None
-    ] = _build_coderank_adapter,
+    adapter_builder: Callable[[_CoderankLLMConfig], RerankAdapter | None] = _build_coderank_adapter,
     doc_fetcher: Callable[
         [ApplicationContext, Sequence[int], RelationChecker], list[dict]
     ] = _fetch_docs_for_reranker,

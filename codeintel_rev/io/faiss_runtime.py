@@ -35,10 +35,26 @@ _faiss = LazyModule("faiss", "FAISS runtime operations")
 
 
 def _noop_parameter_space(_index: FaissIndex, _params: list[str]) -> bool:
+    """No-op parameter space applier that always returns False.
+
+    Parameters
+    ----------
+    _index : FaissIndex
+        FAISS index (unused).
+    _params : list[str]
+        Parameter list (unused).
+
+    Returns
+    -------
+    bool
+        Always False (indicates no parameter space was applied).
+    """
     return False
 
 
-_PARAMETER_SPACE_APPLIER_REF: list[Callable[[FaissIndex, list[str]], bool]] = [_noop_parameter_space]
+_PARAMETER_SPACE_APPLIER_REF: list[Callable[[FaissIndex, list[str]], bool]] = [
+    _noop_parameter_space
+]
 _SEARCH_RESULT_DIM = 2
 
 

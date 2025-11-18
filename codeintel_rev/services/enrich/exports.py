@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import json
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,8 +20,9 @@ from codeintel_rev.enrich.output_writers import (
 )
 from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
 from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
-from codeintel_rev.services.enrich.context import PipelineResult, StageMeta, _stage
+from codeintel_rev.services.enrich.context import PipelineContext, PipelineResult, StageMeta, _stage
 from codeintel_rev.services.enrich.io import (
+    atomic_write_text,
     collect_ast_artifacts,
     write_ast_jsonl,
     write_markdown_modules,
@@ -29,6 +31,11 @@ from codeintel_rev.services.enrich.io import (
     write_tabular_records,
     write_tag_index,
 )
+from codeintel_rev.services.enrich.io import (
+    write_jsonl as simple_write_jsonl,
+)
+from codeintel_rev.services.enrich.models import ExportResult
+from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
 from codeintel_rev.uses_builder import write_use_graph
 
 
@@ -228,8 +235,125 @@ def write_repo_map(out: Path, result: PipelineResult) -> None:
     )
 
 
+def record_to_json(record: SimpleModuleRecord) -> Mapping[str, Any]:
+    """Convert a service-level ModuleRecord to a JSON-compatible mapping.
+
+    Returns
+    -------
+    Mapping[str, Any]
+        JSON-serializable representation of the record.
+    """
+    return {
+        "path": str(record.path),
+        "module": record.module,
+        "language": record.language,
+        "loc": record.loc,
+        "tags": list(record.tags),
+        "meta": dict(record.meta),
+    }
+
+
+def emit_modules_jsonl(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
+    """Write modules.jsonl for the refactored CLI.
+
+    Returns
+    -------
+    Path
+        Path to the generated modules.jsonl file.
+    """
+    target = ctx.paths.data_dir / "modules.jsonl"
+    count = simple_write_jsonl(target, (record_to_json(r) for r in records))
+    ctx.logger.info("Wrote %d module rows to %s", count, target)
+    return target
+
+
+def emit_repo_map(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
+    """Emit a lightweight repo_map.json file.
+
+    Returns
+    -------
+    Path
+        Path to the generated repo_map.json file.
+    """
+    by_pkg: dict[str, list[str]] = {}
+    for record in records:
+        pkg = record.module.split(".")[0] if "." in record.module else record.module
+        by_pkg.setdefault(pkg, []).append(record.module)
+    target = ctx.paths.data_dir / "repo_map.json"
+    atomic_write_text(target, json.dumps(by_pkg, indent=2))
+    ctx.logger.info("Wrote repo map to %s", target)
+    return target
+
+
+def emit_tag_index(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
+    """Emit a tag->count mapping for module tags.
+
+    Returns
+    -------
+    Path
+        Path to the generated tag index file.
+    """
+    tag_counts: dict[str, int] = {}
+    for record in records:
+        for tag in record.tags:
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    target = ctx.paths.data_dir / "tag_index.json"
+    atomic_write_text(target, json.dumps(tag_counts, indent=2))
+    ctx.logger.info("Wrote tag index to %s", target)
+    return target
+
+
+def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
+    """Emit Markdown sheets summarizing each module.
+
+    Returns
+    -------
+    Path
+        Directory containing the generated sheets.
+    """
+    md_dir = ctx.paths.data_dir / "sheets"
+    md_dir.mkdir(parents=True, exist_ok=True)
+    for record in records:
+        slug = record.module.replace(".", "-")
+        body = (
+            f"# {record.module}\n\n"
+            f"- Path: `{record.path}`\n"
+            f"- LOC: {record.loc}\n"
+            f"- Tags: {', '.join(record.tags) or '—'}\n"
+        )
+        atomic_write_text(md_dir / f"{slug}.md", body)
+    ctx.logger.info("Wrote markdown sheets to %s", md_dir)
+    return md_dir
+
+
+def run_all_exports(ctx: PipelineContext, records: list[SimpleModuleRecord]) -> ExportResult:
+    """Emit all enrich artifacts for the simplified CLI.
+
+    Returns
+    -------
+    ExportResult
+        Dataclass pointing to the emitted artifacts.
+    """
+    modules_jsonl = emit_modules_jsonl(ctx, records)
+    repo_map = emit_repo_map(ctx, records)
+    tag_index = emit_tag_index(ctx, records)
+    markdown_dir = emit_markdown_sheets(ctx, records)
+    return ExportResult(
+        modules_jsonl=modules_jsonl,
+        repo_map=repo_map,
+        tag_index=tag_index,
+        markdown_dir=markdown_dir,
+    )
+
+
 __all__ = [
     "apply_ownership",
+    "emit_markdown_sheets",
+    "emit_modules_jsonl",
+    "emit_repo_map",
+    "emit_tag_index",
+    "record_to_json",
+    "run_all_exports",
     "write_ast_outputs",
     "write_config_output",
     "write_coverage_output",

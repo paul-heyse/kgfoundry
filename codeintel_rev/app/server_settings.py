@@ -118,6 +118,19 @@ class ServerSettings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_keepalive_interval(self) -> ServerSettings:
+        """Enforce minimum SSE keep-alive interval.
+
+        Returns
+        -------
+        ServerSettings
+            Self instance with sse_keepalive_seconds clamped to minimum value.
+
+        Notes
+        -----
+        Ensures sse_keepalive_seconds is at least _MIN_SSE_KEEPALIVE_SECONDS
+        (5.0 seconds) to prevent connection timeouts. Values below the minimum
+        are automatically adjusted upward.
+        """
         self.sse_keepalive_seconds = max(self.sse_keepalive_seconds, _MIN_SSE_KEEPALIVE_SECONDS)
         return self
 

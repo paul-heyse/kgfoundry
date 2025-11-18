@@ -595,7 +595,21 @@ class XTRIndex:
         self._cell.close()
 
     def _ensure_state(self) -> _XTRIndexRuntime:
+        """Ensure runtime state is initialized, creating if needed.
+
+        Returns
+        -------
+        _XTRIndexRuntime
+            Runtime state instance (newly created or existing).
+        """
         return self._cell.get_or_initialize(_XTRIndexRuntime)
 
     def _current_state(self) -> _XTRIndexRuntime | None:
+        """Get current runtime state without initializing.
+
+        Returns
+        -------
+        _XTRIndexRuntime | None
+            Current runtime state if initialized, None otherwise.
+        """
         return self._cell.peek()

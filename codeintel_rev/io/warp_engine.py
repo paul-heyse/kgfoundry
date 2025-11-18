@@ -127,6 +127,14 @@ class WarpEngine:
 
     @staticmethod
     def _import_warp_executor_module() -> ModuleType:
+        """Import xtr_warp.executor module with gated import.
+
+        Returns
+        -------
+        ModuleType
+            xtr_warp.executor module instance.
+
+        """
         purpose = "WARP/XTR reranking (install `xtr-warp` and build the index)"
         module = gate_import("xtr_warp.executor", purpose)
         return cast("ModuleType", module)

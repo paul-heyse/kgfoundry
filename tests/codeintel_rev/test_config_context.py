@@ -25,7 +25,7 @@ def _prepare_base_repo(repo_root: Path) -> None:
     """Create directories/files required by readiness probes."""
     config_dir = repo_root / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
-    config_file = config_dir / "config.yaml"
+    config_file = config_dir / "app.yml"
     config_file.write_text("tests: true")
     for relative in ("logs", ".cache", ".tmp", "plugins"):
         (repo_root / relative).mkdir(parents=True, exist_ok=True)

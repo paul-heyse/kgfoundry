@@ -79,9 +79,13 @@ def test_register_idmap_creates_views(tmp_path: Path) -> None:
     assertions.expect_true(stats["refreshed"])
 
     with catalog.connection() as conn:
-        count = _fetch_single_value(conn, "SELECT COUNT(*) FROM faiss_idmap", reason="faiss_idmap count")
+        count = _fetch_single_value(
+            conn, "SELECT COUNT(*) FROM faiss_idmap", reason="faiss_idmap count"
+        )
         assertions.expect_equal(count, 1)
-        join_count = _fetch_single_value(conn, "SELECT COUNT(*) FROM v_faiss_join", reason="v_faiss_join count")
+        join_count = _fetch_single_value(
+            conn, "SELECT COUNT(*) FROM v_faiss_join", reason="v_faiss_join count"
+        )
         assertions.expect_equal(join_count, 1)
 
 

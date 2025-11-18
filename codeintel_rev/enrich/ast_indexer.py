@@ -157,6 +157,24 @@ def stable_module_path(repo_root: Path, file_path: Path) -> str:
 
 
 def _module_name_from_path(path: str) -> str:
+    """Extract module name from a file path.
+
+    Converts a file path to a Python module name by removing the file extension
+    and converting path separators to dots. Handles `__init__.py` files specially
+    by using the parent directory as the module name.
+
+    Parameters
+    ----------
+    path : str
+        File path (relative or absolute) to extract module name from. May include
+        `.py` extension or be a directory path ending with `__init__.py`.
+
+    Returns
+    -------
+    str
+        Module name string with dots as separators (e.g., "pkg.module").
+        Returns empty string if path has no parts after processing.
+    """
     candidate = Path(path)
     if candidate.name == "__init__.py":
         parts = candidate.parent.parts
@@ -168,6 +186,24 @@ def _module_name_from_path(path: str) -> str:
 
 
 def _safe_unparse(node: ast.AST | None) -> str | None:
+    """Safely convert an AST node to its source code representation.
+
+    Attempts to unparse an AST node to its source code string using ast.unparse().
+    Falls back to the node's class name if unparsing fails (e.g., for exotic or
+    unsupported node types).
+
+    Parameters
+    ----------
+    node : ast.AST | None
+        AST node to unparse, or None. If None, returns None immediately.
+
+    Returns
+    -------
+    str | None
+        Source code representation of the node if unparsing succeeds, or the
+        node's class name (e.g., "FunctionDef") if unparsing fails. Returns None
+        if node is None.
+    """
     if node is None:
         return None
     try:
@@ -202,6 +238,25 @@ def walk_defs_with_qualname(tree: ast.AST) -> Iterator[DefInfo]:
     stack: list[str] = []
 
     def _visit(node: ast.AST) -> Iterator[DefInfo]:
+        """Recursively visit AST nodes and yield definition information.
+
+        Traverses the AST tree depth-first, tracking the nesting stack to build
+        fully-qualified names for classes and functions. Yields DefInfo objects
+        for each class, function, or async function definition encountered.
+
+        Parameters
+        ----------
+        node : ast.AST
+            AST node to visit and traverse. The function recursively visits all
+            child nodes to find definitions.
+
+        Yields
+        ------
+        DefInfo
+            Metadata object for each class, function, or async function definition
+            found in the subtree rooted at node. Each DefInfo includes the node,
+            name, qualified name, and parent qualified name.
+        """
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 name = getattr(child, "name", None)
@@ -460,6 +515,24 @@ RowType = AstNodeRow | AstMetricsRow
 
 
 def _table_from_rows(rows: Sequence[RowType], schema: pa.Schema) -> pa.Table:
+    """Convert a sequence of row objects to a PyArrow Table.
+
+    Parameters
+    ----------
+    rows : Sequence[RowType]
+        Sequence of AstNodeRow or AstMetricsRow objects to convert. If empty,
+        returns an empty table with the specified schema.
+    schema : pa.Schema
+        PyArrow schema defining the table structure. Must match the fields
+        produced by row.as_record() methods.
+
+    Returns
+    -------
+    pa.Table
+        PyArrow Table containing the row data. Each row is converted to a
+        dictionary via as_record() and then ingested into the table using
+        the provided schema.
+    """
     if not rows:
         empty_arrays = [pa.array([], type=field.type) for field in schema]
         return pa.Table.from_arrays(empty_arrays, schema=schema)
@@ -556,6 +629,28 @@ class _MetricsVisitor(ast.NodeVisitor):
         self._with_branch(self.generic_visit, node)
 
     def _with_branch(self, visitor: Callable[[ast.AST], None], node: ast.AST) -> None:
+        """Visit a branch node while tracking nesting depth.
+
+        Increments branch node counter and nesting depth, then calls the visitor
+        function. After visiting, decrements nesting depth to restore the previous
+        level. Updates max_nesting if the current nesting exceeds the previous maximum.
+
+        Parameters
+        ----------
+        visitor : Callable[[ast.AST], None]
+            Visitor function to call for the node. Typically generic_visit() or
+            a specific visitor method.
+        node : ast.AST
+            AST node representing a branch/control-flow construct (if, for, while,
+            try, etc.) to visit and process.
+
+        Notes
+        -----
+        This method is used by branch_visit() to handle control-flow nodes that
+        increase cyclomatic complexity and nesting depth. The nesting counter is
+        incremented before visiting and decremented after to maintain accurate
+        depth tracking during recursive traversal.
+        """
         self.branch_nodes += 1
         self._current_nesting += 1
         self.max_nesting = max(self.max_nesting, self._current_nesting)

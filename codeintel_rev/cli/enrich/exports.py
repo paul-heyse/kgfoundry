@@ -1,106 +1,47 @@
-# SPDX-License-Identifier: MIT
 """Exports command."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
 
-from codeintel_rev.cli.enrich import app, common
-from codeintel_rev.enrich.errors import StageError
-from codeintel_rev.services.enrich import exports as export_services
+from codeintel_rev.app.readiness import raise_on_errors, validate_paths
+from codeintel_rev.cli.enrich import app
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
+from codeintel_rev.services.enrich.context import PipelineContext
+from codeintel_rev.services.enrich.exports import run_all_exports
+from codeintel_rev.services.enrich.scan import scan_repo
+
+REPO_ROOT_OPTION = typer.Option(".", "--repo-root", help="Repository root")
+OUT_DIR_OPTION = typer.Option("./.enrich", "--out-dir", help="Output directory")
 
 
-def _run_exports_pipeline(
-    ctx: typer.Context,
-    *,
-    emit_ast: bool,
-    dry_run: bool,
-    command: str,
-) -> None:
-    state = common.ensure_state(ctx)
-    try:
-        result = common.execute_pipeline(state)
-    except StageError as exc:  # pragma: no cover - defensive
-        common.handle_stage_error(exc)
-        return
-    if common.handle_dry_run(command, dry_run=dry_run, result=result):
-        return
-    if state.analytics.owners:
-        export_services.apply_ownership(
-            result,
-            state.pipeline.out,
-            history_window_days=state.analytics.history_window_days,
-            commits_window=state.analytics.commits_window,
-        )
-    if state.analytics.emit_slices:
-        export_services.write_slices_output(
-            result.module_rows,
-            state.pipeline.out,
-            slices_filter=list(state.analytics.slices_filter),
-        )
-    export_services.write_exports_outputs(result, state.pipeline.out)
-    export_services.write_ast_outputs(result, state.pipeline.out, emit_ast=emit_ast)
-    typer.echo(f"[{command}] Wrote module artifacts for {len(result.module_rows)} modules.")
+def _prepare_outputs(paths: ResolvedPaths) -> None:
+    """Ensure output directories exist.
+
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved application paths containing the data directory to create.
+    """
+    paths.data_dir.mkdir(parents=True, exist_ok=True)
 
 
 @app.command("exports")
 def exports(
-    ctx: typer.Context,
     *,
-    emit_ast: bool = common.EMIT_AST_OPTION,
-    dry_run: bool = common.DRY_RUN_OPTION,
+    repo_root: Path = REPO_ROOT_OPTION,
+    out_dir: Path = OUT_DIR_OPTION,
 ) -> None:
-    """Emit modules.jsonl, repo map, markdown sheets, and tag index."""
-    _run_exports_pipeline(ctx, emit_ast=emit_ast, dry_run=dry_run, command="exports")
-
-
-@app.command("all")
-def run_all(
-    ctx: typer.Context,
-    *,
-    emit_ast: bool = common.EMIT_AST_OPTION,
-    dry_run: bool = common.DRY_RUN_OPTION,
-) -> None:
-    """Run the full enrichment pipeline and emit all artifacts."""
-    state = common.ensure_state(ctx)
-    try:
-        result = common.execute_pipeline(state)
-    except StageError as exc:  # pragma: no cover - defensive
-        common.handle_stage_error(exc)
-        return
-    if common.handle_dry_run("all", dry_run=dry_run, result=result):
-        return
-    if state.analytics.owners:
-        export_services.apply_ownership(
-            result,
-            state.pipeline.out,
-            history_window_days=state.analytics.history_window_days,
-            commits_window=state.analytics.commits_window,
-        )
-    if state.analytics.emit_slices:
-        export_services.write_slices_output(
-            result.module_rows,
-            state.pipeline.out,
-            slices_filter=list(state.analytics.slices_filter),
-        )
-    export_services.write_exports_outputs(result, state.pipeline.out)
-    export_services.write_graph_outputs(result, state.pipeline.out)
-    export_services.write_uses_output(result, state.pipeline.out)
-    export_services.write_typedness_output(result, state.pipeline.out)
-    export_services.write_doc_output(result, state.pipeline.out)
-    export_services.write_coverage_output(result, state.pipeline.out)
-    export_services.write_config_output(result, state.pipeline.out)
-    export_services.write_hotspot_output(result, state.pipeline.out)
-    export_services.write_ast_outputs(result, state.pipeline.out, emit_ast=emit_ast)
-    typer.echo(f"[all] Completed enrichment for {len(result.module_rows)} modules.")
-
-
-@app.command("run")
-def run(
-    ctx: typer.Context,
-    *,
-    emit_ast: bool = common.EMIT_AST_OPTION,
-    dry_run: bool = common.DRY_RUN_OPTION,
-) -> None:
-    """Alias for ``all`` to match historical CLI entrypoints."""
-    run_all(ctx, emit_ast=emit_ast, dry_run=dry_run)
+    """Emit modules.jsonl, repo map, tag index, and markdown sheets."""
+    paths = resolve_application_paths({"BASE_DIR": repo_root, "DATA_DIR": out_dir})
+    raise_on_errors(validate_paths(paths))
+    _prepare_outputs(paths)
+    ctx = PipelineContext.from_paths(paths)
+    records = scan_repo(ctx)
+    result = run_all_exports(ctx, records)
+    typer.echo(
+        "Wrote artifacts: "
+        f"{result.modules_jsonl}, {result.repo_map}, {result.tag_index}, {result.markdown_dir}"
+    )

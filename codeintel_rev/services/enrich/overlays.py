@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -20,8 +20,10 @@ from codeintel_rev.services.enrich.context import (
     EXPORT_HUB_THRESHOLD,
     OverlayCLIOptions,
     OverlayContext,
+    PipelineContext,
     PipelineOptions,
 )
+from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
 from codeintel_rev.typedness import collect_type_signals
 
 try:  # pragma: no cover - optional dependency
@@ -321,7 +323,82 @@ def ensure_package_overlays(  # noqa: PLR0913
     return False
 
 
+def _load_overlay_file(path: Path) -> dict[str, dict[str, Any]]:
+    """Load overlay metadata from either JSON or JSONL.
+
+    Returns
+    -------
+    dict[str, dict[str, Any]]
+        Mapping of module names to metadata dictionaries.
+    """
+    text = path.read_text(encoding="utf-8")
+    try:
+        data = json.loads(text)
+        if isinstance(data, Mapping):
+            return {str(key): dict(value) for key, value in data.items()}
+    except json.JSONDecodeError:
+        pass
+    merged: dict[str, dict[str, Any]] = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            row = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        module = str(row.get("module") or "")
+        if not module:
+            continue
+        payload = dict(row)
+        payload.pop("module", None)
+        merged.setdefault(module, {}).update(payload)
+    return merged
+
+
+def apply_overlays(
+    ctx: PipelineContext,
+    records: list[SimpleModuleRecord],
+    overlay_files: Iterable[Path],
+) -> list[SimpleModuleRecord]:
+    """Merge overlay metadata into scanned records.
+
+    Returns
+    -------
+    list[SimpleModuleRecord]
+        Updated module records containing overlay metadata.
+    """
+    merged_overlays: dict[str, dict[str, Any]] = {}
+    files = list(overlay_files)
+    for overlay_path in files:
+        try:
+            data = _load_overlay_file(overlay_path)
+        except OSError as exc:  # pragma: no cover - file read errors
+            ctx.logger.warning("Skipping overlay %s: %s", overlay_path, exc)
+            continue
+        for module, payload in data.items():
+            merged_overlays.setdefault(module, {}).update(payload)
+    enriched: list[SimpleModuleRecord] = []
+    for record in records:
+        meta = dict(record.meta)
+        if record.module in merged_overlays:
+            meta.update(merged_overlays[record.module])
+        enriched.append(
+            SimpleModuleRecord(
+                path=record.path,
+                module=record.module,
+                language=record.language,
+                loc=record.loc,
+                tags=record.tags,
+                meta=meta,
+            )
+        )
+    ctx.logger.info("Applied overlays from %d file(s)", len(files))
+    return enriched
+
+
 __all__ = [
+    "apply_overlays",
     "build_overlay_context",
     "ensure_package_overlays",
     "load_overlay_options",

@@ -59,6 +59,17 @@ def _build_shutdown_trigger() -> tuple[asyncio.Event, ShutdownTrigger]:
     event = asyncio.Event()
 
     async def _wait_for_shutdown() -> None:
+        """Wait for the shutdown event to be set.
+
+        This coroutine blocks until the shutdown event is signaled, at which
+        point Hypercorn will gracefully shut down the server.
+
+        Notes
+        -----
+        Used as the shutdown_trigger callback passed to Hypercorn's serve()
+        function. When the event is set (via signal handlers), this coroutine
+        completes and Hypercorn initiates graceful shutdown.
+        """
         await event.wait()
 
     return event, _wait_for_shutdown
@@ -78,6 +89,27 @@ async def serve_app(
         with suppress(NotImplementedError):
 
             def _set_event(*_: object, _evt: asyncio.Event = event) -> object:
+                """Set the shutdown event to trigger graceful shutdown.
+
+                Parameters
+                ----------
+                *_ : object
+                    Ignored signal handler arguments (signum, frame).
+                _evt : asyncio.Event, optional
+                    Shutdown event to set (defaults to event from closure).
+
+                Returns
+                -------
+                object
+                    Always returns None (required by signal handler signature).
+
+                Notes
+                -----
+                This function is registered as a signal handler for SIGINT and
+                SIGTERM. When called, it sets the shutdown event which causes
+                the shutdown trigger coroutine to complete, initiating graceful
+                Hypercorn shutdown.
+                """
                 _evt.set()
                 return None
 

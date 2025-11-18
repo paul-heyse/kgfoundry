@@ -94,7 +94,7 @@ def _synthetic_paths(tmp_path: Path) -> ResolvedPaths:
 
     config_dir = repo_root / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
-    config_file = config_dir / "config.yaml"
+    config_file = config_dir / "app.yml"
     config_file.write_text("test: true")
 
     for directory in (

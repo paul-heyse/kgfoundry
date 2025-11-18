@@ -132,6 +132,18 @@ class SemanticStage0Request:
 
 @dataclass(slots=True, frozen=True)
 class _ScopeFilterFlags:
+    """Flags indicating which filter types are present in a scope configuration.
+
+    Attributes
+    ----------
+    has_include_globs : bool
+        True if include_globs filters are present in the scope.
+    has_exclude_globs : bool
+        True if exclude_globs filters are present in the scope.
+    has_languages : bool
+        True if language filters are present in the scope.
+    """
+
     has_include_globs: bool
     has_exclude_globs: bool
     has_languages: bool
@@ -170,12 +182,37 @@ class _ScopeFilterFlags:
 
 @dataclass(slots=True, frozen=True)
 class _FaissFanout:
+    """FAISS search fan-out configuration accounting for post-filtering.
+
+    Attributes
+    ----------
+    faiss_k : int
+        Actual FAISS k value to use (clamped to max_results).
+    faiss_k_target : int
+        Target FAISS k value before clamping (includes overfetch multiplier
+        and bonus adjustments).
+    """
+
     faiss_k: int
     faiss_k_target: int
 
 
 @dataclass(slots=True, frozen=True)
 class _SearchBudget:
+    """Search budget constraints and FAISS readiness status.
+
+    Attributes
+    ----------
+    effective_limit : int
+        Clamped result limit (between 1 and max_results).
+    max_results : int
+        Maximum allowed results from server configuration.
+    limits_metadata : tuple[str, ...]
+        Metadata strings describing limit clamps and FAISS readiness.
+    faiss_ready : bool
+        True if FAISS index is available and ready for search.
+    """
+
     effective_limit: int
     max_results: int
     limits_metadata: tuple[str, ...]
@@ -184,6 +221,26 @@ class _SearchBudget:
 
 @dataclass(slots=True, frozen=True)
 class _SemanticSearchPlan:
+    """Complete search plan for Stage-0 semantic retrieval.
+
+    Attributes
+    ----------
+    scope_flags : _ScopeFilterFlags
+        Flags indicating which filter types are active.
+    tuning_overrides : Mapping[str, float | int]
+        FAISS tuning parameter overrides from scope configuration.
+    limits_metadata : tuple[str, ...]
+        Metadata strings describing limit clamps and configuration decisions.
+    effective_limit : int
+        Clamped result limit for the search.
+    fanout : _FaissFanout
+        FAISS fan-out configuration accounting for post-filtering.
+    nprobe : int
+        FAISS nprobe parameter for approximate search.
+    faiss_ready : bool
+        True if FAISS index is available and ready for search.
+    """
+
     scope_flags: _ScopeFilterFlags
     tuning_overrides: Mapping[str, float | int]
     limits_metadata: tuple[str, ...]
@@ -195,6 +252,18 @@ class _SemanticSearchPlan:
 
 @dataclass(slots=True, frozen=True)
 class _FaissStageResult:
+    """Result from the FAISS search stage.
+
+    Attributes
+    ----------
+    ids : list[int]
+        List of chunk IDs returned from FAISS search.
+    scores : list[float]
+        List of similarity scores corresponding to ids.
+    exception : Exception | None
+        Exception raised during FAISS search, if any. None if search succeeded.
+    """
+
     ids: list[int]
     scores: list[float]
     exception: Exception | None
@@ -202,6 +271,25 @@ class _FaissStageResult:
 
 @dataclass(slots=True, frozen=True)
 class _HybridResult:
+    """Result from hybrid search fusion stage.
+
+    Attributes
+    ----------
+    ids : list[int]
+        List of fused chunk IDs ranked by hybrid search.
+    scores : list[float]
+        List of fused scores corresponding to ids.
+    warnings : list[str]
+        List of warning messages from hybrid search engine.
+    method : Stage0MethodInfo | None
+        Stage-0 fusion method metadata, if available.
+    channels : list[str]
+        List of channel names that contributed to the results.
+    contributions : Mapping[int, list[tuple[str, int, float]]] | None
+        Optional mapping of chunk IDs to per-channel contribution tuples
+        (channel_name, rank, score).
+    """
+
     ids: list[int]
     scores: list[float]
     warnings: list[str]
@@ -212,6 +300,22 @@ class _HybridResult:
 
 @dataclass(slots=True, frozen=True)
 class _HybridResolveParams:
+    """Parameters for resolving hybrid search results.
+
+    Attributes
+    ----------
+    context : ApplicationContext
+        Application context providing hybrid engine and settings.
+    query : str
+        Query text for hybrid search.
+    plan : _SemanticSearchPlan
+        Search plan with fan-out and tuning configuration.
+    limits_metadata : list[str]
+        Mutable list for appending limit and warning metadata.
+    options : Stage0Options | None
+        Optional Stage-0 options for weights, channels, and tuning.
+    """
+
     context: ApplicationContext
     query: str
     plan: _SemanticSearchPlan
@@ -221,6 +325,22 @@ class _HybridResolveParams:
 
 @dataclass(slots=True, frozen=True)
 class _FaissSearchConfig:
+    """Configuration bundle for executing a FAISS search.
+
+    Attributes
+    ----------
+    context : ApplicationContext
+        Application context providing FAISS manager.
+    catalog : DuckDBCatalog
+        DuckDB catalog for chunk retrieval during search.
+    limit : int
+        Number of neighbors to retrieve (k parameter).
+    nprobe : int
+        FAISS nprobe parameter for approximate search.
+    overrides : Mapping[str, float | int] | None
+        Optional runtime tuning overrides (ef_search, k_factor, etc.).
+    """
+
     context: ApplicationContext
     catalog: DuckDBCatalog
     limit: int
@@ -601,6 +721,22 @@ def _build_search_budget(
 
 
 def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, list[str]]:
+    """Clamp requested limit to valid range and generate warning messages.
+
+    Parameters
+    ----------
+    requested_limit : int
+        Requested number of results from the client.
+    max_results : int
+        Maximum allowed results from server configuration.
+
+    Returns
+    -------
+    tuple[int, list[str]]
+        Tuple containing:
+        - effective_limit: Clamped limit (between 1 and max_results)
+        - messages: List of warning messages describing any clamps applied
+    """
     messages: list[str] = []
     if requested_limit <= 0:
         messages.append(f"Requested limit {requested_limit} is not positive; using minimum of 1.")
@@ -620,6 +756,26 @@ def _calculate_faiss_fanout(
     multiplier: int,
     scope_flags: _ScopeFilterFlags,
 ) -> _FaissFanout:
+    """Calculate FAISS fan-out accounting for post-filtering overhead.
+
+    Parameters
+    ----------
+    effective_limit : int
+        Clamped result limit (between 1 and max_results).
+    max_results : int
+        Maximum allowed results from server configuration.
+    multiplier : int
+        Overfetch multiplier to apply when filters are active.
+    scope_flags : _ScopeFilterFlags
+        Flags indicating which filter types are present.
+
+    Returns
+    -------
+    _FaissFanout
+        Fan-out configuration with target and clamped k values. When filters
+        are active, applies multiplier and bonus adjustments to account for
+        results that will be filtered out.
+    """
     faiss_k_target = effective_limit
     if scope_flags.has_filters:
         faiss_k_target = effective_limit * multiplier
@@ -633,6 +789,22 @@ def _calculate_faiss_fanout(
 
 
 def _overfetch_bonus(effective_limit: int, scope_flags: _ScopeFilterFlags) -> int:
+    """Calculate additional overfetch bonus based on filter combinations.
+
+    Parameters
+    ----------
+    effective_limit : int
+        Clamped result limit for the search.
+    scope_flags : _ScopeFilterFlags
+        Flags indicating which filter types are present.
+
+    Returns
+    -------
+    int
+        Additional overfetch bonus to add to faiss_k_target. Returns
+        effective_limit when both include_globs and languages filters are
+        present, effective_limit // 2 when either is present, or 0 otherwise.
+    """
     if scope_flags.has_include_globs and scope_flags.has_languages:
         return effective_limit
     if scope_flags.has_include_globs or scope_flags.has_languages:
@@ -692,6 +864,26 @@ def _run_faiss_search(
 def _normalize_scope_faiss_tuning(
     raw: Mapping[str, object] | None,
 ) -> tuple[dict[str, float | int], list[str]]:
+    """Normalize FAISS tuning overrides from scope configuration.
+
+    Parameters
+    ----------
+    raw : Mapping[str, object] | None
+        Raw tuning overrides dictionary from scope configuration, or None.
+
+    Returns
+    -------
+    tuple[dict[str, float | int], list[str]]
+        Tuple containing:
+        - Normalized overrides dictionary with canonical keys (nprobe, ef_search,
+          quantizer_ef_search, k_factor) and coerced values
+        - List of warning messages for unsupported or invalid overrides
+
+    Notes
+    -----
+    Handles key aliases (e.g., "efSearch" -> "ef_search") and type coercion.
+    k_factor is coerced to float, other parameters are coerced to int.
+    """
     if not raw:
         return {}, []
 
@@ -730,6 +922,27 @@ def _embed_query_or_raise(
     query: str,
     vllm_url: str,
 ) -> NDArrayF32:
+    """Embed query text or raise EmbeddingError if embedding fails.
+
+    Parameters
+    ----------
+    client : VLLMClient
+        VLLM embedding client for converting text to vectors.
+    query : str
+        Query text to embed.
+    vllm_url : str
+        VLLM server URL for error context.
+
+    Returns
+    -------
+    NDArrayF32
+        Query embedding vector with shape (1, dim).
+
+    Raises
+    ------
+    EmbeddingError
+        Raised if embedding fails or returns None.
+    """
     embedding, embed_error = _embed_query(client, query)
     if embedding is None or embed_error is not None:
         raise EmbeddingError(
@@ -741,6 +954,22 @@ def _embed_query_or_raise(
 
 
 def _embed_query(client: VLLMClient, query: str) -> tuple[NDArrayF32 | None, str | None]:
+    """Embed query text and return vector or error message.
+
+    Parameters
+    ----------
+    client : VLLMClient
+        VLLM embedding client for converting text to vectors.
+    query : str
+        Query text to embed.
+
+    Returns
+    -------
+    tuple[NDArrayF32 | None, str | None]
+        Tuple containing:
+        - Embedding vector with shape (1, dim) if successful, None if failed
+        - Error message string if embedding failed, None if successful
+    """
     try:
         vector = client.embed_single(query)
     except (RuntimeError, ValueError, httpx.HTTPError) as exc:

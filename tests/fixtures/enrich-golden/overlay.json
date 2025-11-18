@@ -1,0 +1,6 @@
+{
+  "pkg.mod": {
+    "owner": "platform"
+  },
+  "pkg.cli.entry": { "owner": "devex" }
+}

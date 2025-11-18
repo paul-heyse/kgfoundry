@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import ast
+import json
 import logging
+import os
+import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
@@ -19,8 +22,12 @@ from codeintel_rev.enrich.ast_indexer import (
 )
 from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.output_writers import (
-    write_json,
-    write_jsonl,
+    write_json as legacy_write_json,
+)
+from codeintel_rev.enrich.output_writers import (
+    write_jsonl as legacy_write_jsonl,
+)
+from codeintel_rev.enrich.output_writers import (
     write_markdown_module,
     write_parquet,
 )
@@ -59,7 +66,7 @@ def write_modules_json(
     """
     target = out / "modules" / "modules.jsonl"
     target.parent.mkdir(parents=True, exist_ok=True)
-    write_jsonl(
+    legacy_write_jsonl(
         target,
         [dict(row) if isinstance(row, Mapping) else asdict(row) for row in module_rows],
         writer_version="v2",
@@ -95,7 +102,7 @@ def write_symbol_graph(out: Path, symbol_edges: list[tuple[str, str]]) -> Path:
         Path to the generated JSON file.
     """
     target = out / "graphs" / "symbol_graph.json"
-    write_json(
+    legacy_write_json(
         target,
         [{"symbol": symbol, "file": rel} for symbol, rel in symbol_edges],
     )
@@ -105,7 +112,7 @@ def write_symbol_graph(out: Path, symbol_edges: list[tuple[str, str]]) -> Path:
 def write_tabular_records(parquet_path: Path, rows: list[dict[str, Any]]) -> None:
     """Persist Parquet + JSONL pair for tabular analytics."""
     write_parquet(parquet_path, rows)
-    write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
+    legacy_write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
 
 
 def collect_ast_artifacts(
@@ -141,7 +148,7 @@ def collect_ast_artifacts(
 
 def write_ast_jsonl(path: Path, rows: Iterable[AstNodeRow | AstMetricsRow]) -> None:
     """Persist AST artifacts to JSONL for portability."""
-    write_jsonl(path, [row.as_record() for row in rows])
+    legacy_write_jsonl(path, [row.as_record() for row in rows])
 
 
 def write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> Path | None:
@@ -165,9 +172,41 @@ def write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> Path | Non
     return target
 
 
+def atomic_write_text(path: Path, data: str) -> None:
+    """Write text atomically via a temporary file swap."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w", delete=False, dir=str(path.parent), encoding="utf-8"
+    ) as tmp:
+        tmp.write(data)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        tmp_path = Path(tmp.name)
+    tmp_path.replace(path)
+
+
+def write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> int:
+    """Write JSONL rows and return the number of emitted rows.
+
+    Returns
+    -------
+    int
+        Number of encoded rows.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    count = 0
+    with path.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+            count += 1
+    return count
+
+
 __all__ = [
+    "atomic_write_text",
     "collect_ast_artifacts",
     "write_ast_jsonl",
+    "write_jsonl",
     "write_markdown_modules",
     "write_modules_json",
     "write_symbol_graph",

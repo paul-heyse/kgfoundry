@@ -196,6 +196,23 @@ class CollectorStats:
 
 
 def _format_doc(doc: DocSnippet | None) -> dict[str, str] | None:
+    """Format a docstring snippet dictionary for serialization.
+
+    Converts a DocSnippet dictionary (which uses "def_" as the key) to a
+    normalized dictionary using "def" as the key (for JSON serialization).
+
+    Parameters
+    ----------
+    doc : DocSnippet | None
+        Docstring snippet dictionary containing optional "module" and "def_"
+        keys, or None.
+
+    Returns
+    -------
+    dict[str, str] | None
+        Normalized dictionary with "module" and "def" keys (renamed from "def_"),
+        or None if doc is None or empty after normalization.
+    """
     if not doc:
         return None
     normalized: dict[str, str] = {}
@@ -213,6 +230,32 @@ def _assign_optional(
     *,
     allow_false: bool = False,
 ) -> None:
+    """Conditionally assign an optional value to a payload dictionary.
+
+    Adds a key-value pair to the payload dictionary only if the value is not None
+    and (if allow_false is False) is truthy. Used for serialization to omit
+    None and falsy values from JSON output.
+
+    Parameters
+    ----------
+    payload : dict[str, object]
+        Dictionary to update with the optional value. Modified in-place.
+    key : str
+        Dictionary key to assign the value to.
+    value : object | None
+        Value to assign if it passes the None and truthiness checks.
+    allow_false : bool, optional
+        If True, allows False values to be assigned (default: False). When False,
+        falsy values (False, 0, empty strings, empty lists) are skipped along
+        with None.
+
+    Notes
+    -----
+    This function mutates the payload dictionary in-place. Values are only assigned
+    if they are not None and (if allow_false=False) are truthy. This ensures
+    that optional fields are omitted from serialized output when they have no
+    meaningful value.
+    """
     if value is None:
         return
     if not allow_false and not value:

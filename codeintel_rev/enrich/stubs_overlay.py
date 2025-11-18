@@ -78,6 +78,36 @@ def _should_generate_overlay(
     inputs: OverlayInputs,
     policy: OverlayPolicy,
 ) -> bool:
+    """Determine whether an overlay should be generated based on policy gates.
+
+    Evaluates multiple policy conditions to decide if a type stub overlay should
+    be generated for a module. Returns True if any of the configured triggers
+    are met: force flag, star imports, export hub threshold, overlay-needed tag,
+    or type error threshold.
+
+    Parameters
+    ----------
+    decision : OverlayDecisionInputs
+        Decision inputs containing module metadata, relative path key, star import
+        flag, and type error count.
+    inputs : OverlayInputs
+        Runtime inputs including force flag, overlay-tagged paths, and type error
+        counts. The force flag bypasses all other checks.
+    policy : OverlayPolicy
+        Policy configuration controlling when overlays are generated. Includes
+        thresholds for export hubs, type errors, and flags for star imports and
+        overlay-needed tags.
+
+    Returns
+    -------
+    bool
+        True if an overlay should be generated based on policy gates, False otherwise.
+        Returns True immediately if inputs.force is True, otherwise evaluates:
+        - Star import trigger (if policy.when_star_imports and module has star imports)
+        - Export hub trigger (if exports count >= policy.export_hub_threshold)
+        - Tagged overlay trigger (if path is in inputs.overlay_tagged_paths)
+        - Type error trigger (if policy.when_type_errors and error_count >= min_type_errors)
+    """
     if inputs.force:
         return True
     export_hub = (

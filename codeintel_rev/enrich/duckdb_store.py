@@ -59,6 +59,27 @@ _MODULE_COLUMN_NAMES: Sequence[str] = tuple(name for name, _ in _MODULE_COLUMNS)
 
 
 def _parse_pragmas(spec: str) -> tuple[tuple[str, str], ...]:
+    """Parse DuckDB pragma settings from a comma-separated string.
+
+    Parameters
+    ----------
+    spec : str
+        Comma-separated string of key=value pairs (e.g., "threads=4,memory_limit=1GB").
+        Empty strings or invalid entries are ignored.
+
+    Returns
+    -------
+    tuple[tuple[str, str], ...]
+        Tuple of (key, literal_value) pairs where literal_value is either a numeric
+        string or a quoted string. Keys must match the pattern `^[A-Za-z_][A-Za-z0-9_]*$`.
+        Returns an empty tuple if spec is empty or no valid entries are found.
+
+    Notes
+    -----
+    Numeric values (including floats with a single decimal point) are left unquoted.
+    Non-numeric values are wrapped in single quotes. Invalid entries (missing "=",
+    empty key/value, or invalid key pattern) are silently skipped.
+    """
     settings: list[tuple[str, str]] = []
     if not spec:
         return ()
@@ -235,6 +256,27 @@ def ingest_modules_jsonl(
 
 
 def _load_json_rows(path: Path) -> list[dict[str, object]]:
+    """Load JSON objects from a JSONL file, handling multi-line JSON.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the JSONL file to read. Each line should be a JSON object, but
+        multi-line JSON objects are supported by tracking brace depth.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        List of parsed JSON objects from the file. Empty lines are skipped.
+        Multi-line JSON objects are reconstructed by tracking opening and closing braces.
+
+    Notes
+    -----
+    This function handles both single-line JSONL format and multi-line JSON objects
+    by tracking brace depth. When depth reaches zero (balanced braces), the buffered
+    lines are parsed as a single JSON object. This allows handling JSON objects that
+    span multiple lines in the file.
+    """
     rows: list[dict[str, object]] = []
     buffer: list[str] = []
     depth = 0
@@ -253,6 +295,23 @@ def _load_json_rows(path: Path) -> list[dict[str, object]]:
 
 
 def _coerce_value(value: object, col_type: str | None) -> object:
+    """Coerce a value to the appropriate format for DuckDB column insertion.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce. If None, returns None. Otherwise, JSON values are
+        serialized to strings.
+    col_type : str | None
+        DuckDB column type string (e.g., "JSON", "TEXT", "INTEGER"). Used to
+        determine if the value should be JSON-serialized.
+
+    Returns
+    -------
+    object
+        Coerced value: None if input is None, JSON string if col_type contains
+        "JSON", otherwise the original value unchanged.
+    """
     if value is None:
         return None
     normalized = (col_type or "").upper()
@@ -262,6 +321,22 @@ def _coerce_value(value: object, col_type: str | None) -> object:
 
 
 def _apply_pragmas(con: DuckDBConnection, pragmas: tuple[tuple[str, str], ...]) -> None:
+    """Apply DuckDB pragma settings to a connection.
+
+    Parameters
+    ----------
+    con : DuckDBConnection
+        DuckDB connection to apply pragmas to.
+    pragmas : tuple[tuple[str, str], ...]
+        Tuple of (key, literal_value) pairs representing pragma settings to apply.
+        Each pragma is executed as `PRAGMA key=literal_value`. If empty, no pragmas
+        are applied.
+
+    Notes
+    -----
+    Pragmas are applied sequentially. The literal_value should already be formatted
+    as a SQL literal (numeric or quoted string) as produced by `_parse_pragmas()`.
+    """
     if not pragmas:
         return
     for key, literal in pragmas:
@@ -269,6 +344,29 @@ def _apply_pragmas(con: DuckDBConnection, pragmas: tuple[tuple[str, str], ...]) 
 
 
 def _ingest_via_native_json(con: DuckDBConnection, modules_jsonl: Path) -> None:
+    """Ingest module records using DuckDB's native JSON reading capabilities.
+
+    Uses DuckDB's `read_json_auto()` function to efficiently load JSONL data into
+    a temporary staging table, then merges it into the main `modules` table using
+    an UPSERT pattern (UPDATE on match, INSERT on no match).
+
+    Parameters
+    ----------
+    con : DuckDBConnection
+        DuckDB connection to execute ingestion queries on.
+    modules_jsonl : Path
+        Path to the JSONL file containing module records to ingest.
+
+    Notes
+    -----
+    This method is more efficient than Python-based parsing for large files. It:
+    1. Creates a temporary staging table from the JSONL file using `read_json_auto()`
+    2. Adds any missing columns from the schema definition
+    3. Merges staging data into the main `modules` table (UPSERT by path)
+    4. Drops the temporary staging table
+    The merge operation updates existing records and inserts new ones based on the
+    `path` primary key.
+    """
     con.execute("DROP TABLE IF EXISTS modules_stage")
     con.execute(
         "CREATE TEMP TABLE modules_stage AS SELECT * FROM read_json_auto(?)",
@@ -300,6 +398,30 @@ def _ingest_via_native_json(con: DuckDBConnection, modules_jsonl: Path) -> None:
 
 
 def _ingest_via_python(con: DuckDBConnection, modules_jsonl: Path) -> None:
+    """Ingest module records using Python-based JSON parsing and parameterized queries.
+
+    Loads JSONL data using Python JSON parsing, deletes existing records for the
+    same paths, then inserts all records using parameterized batch inserts. This
+    method is used when native JSON ingestion is disabled or unavailable.
+
+    Parameters
+    ----------
+    con : DuckDBConnection
+        DuckDB connection to execute ingestion queries on.
+    modules_jsonl : Path
+        Path to the JSONL file containing module records to ingest.
+
+    Notes
+    -----
+    This method:
+    1. Loads all JSON objects from the file using `_load_json_rows()`
+    2. Extracts unique path values from the payloads
+    3. Deletes existing records with matching paths (to avoid primary key conflicts)
+    4. Coerces values to appropriate types and builds insert rows
+    5. Executes batch inserts using `executemany()` for efficiency
+    This approach is slower than native JSON ingestion but provides more control
+    over data transformation and error handling.
+    """
     payloads = _load_json_rows(modules_jsonl)
     if not payloads:
         return

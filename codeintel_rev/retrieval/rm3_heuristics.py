@@ -83,9 +83,36 @@ class RM3Heuristics:
 
     @staticmethod
     def _tokenize(query: str) -> list[str]:
+        """Tokenize query text into lowercase alphanumeric tokens.
+
+        Parameters
+        ----------
+        query : str
+            Query string to tokenize.
+
+        Returns
+        -------
+        list[str]
+            List of non-empty tokens extracted from the query, converted to
+            lowercase. Tokens consist of alphanumeric characters and underscores.
+        """
         return [token for token in re.split(r"[^A-Za-z0-9_]+", query.lower()) if token]
 
     def _looks_symbolic(self, query: str) -> bool:
+        """Check if query contains symbol-like patterns.
+
+        Parameters
+        ----------
+        query : str
+            Query string to check for symbolic patterns.
+
+        Returns
+        -------
+        bool
+            True if the query matches symbol-like patterns (namespaces, dotted
+            imports, paths, camelCase/PascalCase, identifiers with digits),
+            False otherwise.
+        """
         return bool(self._symbol_regex.search(query))
 
     def should_enable(self, query: str) -> bool:

@@ -125,10 +125,14 @@ def test_semantic_search_pro_sync_orchestrates(
             if should_run_stage_two
             else None
         ),
-        reranker_response=([
-            2,
-            1,
-        ], [1.1, 0.8], {"provider": "coderank_llm", "enabled": True, "reordered": 2}),
+        reranker_response=(
+            [
+                2,
+                1,
+            ],
+            [1.1, 0.8],
+            {"provider": "coderank_llm", "enabled": True, "reordered": 2},
+        ),
         findings=[
             {
                 "type": "usage",

@@ -52,6 +52,20 @@ _DEFAULT_CONTEXT = BM25CliContext.production()
 
 
 def _cli_context(ctx: typer.Context | None = None) -> BM25CliContext:
+    """Retrieve or create the BM25 CLI context from Typer state.
+
+    Parameters
+    ----------
+    ctx : typer.Context | None, optional
+        Typer context object. If None, attempts to retrieve the current Click
+        context. Defaults to None.
+
+    Returns
+    -------
+    BM25CliContext
+        CLI context instance from Typer state, or the default production context
+        if no context is available or configured.
+    """
     active = ctx or click.get_current_context(silent=True)
     if active is None:
         return _DEFAULT_CONTEXT
@@ -124,6 +138,22 @@ def prepare_corpus(
         output_dir: Path | None,
         overwrite: bool,
     ) -> None:
+        """Execute the corpus preparation operation.
+
+        Parameters
+        ----------
+        ctx : CliContext
+            CLI context providing logging and operation tracking.
+        env : EnvelopeBuilder
+            Envelope builder for attaching artifacts and result metadata.
+        source : Path
+            Path to the JSONL corpus file to process.
+        output_dir : Path | None
+            Optional output directory for JsonCollection files. If None, uses
+            the configured BM25 corpus directory.
+        overwrite : bool
+            Whether to overwrite existing JsonCollection files if they exist.
+        """
         manager = _create_bm25_manager()
         summary = manager.prepare_corpus(source, output_dir=output_dir, overwrite=overwrite)
 
@@ -194,6 +224,24 @@ def build_index(
         index_dir: Path | None,
         threads: int | None,
     ) -> None:
+        """Execute the BM25 index build operation.
+
+        Parameters
+        ----------
+        ctx : CliContext
+            CLI context providing logging and operation tracking.
+        env : EnvelopeBuilder
+            Envelope builder for attaching artifacts and result metadata.
+        json_dir : Path | None
+            Optional JsonCollection directory to index. If None, uses the
+            configured BM25 corpus directory.
+        index_dir : Path | None
+            Optional target Lucene index directory. If None, uses the configured
+            BM25 index directory.
+        threads : int | None
+            Optional worker thread count for Pyserini. If None, uses the
+            configured BM25 thread count.
+        """
         manager = _create_bm25_manager()
         options = BM25BuildOptions(
             json_dir=json_dir,

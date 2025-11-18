@@ -54,11 +54,37 @@ if TYPE_CHECKING:
 
 
 def _string_attr(obj: object, attr: str) -> str:
+    """Get string attribute from object, returning empty string if missing or None.
+
+    Parameters
+    ----------
+    obj : object
+        Object to get attribute from.
+    attr : str
+        Attribute name to retrieve.
+
+    Returns
+    -------
+    str
+        String value of attribute, or empty string if attribute is missing or None.
+    """
     value = getattr(obj, attr, "")
     return str(value) if value is not None else ""
 
 
 def _commit_iso_date(commit: object) -> str:
+    """Extract ISO format date string from commit authored_datetime.
+
+    Parameters
+    ----------
+    commit : object
+        Git commit object with authored_datetime attribute.
+
+    Returns
+    -------
+    str
+        ISO format date string, or empty string if date is unavailable.
+    """
     authored = getattr(commit, "authored_datetime", None)
     if authored is None:
         return ""
@@ -69,6 +95,20 @@ def _commit_iso_date(commit: object) -> str:
 
 
 def _author_field(commit: object, field: str) -> str:
+    """Extract field value from commit author object.
+
+    Parameters
+    ----------
+    commit : object
+        Git commit object with author attribute.
+    field : str
+        Field name to retrieve from author object (e.g., "name", "email").
+
+    Returns
+    -------
+    str
+        String value of author field, or empty string if author or field is missing.
+    """
     author = getattr(commit, "author", None)
     if author is None:
         return ""
@@ -77,11 +117,35 @@ def _author_field(commit: object, field: str) -> str:
 
 
 def _short_sha(commit: object) -> str:
+    """Extract short SHA (first 8 characters) from commit hexsha.
+
+    Parameters
+    ----------
+    commit : object
+        Git commit object with hexsha attribute.
+
+    Returns
+    -------
+    str
+        First 8 characters of commit SHA, or empty string if hexsha is unavailable.
+    """
     sha = _string_attr(commit, "hexsha")
     return sha[:8] if sha else ""
 
 
 def _normalize_line_numbers(raw: object) -> list[int]:
+    """Normalize line number input to list of integers.
+
+    Parameters
+    ----------
+    raw : object
+        Input to normalize (Sequence of numbers, single number, or other).
+
+    Returns
+    -------
+    list[int]
+        List of integer line numbers, or empty list if input is invalid.
+    """
     if isinstance(raw, Sequence):
         values: list[int] = []
         for num in raw:
@@ -95,6 +159,18 @@ def _normalize_line_numbers(raw: object) -> list[int]:
 
 
 def _coerce_blame_tuple(blame_tuple: Sequence[object]) -> tuple[object, list[int]] | None:
+    """Coerce blame tuple to normalized (commit, line_numbers) format.
+
+    Parameters
+    ----------
+    blame_tuple : Sequence[object]
+        Blame tuple from GitPython, expected to contain (commit, line_numbers).
+
+    Returns
+    -------
+    tuple[object, list[int]] | None
+        Normalized tuple of (commit, list[int]), or None if tuple is invalid.
+    """
     tuple_min_length = 2
     if len(blame_tuple) < tuple_min_length:
         return None

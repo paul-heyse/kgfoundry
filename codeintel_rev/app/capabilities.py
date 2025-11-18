@@ -110,6 +110,7 @@ def override_capability_imports(
         Callable[[str], ModuleType | None]
             Patched importer function that checks mapping first, then falls back.
         """
+
         def _patched(name: str) -> ModuleType | None:
             """Return module from mapping if present, otherwise use fallback.
 

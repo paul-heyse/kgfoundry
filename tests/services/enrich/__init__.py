@@ -1,1 +1,1 @@
-"""Enrichment service tests."""
+"""Enrich service tests."""

@@ -112,12 +112,37 @@ def normalize_stage0_method(payload: Mapping[str, object] | None) -> Stage0Metho
 
 
 def _coerce_str_sequence(value: object) -> list[str] | None:
+    """Coerce value to list of strings if it's a sequence.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce. Must be a Sequence (but not str or bytes).
+
+    Returns
+    -------
+    list[str] | None
+        List of string items if value is a sequence, None otherwise.
+    """
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return None
     return [str(item) for item in value]
 
 
 def _normalize_channels(channels: Sequence[str]) -> list[str]:
+    """Normalize channel names, removing duplicates and empty values.
+
+    Parameters
+    ----------
+    channels : Sequence[str]
+        Sequence of channel name strings to normalize.
+
+    Returns
+    -------
+    list[str]
+        List of unique non-empty channel names, or ["semantic"] if input is empty.
+        Order is preserved (first occurrence of each name).
+    """
     normalized = [str(name) for name in channels if str(name)]
     return list(dict.fromkeys(normalized or ["semantic"]))
 

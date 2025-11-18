@@ -1,40 +1,47 @@
-# SPDX-License-Identifier: MIT
-"""DuckDB ingestion command."""
+"""Write scan results to DuckDB."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
 
 import typer
 
+from codeintel_rev.app.readiness import raise_on_errors, validate_paths
 from codeintel_rev.cli.enrich import app
-from codeintel_rev.services.enrich import to_duckdb as duckdb_service
+from codeintel_rev.config.paths import resolve_application_paths
+from codeintel_rev.services.enrich.context import PipelineContext
+from codeintel_rev.services.enrich.scan import scan_repo
+from codeintel_rev.services.enrich.to_duckdb import write_to_duckdb
+
+REPO_ROOT_OPTION = typer.Option(".", "--repo-root", help="Repository root")
+OUT_DIR_OPTION = typer.Option("./.enrich", "--out-dir", help="Output directory")
+DUCKDB_PATH_OPTION = typer.Option(None, "--duckdb-path", help="DuckDB file to write")
+TABLE_OPTION = typer.Option("modules", "--table", help="Table name")
+REPLACE_OPTION = typer.Option(
+    default=True,
+    help="Replace the target table if it exists",
+    show_default=True,
+)
 
 
 @app.command("to-duckdb")
 def to_duckdb(
-    modules_jsonl: Annotated[
-        Path,
-        typer.Option(
-            "--modules-jsonl",
-            help="Path to modules.jsonl produced by the enrichment CLI.",
-            exists=True,
-            dir_okay=False,
-            readable=True,
-        ),
-    ],
-    db_path: Annotated[
-        Path,
-        typer.Option(
-            "--db-path",
-            "--db",
-            help="Target DuckDB database file.",
-            dir_okay=False,
-            writable=True,
-        ),
-    ] = Path("build/enrich/enrich.duckdb"),
+    *,
+    repo_root: Path = REPO_ROOT_OPTION,
+    out_dir: Path = OUT_DIR_OPTION,
+    duckdb_path: Path | None = DUCKDB_PATH_OPTION,
+    table: str = TABLE_OPTION,
+    replace: bool = REPLACE_OPTION,
 ) -> None:
-    """Load ``modules.jsonl`` into DuckDB (idempotent on ``path``)."""
-    count = duckdb_service.load_modules_jsonl(modules_jsonl, db_path)
-    typer.echo(f"[to-duckdb] Loaded {count} rows into {db_path}")
+    """Scan the repo and persist records inside DuckDB."""
+    paths = resolve_application_paths({"BASE_DIR": repo_root, "DATA_DIR": out_dir})
+    raise_on_errors(validate_paths(paths))
+    target = duckdb_path or (paths.data_dir / "enrich.duckdb")
+    ctx = PipelineContext.from_paths(
+        paths,
+        enable_db=True,
+        duckdb_path=str(target),
+    )
+    records = scan_repo(ctx)
+    write_to_duckdb(ctx, records, table=table, replace=replace)
+    typer.echo(f"Wrote {len(records)} rows to {target}::{table}")
