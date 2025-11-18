@@ -20,7 +20,8 @@ import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.config.settings import VLLMConfig
-from codeintel_rev.typing import NDArrayF32, gate_import
+from codeintel_rev.runtime.imports import gate_import
+from codeintel_rev.typing import NDArrayF32
 
 if TYPE_CHECKING:
     import httpx
@@ -93,9 +94,7 @@ def _get_numpy() -> ModuleType:
     Returns
     -------
     ModuleType
-        The lazily imported NumPy module. The return type is ``ModuleType`` to
-        match the runtime type, but the actual value is the ``numpy`` module
-        (cast from the gate_import result).
+        The lazily imported NumPy module returned by ``gate_import``.
 
     Notes
     -----
@@ -105,12 +104,9 @@ def _get_numpy() -> ModuleType:
     to lru_cache implementation. Uses ``gate_import`` to ensure proper typing
     facade compliance and prevent eager NumPy loading.
     """
-    return cast(
-        "ModuleType",
-        gate_import(
-            "numpy",
-            "Embedding batching operations in VLLMClient",
-        ),
+    return gate_import(
+        "numpy",
+        "Embedding batching operations in VLLMClient",
     )
 
 

@@ -8,7 +8,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
-from codeintel_rev.typing import gate_import
+from codeintel_rev.runtime.imports import gate_import
 
 if TYPE_CHECKING:
     from transformers import AutoModelForCausalLM, PreTrainedTokenizerBase

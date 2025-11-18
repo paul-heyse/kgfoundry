@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from types import ModuleType
-from typing import cast
 
-from codeintel_rev.typing import gate_import
+from codeintel_rev.runtime.imports import gate_import
 
 
 class LazyModule:
@@ -37,8 +36,7 @@ class LazyModule:
             Imported module referenced by this proxy.
         """
         if self._module is None:
-            imported = gate_import(self._module_name, self._purpose)
-            self._module = cast("ModuleType", imported)
+            self._module = gate_import(self._module_name, self._purpose)
         return self._module
 
     def __getattr__(self, name: str) -> object:

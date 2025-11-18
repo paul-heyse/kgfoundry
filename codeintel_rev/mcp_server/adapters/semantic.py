@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
@@ -24,13 +24,16 @@ from codeintel_rev.retrieval.pipeline.gating import (
 )
 from codeintel_rev.retrieval.pipeline.stage0 import Stage0Options, Stage0Result, run_stage0
 
+if TYPE_CHECKING:
+    from codeintel_rev.io.hybrid_search import HybridSearchEngine
+
 _VIEW_CHUNKS = "chunks"
 
 
 class Stage0Runner(Protocol):
     def __call__(
         self,
-        engine: object,
+        engine: HybridSearchEngine,
         *,
         query: str,
         semantic_hits: Sequence[tuple[int, float]] | None,

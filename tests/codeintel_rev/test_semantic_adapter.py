@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import contextlib
-from typing import cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
+from codeintel_rev.mcp_server.schemas import Finding
 from codeintel_rev.retrieval.pipeline.gating import StageDecision
-from codeintel_rev.retrieval.pipeline.stage0 import Stage0Result
+from codeintel_rev.retrieval.pipeline.stage0 import Stage0Options, Stage0Result
 
 from tests._helpers import assertions
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+    from codeintel_rev.io.hybrid_search import HybridSearchEngine
 
 
 class _StubContext:
@@ -33,30 +39,32 @@ class _StubContext:
 def _build_runtime_hooks(
     *,
     stage0: Stage0Result,
-    findings: list[dict[str, float]],
+    findings: list[Finding],
     decision: StageDecision,
 ) -> semantic_adapter.SemanticRuntimeHooks:
     def _run_stage0(
-        _engine: object,
+        engine: HybridSearchEngine,
         *,
         query: str,
-        semantic_hits: list[tuple[int, float]] | None,
+        semantic_hits: Sequence[tuple[int, float]] | None,
         limit: int,
-        options: object | None = None,
+        options: Stage0Options | None = None,
     ) -> Stage0Result:
-        del _engine, query, semantic_hits, limit, options
+        del engine, query, semantic_hits, limit, options
         return stage0
 
     def _hydrate(
-        _catalog: object,
-        ids: list[int],
-        scores: list[float],
-    ) -> list[dict[str, float]]:
-        del _catalog, ids, scores
+        catalog: DuckDBCatalog,
+        ids: Sequence[int],
+        scores: Sequence[float],
+    ) -> list[Finding]:
+        del catalog, ids, scores
         return findings
 
-    def _decide(_signals: object, _config: object) -> StageDecision:
-        del _signals, _config
+    def _decide(
+        signals: Mapping[str, object], config: semantic_adapter.StageGateConfig
+    ) -> StageDecision:
+        del signals, config
         return decision
 
     return semantic_adapter.SemanticRuntimeHooks(
@@ -72,9 +80,10 @@ async def test_semantic_search_returns_findings() -> None:
     stage0 = Stage0Result(
         ids=[1, 2], scores=[0.9, 0.8], warnings=["fanout"], method={"engine": "stub"}
     )
+    sample_finding: Finding = {"chunk_id": 1, "score": 0.9}
     hooks = _build_runtime_hooks(
         stage0=stage0,
-        findings=[{"chunk_id": 1, "score": 0.9}],
+        findings=[sample_finding],
         decision=StageDecision(should_run=False, reason="tests"),
     )
 

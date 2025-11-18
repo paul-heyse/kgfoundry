@@ -12,13 +12,14 @@ from typing import TYPE_CHECKING, Any, cast
 import duckdb
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.runtime.imports import gate_import
 
 if TYPE_CHECKING:
     import numpy as np  # type: ignore[reportMissingImports]
 else:
     np = cast("np", LazyModule("numpy", "faiss store operations"))
 from codeintel_rev.io.duckdb_catalog import IdMapMeta, refresh_faiss_idmap_materialized
-from codeintel_rev.typing import FaissIndex, NDArrayF32, NDArrayI64, gate_import
+from codeintel_rev.typing import FaissIndex, NDArrayF32, NDArrayI64
 
 if TYPE_CHECKING:
     from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
@@ -187,7 +188,10 @@ def refresh_duckdb_materialization(
 
 
 def write_profile(
-    index: FaissIndex | None, path: Path, faiss_family: str | None, refine_k_factor: float
+    index: FaissIndex | None,
+    path: Path,
+    faiss_family: str | None,
+    refine_k_factor: float,
 ) -> None:
     """Persist a minimal profile snapshot describing a FAISS index.
 

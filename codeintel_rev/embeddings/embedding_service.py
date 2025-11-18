@@ -13,9 +13,15 @@ from dataclasses import dataclass
 from types import ModuleType, TracebackType
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
-from codeintel_rev.config.settings import EmbeddingsConfig, IndexConfig, Settings, VLLMConfig
+from codeintel_rev.config.settings import (
+    EmbeddingsConfig,
+    IndexConfig,
+    Settings,
+    VLLMConfig,
+)
 from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
-from codeintel_rev.typing import NDArrayF32, gate_import
+from codeintel_rev.runtime.imports import gate_import
+from codeintel_rev.typing import NDArrayF32
 
 EMBEDDING_RANK = 2
 
@@ -93,7 +99,7 @@ def _numpy() -> ModuleType:
     ModuleType
         The ``numpy`` module resolved via the typing gate.
     """
-    return cast("ModuleType", gate_import("numpy", "embedding provider vector operations"))
+    return gate_import("numpy", "embedding provider vector operations")
 
 
 def _l2_normalize(vectors: NDArrayF32) -> NDArrayF32:

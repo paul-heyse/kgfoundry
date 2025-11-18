@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
-from codeintel_rev.typing import gate_import
+from codeintel_rev.runtime.imports import gate_import
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -150,8 +150,7 @@ class WarpEngine:
 
         """
         purpose = "WARP/XTR reranking (install `xtr-warp` and build the index)"
-        module = gate_import("xtr_warp.executor", purpose)
-        return cast("ModuleType", module)
+        return gate_import("xtr_warp.executor", purpose)
 
     def _ensure_executor(self) -> WarpExecutorProtocol:
         """Ensure the WARP executor is initialized and return it.

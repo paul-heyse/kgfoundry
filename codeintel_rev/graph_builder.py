@@ -14,7 +14,8 @@ from codeintel_rev.module_utils import (
     normalize_module_name,
 )
 from codeintel_rev.polars_support import resolve_polars_frame_factory
-from codeintel_rev.typing import PolarsModule, gate_import
+from codeintel_rev.runtime.imports import gate_import
+from codeintel_rev.typing import PolarsModule
 
 
 @dataclass(slots=True, frozen=True)

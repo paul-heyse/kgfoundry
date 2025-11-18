@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
@@ -31,6 +31,9 @@ from codeintel_rev.retrieval.pipeline.late_interaction import (
 from codeintel_rev.retrieval.pipeline.rerankers import NoopReranker, RerankResult
 from codeintel_rev.retrieval.pipeline.stage0 import Stage0Options, Stage0Result, run_stage0
 
+if TYPE_CHECKING:
+    from codeintel_rev.io.hybrid_search import HybridSearchEngine
+
 
 @dataclass(frozen=True)
 class SemanticProOptions:
@@ -49,7 +52,7 @@ ProOptions = SemanticProOptions
 class Stage0Runner(Protocol):
     def __call__(
         self,
-        engine: object,
+        engine: HybridSearchEngine,
         *,
         query: str,
         semantic_hits: Sequence[tuple[int, float]] | None,
@@ -104,13 +107,29 @@ class SemanticProHooks:
         SemanticProHooks
             Hook bundle referencing production implementations.
         """
+
+        class _NoopRerankerAdapter:
+            def __init__(self) -> None:
+                self._inner = NoopReranker()
+
+            def rerank(
+                self,
+                query: str,
+                ids: Iterable[int],
+                scores: Iterable[float],
+            ) -> RerankResult:
+                return self._inner.rerank(query, ids, scores)
+
+        def _build_default_reranker() -> Reranker:
+            return cast("Reranker", _NoopRerankerAdapter())
+
         return cls(
             run_stage0=run_stage0,
             decide_secondary_stage=decide_secondary_stage,
             hydrate_ids=_hydrate_ids,
             resolve_xtr_index=_resolve_xtr_index,
             late_interaction_factory=XTRLateInteraction,
-            reranker_factory=NoopReranker,
+            reranker_factory=_build_default_reranker,
         )
 
 

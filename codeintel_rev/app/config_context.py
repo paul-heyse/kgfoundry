@@ -84,8 +84,8 @@ from codeintel_rev.runtime.factory_adjustment import (
     FactoryAdjuster,
     NoopFactoryAdjuster,
 )
+from codeintel_rev.runtime.imports import gate_import
 from codeintel_rev.runtime.multiprocessing import ensure_spawn_start_method
-from codeintel_rev.typing import gate_import
 from kgfoundry_common.errors import ConfigurationError
 
 ensure_spawn_start_method()
@@ -600,7 +600,7 @@ def _require_dependency(module: str, *, runtime: str, purpose: str) -> None:
 
     Notes
     -----
-    Uses `gate_import()` from `kgfoundry_common.typing` to safely
+    Uses `gate_import()` from :mod:`codeintel_rev.runtime.imports` to safely
     attempt the import. Time O(1); no I/O or state mutations.
     This is a fail-fast validation helper, not a lazy loader.
 
@@ -996,7 +996,11 @@ class ApplicationContext:
         for _, cell in self._iter_runtime_cells():
             try:
                 cell.close()
-            except (RuntimeError, OSError, ValueError):  # pragma: no cover - defensive logging
+            except (
+                RuntimeError,
+                OSError,
+                ValueError,
+            ):  # pragma: no cover - defensive logging
                 continue
         faiss_state = self._runtime.faiss
         with faiss_state.lock:

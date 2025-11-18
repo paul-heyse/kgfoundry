@@ -3,19 +3,24 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import replace
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server.adapters import semantic_pro
+from codeintel_rev.mcp_server.schemas import Finding
 from codeintel_rev.retrieval.pipeline.gating import StageDecision
 from codeintel_rev.retrieval.pipeline.late_interaction import LateInteractionResult
 from codeintel_rev.retrieval.pipeline.rerankers import RerankResult
-from codeintel_rev.retrieval.pipeline.stage0 import Stage0Result
+from codeintel_rev.retrieval.pipeline.stage0 import Stage0Options, Stage0Result
 
 from tests._helpers import assertions
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+    from codeintel_rev.io.hybrid_search import HybridSearchEngine
 
 _SECOND_STAGE_CHUNK_ID = 2
 _RERANKED_CHUNK_ID = 4
@@ -43,31 +48,33 @@ def _build_pro_hooks(
     *,
     stage0: Stage0Result,
     decision: StageDecision,
-    findings: list[dict[str, float]],
+    findings: list[Finding],
 ) -> semantic_pro.SemanticProHooks:
     base = semantic_pro.SemanticProHooks.default()
 
     def _run_stage0(
-        _engine: object,
+        engine: HybridSearchEngine,
         *,
         query: str,
-        semantic_hits: list[tuple[int, float]] | None,
+        semantic_hits: Sequence[tuple[int, float]] | None,
         limit: int,
-        options: object | None = None,
+        options: Stage0Options | None = None,
     ) -> Stage0Result:
-        del _engine, query, semantic_hits, limit, options
+        del engine, query, semantic_hits, limit, options
         return stage0
 
     def _hydrate(
-        _catalog: object,
-        ids: list[int],
-        scores: list[float],
-    ) -> list[dict[str, float]]:
-        del _catalog, ids, scores
+        catalog: DuckDBCatalog,
+        ids: Sequence[int],
+        scores: Sequence[float],
+    ) -> list[Finding]:
+        del catalog, ids, scores
         return findings
 
-    def _decide(_signals: object, _config: object) -> StageDecision:
-        del _signals, _config
+    def _decide(
+        signals: Mapping[str, object], config: semantic_pro.StageGateConfig
+    ) -> StageDecision:
+        del signals, config
         return decision
 
     return replace(
@@ -82,10 +89,11 @@ def _build_pro_hooks(
 async def test_semantic_search_pro_returns_findings() -> None:
     """semantic_search_pro orchestrates Stage-0 and returns hydrated findings."""
     stage0 = Stage0Result(ids=[1, 2], scores=[0.9, 0.8], warnings=[], method={})
+    base_finding: Finding = {"chunk_id": 1, "score": 0.9}
     hooks = _build_pro_hooks(
         stage0=stage0,
         decision=StageDecision(should_run=False, reason="tests"),
-        findings=[{"chunk_id": 1, "score": 0.9}],
+        findings=[base_finding],
     )
 
     context = cast("ApplicationContext", _StubContext())
@@ -108,29 +116,31 @@ async def test_semantic_search_pro_returns_findings() -> None:
 async def test_semantic_search_pro_runs_late_interaction() -> None:
     """Late-interaction results replace Stage-0 ordering when gate allows."""
     stage0 = Stage0Result(ids=[1, 2], scores=[0.9, 0.8], warnings=[], method={})
+    li_finding: Finding = {"chunk_id": _SECOND_STAGE_CHUNK_ID, "score": 1.0}
     hooks = _build_pro_hooks(
         stage0=stage0,
         decision=StageDecision(should_run=True, reason="budget"),
-        findings=[{"chunk_id": _SECOND_STAGE_CHUNK_ID, "score": 1.0}],
+        findings=[li_finding],
     )
 
-    def _late_factory(_index: object) -> object:
+    def _late_factory(_index: semantic_pro.XTRIndex) -> semantic_pro.LateInteractionRunner:
         class _StubLateInteraction:
-            @staticmethod
             def rescore(
-                *,
+                self,
                 query: str,
                 candidate_ids: Sequence[int],
+                *,
                 explain: bool = False,
             ) -> LateInteractionResult:
-                del query, candidate_ids, explain
+                del self, query, candidate_ids, explain
                 return LateInteractionResult(ids=[_SECOND_STAGE_CHUNK_ID, 1], scores=[1.0, 0.7])
 
+        del _index
         return _StubLateInteraction()
 
-    def _resolve_stub(_ctx: ApplicationContext) -> object:
+    def _resolve_stub(_ctx: ApplicationContext) -> semantic_pro.XTRIndex | None:
         del _ctx
-        return object()
+        return cast("semantic_pro.XTRIndex", object())
 
     hooks = replace(
         hooks,
@@ -163,19 +173,21 @@ async def test_semantic_search_pro_runs_late_interaction() -> None:
 async def test_semantic_search_pro_runs_reranker() -> None:
     """Reranker output is honored when enabled in options."""
     stage0 = Stage0Result(ids=[3, 4], scores=[0.4, 0.3], warnings=[], method={})
+    rerank_finding: Finding = {"chunk_id": _RERANKED_CHUNK_ID, "score": 0.3}
     hooks = _build_pro_hooks(
         stage0=stage0,
         decision=StageDecision(should_run=False, reason="tests"),
-        findings=[{"chunk_id": _RERANKED_CHUNK_ID, "score": 0.3}],
+        findings=[rerank_finding],
     )
 
     class _StubReranker:
-        @staticmethod
         def rerank(
-            _query: str,
+            self,
+            query: str,
             ids: Iterable[int],
             scores: Iterable[float],
         ) -> RerankResult:
+            del self, query
             ordered_ids = list(ids)
             ordered_scores = list(scores)
             return RerankResult(ids=list(reversed(ordered_ids)), scores=ordered_scores)

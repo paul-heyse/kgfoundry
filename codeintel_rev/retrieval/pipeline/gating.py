@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Protocol
 
 from codeintel_rev.retrieval.gating import (
     StageGateConfig as _CoreStageGateConfig,
@@ -14,7 +15,16 @@ from codeintel_rev.retrieval.gating import (
 )
 from codeintel_rev.retrieval.types import StageSignals
 
-StageGateCore = Callable[[StageSignals, _CoreStageGateConfig], object]
+
+class StageGateCoreResult(Protocol):
+    @property
+    def should_run(self) -> bool: ...
+
+    @property
+    def reason(self) -> object: ...
+
+
+StageGateCore = Callable[[StageSignals, _CoreStageGateConfig], StageGateCoreResult]
 
 
 _STAGE_GATE_CORE_REF: list[StageGateCore] = [_core]

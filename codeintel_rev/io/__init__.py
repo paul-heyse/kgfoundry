@@ -6,10 +6,12 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 __all__ = [
+    "BM25Engine",
     "BM25CorpusMetadata",
     "BM25CorpusSummary",
     "BM25IndexManager",
     "BM25IndexMetadata",
+    "SPLADEEngine",
     "HybridResultDoc",
     "HybridSearchEngine",
     "HybridSearchResult",
@@ -28,6 +30,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:  # pragma: no cover - import-time heavy modules avoided at runtime
+    from codeintel_rev.io.bm25_engine import BM25Engine
     from codeintel_rev.io.bm25_manager import (
         BM25CorpusMetadata,
         BM25CorpusSummary,
@@ -39,6 +42,7 @@ if TYPE_CHECKING:  # pragma: no cover - import-time heavy modules avoided at run
         HybridSearchEngine,
         HybridSearchResult,
     )
+    from codeintel_rev.io.splade_engine import SPLADEEngine
     from codeintel_rev.io.splade_manager import (
         SpladeArtifactMetadata,
         SpladeArtifactsManager,
@@ -55,6 +59,7 @@ if TYPE_CHECKING:  # pragma: no cover - import-time heavy modules avoided at run
     )
 
 _EXPORTS: dict[str, tuple[str, str]] = {
+    "BM25Engine": ("codeintel_rev.io.bm25_engine", "BM25Engine"),
     "BM25CorpusMetadata": ("codeintel_rev.io.bm25_manager", "BM25CorpusMetadata"),
     "BM25CorpusSummary": ("codeintel_rev.io.bm25_manager", "BM25CorpusSummary"),
     "BM25IndexManager": ("codeintel_rev.io.bm25_manager", "BM25IndexManager"),
@@ -62,6 +67,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "HybridResultDoc": ("codeintel_rev.io.hybrid_search", "HybridResultDoc"),
     "HybridSearchEngine": ("codeintel_rev.io.hybrid_search", "HybridSearchEngine"),
     "HybridSearchResult": ("codeintel_rev.io.hybrid_search", "HybridSearchResult"),
+    "SPLADEEngine": ("codeintel_rev.io.splade_engine", "SPLADEEngine"),
     "SpladeArtifactMetadata": ("codeintel_rev.io.splade_manager", "SpladeArtifactMetadata"),
     "SpladeArtifactsManager": ("codeintel_rev.io.splade_manager", "SpladeArtifactsManager"),
     "SpladeBenchmarkOptions": ("codeintel_rev.io.splade_manager", "SpladeBenchmarkOptions"),

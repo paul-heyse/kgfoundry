@@ -10,6 +10,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.runtime.imports import gate_import
 
 if TYPE_CHECKING:
     import numpy as np  # type: ignore[reportMissingImports]
@@ -21,7 +22,6 @@ from codeintel_rev.typing import (
     FaissParameterSpace,
     NDArrayF32,
     NDArrayI64,
-    gate_import,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only

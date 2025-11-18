@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
-from codeintel_rev.typing import gate_import
+from codeintel_rev.runtime.imports import gate_import
 
 __all__ = ["DuckConn", "DuckDBIngestContext", "ensure_schema", "ingest_modules_jsonl"]
 
@@ -154,7 +154,9 @@ class DuckDBIngestContext:
             Context configured with the project-wide DuckDB module and env toggles.
         """
         return cls(
-            duckdb_module=_duckdb(), use_native_json=_USE_NATIVE_JSON, pragmas=_PRAGMA_SETTINGS
+            duckdb_module=_duckdb(),
+            use_native_json=_USE_NATIVE_JSON,
+            pragmas=_PRAGMA_SETTINGS,
         )
 
 

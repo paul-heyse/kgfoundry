@@ -9,7 +9,8 @@ from typing import cast
 
 from codeintel_rev.enrich.scip_reader import SCIPIndex
 from codeintel_rev.polars_support import resolve_polars_frame_factory
-from codeintel_rev.typing import PolarsModule, gate_import
+from codeintel_rev.runtime.imports import gate_import
+from codeintel_rev.typing import PolarsModule
 
 
 @dataclass(slots=True, frozen=True)

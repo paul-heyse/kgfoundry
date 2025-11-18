@@ -69,9 +69,11 @@ except ImportError:  # pragma: no cover - when package not importable
     _EXTRAS_HINT: dict[str, str] = {}
 
 try:  # pragma: no cover - executed in tooling context
-    from codeintel_rev.typing import HEAVY_DEPS as _HEAVY_DEPS_SOURCE
+    from codeintel_rev.runtime import imports as _runtime_imports
 except ImportError:  # pragma: no cover - when package not importable
-    _HEAVY_DEPS_SOURCE: dict[str, str | None] = {}
+    _HEAVY_DEPS_SOURCE = frozenset()
+else:
+    _HEAVY_DEPS_SOURCE = frozenset(_runtime_imports.HEAVY_DEPS)
 
 _DEFAULT_HEAVY_MODULES = {
     "numpy",

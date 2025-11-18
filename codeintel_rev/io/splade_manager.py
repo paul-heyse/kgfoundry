@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, TextIO, TypedDict, Unpack, cast
 import msgspec
 
 from codeintel_rev.io.path_utils import resolve_within_repo
+from codeintel_rev.io.splade_engine import SPLADEEngine
 from kgfoundry_common.subprocess_utils import run_subprocess
 
 if TYPE_CHECKING:
@@ -1739,6 +1740,7 @@ class SpladeIndexManager:
 
 
 __all__ = [
+    "SPLADEEngine",
     "SpladeArtifactMetadata",
     "SpladeArtifactsManager",
     "SpladeBuildOptions",

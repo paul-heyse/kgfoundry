@@ -14,12 +14,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.runtime.imports import gate_import
 
 if TYPE_CHECKING:
     import numpy as np  # type: ignore[reportMissingImports]
 else:
     np = cast("np", LazyModule("numpy", "faiss builder operations"))
-from codeintel_rev.typing import FaissIndex, FaissModule, NDArrayF32, NDArrayI64, gate_import
+from codeintel_rev.typing import FaissIndex, FaissModule, NDArrayF32, NDArrayI64
 
 _faiss = LazyModule("faiss", "FAISS builder operations")
 

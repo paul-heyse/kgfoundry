@@ -7,7 +7,7 @@ import warnings
 from collections.abc import Iterator
 from types import ModuleType
 
-from codeintel_rev.typing import gate_import
+from codeintel_rev.runtime.imports import gate_import
 
 _SWIG_WARNING_MODULE = r"importlib\._bootstrap"
 

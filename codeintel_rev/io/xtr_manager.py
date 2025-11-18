@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.config.settings import XTRConfig
 from codeintel_rev.runtime import RuntimeCell
-from codeintel_rev.typing import NDArrayF32, TorchModule, gate_import
+from codeintel_rev.runtime.imports import gate_import
+from codeintel_rev.typing import NDArrayF32, TorchModule
 
 if TYPE_CHECKING:
     import numpy as np
@@ -34,7 +35,15 @@ class XTRMetadata(TypedDict):
 class _XTRIndexRuntime:
     """Mutable runtime artifacts for XTRIndex."""
 
-    __slots__ = ("chunk_lookup", "device", "meta", "model", "test_vectors", "tokenizer", "tokens")
+    __slots__ = (
+        "chunk_lookup",
+        "device",
+        "meta",
+        "model",
+        "test_vectors",
+        "tokenizer",
+        "tokens",
+    )
 
     def __init__(self) -> None:
         self.meta: XTRMetadata | None = None

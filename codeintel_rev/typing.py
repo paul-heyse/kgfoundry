@@ -1,20 +1,10 @@
-"""Typing façade for codeintel_rev heavy optional dependencies.
-
-This module centralizes numpy-style array aliases and exposes a wrapper around
-``kgfoundry_common.typing.gate_import`` that is aware of the local heavy
-dependency policy. Keeping aliases and dependency metadata in one place lets
-lint/type tooling (PR-E) and runtime helpers share the same source of truth.
-"""
+"""Typing façade for codeintel_rev optional dependencies."""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from os import PathLike
-from typing import TYPE_CHECKING, Any, Literal, Protocol
-
-from kgfoundry_common.typing import EXTRAS_HINT
-from kgfoundry_common.typing import HEAVY_DEPS as _BASE_HEAVY_DEPS
-from kgfoundry_common.typing import gate_import as _base_gate_import
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     import numpy as np
@@ -28,95 +18,42 @@ else:  # pragma: no cover
     NDArrayI64 = Any
     NDArrayAny = Any
 
+PathLike = str | Path
+
+
 __all__ = [
-    "HEAVY_DEPS",
     "FaissIndex",
     "FaissModule",
+    "FaissParameterSpace",
+    "LoggerLike",
     "NDArrayAny",
     "NDArrayF32",
     "NDArrayI64",
     "NumpyModule",
+    "PathLike",
     "PolarsDataFrame",
     "PolarsModule",
+    "TorchCudaAPI",
     "TorchModule",
-    "gate_import",
+    "TorchTensor",
 ]
 
 
-HEAVY_DEPS = _BASE_HEAVY_DEPS
-"""Re-exported heavy dependency registry (single source of truth)."""
+@runtime_checkable
+class LoggerLike(Protocol):
+    """Minimal logger interface used for structured logging."""
 
+    def debug(self, msg: str, *args: object, **kwargs: object) -> None:
+        """Emit a debug-level log message."""
 
-def gate_import(
-    module_name: str,
-    purpose: str,
-    *,
-    min_version: str | None = None,
-    import_func: Callable[[str], object] | None = None,
-) -> object:
-    """Resolve ``module_name`` lazily using the heavy dependency policy.
+    def info(self, msg: str, *args: object, **kwargs: object) -> None:
+        """Emit an info-level log message."""
 
-    Extended Summary
-    ----------------
-    This function provides lazy import resolution for heavy optional dependencies
-    (e.g., numpy, fastapi, FAISS) using the shared gate helper. It validates
-    module availability, checks minimum version requirements, and provides helpful
-    error messages if dependencies are missing. Used throughout the codebase to
-    safely import optional dependencies without breaking on minimal installations.
+    def warning(self, msg: str, *args: object, **kwargs: object) -> None:
+        """Emit a warning-level log message."""
 
-    Parameters
-    ----------
-    module_name : str
-        Name of the module to import (e.g., "numpy", "faiss"). The module must
-        be registered in the heavy dependency registry.
-    purpose : str
-        Human-readable purpose description for the import (e.g., "vector operations",
-        "FAISS index management"). Used in error messages if the module is unavailable.
-    min_version : str | None, optional
-        Optional minimum version requirement (e.g., "1.24.0"). If provided, the
-        module version is validated against this requirement.
-    import_func : Callable[[str], object] | None, optional
-        Optional import callable to use for resolving modules. Primarily for
-        tests to inject fake import behavior. Defaults to the shared gate helper.
-
-    Returns
-    -------
-    object
-        Imported module or attribute returned by the shared gate helper. The return
-        type depends on the module structure.
-
-    Raises
-    ------
-    ImportError
-        If the module cannot be imported or fails minimum version checks. The error
-        message includes installation guidance referencing the configured extras.
-
-    Notes
-    -----
-    This function delegates to the base gate helper from kgfoundry_common.typing.
-    It provides a consistent API for lazy imports across the codebase. Time
-    complexity: O(1) for cached imports, O(import_time) for first-time imports.
-    """
-    if import_func is not None:
-        try:
-            return import_func(module_name)
-        except ImportError as exc:
-            module_root = module_name.split(".", maxsplit=1)[0]
-            hint = EXTRAS_HINT.get(module_root)
-            msg = f"Cannot proceed with {purpose}: '{module_name}' is not installed."
-            if hint:
-                if " or " in hint:
-                    options = " or ".join(
-                        f"pip install codeintel-rev[{option.strip()}]"
-                        for option in hint.split(" or ")
-                    )
-                    msg = f"{msg} Install with: {options}"
-                else:
-                    msg = f"{msg} Install with: pip install codeintel-rev[{hint}]"
-            else:
-                msg = f"{msg} Install via: pip install {module_root}"
-            raise ImportError(msg) from exc
-    return _base_gate_import(module_name, purpose, min_version=min_version)
+    def error(self, msg: str, *args: object, **kwargs: object) -> None:
+        """Emit an error-level log message."""
 
 
 class TorchDeviceProperties(Protocol):
@@ -575,7 +512,7 @@ class FaissModule(Protocol):
         """
         ...
 
-    def write_index(self, index: FaissIndex, path: str | PathLike[str]) -> None:
+    def write_index(self, index: FaissIndex, path: PathLike) -> None:
         """Persist an index to disk.
 
         Extended Summary
@@ -590,7 +527,7 @@ class FaissModule(Protocol):
         index : FaissIndex
             FAISS index instance to serialize. The index can be trained or untrained,
             populated or empty.
-        path : str | PathLike[str]
+        path : PathLike
             File path where the index will be written. The file format is FAISS-specific
             binary format. Existing files are overwritten.
 
@@ -603,7 +540,7 @@ class FaissModule(Protocol):
         """
         ...
 
-    def read_index(self, path: str | PathLike[str]) -> FaissIndex:
+    def read_index(self, path: PathLike) -> FaissIndex:
         """Load an index from disk.
 
         Extended Summary
@@ -614,7 +551,7 @@ class FaissModule(Protocol):
 
         Parameters
         ----------
-        path : str | PathLike[str]
+        path : PathLike
             File path to the serialized FAISS index file. The file must exist
             and be a valid FAISS index format.
 
@@ -729,12 +666,12 @@ class NumpyModule(Protocol):
 class PolarsDataFrame(Protocol):
     """Subset of polars.DataFrame used for Parquet exports."""
 
-    def write_parquet(self, file: str | PathLike[str]) -> None:
+    def write_parquet(self, file: PathLike) -> None:
         """Write DataFrame to Parquet format.
 
         Parameters
         ----------
-        file : str | PathLike[str]
+        file : PathLike
             File system path (string or path-like object) where the Parquet file
             will be written. The file will be created or overwritten.
 

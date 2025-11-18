@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from codeintel_rev.retrieval.pipeline import gating
 
 from tests._helpers import assertions
@@ -17,10 +15,10 @@ def test_decide_secondary_stage_delegates_to_core() -> None:
     """decide_secondary_stage returns StageDecision shaped like core output."""
     captured: dict[str, object] = {}
 
-    def _fake_core(signals: object, config: object) -> SimpleNamespace:
+    def _fake_core(signals: gating.StageSignals, config: object) -> gating.StageDecision:
         captured["signals"] = signals
         captured["config"] = config
-        return SimpleNamespace(should_run=True, reason="ok")
+        return gating.StageDecision(should_run=True, reason="ok")
 
     with gating.override_stage_gate_core(_fake_core):
         decision = gating.decide_secondary_stage({"candidate_count": 5}, gating.StageGateConfig())

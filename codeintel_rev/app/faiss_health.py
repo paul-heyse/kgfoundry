@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing import Any, cast
 
 from codeintel_rev.io.faiss_compat import load_faiss_module
-from codeintel_rev.typing import gate_import
+from codeintel_rev.runtime.imports import gate_import
 
 __all__ = ["check_faiss_health"]
 

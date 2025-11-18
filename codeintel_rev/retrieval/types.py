@@ -48,7 +48,7 @@ class HybridSearchResult:
     """Container for fused docs alongside explainability metadata."""
 
     docs: Sequence[HybridResultDoc]
-    contributions: Mapping[str, list[tuple[str, int, float]]]
+    contributions: Mapping[str, Mapping[str, object]]
     channels: list[str]
     warnings: list[str]
     method: Mapping[str, object] | None = None

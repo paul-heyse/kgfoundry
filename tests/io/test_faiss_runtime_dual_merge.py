@@ -22,8 +22,11 @@ from tests._helpers import assertions
 
 if TYPE_CHECKING:  # pragma: no cover - typing-only dependency
     from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+    from codeintel_rev.typing import NDArrayF32, NDArrayI64
 else:  # pragma: no cover - runtime import avoided
     DuckDBCatalog = Any
+    NDArrayF32 = np.ndarray
+    NDArrayI64 = np.ndarray
 
 _MERGE_K = 20
 _REFINE_K = 10
@@ -86,17 +89,17 @@ def test_dual_search_merge_with_refine() -> None:
     """Trigger refine path to ensure reranker output shapes are respected."""
 
     def fake_exact_rerank(
-        _catalog: object,
-        _query: np.ndarray,
-        candidate_ids: np.ndarray,
+        catalog: DuckDBCatalog,
+        queries: NDArrayF32,
+        candidate_ids: NDArrayI64,
         *,
         top_k: int,
         metric: str,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        del metric
+    ) -> tuple[NDArrayF32, NDArrayI64]:
+        del catalog, queries, metric
         batch = candidate_ids.shape[0]
-        distances = np.full((batch, top_k), 1.0, dtype=np.float32)
-        ids = candidate_ids[:, :top_k].astype(np.int64, copy=False)
+        distances: NDArrayF32 = np.full((batch, top_k), 1.0, dtype=np.float32)
+        ids: NDArrayI64 = candidate_ids[:, :top_k].astype(np.int64, copy=False)
         return distances, ids
 
     d = 16

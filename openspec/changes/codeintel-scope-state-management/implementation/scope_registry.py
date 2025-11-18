@@ -113,6 +113,10 @@ class ScopeRegistry:
     """
 
     def __init__(self) -> None:
+        """Initialize scope registry.
+
+        Creates empty scope storage with thread-safe locking.
+        """
         self._scopes: dict[str, tuple[ScopeIn, float]] = {}
         self._lock = RLock()
         LOGGER.debug("Initialized ScopeRegistry")

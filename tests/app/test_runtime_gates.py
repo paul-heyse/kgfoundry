@@ -8,13 +8,15 @@ from pathlib import Path
 import pytest
 from codeintel_rev.app.config_context import override_gate_config
 from codeintel_rev.errors import RuntimeUnavailableError
-from codeintel_rev.typing import gate_import
+from codeintel_rev.runtime.imports import gate_import
 
 from tests._helpers import assertions
 from tests.app._context_factory import build_application_context
 
 
-def test_coderank_faiss_missing_index_raises_runtime_unavailable(tmp_path: Path) -> None:
+def test_coderank_faiss_missing_index_raises_runtime_unavailable(
+    tmp_path: Path,
+) -> None:
     """Verify missing coderank FAISS index raises RuntimeUnavailableError."""
     ctx = build_application_context(tmp_path)
     ctx.paths.coderank_faiss_index.unlink(missing_ok=True)
@@ -67,5 +69,8 @@ def test_xtr_missing_dependency_raise(tmp_path: Path) -> None:
             raise ImportError(error_msg)
         return gate_import(module, purpose)
 
-    with override_gate_config(gate_import=fake_gate), pytest.raises(RuntimeUnavailableError):
+    with (
+        override_gate_config(gate_import=fake_gate),
+        pytest.raises(RuntimeUnavailableError),
+    ):
         ctx.get_xtr_index()

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import msgspec
 
 from codeintel_rev.io.path_utils import resolve_within_repo
+from codeintel_rev.io.bm25_engine import BM25Engine
 from kgfoundry_common.subprocess_utils import run_subprocess
 
 if TYPE_CHECKING:
@@ -516,6 +517,7 @@ def _directory_size(path: Path) -> int:
 
 
 __all__ = [
+    "BM25Engine",
     "BM25BuildOptions",
     "BM25CorpusMetadata",
     "BM25CorpusSummary",

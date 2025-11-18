@@ -83,6 +83,17 @@ class FileOperationError(KgFoundryError):
         path: str,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize file operation error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str
+            File path that caused the error.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         super().__init__(
             message,
             code=ErrorCode.FILE_OPERATION_ERROR,
@@ -195,6 +206,17 @@ class InvalidLineRangeError(FileOperationError):
         path: str,
         line_range: tuple[int | None, int | None] | None = None,
     ) -> None:
+        """Initialize file parse error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str
+            File path that failed to parse.
+        line_range : tuple[int | None, int | None] | None, optional
+            Optional line range (start, end) where the parse error occurred.
+        """
         context: dict[str, object] = {"path": path}
         if line_range is not None:
             context["start_line"] = line_range[0]
@@ -278,6 +300,19 @@ class GitOperationError(KgFoundryError):
         git_command: str | None = None,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize Git operation error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str | None, optional
+            Optional file path related to the Git operation.
+        git_command : str | None, optional
+            Optional Git command that failed.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         context: dict[str, object] = {}
         if path is not None:
             context["path"] = path

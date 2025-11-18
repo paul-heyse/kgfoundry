@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.typing import NDArrayF32, gate_import
+from codeintel_rev.runtime.imports import gate_import
+from codeintel_rev.typing import NDArrayF32
 
 if TYPE_CHECKING:
     import numpy as np
