@@ -1,0 +1,294 @@
+/home/paul/kgfoundry/bin/faiss_diag.py
+  /home/paul/kgfoundry/bin/faiss_diag.py:62:25 - error: Cannot access attribute "autotune" for class "FAISSManager"
+    Attribute "autotune" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/bin/faiss_diag.py:83:28 - error: Cannot access attribute "get_compile_options" for class "FAISSManager"
+    Attribute "get_compile_options" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/bin/faiss_diag.py:88:39 - error: Cannot access attribute "autotune_profile_path" for class "FAISSManager"
+    Attribute "autotune_profile_path" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/codeintel_rev/app/config_context.py
+  /home/paul/kgfoundry/codeintel_rev/app/config_context.py:960:31 - error: Cannot access attribute "autotune_profile_path" for class "FAISSManager"
+    Attribute "autotune_profile_path" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/app/config_context.py:974:32 - error: Cannot access attribute "autotune" for class "FAISSManager"
+    Attribute "autotune" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/app/config_context.py:1309:25 - error: No parameter named "export_idmap" (reportCallIssue)
+  /home/paul/kgfoundry/codeintel_rev/app/config_context.py:1310:25 - error: No parameter named "profile_path" (reportCallIssue)
+  /home/paul/kgfoundry/codeintel_rev/app/config_context.py:1310:57 - error: Cannot access attribute "autotune_profile_path" for class "FAISSManager"
+    Attribute "autotune_profile_path" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/codeintel_rev/app/routers/index_admin.py
+  /home/paul/kgfoundry/codeintel_rev/app/routers/index_admin.py:496:33 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/app/routers/index_admin.py:567:26 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/app/routers/index_admin.py:625:33 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/codeintel_rev/bin/index_all.py
+  /home/paul/kgfoundry/codeintel_rev/bin/index_all.py:441:25 - error: Cannot access attribute "estimate_memory_usage" for class "FAISSManager"
+    Attribute "estimate_memory_usage" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/codeintel_rev/cli/indexctl.py
+  /home/paul/kgfoundry/codeintel_rev/cli/indexctl.py:1164:55 - error: Cannot access attribute "autotune_profile_path" for class "FAISSManager"
+    Attribute "autotune_profile_path" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/cli/indexctl.py:1176:22 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/cli/indexctl.py:1220:26 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/cli/indexctl.py:1232:35 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/cli/indexctl.py:1263:13 - error: Cannot access attribute "autotune" for class "FAISSManager"
+    Attribute "autotune" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/cli/indexctl.py:1341:36 - error: Cannot access attribute "search_with_refine" for class "FAISSManager"
+    Attribute "search_with_refine" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/codeintel_rev/eval/hybrid_evaluator.py
+  /home/paul/kgfoundry/codeintel_rev/eval/hybrid_evaluator.py:232:33 - error: Cannot access attribute "reconstruct_batch" for class "FAISSManager"
+    Attribute "reconstruct_batch" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:179:26 - error: Cannot assign to attribute "cpu_index" for class "FAISSManager*"
+    Type "tuple[FaissIndex, str]" is not assignable to type "FaissIndex | None"
+      "tuple[FaissIndex, str]" is incompatible with protocol "FaissIndex"
+        "ntotal" is not present
+        "d" is not present
+        "nprobe" is not present
+        "is_trained" is not present
+        "add" is not present
+        "add_with_ids" is not present
+    ... (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:179:80 - error: Argument of type "str | None" cannot be assigned to parameter "override_family" of type "IndexFamily | None" in function "build_primary_index"
+    Type "str | None" is not assignable to type "IndexFamily | None"
+      Type "str" is not assignable to type "IndexFamily | None"
+        "str" is not assignable to "None"
+        "str" is not assignable to type "Literal['flat']"
+        "str" is not assignable to type "Literal['ivfflat']"
+        "str" is not assignable to type "Literal['ivfpq']"
+        "str" is not assignable to type "Literal['adaptive']" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:378:16 - error: Argument missing for parameter "refine_k_factor" (reportCallIssue)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:384:13 - error: No parameter named "runtime" (reportCallIssue)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:401:24 - error: Argument of type "float | int | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "float | int | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:401:24 - error: Argument of type "float | int | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "float | int | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:402:27 - error: Argument of type "float | int | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "float | int | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:402:27 - error: Argument of type "float | int | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "float | int | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:403:37 - error: Argument of type "float | int | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "float | int | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager_refactored.py:403:37 - error: Argument of type "float | int | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "float | int | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/deep_research.py
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/deep_research.py:199:23 - error: Argument of type "FAISSManager" cannot be assigned to parameter "faiss" of type "VectorIndex" in function "__init__"
+    "FAISSManager" is incompatible with protocol "VectorIndex"
+      "faiss_family" is not present
+      "runtime" is not present
+        "search" is an incompatible type
+          Type "(query: NDArrayF32, k: int | None = None, *, nprobe: int | None = None, runtime: SearchRuntimeOverrides | None = None, catalog: DuckDBCatalog | None = None) -> tuple[NDArrayF32, NDArrayI64]" is not assignable to type "(query: NDArrayF32, k: int | None = None, *, nprobe: int | None = None, runtime: SearchRuntimeOverrides | None = None, catalog: object | None = None) -> tuple[NDArrayF32, NDArrayI64]"
+            Keyword parameter "catalog" of type "object | None" is incompatible with type "DuckDBCatalog | None" (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:79:9 - error: Argument of type "Mapping[int, list[tuple[str, int, float]]] | None" cannot be assigned to parameter "contribution_map" of type "dict[int, list[tuple[str, int, float]]] | None" in function "_annotate_hybrid_contributions"
+    Type "Mapping[int, list[tuple[str, int, float]]] | None" is not assignable to type "dict[int, list[tuple[str, int, float]]] | None"
+      Type "Mapping[int, list[tuple[str, int, float]]]" is not assignable to type "dict[int, list[tuple[str, int, float]]] | None"
+        "Mapping[int, list[tuple[str, int, float]]]" is not assignable to "dict[int, list[tuple[str, int, float]]]"
+        "Mapping[int, list[tuple[str, int, float]]]" is not assignable to "None" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:90:41 - error: Type "dict[str, dict[str, Unknown]]" is not assignable to declared type "AnswerEnvelope"
+    "dict[str, Unknown]" is not assignable to "MethodInfo" (reportAssignmentType)
+/home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic_pro.py
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic_pro.py:227:19 - error: Type "dict[str, str | list[Finding] | float | Mapping[str, Any] | list[str]]" is not assignable to declared type "AnswerEnvelope"
+    "Mapping[str, Any]" is not assignable to "MethodInfo" (reportAssignmentType)
+/home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/gating.py
+  /home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/gating.py:42:29 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToInt"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present
+    ... (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/gating.py:42:29 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToInt"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/gating.py:43:26 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/gating.py:59:22 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/stage0.py
+  /home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/stage0.py:161:24 - error: Argument of type "Mapping[str, Sequence[tuple[str, int, float]]] | None" cannot be assigned to parameter "extra_channels" of type "Mapping[str, Sequence[SearchHit]] | None" in function "__init__"
+    Type "Mapping[str, Sequence[tuple[str, int, float]]] | None" is not assignable to type "Mapping[str, Sequence[SearchHit]] | None"
+      Type "Mapping[str, Sequence[tuple[str, int, float]]]" is not assignable to type "Mapping[str, Sequence[SearchHit]] | None"
+        "Mapping[str, Sequence[tuple[str, int, float]]]" is not assignable to "Mapping[str, Sequence[SearchHit]]"
+          Type parameter "_VT_co@Mapping" is covariant, but "Sequence[tuple[str, int, float]]" is not a subtype of "Sequence[SearchHit]"
+            "Sequence[tuple[str, int, float]]" is not assignable to "Sequence[SearchHit]"
+        "Mapping[str, Sequence[tuple[str, int, float]]]" is not assignable to "None" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/stage0.py:300:28 - error: Argument of type "Mapping[str, Sequence[tuple[str, int, float]]] | None" cannot be assigned to parameter "extra_channels" of type "Mapping[str, Sequence[SearchHit]] | None" in function "__init__"
+    Type "Mapping[str, Sequence[tuple[str, int, float]]] | None" is not assignable to type "Mapping[str, Sequence[SearchHit]] | None"
+      Type "Mapping[str, Sequence[tuple[str, int, float]]]" is not assignable to type "Mapping[str, Sequence[SearchHit]] | None"
+        "Mapping[str, Sequence[tuple[str, int, float]]]" is not assignable to "Mapping[str, Sequence[SearchHit]]"
+          Type parameter "_VT_co@Mapping" is covariant, but "Sequence[tuple[str, int, float]]" is not a subtype of "Sequence[SearchHit]"
+            "Sequence[tuple[str, int, float]]" is not assignable to "Sequence[SearchHit]"
+        "Mapping[str, Sequence[tuple[str, int, float]]]" is not assignable to "None" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/retrieval/pipeline/stage0.py:316:13 - error: "limits_metadata" is not defined (reportUndefinedVariable)
+/home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:182:17 - error: Argument of type "_FakeContext" cannot be assigned to parameter "context" of type "ApplicationContext" in function "_semantic_search_pro_sync"
+    "_FakeContext" is not assignable to "ApplicationContext" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:186:52 - error: Argument of type "dict[str, bool]" cannot be assigned to parameter "options" of type "SemanticProOptions | None" in function "build_runtime_options"
+    Type "dict[str, bool]" is not assignable to type "SemanticProOptions | None"
+      "dict[str, bool]" is not assignable to "SemanticProOptions"
+      "dict[str, bool]" is not assignable to "None" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:189:29 - error: Could not access item in TypedDict
+    "findings" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:189:29 - error: Could not access item in TypedDict
+    "chunk_id" is not a required key in "Finding", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:190:28 - error: Could not access item in TypedDict
+    "method" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:190:28 - error: Could not access item in TypedDict
+    "gating" is not a defined key in "MethodInfo" (reportGeneralTypeIssues)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:191:28 - error: Could not access item in TypedDict
+    "method" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:191:28 - error: Could not access item in TypedDict
+    "reranker" is not a defined key in "MethodInfo" (reportGeneralTypeIssues)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:192:43 - error: Could not access item in TypedDict
+    "limits" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:199:48 - error: Argument of type "_FakeContext" cannot be assigned to parameter "context" of type "ApplicationContext" in function "semantic_search_pro"
+    "_FakeContext" is not assignable to "ApplicationContext" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:218:13 - error: Cannot assign to attribute "get_xtr_index" for class "_FakeContext"
+    Attribute "get_xtr_index" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:220:17 - error: Argument of type "_FakeContext" cannot be assigned to parameter "context" of type "ApplicationContext" in function "_maybe_run_late_interaction"
+    "_FakeContext" is not assignable to "ApplicationContext" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:240:13 - error: Cannot assign to attribute "get_xtr_index" for class "_FakeContext"
+    Attribute "get_xtr_index" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:243:55 - error: Argument of type "_FakeContext" cannot be assigned to parameter "context" of type "ApplicationContext" in function "_maybe_run_late_interaction"
+    "_FakeContext" is not assignable to "ApplicationContext" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:268:17 - error: Argument of type "_FakeContext" cannot be assigned to parameter "context" of type "ApplicationContext" in function "_maybe_apply_reranker"
+    "_FakeContext" is not assignable to "ApplicationContext" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:280:28 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+  /home/paul/kgfoundry/tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:281:29 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+/home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py:43:30 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py:47:29 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py:59:27 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager_adaptive.py
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager_adaptive.py:375:25 - error: Cannot access attribute "estimate_memory_usage" for class "FAISSManager"
+    Attribute "estimate_memory_usage" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager_adaptive.py:395:25 - error: Cannot access attribute "estimate_memory_usage" for class "FAISSManager"
+    Attribute "estimate_memory_usage" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager_adaptive.py:419:25 - error: Cannot access attribute "estimate_memory_usage" for class "FAISSManager"
+    Attribute "estimate_memory_usage" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager_adaptive.py:448:25 - error: Cannot access attribute "estimate_memory_usage" for class "FAISSManager"
+    Attribute "estimate_memory_usage" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:85:17 - error: Argument of type "_FakeContext" cannot be assigned to parameter "context" of type "ApplicationContext" in function "_semantic_search_sync"
+    "_FakeContext" is not assignable to "ApplicationContext" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:91:28 - error: Could not access item in TypedDict
+    "findings" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:92:29 - error: Could not access item in TypedDict
+    "findings" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:92:29 - error: Could not access item in TypedDict
+    "chunk_id" is not a required key in "Finding", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:93:40 - error: Could not access item in TypedDict
+    "findings" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:93:40 - error: Could not access item in TypedDict
+    "why" is not a required key in "Finding", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:94:29 - error: Could not access item in TypedDict
+    "limits" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:112:56 - error: Argument of type "_FakeContext" cannot be assigned to parameter "context" of type "ApplicationContext" in function "_semantic_search_sync"
+    "_FakeContext" is not assignable to "ApplicationContext" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:143:55 - error: Argument of type "_FakeContext" cannot be assigned to parameter "context" of type "ApplicationContext" in function "semantic_search"
+    "_FakeContext" is not assignable to "ApplicationContext" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:144:29 - error: Could not access item in TypedDict
+    "findings" is not a required key in "AnswerEnvelope", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_semantic_adapter.py:144:29 - error: Could not access item in TypedDict
+    "chunk_id" is not a required key in "Finding", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+/home/paul/kgfoundry/tests/io/test_duckdb_catalog.py
+  /home/paul/kgfoundry/tests/io/test_duckdb_catalog.py:72:16 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+  /home/paul/kgfoundry/tests/io/test_duckdb_catalog.py:73:16 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+  /home/paul/kgfoundry/tests/io/test_duckdb_catalog.py:83:16 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
+/home/paul/kgfoundry/tests/io/test_duckdb_catalog_faiss_join.py
+  /home/paul/kgfoundry/tests/io/test_duckdb_catalog_faiss_join.py:54:9 - error: No parameter named "chunks_parquet" (reportCallIssue)
+/home/paul/kgfoundry/tests/io/test_faiss_idmap.py
+  /home/paul/kgfoundry/tests/io/test_faiss_idmap.py:128:24 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/io/test_faiss_idmap.py:166:22 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/io/test_faiss_idmap.py:188:17 - error: Cannot access attribute "runtime" for class "FAISSManager"
+    Attribute "runtime" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/tests/retrieval/pipeline/test_late_interaction.py
+  /home/paul/kgfoundry/tests/retrieval/pipeline/test_late_interaction.py:29:35 - error: Argument of type "_StubXTRIndex" cannot be assigned to parameter "index" of type "XTRIndex" in function "__init__"
+    "_StubXTRIndex" is not assignable to "XTRIndex" (reportArgumentType)
+/home/paul/kgfoundry/tests/retrieval/pipeline/test_stage0.py
+  /home/paul/kgfoundry/tests/retrieval/pipeline/test_stage0.py:38:9 - error: Argument of type "_StubHybridEngine" cannot be assigned to parameter "engine" of type "HybridSearchEngine" in function "run_stage0"
+    "_StubHybridEngine" is not assignable to "HybridSearchEngine" (reportArgumentType)
+  /home/paul/kgfoundry/tests/retrieval/pipeline/test_stage0.py:69:9 - error: Argument of type "_StubHybridEngine" cannot be assigned to parameter "engine" of type "HybridSearchEngine" in function "run_stage0"
+    "_StubHybridEngine" is not assignable to "HybridSearchEngine" (reportArgumentType)
+  /home/paul/kgfoundry/tests/retrieval/pipeline/test_stage0.py:90:25 - error: Argument of type "_StubHybridEngine" cannot be assigned to parameter "engine" of type "HybridSearchEngine" in function "run_stage0"
+    "_StubHybridEngine" is not assignable to "HybridSearchEngine" (reportArgumentType)
+/home/paul/kgfoundry/tests/retrieval/test_refine_rerank.py
+  /home/paul/kgfoundry/tests/retrieval/test_refine_rerank.py:44:20 - error: Cannot access attribute "search_with_refine" for class "FAISSManager"
+    Attribute "search_with_refine" is unknown (reportAttributeAccessIssue)
+87 errors, 0 warnings, 0 informations

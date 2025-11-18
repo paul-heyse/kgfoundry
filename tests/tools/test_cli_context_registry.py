@@ -40,7 +40,7 @@ def _default_paths() -> tuple[Path, Path]:
     return augment_path, registry_path
 
 
-def _register_test_cli(  # noqa: PLR0913 - explicit override knobs keep tests readable
+def _register_test_cli(
     *,
     command: str,
     title: str = "Test CLI",

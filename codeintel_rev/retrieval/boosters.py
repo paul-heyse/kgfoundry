@@ -48,16 +48,54 @@ class RecencyConfig:
 
 
 def _now() -> float:
+    """Return current Unix timestamp.
+
+    Returns
+    -------
+    float
+        Current time as seconds since epoch.
+    """
     return time.time()
 
 
 def _exp_decay(age_days: float, half_life_days: float) -> float:
+    """Compute exponential decay factor for recency boost.
+
+    Parameters
+    ----------
+    age_days : float
+        Age in days.
+    half_life_days : float
+        Half-life period in days.
+
+    Returns
+    -------
+    float
+        Decay factor between 0.0 and 1.0.
+    """
     if half_life_days <= 0:
         return 0.0
     return 0.5 ** (age_days / half_life_days)
 
 
 def _safe_identifier(value: str) -> str:
+    """Validate and return SQL identifier.
+
+    Parameters
+    ----------
+    value : str
+        Identifier string to validate.
+
+    Returns
+    -------
+    str
+        Validated identifier.
+
+    Raises
+    ------
+    ValueError
+        When identifier doesn't match valid pattern.
+    """
     if not _IDENTIFIER_RE.match(value):
         msg = f"Invalid identifier: {value}"
         raise ValueError(msg)
@@ -65,6 +103,18 @@ def _safe_identifier(value: str) -> str:
 
 
 def _normalize_ids(source: Iterable[str]) -> list[int]:
+    """Convert string identifiers to integers, filtering invalid values.
+
+    Parameters
+    ----------
+    source : Iterable[str]
+        String identifiers to normalize.
+
+    Returns
+    -------
+    list[int]
+        List of valid integer IDs.
+    """
     normalized: list[int] = []
     for identifier in source:
         try:

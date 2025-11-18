@@ -1,0 +1,464 @@
+ERROR Object of class `FAISSManager` has no attribute `autotune` [missing-attribute]
+  --> bin/faiss_diag.py:62:17
+   |
+62 |     return dict(manager.autotune(xq, xt, k=10))
+   |                 ^^^^^^^^^^^^^^^^
+   |
+ERROR Object of class `FAISSManager` has no attribute `get_compile_options` [missing-attribute]
+  --> bin/faiss_diag.py:83:20
+   |
+83 |     compile_opts = manager.get_compile_options()
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR Object of class `FAISSManager` has no attribute `autotune_profile_path` [missing-attribute]
+  --> bin/faiss_diag.py:88:31
+   |
+88 |         profile["path"] = str(manager.autotune_profile_path)
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR Object of class `FAISSManager` has no attribute `autotune_profile_path` [missing-attribute]
+   --> codeintel_rev/app/config_context.py:960:12
+    |
+960 |         if self.faiss_manager.autotune_profile_path.exists() or (
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `autotune` [missing-attribute]
+   --> codeintel_rev/app/config_context.py:974:13
+    |
+974 |             self.faiss_manager.autotune(
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Unexpected keyword argument `export_idmap` in function `codeintel_rev.io.faiss_manager.FAISSManager.load_cpu_index` [unexpected-keyword]
+    --> codeintel_rev/app/config_context.py:1309:25
+     |
+1309 |                         export_idmap=self.paths.faiss_idmap_path,
+     |                         ^^^^^^^^^^^^
+     |
+ERROR Unexpected keyword argument `profile_path` in function `codeintel_rev.io.faiss_manager.FAISSManager.load_cpu_index` [unexpected-keyword]
+    --> codeintel_rev/app/config_context.py:1310:25
+     |
+1310 |                         profile_path=self.faiss_manager.autotune_profile_path,
+     |                         ^^^^^^^^^^^^
+     |
+ERROR Object of class `FAISSManager` has no attribute `autotune_profile_path` [missing-attribute]
+    --> codeintel_rev/app/config_context.py:1310:38
+     |
+1310 |                         profile_path=self.faiss_manager.autotune_profile_path,
+     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+   --> codeintel_rev/app/routers/index_admin.py:496:25
+    |
+496 |     return JSONResponse(manager.runtime.get_runtime_tuning())
+    |                         ^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+   --> codeintel_rev/app/routers/index_admin.py:567:18
+    |
+567 |         result = manager.runtime.apply_runtime_tuning(
+    |                  ^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+   --> codeintel_rev/app/routers/index_admin.py:625:25
+    |
+625 |     return JSONResponse(manager.runtime.reset_runtime_tuning())
+    |                         ^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `estimate_memory_usage` [missing-attribute]
+   --> codeintel_rev/bin/index_all.py:441:15
+    |
+441 |     mem_est = faiss_mgr.estimate_memory_usage(n_vectors)
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `autotune_profile_path` [missing-attribute]
+    --> codeintel_rev/cli/indexctl.py:1164:47
+     |
+1164 |         typer.echo(f"Saved tuning profile -> {manager.autotune_profile_path}")
+     |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+    --> codeintel_rev/cli/indexctl.py:1176:14
+     |
+1176 |     tuning = manager.runtime.apply_runtime_tuning(
+     |              ^^^^^^^^^^^^^^^
+     |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+    --> codeintel_rev/cli/indexctl.py:1220:18
+     |
+1220 |         tuning = manager.runtime.set_search_parameters(params)
+     |                  ^^^^^^^^^^^^^^^
+     |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+    --> codeintel_rev/cli/indexctl.py:1232:27
+     |
+1232 |     typer.echo(json.dumps(manager.runtime.get_runtime_tuning(), indent=2))
+     |                           ^^^^^^^^^^^^^^^
+     |
+ERROR Object of class `FAISSManager` has no attribute `autotune` [missing-attribute]
+    --> codeintel_rev/cli/indexctl.py:1263:5
+     |
+1263 |     manager.autotune(
+     |     ^^^^^^^^^^^^^^^^
+     |
+ERROR Object of class `FAISSManager` has no attribute `search_with_refine` [missing-attribute]
+    --> codeintel_rev/cli/indexctl.py:1341:28
+     |
+1341 |             refined_hits = manager.search_with_refine(
+     |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+ERROR Object of class `FAISSManager` has no attribute `reconstruct_batch` [missing-attribute]
+   --> codeintel_rev/eval/hybrid_evaluator.py:232:19
+    |
+232 |         vectors = self._manager.reconstruct_batch(cand_ids)
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR `msg` may be uninitialized [unbound-name]
+   --> codeintel_rev/io/faiss_manager.py:253:32
+    |
+253 |             raise RuntimeError(msg)
+    |                                ^^^
+    |
+ERROR Argument `FaissIndex | None` is not assignable to parameter `index` with type `FaissIndex` in function `codeintel_rev.io.faiss_build.add_vectors` [bad-argument-type]
+   --> codeintel_rev/io/faiss_manager.py:254:33
+    |
+254 |             builder_add_vectors(self.secondary_index, vectors_arr[keep_mask], ids_arr[keep_mask])
+    |                                 ^^^^^^^^^^^^^^^^^^^^
+    |
+  Protocol `FaissIndex` requires attribute `ntotal`
+ERROR `tuple[FaissIndex, str]` is not assignable to attribute `cpu_index` with type `FaissIndex | None` [bad-assignment]
+   --> codeintel_rev/io/faiss_manager_refactored.py:179:26
+    |
+179 |         self.cpu_index = build_primary_index(vectors, cfg=cfg, override_family=family)
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Argument `str | None` is not assignable to parameter `override_family` with type `Literal['adaptive', 'flat', 'ivfflat', 'ivfpq'] | None` in function `codeintel_rev.io.faiss_build.build_primary_index` [bad-argument-type]
+   --> codeintel_rev/io/faiss_manager_refactored.py:179:80
+    |
+179 |         self.cpu_index = build_primary_index(vectors, cfg=cfg, override_family=family)
+    |                                                                                ^^^^^^
+    |
+ERROR Missing argument `refine_k_factor` in function `codeintel_rev.io.faiss_runtime.search_dual` [missing-argument]
+   --> codeintel_rev/io/faiss_manager_refactored.py:378:35
+    |
+378 |           return runtime_search_dual(
+    |  ___________________________________^
+379 | |             primary=self.cpu_index,
+380 | |             secondary=self.secondary_index,
+381 | |             query=query,
+382 | |             k=eff_k,
+383 | |             nprobe=eff_nprobe,
+    | |_______________________________^
+    |
+ERROR Unexpected keyword argument `runtime` in function `codeintel_rev.io.faiss_runtime.search_dual` [unexpected-keyword]
+   --> codeintel_rev/io/faiss_manager_refactored.py:384:13
+    |
+384 |             runtime=runtime,
+    |             ^^^^^^^
+    |
+ERROR No matching overload found for function `int.__new__` called with arguments: (type[int], float | int | None) [no-matching-overload]
+   --> codeintel_rev/io/faiss_manager_refactored.py:401:23
+    |
+401 |             nprobe=int(overrides.get("nprobe")) if "nprobe" in overrides else None,
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+  Possible overloads:
+  (cls: type[int], x: Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str = 0, /) -> int [closest match]
+  (cls: type[int], x: bytearray | bytes | str, /, base: SupportsIndex) -> int
+ERROR No matching overload found for function `int.__new__` called with arguments: (type[int], float | int | None) [no-matching-overload]
+   --> codeintel_rev/io/faiss_manager_refactored.py:402:26
+    |
+402 |             ef_search=int(overrides.get("efSearch")) if "efSearch" in overrides else None,
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+  Possible overloads:
+  (cls: type[int], x: Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str = 0, /) -> int [closest match]
+  (cls: type[int], x: bytearray | bytes | str, /, base: SupportsIndex) -> int
+ERROR No matching overload found for function `int.__new__` called with arguments: (type[int], float | int | None) [no-matching-overload]
+   --> codeintel_rev/io/faiss_manager_refactored.py:403:36
+    |
+403 |             quantizer_ef_search=int(overrides.get("quantizer_efSearch"))
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+  Possible overloads:
+  (cls: type[int], x: Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str = 0, /) -> int [closest match]
+  (cls: type[int], x: bytearray | bytes | str, /, base: SupportsIndex) -> int
+ERROR Argument `FAISSManager` is not assignable to parameter `faiss` with type `VectorIndex` in function `codeintel_rev.retrieval.mcp_search.SearchDependencies.__init__` [bad-argument-type]
+   --> codeintel_rev/mcp_server/adapters/deep_research.py:199:23
+    |
+199 |                 faiss=context.faiss_manager,
+    |                       ^^^^^^^^^^^^^^^^^^^^^
+    |
+  Protocol `VectorIndex` requires attribute `faiss_family`
+ERROR Argument `Mapping[int, list[tuple[str, int, float]]] | None` is not assignable to parameter `contribution_map` with type `dict[int, list[tuple[str, int, float]]] | None` in function `_annotate_hybrid_contributions` [bad-argument-type]
+  --> codeintel_rev/mcp_server/adapters/semantic.py:79:9
+   |
+79 |         stage0_result.contributions,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR `dict[str, Mapping[str, object] | dict[str, object] | list[str] | str]` is not assignable to TypedDict key `method` with type `TypedDict[MethodInfo]` [bad-typed-dict-key]
+  --> codeintel_rev/mcp_server/adapters/semantic.py:90:41
+   |
+90 |     extras: AnswerEnvelope = {"method": method}
+   |                                         ^^^^^^
+   |
+ERROR `Mapping[str, Any]` is not assignable to TypedDict key `method` with type `TypedDict[MethodInfo]` [bad-typed-dict-key]
+   --> codeintel_rev/mcp_server/adapters/semantic_pro.py:227:19
+    |
+227 |         "method": method,
+    |                   ^^^^^^
+    |
+ERROR Expected a callable, got `None` [not-callable]
+   --> codeintel_rev/mcp_server/adapters/semantic_pro.py:359:12
+    |
+359 |     return CodeRankLLMAdapter(reranker)
+    |            ^^^^^^^^^^^^^^^^^^
+    |
+ERROR No matching overload found for function `int.__new__` called with arguments: (type[int], object) [no-matching-overload]
+  --> codeintel_rev/retrieval/pipeline/gating.py:42:28
+   |
+42 |         candidate_count=int(signals.get("candidate_count", 0)),
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  Possible overloads:
+  (cls: type[int], x: Buffer | SupportsIndex | SupportsInt | SupportsTrunc | str = 0, /) -> int [closest match]
+  (cls: type[int], x: bytearray | bytes | str, /, base: SupportsIndex) -> int
+ERROR Argument `object` is not assignable to parameter `x` with type `Buffer | SupportsFloat | SupportsIndex | str` in function `float.__new__` [bad-argument-type]
+  --> codeintel_rev/retrieval/pipeline/gating.py:43:26
+   |
+43 |         elapsed_ms=float(signals.get("elapsed_ms", 0.0)),
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR Argument `object` is not assignable to parameter `x` with type `Buffer | SupportsFloat | SupportsIndex | str` in function `float.__new__` [bad-argument-type]
+  --> codeintel_rev/retrieval/pipeline/gating.py:59:22
+   |
+59 |         return float(value)
+   |                      ^^^^^
+   |
+ERROR Argument `Mapping[str, Sequence[tuple[str, int, float]]] | None` is not assignable to parameter `extra_channels` with type `Mapping[str, Sequence[SearchHit]] | None` in function `codeintel_rev.io.hybrid_search.HybridSearchOptions.__init__` [bad-argument-type]
+   --> codeintel_rev/retrieval/pipeline/stage0.py:161:24
+    |
+161 |         extra_channels=opts.extra_channels,
+    |                        ^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Argument `Mapping[str, Sequence[tuple[str, int, float]]] | None` is not assignable to parameter `extra_channels` with type `Mapping[str, Sequence[SearchHit]] | None` in function `codeintel_rev.io.hybrid_search.HybridSearchOptions.__init__` [bad-argument-type]
+   --> codeintel_rev/retrieval/pipeline/stage0.py:300:28
+    |
+300 |             extra_channels=opts.extra_channels,
+    |                            ^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Could not find name `limits_metadata` [unknown-name]
+   --> codeintel_rev/retrieval/pipeline/stage0.py:316:13
+    |
+316 |             limits_metadata.append(f"Hybrid result skipped (non-numeric chunk id): {doc.doc_id}")
+    |             ^^^^^^^^^^^^^^^
+    |
+ERROR Argument `_FakeContext` is not assignable to parameter `context` with type `ApplicationContext` in function `codeintel_rev.mcp_server.adapters.semantic_pro._semantic_search_pro_sync` [bad-argument-type]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:182:17
+    |
+182 |         context=context,
+    |                 ^^^^^^^
+    |
+ERROR Argument `dict[str, bool]` is not assignable to parameter `options` with type `SemanticProOptions | None` in function `codeintel_rev.mcp_server.adapters.semantic_pro.build_runtime_options` [bad-argument-type]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:186:52
+    |
+186 |         options=semantic_pro.build_runtime_options({"use_warp": True, "use_reranker": True}),
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR TypedDict `MethodInfo` does not have key `gating` [bad-typed-dict-key]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:190:47
+    |
+190 |     assertions.expect_true(envelope["method"]["gating"]["should_run_secondary_stage"])
+    |                                               ^^^^^^^^
+    |
+ERROR TypedDict `MethodInfo` does not have key `reranker` [bad-typed-dict-key]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:191:47
+    |
+191 |     assertions.expect_true(envelope["method"]["reranker"]["enabled"])
+    |                                               ^^^^^^^^^^
+    |
+ERROR Argument `_FakeContext` is not assignable to parameter `context` with type `ApplicationContext` in function `codeintel_rev.mcp_server.adapters.semantic_pro.semantic_search_pro` [bad-argument-type]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:199:48
+    |
+199 |         await semantic_pro.semantic_search_pro(context, query="q", limit=0)
+    |                                                ^^^^^^^
+    |
+ERROR Object of class `_FakeContext` has no attribute `get_xtr_index` [missing-attribute]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:218:5
+    |
+218 |     context.get_xtr_index = lambda: _Index()
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Argument `_FakeContext` is not assignable to parameter `context` with type `ApplicationContext` in function `codeintel_rev.mcp_server.adapters.semantic_pro._maybe_run_late_interaction` [bad-argument-type]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:220:17
+    |
+220 |         context=context,
+    |                 ^^^^^^^
+    |
+ERROR Object of class `_FakeContext` has no attribute `get_xtr_index` [missing-attribute]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:240:5
+    |
+240 |     context.get_xtr_index = lambda: _Index()
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Argument `_FakeContext` is not assignable to parameter `context` with type `ApplicationContext` in function `codeintel_rev.mcp_server.adapters.semantic_pro._maybe_run_late_interaction` [bad-argument-type]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:243:55
+    |
+243 |     result = semantic_pro._maybe_run_late_interaction(context, "search", [3, 4], options)
+    |                                                       ^^^^^^^
+    |
+ERROR Argument `_FakeContext` is not assignable to parameter `context` with type `ApplicationContext` in function `codeintel_rev.mcp_server.adapters.semantic_pro._maybe_apply_reranker` [bad-argument-type]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:268:17
+    |
+268 |         context=context,
+    |                 ^^^^^^^
+    |
+ERROR `None` is not subscriptable [unsupported-operation]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:280:28
+    |
+280 |     assertions.expect_true(metadata["enabled"])
+    |                            ^^^^^^^^^^^^^^^^^^^
+    |
+ERROR `None` is not subscriptable [unsupported-operation]
+   --> tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:281:29
+    |
+281 |     assertions.expect_equal(metadata["reordered"], 2)
+    |                             ^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+  --> tests/codeintel_rev/test_faiss_manager.py:43:16
+   |
+43 |     snapshot = faiss_manager.runtime.get_runtime_tuning()
+   |                ^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+  --> tests/codeintel_rev/test_faiss_manager.py:47:15
+   |
+47 |     updated = faiss_manager.runtime.apply_runtime_tuning(
+   |               ^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+  --> tests/codeintel_rev/test_faiss_manager.py:59:13
+   |
+59 |     reset = faiss_manager.runtime.reset_runtime_tuning()
+   |             ^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR Object of class `FAISSManager` has no attribute `estimate_memory_usage` [missing-attribute]
+   --> tests/codeintel_rev/test_faiss_manager_adaptive.py:375:17
+    |
+375 |     estimates = manager.estimate_memory_usage(n_vectors)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `estimate_memory_usage` [missing-attribute]
+   --> tests/codeintel_rev/test_faiss_manager_adaptive.py:395:17
+    |
+395 |     estimates = manager.estimate_memory_usage(n_vectors)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `estimate_memory_usage` [missing-attribute]
+   --> tests/codeintel_rev/test_faiss_manager_adaptive.py:419:17
+    |
+419 |     estimates = manager.estimate_memory_usage(n_vectors)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `estimate_memory_usage` [missing-attribute]
+   --> tests/codeintel_rev/test_faiss_manager_adaptive.py:448:17
+    |
+448 |     estimates = manager.estimate_memory_usage(n_vectors)
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+ERROR Argument `_FakeContext` is not assignable to parameter `context` with type `ApplicationContext` in function `codeintel_rev.mcp_server.adapters.semantic._semantic_search_sync` [bad-argument-type]
+  --> tests/codeintel_rev/test_semantic_adapter.py:85:17
+   |
+85 |         context=context,
+   |                 ^^^^^^^
+   |
+ERROR Argument `_FakeContext` is not assignable to parameter `context` with type `ApplicationContext` in function `codeintel_rev.mcp_server.adapters.semantic._semantic_search_sync` [bad-argument-type]
+   --> tests/codeintel_rev/test_semantic_adapter.py:112:56
+    |
+112 |         semantic_adapter._semantic_search_sync(context=context, query="test", limit=5, scope=None)
+    |                                                        ^^^^^^^
+    |
+ERROR Argument `_FakeContext` is not assignable to parameter `context` with type `ApplicationContext` in function `codeintel_rev.mcp_server.adapters.semantic.semantic_search` [bad-argument-type]
+   --> tests/codeintel_rev/test_semantic_adapter.py:143:55
+    |
+143 |     envelope = await semantic_adapter.semantic_search(context, "query", limit=5)
+    |                                                       ^^^^^^^
+    |
+ERROR `None` is not subscriptable [unsupported-operation]
+  --> tests/io/test_duckdb_catalog.py:72:16
+   |
+72 |         assert conn.execute("SELECT COUNT(*) FROM faiss_idmap").fetchone()[0] == 1
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR `None` is not subscriptable [unsupported-operation]
+  --> tests/io/test_duckdb_catalog.py:73:16
+   |
+73 |         assert conn.execute("SELECT COUNT(*) FROM v_faiss_join").fetchone()[0] == 1
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR `None` is not subscriptable [unsupported-operation]
+  --> tests/io/test_duckdb_catalog.py:83:16
+   |
+83 |         assert conn.execute("SELECT COUNT(*) FROM faiss_join_mat").fetchone()[0] == 1
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+ERROR Argument `str` is not assignable to parameter `idmap_parquet` with type `Path | None` in function `codeintel_rev.io.duckdb_dao.ensure_faiss_idmap_view` [bad-argument-type]
+  --> tests/io/test_duckdb_catalog_faiss_join.py:53:23
+   |
+53 |         idmap_parquet=str(idmap),
+   |                       ^^^^^^^^^^
+   |
+ERROR Unexpected keyword argument `chunks_parquet` in function `codeintel_rev.io.duckdb_dao.ensure_faiss_idmap_view` [unexpected-keyword]
+  --> tests/io/test_duckdb_catalog_faiss_join.py:54:9
+   |
+54 |         chunks_parquet=str(chunks),
+   |         ^^^^^^^^^^^^^^
+   |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+   --> tests/io/test_faiss_idmap.py:128:15
+    |
+128 |     runtime = reloaded.runtime.get_runtime_tuning()
+    |               ^^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+   --> tests/io/test_faiss_idmap.py:166:14
+    |
+166 |     tuning = manager.runtime.set_search_parameters("nprobe=12,k_factor=1.5")
+    |              ^^^^^^^^^^^^^^^
+    |
+ERROR Object of class `FAISSManager` has no attribute `runtime` [missing-attribute]
+   --> tests/io/test_faiss_idmap.py:188:9
+    |
+188 |         manager.runtime.set_search_parameters("bad_param=1")
+    |         ^^^^^^^^^^^^^^^
+    |
+ERROR Argument `_StubXTRIndex` is not assignable to parameter `index` with type `XTRIndex` in function `codeintel_rev.retrieval.pipeline.late_interaction.XTRLateInteraction.__init__` [bad-argument-type]
+  --> tests/retrieval/pipeline/test_late_interaction.py:29:35
+   |
+29 |     li = XTRLateInteraction(index=index)
+   |                                   ^^^^^
+   |
+ERROR Argument `_StubHybridEngine` is not assignable to parameter `engine` with type `HybridSearchEngine` in function `codeintel_rev.retrieval.pipeline.stage0.run_stage0` [bad-argument-type]
+  --> tests/retrieval/pipeline/test_stage0.py:38:9
+   |
+38 |         engine,
+   |         ^^^^^^
+   |
+ERROR Argument `_StubHybridEngine` is not assignable to parameter `engine` with type `HybridSearchEngine` in function `codeintel_rev.retrieval.pipeline.stage0.run_stage0` [bad-argument-type]
+  --> tests/retrieval/pipeline/test_stage0.py:69:9
+   |
+69 |         engine,
+   |         ^^^^^^
+   |
+ERROR Argument `_StubHybridEngine` is not assignable to parameter `engine` with type `HybridSearchEngine` in function `codeintel_rev.retrieval.pipeline.stage0.run_stage0` [bad-argument-type]
+  --> tests/retrieval/pipeline/test_stage0.py:90:25
+   |
+90 |     result = run_stage0(engine, query="nothing", semantic_hits=[], limit=1)
+   |                         ^^^^^^
+   |
+ERROR Object of class `FAISSManager` has no attribute `search_with_refine` [missing-attribute]
+  --> tests/retrieval/test_refine_rerank.py:44:12
+   |
+44 |     hits = manager.search_with_refine(query, k=2, catalog=cast("DuckDBCatalog", catalog))
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |

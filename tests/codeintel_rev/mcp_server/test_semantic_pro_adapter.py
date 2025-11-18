@@ -1,376 +1,284 @@
-"""Tests for semantic_pro adapter behaviors."""
+"""Regression tests for the refactored semantic_pro adapter."""
 
 from __future__ import annotations
 
-import asyncio
-from collections.abc import Iterator
-from contextlib import AbstractContextManager, contextmanager
-from pathlib import Path
-from types import SimpleNamespace
-from typing import cast
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
 
-import numpy as np
 import pytest
-from codeintel_rev.app.config_context import ApplicationContext
-from codeintel_rev.io.duckdb_catalog import StructureAnnotations
-from codeintel_rev.io.hybrid_search import HybridSearchOptions
 from codeintel_rev.mcp_server.adapters import semantic_pro
-from codeintel_rev.mcp_server.schemas import ScopeIn
-from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
+from codeintel_rev.retrieval.pipeline.late_interaction import LateInteractionResult
+from codeintel_rev.retrieval.pipeline.rerankers import RerankResult
+from codeintel_rev.retrieval.pipeline.stage0 import Stage0Metadata, Stage0Result
 
 from kgfoundry_common.errors import VectorSearchError
-from tests._helpers import assertions, constants
-
-EXPECTED_CHUNK_ID = 101
+from tests._helpers import assertions
 
 
-class _FakeVLLMClient:
-    def __init__(self) -> None:
-        self.embed_calls = 0
-
-    def embed_batch(self, texts: list[str]) -> np.ndarray:
-        self.embed_calls += 1
-        assertions.expect_true(texts, reason="semantic search must embed at least one text.")
-        return np.asarray([[0.1, 0.2]], dtype=np.float32)
-
-
-class _FakeFaissManager:
-    def __init__(self) -> None:
-        self.search_calls = 0
-
-    def search(self, *_: object, **__: object) -> tuple[np.ndarray, np.ndarray]:
-        self.search_calls += 1
-        distances = np.asarray([[0.9, 0.8]], dtype=np.float32)
-        ids = np.asarray([[EXPECTED_CHUNK_ID, EXPECTED_CHUNK_ID + 1]], dtype=np.int64)
-        return distances, ids
-
-
-class _FakeCatalog:
-    def __init__(self) -> None:
-        self.records = [
-            {
-                "id": EXPECTED_CHUNK_ID,
-                "uri": "src/file_a.py",
-                "start_line": 1,
-                "end_line": 5,
-                "preview": "code A",
-            },
-            {
-                "id": EXPECTED_CHUNK_ID + 1,
-                "uri": "src/file_b.py",
-                "start_line": 10,
-                "end_line": 20,
-                "preview": "code B",
-            },
-        ]
-        self.annotation_requests = 0
-
-    def query_by_ids(self, ids: list[int]) -> list[dict]:
-        return [record for record in self.records if record["id"] in ids]
-
-    def query_by_filters(self, ids: list[int], **_: object) -> list[dict]:
-        return self.query_by_ids(ids)
-
-    def get_structure_annotations(self, ids: list[int]) -> dict[int, StructureAnnotations]:
-        self.annotation_requests += 1
-        annotations: dict[int, StructureAnnotations] = {}
-        for chunk_id in ids:
-            annotations[int(chunk_id)] = StructureAnnotations(
-                uri="src/file.py",
-                symbol_hits=("fake.symbol",),
-                ast_node_kinds=("FunctionDef",),
-                cst_matches=(),
-            )
-        return annotations
-
-
-class _FakeHybridEngine:
-    def __init__(self) -> None:
-        self.search_calls = 0
-        self.last_options: HybridSearchOptions | None = None
-
-    def search(
-        self,
-        query: str,
-        *,
-        semantic_hits: list[tuple[int, float]],
-        limit: int,
-        options: HybridSearchOptions | None = None,
-    ) -> HybridSearchResult:
-        self.search_calls += 1
-        self.last_options = options
-        assertions.expect_true(query)
-        extra_channels = options.extra_channels if options else None
-        docs = [
-            HybridResultDoc(doc_id=str(cid), score=float(score)) for cid, score in semantic_hits
-        ]
-        contributions = {
-            str(cid): [("semantic", idx + 1, float(score))]
-            for idx, (cid, score) in enumerate(semantic_hits)
-        }
-        channels = ["semantic"]
-        if extra_channels and extra_channels.get("warp"):
-            warp_hit = extra_channels["warp"][0]
-            docs.insert(0, HybridResultDoc(doc_id=warp_hit.doc_id, score=float(warp_hit.score)))
-            contributions.setdefault(warp_hit.doc_id, []).append(("warp", 1, float(warp_hit.score)))
-            channels.append("warp")
-        return HybridSearchResult(
-            docs=docs[:limit],
-            contributions=contributions,
-            channels=channels,
-            warnings=[],
-            method={"retrieval": channels, "coverage": f"{len(docs[:limit])}/{limit} results"},
-        )
-
-
-class _StubXTRIndex:
-    ready = True
-
-    def __init__(self) -> None:
-        self.calls = 0
-
-    def rescore(
-        self,
-        query: str,
-        candidate_chunk_ids: list[int],
-        *,
-        explain: bool = False,
-        topk_explanations: int = 5,
-    ) -> list[tuple[int, float, None]]:
-        self.calls += 1
-        assertions.expect_true(query)
-        _ = explain
-        _ = topk_explanations
-        reordered = list(reversed(candidate_chunk_ids))
-        total = len(reordered)
-        return [(cid, float(total - idx), None) for idx, cid in enumerate(reordered)]
-
-
+@dataclass
 class _FakeContext:
-    def __init__(self, tmp_path: Path, *, xtr_ready: bool = False) -> None:
-        coderank_index = tmp_path / "coderank.faiss"
-        coderank_index.write_bytes(b"index")
-        (tmp_path / "xtr").mkdir(exist_ok=True)
-        self.vllm_client = _FakeVLLMClient()
-        self.paths = SimpleNamespace(
-            coderank_faiss_index=coderank_index,
-            warp_index_dir=tmp_path / "warp",
-            xtr_dir=tmp_path / "xtr",
-        )
-        self._catalog = _FakeCatalog()
-        self._hybrid = _FakeHybridEngine()
-        self.faiss_requests = 0
-        self.settings = SimpleNamespace(
-            coderank=SimpleNamespace(
-                model_id="stub",
-                device="cpu",
-                trust_remote_code=True,
-                query_prefix="prefix: ",
-                normalize=True,
-                batch_size=8,
-                top_k=10,
-                budget_ms=1000,
-                min_stage2_margin=0.05,
-                min_stage2_candidates=1,
-            ),
-            limits=SimpleNamespace(max_results=10, semantic_overfetch_multiplier=2),
-            index=SimpleNamespace(
-                rrf_k=60, faiss_nprobe=16, rrf_weights={"semantic": 1.0, "warp": 1.0}
-            ),
-            warp=SimpleNamespace(enabled=False, device="cpu", top_k=50),
-            xtr=SimpleNamespace(
-                enable=xtr_ready,
-                candidate_k=50,
-                dtype="float16",
-                dim=2,
-                max_query_tokens=32,
-                device="cpu",
-                model_id="stub",
-                mode="narrow",
-            ),
-            rerank=SimpleNamespace(
-                enabled=False,
-                top_k=50,
-                provider="xtr",
-                explain=False,
-            ),
-            coderank_llm=SimpleNamespace(
-                enabled=False,
-                model_id="stub",
-                device="cpu",
-                max_new_tokens=16,
-                temperature=0.0,
-                top_p=1.0,
-                budget_ms=500,
-            ),
-            vllm=SimpleNamespace(model="stub", run=SimpleNamespace(mode="inprocess")),
-        )
-        self._xtr_index = _StubXTRIndex() if xtr_ready else None
-
-    def get_coderank_faiss_manager(self, vec_dim: int) -> _FakeFaissManager:
-        assertions.expect_equal(vec_dim, constants.VECTOR_DIMS.pair)
-        self.faiss_requests += 1
-        return _FakeFaissManager()
-
-    def open_catalog(self) -> AbstractContextManager[_FakeCatalog]:
-        @contextmanager
-        def _catalog_cm() -> Iterator[_FakeCatalog]:
-            yield self._catalog
-
-        return _catalog_cm()
-
-    def get_hybrid_engine(self) -> _FakeHybridEngine:
-        return self._hybrid
-
-    def get_xtr_index(self) -> _StubXTRIndex | None:
-        return self._xtr_index
-
-
-TEST_SCOPE: ScopeIn = {}
-
-
-def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
-    """Semantic pro returns findings with explainability metadata."""
-    context = cast("ApplicationContext", _FakeContext(tmp_path))
-    envelope = asyncio.run(
-        semantic_pro.semantic_search_pro(
-            context=context,
-            query="how to open file",
-            limit=constants.BATCH_SIZES.minimal,
-            options={
-                "use_warp": False,
-                "use_reranker": False,
-                "stage_weights": {},
-                "explain": True,
-            },
-            request_context=semantic_pro.SemanticRequestContext(
-                session_id="test-session", scope=TEST_SCOPE
-            ),
-        )
-    )
-
-    findings_payload = envelope.get("findings")
-    assertions.expect_true(isinstance(findings_payload, list), reason="findings should be list")
-    if not isinstance(findings_payload, list):  # pragma: no cover - defensive
-        pytest.fail("findings should be present")
-    findings = cast("list[dict[str, object]]", findings_payload)
-    assertions.expect_true(findings)
-    explanation_payload = findings[0].get("explanations")
-    assertions.expect_true(
-        isinstance(explanation_payload, dict), reason="explanations should be dict"
-    )
-    if not isinstance(explanation_payload, dict):  # pragma: no cover - defensive
-        pytest.fail("explanations should be dict")
-    assertions.expect_sequence_equal(explanation_payload["matched_symbols"], ["fake.symbol"])
-
-
-def test_semantic_pro_rerank_skips_without_capability(tmp_path: Path) -> None:
-    """Reranker metadata indicates capability is off."""
-    context = cast("ApplicationContext", _FakeContext(tmp_path))
-    envelope = asyncio.run(
-        semantic_pro.semantic_search_pro(
-            context=context,
-            query="gateway",
-            limit=constants.BATCH_SIZES.minimal,
-            options={"use_reranker": True, "rerank": {"enabled": True}},
-            request_context=semantic_pro.SemanticRequestContext(
-                session_id="test-session", scope=TEST_SCOPE
-            ),
-        )
-    )
-    method = envelope.get("method")
-    assertions.expect_true(method is not None, reason="method metadata missing")
-    if not isinstance(method, dict):  # pragma: no cover - defensive
-        pytest.fail("method should be present")
-    rerank = method.get("rerank")
-    assertions.expect_true(rerank is not None)
-    rerank_meta = cast("dict[str, object]", rerank)
-    assertions.expect_false(rerank_meta["enabled"])
-    assertions.expect_equal(rerank_meta["reason"], "capability_off")
-
-
-def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
-    """XTR-enabled reranker reorders findings."""
-    context = cast("ApplicationContext", _FakeContext(tmp_path, xtr_ready=True))
-    envelope = asyncio.run(
-        semantic_pro.semantic_search_pro(
-            context=context,
-            query="gateway",
-            limit=constants.BATCH_SIZES.minimal,
-            options={
-                "use_reranker": True,
-                "rerank": {"enabled": True, "top_k": constants.BATCH_SIZES.minimal},
-            },
-            request_context=semantic_pro.SemanticRequestContext(
-                session_id="test-session", scope=TEST_SCOPE
-            ),
-        )
-    )
-    method = envelope.get("method")
-    assertions.expect_true(method is not None, reason="method metadata missing")
-    if not isinstance(method, dict):  # pragma: no cover - defensive
-        pytest.fail("method should be present")
-    rerank_meta = method.get("rerank")
-    assertions.expect_true(rerank_meta is not None, reason="rerank metadata missing")
-    rerank_meta_dict = cast("dict[str, object]", rerank_meta)
-    assertions.expect_true(bool(rerank_meta_dict["enabled"]), reason="rerank stage disabled")
-    reordered = rerank_meta_dict.get("reordered")
-    assertions.expect_true(
-        isinstance(reordered, int) and reordered >= 1, reason="reranker did not reorder results"
-    )
-    findings_payload = envelope.get("findings")
-    assertions.expect_true(isinstance(findings_payload, list), reason="expected findings list")
-    if not isinstance(findings_payload, list):  # pragma: no cover - defensive
-        pytest.fail("findings should be a list")
-    first_finding = findings_payload[0]
-    assertions.expect_equal(first_finding.get("chunk_id"), EXPECTED_CHUNK_ID)
-    assertions.expect_in("why", first_finding)
-    method_details = envelope.get("method")
-    assertions.expect_true(isinstance(method_details, dict), reason="method metadata missing")
-    if not isinstance(method_details, dict):  # pragma: no cover - defensive
-        pytest.fail("method should be a dict")
-    method_details_dict = cast("dict[str, object]", method_details)
-    retrieval_methods = method_details_dict.get("retrieval")
-    assertions.expect_true(isinstance(retrieval_methods, list), reason="retrieval metadata missing")
-    if not isinstance(retrieval_methods, list):  # pragma: no cover - defensive
-        pytest.fail("retrieval metadata missing")
-    assertions.expect_sequence_equal(retrieval_methods, ["semantic"])
-
-
-def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:
-    """Disabling coderank raises VectorSearchError."""
-    context = cast("ApplicationContext", _FakeContext(tmp_path))
-    with pytest.raises(VectorSearchError):
-        asyncio.run(
-            semantic_pro.semantic_search_pro(
-                context=context,
-                query="noop",
-                limit=1,
-                options={"use_coderank": False},
-                request_context=semantic_pro.SemanticRequestContext(
-                    session_id="test-session", scope=TEST_SCOPE
+    def __post_init__(self) -> None:
+        self.settings = type(
+            "Settings",
+            (),
+            {
+                "index": type("Idx", (), {"rrf_k": 60}),
+                "coderank": type(
+                    "Coderank",
+                    (),
+                    {"min_stage2_candidates": 1, "min_stage2_margin": 0.1, "budget_ms": 100},
                 ),
-            )
-        )
+                "limits": type("Limits", (), {"max_results": 5}),
+                "xtr": type("XTR", (), {"enable": True, "candidate_k": 5}),
+                "coderank_llm": type(
+                    "CoderankLLM",
+                    (),
+                    {
+                        "enabled": True,
+                        "model_id": "stub",
+                        "device": "cpu",
+                        "max_new_tokens": 64,
+                        "temperature": 0.0,
+                        "top_p": 0.95,
+                    },
+                ),
+            },
+        )()
+
+    def open_catalog(self) -> _CatalogCtx:
+        return _CatalogCtx()
 
 
-def test_merge_explainability_into_findings() -> None:
-    """Explainability data merges into the finding payload."""
-    finding: semantic_pro.Finding = {
-        "chunk_id": 1,
-        "type": "usage",
-        "title": "main.py",
-        "location": {
-            "uri": "file://main.py",
-            "start_line": 1,
-            "start_column": 0,
-            "end_line": 1,
-            "end_column": 0,
-        },
-        "snippet": "",
-        "score": 0.5,
-        "why": "",
-    }
-    explainability = [(1, {"token_matches": [{"q_index": 0, "doc_index": 2, "similarity": 0.9}]})]
-    semantic_pro.merge_explainability_into_findings([finding], explainability)
-    assertions.expect_in("XTR alignments", finding["why"])
+class _CatalogCtx:
+    def __enter__(self) -> _CatalogCtx:  # pragma: no cover - trivial
+        return self
+
+    def __exit__(self, *exc: object) -> bool:  # pragma: no cover - trivial
+        return False
+
+    def query_by_ids(self, chunk_ids: list[int]) -> list[Mapping[str, Any]]:
+        return [
+            {
+                "id": chunk_id,
+                "uri": f"src/file_{chunk_id}.py",
+                "start_line": 1,
+                "end_line": 2,
+                "preview": f"code {chunk_id}",
+            }
+            for chunk_id in chunk_ids
+        ]
+
+    def query_by_filters(self, chunk_ids: list[int], **_: object) -> list[Mapping[str, Any]]:
+        return self.query_by_ids(chunk_ids)
+
+    def get_structure_annotations(self, ids: list[int]) -> Mapping[int, Any]:
+        return dict.fromkeys(ids)
+
+    def connection(self):
+        class _Conn:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc: object) -> bool:
+                return False
+
+            def execute(self, _query: str, params: tuple[Sequence[int]]):
+                chunk_ids = params[0] if isinstance(params, (list, tuple)) else params
+                if isinstance(chunk_ids, int):
+                    chunk_ids = [chunk_ids]
+
+                class _Result:
+                    def __init__(self, rows):
+                        self._rows = rows
+
+                    def fetchone(self):
+                        return self._rows[0] if self._rows else None
+
+                    def fetchall(self):
+                        return list(self._rows)
+
+                rows = [
+                    (chunk_id, f"snippet {chunk_id}", f"src/{chunk_id}.py")
+                    for chunk_id in chunk_ids
+                ]
+                return _Result(rows)
+
+        return _Conn()
+
+
+def _stage0_result() -> Stage0Result:
+    return Stage0Result(
+        ids=[1, 2],
+        scores=[0.9, 0.8],
+        warnings=[],
+        method={"retrieval": ["semantic"]},
+        channels=["semantic"],
+        contributions={1: [("semantic", 1, 0.9)]},
+    )
+
+
+def _stage0_metadata() -> Stage0Metadata:
+    """Return test Stage0Metadata fixture."""
+    return Stage0Metadata(limits=["limit:clamped"], effective_limit=2, requested_limit=2)
+
+
+def test_semantic_search_pro_sync_orchestrates(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that semantic_search_pro_sync orchestrates all pipeline stages."""
+    context = _FakeContext()
+
+    monkeypatch.setattr(
+        semantic_pro,
+        "execute_semantic_stage0",
+        lambda _request: (_stage0_result(), _stage0_metadata()),
+    )
+    monkeypatch.setattr(
+        semantic_pro,
+        "_maybe_run_late_interaction",
+        lambda *_args, **_kwargs: LateInteractionResult(
+            ids=[2, 1], scores=[0.95, 0.85], explanations=[(2, {"token_matches": []})]
+        ),
+    )
+    monkeypatch.setattr(
+        semantic_pro,
+        "_maybe_apply_reranker",
+        lambda *_args, **_kwargs: ([2, 1], [1.1, 0.8], {"enabled": True}),
+    )
+    monkeypatch.setattr(
+        semantic_pro,
+        "_hydrate_findings",
+        lambda *_args, **_kwargs: [
+            {
+                "chunk_id": 2,
+                "uri": "src/file_2.py",
+                "snippet": "code 2",
+                "why": "",
+                "score": 1.1,
+                "location": {
+                    "uri": "",
+                    "start_line": 0,
+                    "end_line": 0,
+                    "start_column": 0,
+                    "end_column": 0,
+                },
+            },
+            {
+                "chunk_id": 1,
+                "uri": "src/file_1.py",
+                "snippet": "code 1",
+                "why": "",
+                "score": 0.8,
+                "location": {
+                    "uri": "",
+                    "start_line": 0,
+                    "end_line": 0,
+                    "start_column": 0,
+                    "end_column": 0,
+                },
+            },
+        ],
+    )
+
+    envelope = semantic_pro._semantic_search_pro_sync(
+        context=context,
+        query="test",
+        limit=2,
+        scope=None,
+        options=semantic_pro.build_runtime_options({"use_warp": True, "use_reranker": True}),
+    )
+
+    assertions.expect_equal(envelope["findings"][0]["chunk_id"], 2)
+    assertions.expect_true(envelope["method"]["gating"]["should_run_secondary_stage"])
+    assertions.expect_true(envelope["method"]["reranker"]["enabled"])
+    assertions.expect_in("limit:clamped", envelope["limits"])
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_pro_validates_limit() -> None:
+    context = _FakeContext()
+    with pytest.raises(VectorSearchError):
+        await semantic_pro.semantic_search_pro(context, query="q", limit=0)
+
+
+def test_merge_late_interaction_appends_unscored_candidates() -> None:
+    result_ids, result_scores = semantic_pro._merge_late_interaction(
+        [1, 2, 3],
+        [0.9, 0.8, 0.7],
+        LateInteractionResult(ids=[2], scores=[0.95]),
+    )
+    assertions.expect_sequence_equal(result_ids, [2, 1, 3])
+    assertions.expect_sequence_equal(result_scores, [0.95, 0.9, 0.7])
+
+
+def test_maybe_run_late_interaction_returns_none_when_index_unavailable() -> None:
+    context = _FakeContext()
+
+    class _Index:
+        ready = False
+
+    context.get_xtr_index = lambda: _Index()
+    result = semantic_pro._maybe_run_late_interaction(
+        context=context,
+        query="q",
+        ids=[1, 2],
+        options=semantic_pro.SemanticProRuntimeOptions(),
+    )
+    assertions.expect_true(result is None)
+
+
+def test_maybe_run_late_interaction_invokes_xtr_index() -> None:
+    context = _FakeContext()
+
+    class _Index:
+        ready = True
+
+        def rescore(
+            self, _query: str, candidate_chunk_ids, *, _explain: bool, _topk_explanations: int
+        ):
+            return [
+                (candidate_chunk_ids[0], 0.99, {"token_matches": []}),
+                (candidate_chunk_ids[1], 0.88, None),
+            ]
+
+    context.get_xtr_index = lambda: _Index()
+    options = semantic_pro.SemanticProRuntimeOptions(use_warp=True, xtr_k=2, explain=True)
+
+    result = semantic_pro._maybe_run_late_interaction(context, "search", [3, 4], options)
+    assert result is not None
+    assertions.expect_sequence_equal(result.ids, [3, 4])
+    assertions.expect_true(result.explanations is not None)
+
+
+def test_maybe_apply_reranker_merges_scores(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = _FakeContext()
+
+    class _StubAdapter:
+        def rerank(self, _query: str, docs: list[semantic_pro.Doc]) -> RerankResult:
+            return RerankResult(ids=[docs[1].id, docs[0].id], scores=[0.5, 0.1])
+
+    monkeypatch.setattr(semantic_pro, "_build_coderank_adapter", lambda _cfg: _StubAdapter())
+    monkeypatch.setattr(semantic_pro, "relation_exists", lambda *_: True)
+    monkeypatch.setattr(
+        semantic_pro,
+        "_fetch_docs_for_reranker",
+        lambda *_args, **_kwargs: [
+            {"id": 1, "snippet": "doc1", "uri": "src/1.py"},
+            {"id": 2, "snippet": "doc2", "uri": "src/2.py"},
+        ],
+    )
+
+    ids, scores, metadata = semantic_pro._maybe_apply_reranker(
+        context=context,
+        query="vector",
+        ids=[1, 2],
+        scores=[0.3, 0.4],
+        options=semantic_pro.SemanticProRuntimeOptions(
+            use_reranker=True,
+            rerank=semantic_pro.RerankRuntimeOptions(enabled=True, top_k=2),
+        ),
+    )
+
+    assertions.expect_sequence_equal(ids, [2, 1])
+    assertions.expect_sequence_equal(scores, [0.9, 0.4])
+    assertions.expect_true(metadata["enabled"])
+    assertions.expect_equal(metadata["reordered"], 2)

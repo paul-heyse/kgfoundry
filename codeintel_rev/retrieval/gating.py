@@ -210,10 +210,36 @@ _DIGIT_RE = re.compile(r"\d")
 
 
 def _tokenize(query: str) -> list[str]:
+    """Tokenize query string by whitespace.
+
+    Parameters
+    ----------
+    query : str
+        Query string to tokenize.
+
+    Returns
+    -------
+    list[str]
+        List of non-empty tokens.
+    """
     return [token for token in re.split(r"\s+", query.strip()) if token]
 
 
 def _code_like_count(tokens: list[str], patterns: tuple[str, ...]) -> int:
+    """Count tokens matching code-like patterns.
+
+    Parameters
+    ----------
+    tokens : list[str]
+        Token list to check.
+    patterns : tuple[str, ...]
+        Regex patterns for code-like tokens.
+
+    Returns
+    -------
+    int
+        Number of tokens matching any pattern.
+    """
     compiled = [re.compile(pattern) for pattern in patterns]
     count = 0
     for token in tokens:

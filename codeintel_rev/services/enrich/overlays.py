@@ -266,7 +266,7 @@ def build_overlay_context(
     )
 
 
-def ensure_package_overlays(  # noqa: PLR0913
+def ensure_package_overlays(
     *,
     rel_path: Path,
     generated: list[str],

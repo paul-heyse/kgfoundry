@@ -1,0 +1,47 @@
+"""Tests for late-interaction rescoring pipeline components."""
+
+from __future__ import annotations
+
+from codeintel_rev.retrieval.pipeline.late_interaction import (
+    LateInteractionResult,
+    XTRLateInteraction,
+)
+
+from tests._helpers import assertions
+
+
+class _StubXTRIndex:
+    def __init__(self, triples):
+        self._triples = triples
+
+    def rescore(self, *, query: str, candidate_chunk_ids, explain: bool, topk_explanations: int):
+        self.last_query = query
+        self.last_candidates = list(candidate_chunk_ids)
+        self.last_explain = explain
+        self.last_topk = topk_explanations
+        return self._triples
+
+
+def test_xtr_late_interaction_rescore() -> None:
+    """Test XTR late-interaction rescoring produces correct results."""
+    triples = [
+        (1, 0.9, {"token_matches": [{"q_index": 0, "doc_index": 1, "similarity": 0.9}]}),
+        (2, 0.8, None),
+    ]
+    index = _StubXTRIndex(triples=triples)
+    li = XTRLateInteraction(index=index)
+
+    result = li.rescore(
+        query="vector search",
+        candidate_ids=[1, 2],
+        explain=True,
+        topk_explanations=3,
+    )
+
+    assertions.expect_true(isinstance(result, LateInteractionResult))
+    assertions.expect_sequence_equal(result.ids, [1, 2])
+    assertions.expect_sequence_equal(result.scores, [0.9, 0.8])
+    assertions.expect_equal(
+        result.explanations,
+        [(1, {"token_matches": [{"doc_index": 1, "q_index": 0, "similarity": 0.9}]})],
+    )

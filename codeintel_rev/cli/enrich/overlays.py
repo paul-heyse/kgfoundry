@@ -110,7 +110,7 @@ def overlays(
 
 def main() -> None:  # pragma: no cover - entrypoint shim
     """Invoke the enrichment CLI (overlays shim)."""
-    from codeintel_rev.cli.enrich.__main__ import main as enrich_main  # noqa: PLC0415
+    from codeintel_rev.cli.enrich.__main__ import main as enrich_main
 
     enrich_main()
 

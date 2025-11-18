@@ -476,6 +476,18 @@ def run_fetch(*, request: FetchRequest, deps: FetchDependencies) -> FetchRespons
 
 
 def _normalize_str_list(values: Sequence[str] | None) -> list[str]:
+    """Normalize string list by stripping whitespace and filtering empty values.
+
+    Parameters
+    ----------
+    values : Sequence[str] | None
+        Optional sequence of string values to normalize.
+
+    Returns
+    -------
+    list[str]
+        List of non-empty stripped strings. Returns empty list if input is None or empty.
+    """
     if not values:
         return []
     return [str(value).strip() for value in values if str(value).strip()]
@@ -644,6 +656,27 @@ def _compose_limits(
 
 
 def _embed_query(embedder: EmbeddingClient, query: str, vec_dim: int) -> NDArrayF32:
+    """Embed query text and validate dimension.
+
+    Parameters
+    ----------
+    embedder : EmbeddingClient
+        Embedding client for converting text to vectors.
+    query : str
+        Query text to embed.
+    vec_dim : int
+        Expected embedding dimension.
+
+    Returns
+    -------
+    NDArrayF32
+        Query embedding reshaped to (1, vec_dim).
+
+    Raises
+    ------
+    EmbeddingError
+        When embedding service is unavailable or dimension mismatch occurs.
+    """
     try:
         vector = embedder.embed_single(query)
     except (RuntimeError, ValueError) as exc:  # pragma: no cover - network errors
@@ -657,6 +690,23 @@ def _embed_query(embedder: EmbeddingClient, query: str, vec_dim: int) -> NDArray
 
 
 def _compute_fanout(top_k: int, filters: SearchFilters, limits: LimitsConfigLike) -> int:
+    """Compute FAISS fan-out accounting for post-filtering.
+
+    Parameters
+    ----------
+    top_k : int
+        Requested number of results.
+    filters : SearchFilters
+        Search filters that may reduce result count.
+    limits : LimitsConfigLike
+        Server limits configuration.
+
+    Returns
+    -------
+    int
+        Effective fan-out value, accounting for overfetch multiplier when filters
+        are active, bounded by max_results.
+    """
     multiplier = (
         limits.semantic_overfetch_multiplier
         if (filters.has_path_filters or filters.has_language_filters or filters.symbols)
@@ -693,12 +743,36 @@ def _build_runtime_overrides(*, rerank: bool) -> SearchRuntimeOverrides | None:
 
 
 def _flatten_ids(identifiers: NDArrayI64) -> list[int]:
+    """Extract valid chunk IDs from FAISS result array.
+
+    Parameters
+    ----------
+    identifiers : NDArrayI64
+        FAISS result array with shape (1, k) containing chunk IDs.
+
+    Returns
+    -------
+    list[int]
+        List of non-negative chunk IDs from the first row.
+    """
     if identifiers.size == 0:
         return []
     return [int(chunk_id) for chunk_id in identifiers[0].tolist() if chunk_id >= 0]
 
 
 def _flatten_scores(distances: NDArrayF32) -> list[float]:
+    """Extract similarity scores from FAISS result array.
+
+    Parameters
+    ----------
+    distances : NDArrayF32
+        FAISS result array with shape (1, k) containing similarity scores.
+
+    Returns
+    -------
+    list[float]
+        List of similarity scores from the first row.
+    """
     if distances.size == 0:
         return []
     return [float(score) for score in distances[0].tolist()]
@@ -709,6 +783,22 @@ def _hydrate_chunks(
     chunk_ids: Sequence[int],
     filters: SearchFilters,
 ) -> dict[int, dict[str, object]]:
+    """Retrieve chunk metadata from catalog with optional filtering.
+
+    Parameters
+    ----------
+    catalog : CatalogLike
+        Catalog instance for chunk retrieval.
+    chunk_ids : Sequence[int]
+        Chunk identifiers to hydrate.
+    filters : SearchFilters
+        Search filters for path/language filtering.
+
+    Returns
+    -------
+    dict[int, dict[str, object]]
+        Dictionary mapping chunk IDs to their metadata rows.
+    """
     if not chunk_ids:
         return {}
     if filters.has_path_filters or filters.has_language_filters:
@@ -736,6 +826,26 @@ def _build_results(
     request: SearchRequest,
     source_label: str,
 ) -> list[SearchResult]:
+    """Build SearchResult objects from ranked IDs and hydrated metadata.
+
+    Parameters
+    ----------
+    ranked_ids : Sequence[int]
+        Ranked chunk identifiers.
+    scores : Sequence[float]
+        Corresponding similarity scores.
+    hydration : HydrationPayload
+        Hydrated chunk rows and annotations.
+    request : SearchRequest
+        Search request controlling result construction.
+    source_label : str
+        Label describing the result source.
+
+    Returns
+    -------
+    list[SearchResult]
+        List of SearchResult objects with metadata and snippets.
+    """
     results: list[SearchResult] = []
     for chunk_id, score in zip(ranked_ids, scores, strict=False):
         row = hydration.rows.get(chunk_id)
@@ -761,6 +871,20 @@ def _build_results(
 
 
 def _matches_symbols(row: Mapping[str, object], symbols: Sequence[str]) -> bool:
+    """Check if chunk row contains any of the requested symbols.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Chunk metadata row.
+    symbols : Sequence[str]
+        Symbol identifiers to match.
+
+    Returns
+    -------
+    bool
+        True if any requested symbol is present in the chunk's symbols.
+    """
     chunk_symbols = set(_string_sequence(row.get("symbols")))
     if not chunk_symbols:
         return False
@@ -773,6 +897,24 @@ def _build_metadata(
     request: SearchRequest,
     score: float,
 ) -> dict[str, object]:
+    """Build metadata dictionary for search results.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Chunk metadata row.
+    annotation : StructureAnnotations | None
+        Optional structure annotations.
+    request : SearchRequest
+        Search request controlling metadata construction.
+    score : float
+        Similarity score.
+
+    Returns
+    -------
+    dict[str, object]
+        Metadata dictionary with uri, line/byte ranges, language, symbols, and explain.
+    """
     metadata: dict[str, object] = {
         "uri": str(row.get("uri")),
         "start_line": _coerce_int(row.get("start_line")),
@@ -815,6 +957,18 @@ def _build_hit_reasons(
 
 
 def _build_title(row: Mapping[str, object]) -> str:
+    """Build display title from chunk metadata.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Chunk metadata row.
+
+    Returns
+    -------
+    str
+        Title string in format "uri: lines start-end".
+    """
     uri = str(row.get("uri") or "")
     start_line = _coerce_int(row.get("start_line")) + 1
     end_line = _coerce_int(row.get("end_line")) + 1
@@ -822,6 +976,18 @@ def _build_title(row: Mapping[str, object]) -> str:
 
 
 def _build_url(row: Mapping[str, object]) -> str:
+    """Build repository URL from chunk metadata.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Chunk metadata row.
+
+    Returns
+    -------
+    str
+        URL string in format "repo://uri#Lstart-Lend".
+    """
     uri = str(row.get("uri") or "")
     start_line = _coerce_int(row.get("start_line")) + 1
     end_line = _coerce_int(row.get("end_line")) + 1
@@ -829,6 +995,18 @@ def _build_url(row: Mapping[str, object]) -> str:
 
 
 def _build_snippet(row: Mapping[str, object]) -> str:
+    """Extract snippet text from chunk metadata.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Chunk metadata row.
+
+    Returns
+    -------
+    str
+        Snippet text truncated to 400 characters, preferring preview over content.
+    """
     preview = row.get("preview")
     if preview:
         return str(preview)[:400]
@@ -837,6 +1015,20 @@ def _build_snippet(row: Mapping[str, object]) -> str:
 
 
 def _truncate_content(content: str, max_tokens: int) -> str:
+    """Truncate content to approximate token limit preserving line boundaries.
+
+    Parameters
+    ----------
+    content : str
+        Content text to truncate.
+    max_tokens : int
+        Maximum approximate token count (4 chars per token).
+
+    Returns
+    -------
+    str
+        Truncated content ending at a line boundary with ellipsis.
+    """
     max_chars = max_tokens * 4
     if len(content) <= max_chars:
         return content
@@ -845,6 +1037,18 @@ def _truncate_content(content: str, max_tokens: int) -> str:
 
 
 def _build_fetch_metadata(row: Mapping[str, object]) -> dict[str, object]:
+    """Build metadata dictionary for fetch results.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Chunk metadata row.
+
+    Returns
+    -------
+    dict[str, object]
+        Metadata dictionary with uri, line/byte ranges, and language.
+    """
     return {
         "uri": str(row.get("uri")),
         "start_line": _coerce_int(row.get("start_line")),
@@ -900,6 +1104,21 @@ def _write_pool_rows(
     final_results: Sequence[SearchResult],
     rerank_enabled: bool,
 ) -> None:
+    """Write evaluation pool rows to Parquet file.
+
+    Parameters
+    ----------
+    deps : SearchDependencies
+        Dependencies containing pool directory and run ID.
+    annotations : Mapping[int, StructureAnnotations]
+        Structure annotations keyed by chunk ID.
+    ann_snapshot : Sequence[tuple[int, float]] | None
+        ANN search snapshot with (chunk_id, score) pairs.
+    final_results : Sequence[SearchResult]
+        Final search results after reranking.
+    rerank_enabled : bool
+        Whether reranking was performed.
+    """
     if deps.pool_dir is None:
         return
     if not ann_snapshot and (not rerank_enabled or not final_results):
@@ -946,6 +1165,18 @@ def _write_pool_rows(
 
 
 def _build_pool_reason(annotation: StructureAnnotations | None) -> dict[str, object]:
+    """Build reason dictionary from structure annotations for pool rows.
+
+    Parameters
+    ----------
+    annotation : StructureAnnotations | None
+        Optional structure annotations.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary with matched_symbols, ast_kind, and cst_hits.
+    """
     matched = list(annotation.symbol_hits) if annotation and annotation.symbol_hits else []
     ast_kind = annotation.ast_node_kinds[0] if annotation and annotation.ast_node_kinds else None
     cst_hits = list(annotation.cst_matches) if annotation and annotation.cst_matches else None
@@ -957,6 +1188,18 @@ def _build_pool_reason(annotation: StructureAnnotations | None) -> dict[str, obj
 
 
 def _coerce_int(value: object | None) -> int:
+    """Coerce value to integer with safe fallback.
+
+    Parameters
+    ----------
+    value : object | None
+        Value to coerce.
+
+    Returns
+    -------
+    int
+        Integer value, or 0 if coercion fails.
+    """
     if isinstance(value, bool):
         return int(value)
     if isinstance(value, int):
@@ -972,6 +1215,18 @@ def _coerce_int(value: object | None) -> int:
 
 
 def _string_sequence(value: object | None) -> list[str]:
+    """Convert value to list of strings.
+
+    Parameters
+    ----------
+    value : object | None
+        Value to convert.
+
+    Returns
+    -------
+    list[str]
+        List of non-empty string items, or empty list if conversion fails.
+    """
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         return [str(item) for item in value if item]
     return []
@@ -981,6 +1236,20 @@ def _repair_single_result(
     item: SearchResult,
     row: Mapping[str, object],
 ) -> SearchResult | None:
+    """Repair a single search result using hydrated metadata.
+
+    Parameters
+    ----------
+    item : SearchResult
+        Search result to repair.
+    row : Mapping[str, object]
+        Hydrated chunk metadata.
+
+    Returns
+    -------
+    SearchResult | None
+        Repaired result, or None if repair fails (missing snippet).
+    """
     title = item.title or _build_title(row)
     url = item.url or _build_url(row)
     snippet = _resolve_snippet(item.snippet, row)
@@ -993,6 +1262,20 @@ def _repair_single_result(
 
 
 def _resolve_snippet(snippet: str, row: Mapping[str, object]) -> str:
+    """Resolve snippet text with fallback to row metadata.
+
+    Parameters
+    ----------
+    snippet : str
+        Existing snippet text.
+    row : Mapping[str, object]
+        Chunk metadata row for fallback.
+
+    Returns
+    -------
+    str
+        Snippet text, preferring existing snippet, then row preview/content.
+    """
     if snippet and snippet.strip():
         return snippet
     fallback = _build_snippet(row)
@@ -1006,6 +1289,20 @@ def _merge_metadata(
     metadata_in: Mapping[str, object],
     row: Mapping[str, object],
 ) -> tuple[dict[str, object], bool]:
+    """Merge metadata from row into existing metadata.
+
+    Parameters
+    ----------
+    metadata_in : Mapping[str, object]
+        Existing metadata dictionary.
+    row : Mapping[str, object]
+        Chunk metadata row to merge.
+
+    Returns
+    -------
+    tuple[dict[str, object], bool]
+        Merged metadata dictionary and changed flag.
+    """
     metadata = dict(metadata_in)
     changed = False
     if not str(metadata.get("uri") or "").strip():

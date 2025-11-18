@@ -1,0 +1,201 @@
+codeintel_rev/cli/enrich/analytics.py:
+  40:5 PLC0415 `import` should be at the top-level of a file
+
+codeintel_rev/cli/enrich/common.py:
+   89:5 FBT003 Boolean positional value in function call
+  104:5 FBT003 Boolean positional value in function call
+  124:5 FBT003 Boolean positional value in function call
+  129:5 FBT003 Boolean positional value in function call
+  201:5 PLR0913 Too many arguments in function definition (14 > 5)
+  201:5 PLR0917 Too many positional arguments (9/5)
+
+codeintel_rev/cli/enrich/overlays.py:
+  113:5 PLC0415 `import` should be at the top-level of a file
+
+codeintel_rev/mcp_server/adapters/semantic_pro.py:
+   90:5  DOC201 `return` is not documented in docstring
+  125:11 D103 Missing docstring in public function
+  161:5  D401 First line of docstring should be in imperative mood: "Synchronous orchestration entrypoint invoked from the async wrapper."
+  161:5  DOC201 `return` is not documented in docstring
+  342:34 ANN401 Dynamically typed expressions (typing.Any) are disallowed in `cfg`
+  377:13 S608 Possible SQL injection vector through string-based query construction
+
+codeintel_rev/retrieval/pipeline/gating.py:
+  35:5 DOC201 `return` is not documented in docstring
+
+codeintel_rev/retrieval/pipeline/late_interaction.py:
+  24:9  D102 Missing docstring in public method
+  40:9  D102 Missing docstring in public method
+  57:75 PLR2004 Magic value used in comparison, consider replacing `2` with a constant variable
+
+codeintel_rev/retrieval/pipeline/rerankers.py:
+  30:9  D102 Missing docstring in public method
+  36:9  D102 Missing docstring in public method
+  36:9  PLR6301 Method `rerank` could be a function, class method, or static method
+  36:22 ARG002 Unused method argument: `query`
+  50:13 D102 Missing docstring in public method
+  72:8  BLE001 Do not catch blind exception: `Exception`
+
+codeintel_rev/retrieval/pipeline/stage0.py:
+  243:5  DOC201 `return` is not documented in docstring
+  271:5  DOC201 `return` is not documented in docstring
+  316:13 F821 Undefined name `limits_metadata`
+  353:5  DOC201 `return` is not documented in docstring
+  390:5  DOC201 `return` is not documented in docstring
+  447:5  PLR0913 Too many arguments in function definition (6 > 5)
+
+codeintel_rev/services/enrich/overlays.py:
+  269:5 PLR0913 Too many arguments in function definition (10 > 5)
+
+execute_faiss_migration.py:
+    1:1  EXE001 Shebang is present but file is not executable
+    2:1  D400 First line should end with a period
+   19:5  DOC201 `return` is not documented in docstring
+   20:13 PLW1514 `pathlib.Path(...).read_text` without explicit `encoding` argument
+   27:5  DOC201 `return` is not documented in docstring
+   28:13 PLW1514 `pathlib.Path(...).read_text` without explicit `encoding` argument
+   91:5  ANN201 Missing return type annotation for public function `main`
+   91:5  D103 Missing docstring in public function
+   93:5  F841 Local variable `runtime_file` is assigned to but never used
+   94:5  F841 Local variable `build_file` is assigned to but never used
+   95:5  F841 Local variable `store_file` is assigned to but never used
+   98:9  T201 `print` found
+  101:5  T201 `print` found
+  102:5  T201 `print` found
+  103:5  T201 `print` found
+  104:5  T201 `print` found
+  105:5  T201 `print` found
+  106:5  T201 `print` found
+  109:5  T201 `print` found
+  110:5  T201 `print` found
+  111:5  T201 `print` found
+  114:9  T201 `print` found
+  116:5  T201 `print` found
+  119:9  T201 `print` found
+  121:5  T201 `print` found
+  124:9  T201 `print` found
+  126:5  T201 `print` found
+  127:5  T201 `print` found
+  128:5  T201 `print` found
+  129:5  T201 `print` found
+
+migrate_faiss_methods.py:
+    1:1  EXE001 Shebang is present but file is not executable
+    2:1  D400 First line should end with a period
+   14:5  DOC201 `return` is not documented in docstring
+   15:13 PLW1514 `pathlib.Path(...).read_text` without explicit `encoding` argument
+   22:5  DOC201 `return` is not documented in docstring
+   33:28 PLC1901 `line.strip() == ""` can be simplified to `not line.strip()` as an empty string is falsey
+  161:5  ANN201 Missing return type annotation for public function `main`
+  161:5  D103 Missing docstring in public function
+  164:9  T201 `print` found
+  167:5  T201 `print` found
+  168:5  T201 `print` found
+  169:5  T201 `print` found
+  172:9  T201 `print` found
+  173:9  T201 `print` found
+  180:17 T201 `print` found
+  182:17 T201 `print` found
+  183:9  T201 `print` found
+  185:5  T201 `print` found
+  186:5  T201 `print` found
+  187:5  T201 `print` found
+  188:5  T201 `print` found
+  217:5  PLR1722 Use `sys.exit()` instead of `exit`
+
+tests/app/test_admin_index.py:
+  38:30 SLF001 Private member accessed: `_require_admin`
+  64:30 SLF001 Private member accessed: `_require_admin`
+  78:30 SLF001 Private member accessed: `_require_admin`
+  97:30 SLF001 Private member accessed: `_require_admin`
+
+tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py:
+   49:9  PLR6301 Method `open_catalog` could be a function, class method, or static method
+   54:9  PYI034 `__enter__` methods in classes like `_CatalogCtx` usually return `self` at runtime
+   60:9  PLR6301 Method `query_by_ids` could be a function, class method, or static method
+   75:9  PLR6301 Method `get_structure_annotations` could be a function, class method, or static method
+   78:9  ANN202 Missing return type annotation for private function `connection`
+   79:9  F841 Local variable `catalog` is assigned to but never used
+   82:17 ANN204 Missing return type annotation for special method `__enter__`
+   88:17 ANN202 Missing return type annotation for private function `execute`
+   88:17 PLR6301 Method `execute` could be a function, class method, or static method
+   94:25 ANN204 Missing return type annotation for special method `__init__`
+   94:40 ANN001 Missing type annotation for function argument `rows`
+   97:25 ANN202 Missing return type annotation for private function `fetchone`
+  100:25 ANN202 Missing return type annotation for private function `fetchall`
+  126:5  D103 Missing docstring in public function
+  132:16 ARG005 Unused lambda argument: `request`
+  137:17 ARG005 Unused lambda argument: `args`
+  137:25 ARG005 Unused lambda argument: `kwargs`
+  144:17 ARG005 Unused lambda argument: `args`
+  144:25 ARG005 Unused lambda argument: `kwargs`
+  181:16 SLF001 Private member accessed: `_semantic_search_pro_sync`
+  196:11 D103 Missing docstring in public function
+  202:5  D103 Missing docstring in public function
+  203:33 SLF001 Private member accessed: `_merge_late_interaction`
+  212:5  D103 Missing docstring in public function
+  218:29 PLW0108 Lambda may be unnecessary; consider inlining inner function
+  219:14 SLF001 Private member accessed: `_maybe_run_late_interaction`
+  228:5  D103 Missing docstring in public function
+  228:55 ARG001 Unused function argument: `monkeypatch`
+  234:13 ANN202 Missing return type annotation for private function `rescore`
+  234:13 PLR6301 Method `rescore` could be a function, class method, or static method
+  234:27 ARG002 Unused method argument: `query`
+  234:39 ANN001 Missing type annotation for function argument `candidate_chunk_ids`
+  234:63 ARG002 Unused method argument: `explain`
+  234:78 ARG002 Unused method argument: `topk_explanations`
+  240:29 PLW0108 Lambda may be unnecessary; consider inlining inner function
+  243:14 SLF001 Private member accessed: `_maybe_run_late_interaction`
+  244:5  S101 Use of `assert` detected
+  249:5  D103 Missing docstring in public function
+  253:13 PLR6301 Method `rerank` could be a function, class method, or static method
+  253:26 ARG002 Unused method argument: `query`
+  256:73 ARG005 Unused lambda argument: `cfg`
+  267:29 SLF001 Private member accessed: `_maybe_apply_reranker`
+
+tests/codeintel_rev/test_semantic_adapter.py:
+   22:9  PYI034 `__enter__` methods in classes like `_FakeCatalog` usually return `self` at runtime
+   34:9  PLR6301 Method `get_structure_annotations` could be a function, class method, or static method
+   81:16 ARG005 Unused lambda argument: `request`
+   84:16 SLF001 Private member accessed: `_semantic_search_sync`
+  107:16 ARG005 Unused lambda argument: `request`
+  112:9  SLF001 Private member accessed: `_semantic_search_sync`
+  132:15 RUF029 Function `_fake_scope` is declared `async`, but doesn't `await` or use `async` features.
+  139:16 ARG005 Unused lambda argument: `request`
+
+tests/conftest.py:
+  367:9 PLR0913 Too many arguments in function definition (8 > 5)
+  405:9 PLR0913 Too many arguments in function definition (7 > 5)
+
+tests/retrieval/pipeline/test_gating.py:
+   1:1 D100 Missing docstring in public module
+   8:5 D103 Missing docstring in public function
+  17:5 D103 Missing docstring in public function
+  26:5 D103 Missing docstring in public function
+
+tests/retrieval/pipeline/test_late_interaction.py:
+   1:1  D100 Missing docstring in public module
+  12:9  ANN204 Missing return type annotation for special method `__init__`
+  12:24 ANN001 Missing type annotation for function argument `triples`
+  15:9  ANN202 Missing return type annotation for private function `rescore`
+  15:38 ANN001 Missing type annotation for function argument `candidate_chunk_ids`
+  23:5  D103 Missing docstring in public function
+
+tests/retrieval/pipeline/test_rerankers.py:
+  1:1 D100 Missing docstring in public module
+  8:5 D103 Missing docstring in public function
+
+tests/retrieval/pipeline/test_stage0.py:
+   1:1  D100 Missing docstring in public module
+  16:9  ANN202 Missing return type annotation for private function `search`
+  16:34 ANN001 Missing type annotation for function argument `semantic_hits`
+  16:61 ANN001 Missing type annotation for function argument `options`
+  24:5  D103 Missing docstring in public function
+  57:5  D103 Missing docstring in public function
+  81:5  D103 Missing docstring in public function
+
+tests/tools/test_cli_context_registry.py:
+  43:5 PLR0913 Too many arguments in function definition (6 > 5)
+
+Found 159 errors.
+No fixes available (50 hidden fixes can be enabled with the `--unsafe-fixes` option).

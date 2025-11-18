@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from contextlib import suppress
 from dataclasses import dataclass
+from numbers import Integral, Real
+from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -49,6 +51,43 @@ class FAISSRuntimeOptions:
     autotune_on_start: bool = False
     enable_range_search: bool = False
     semantic_min_score: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class SearchRuntimeOverrides:
+    """Per-search overrides for HNSW/quantizer parameters."""
+
+    ef_search: int | None = None
+    quantizer_ef_search: int | None = None
+    k_factor: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RefineSearchConfig:
+    """Configuration bundle for refine searches."""
+
+    nprobe: int | None = None
+    runtime: SearchRuntimeOverrides | None = None
+    source: str = "faiss"
+
+
+@dataclass(frozen=True, slots=True)
+class _SearchExecutionParams:
+    """Runtime parameters applied during dual search execution."""
+
+    nprobe: int
+    ef_search: int | None
+    quantizer_ef_search: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class _SearchPlan:
+    """Resolved parameters and query buffer for a search."""
+
+    queries: NDArrayF32
+    k: int
+    search_k: int
+    params: _SearchExecutionParams
 
 
 def _as2d_f32(arr: NDArrayF32) -> NDArrayF32:
@@ -632,3 +671,255 @@ def search_dual(  # noqa: PLR0913
         )
 
     return d_m[:, :k], i_m[:, :k]
+
+
+def timed_search_with_params(
+    index: FaissIndex,
+    queries: NDArrayF32,
+    k: int,
+    param_str: str,
+) -> tuple[float, tuple[NDArrayF32, NDArrayI64]]:
+    """Execute a parameterized search and measure its latency.
+
+    Extended Summary
+    ----------------
+    Performs a FAISS search with the specified parameter string and measures
+    the execution time in milliseconds. Wraps the search operation with timing
+    instrumentation, recording the elapsed time from start to completion. Used
+    by autotune sweeps to evaluate parameter configurations and select optimal
+    settings based on recall and latency trade-offs.
+
+    Parameters
+    ----------
+    index : FaissIndex
+        FAISS index to search. Must be trained and populated.
+    queries : NDArrayF32
+        Query vector(s) to search, shape (n_queries, vec_dim) or (vec_dim,).
+        Automatically normalized for cosine similarity.
+    k : int
+        Number of nearest neighbors to return per query. Must be positive.
+        Used to retrieve top-k results for evaluation.
+    param_str : str
+        FAISS ParameterSpace parameter string (e.g., "nprobe=64,efSearch=128").
+        Applied to the index before search. Used to test different parameter
+        configurations during autotune sweeps.
+
+    Returns
+    -------
+    tuple[float, tuple[NDArrayF32, NDArrayI64]]
+        Tuple containing:
+        - Elapsed time in milliseconds (float): Search execution time measured
+          using perf_counter() for high-resolution timing
+        - Search results tuple: (distances, ids) arrays, both with shape (n_queries, k).
+          Distances are cosine similarity scores; IDs are candidate indices or external IDs.
+
+    Notes
+    -----
+    This function is used by AutoTuner.run_sweep() to evaluate parameter
+    configurations during autotune sweeps. Time complexity: O(search_time)
+    where search_time depends on index type and parameters, plus O(1) for
+    timing overhead.
+    """
+    start = perf_counter()
+    apply_runtime_parameters(index, nprobe=None, ef_search=None, quantizer_ef_search=None)
+    if param_str and param_str.strip():
+        faiss_mod = cast("FaissModule", _faiss.module())
+        ps_factory = getattr(faiss_mod, "ParameterSpace", None)
+        if ps_factory is not None:
+            with suppress(Exception):  # pragma: no cover - best effort
+                ps = cast("FaissParameterSpace", ps_factory())
+                ps.initialize(index)
+                ps.set_index_parameters(index, param_str)
+    result = _run_index_search(index, queries, k)
+    elapsed = (perf_counter() - start) * 1000.0
+    return elapsed, result
+
+
+def brute_force_truth_ids(queries: NDArrayF32, truths: NDArrayF32, k: int) -> NDArrayI64:
+    """Compute ground-truth nearest neighbor IDs via exact brute-force search.
+
+    Extended Summary
+    ----------------
+    Performs exact nearest neighbor search by computing the full similarity
+    matrix (queries @ truths.T) and selecting the top-k most similar truth
+    vectors for each query. It uses argpartition for efficient top-k selection
+    without full sorting. The result provides ground-truth IDs for recall
+    evaluation during autotune sweeps.
+
+    Parameters
+    ----------
+    queries : NDArrayF32
+        Query vectors with shape (n_queries, vec_dim) and dtype float32.
+        Used to compute similarities against truth vectors. Vectors should be
+        normalized for cosine similarity (inner product).
+    truths : NDArrayF32
+        Ground-truth vectors with shape (n_truths, vec_dim) and dtype float32.
+        Used as the corpus for exact nearest neighbor search. Vectors should be
+        normalized for cosine similarity. The number of truth vectors determines
+        the maximum k value (clamped to n_truths).
+    k : int
+        Number of nearest neighbors to retrieve per query. Must be positive.
+        Clamped to min(k, n_truths) to avoid exceeding the truth corpus size.
+        When k <= 0 or k > n_truths, returns an empty array.
+
+    Returns
+    -------
+    NDArrayI64
+        Array of ground-truth nearest neighbor indices with shape (n_queries, k_eff)
+        where k_eff = min(k, n_truths). Each row contains the indices (0-based) of
+        the top-k most similar truth vectors for the corresponding query, sorted
+        by similarity (descending). Returns an empty array with shape (n_queries, 0)
+        when k <= 0 or n_truths == 0.
+
+    Notes
+    -----
+    Time complexity: O(n_queries * n_truths * vec_dim) for similarity computation
+    plus O(n_queries * n_truths * log(k)) for top-k selection. Space complexity:
+    O(n_queries * n_truths) for the similarity matrix.
+    """
+    sims = queries @ truths.T
+    k_eff = min(k, sims.shape[1])
+    if k_eff <= 0:
+        return np.empty((queries.shape[0], 0), dtype=np.int64)
+    idx = np.argpartition(-sims, kth=k_eff - 1, axis=1)[:, :k_eff]
+    return idx.astype(np.int64)
+
+
+def estimate_recall(candidates: NDArrayI64, truth: NDArrayI64) -> float:
+    """Compute average recall@k between candidate and ground-truth IDs.
+
+    Parameters
+    ----------
+    candidates : NDArrayI64
+        Candidate ID arrays with shape (n_queries, k).
+    truth : NDArrayI64
+        Ground-truth ID arrays with shape (n_queries, k).
+
+    Returns
+    -------
+    float
+        Average recall@k score in the range [0.0, 1.0]. Returns 0.0
+        if either array is empty.
+    """
+    if candidates.size == 0 or truth.size == 0:
+        return 0.0
+    total = candidates.shape[0]
+    hits = 0.0
+    for found, expected in zip(candidates, truth, strict=False):
+        truth_set = {int(val) for val in expected if int(val) >= 0}
+        if not truth_set:
+            continue
+        hit_count = sum(1 for cand in found if int(cand) in truth_set)
+        hits += float(hit_count) / len(truth_set)
+    return hits / max(1, total)
+
+
+def ensure_2d(array: NDArrayF32) -> NDArrayF32:
+    """Normalize query arrays to shape (n_queries, vec_dim).
+
+    Parameters
+    ----------
+    array : NDArrayF32
+        Input array that may be 1-D or 2-D.
+
+    Returns
+    -------
+    NDArrayF32
+        Array guaranteed to be 2-D with shape (n_queries, vec_dim).
+        If input is 1-D, reshaped to (1, vec_dim).
+    """
+    arr = np.asarray(array, dtype=np.float32)
+    if arr.ndim == 1:
+        return arr.reshape(1, -1)
+    return arr
+
+
+def _coerce_to_int(value: object, default: int = -1) -> int:
+    """Safely round arbitrary objects to integers for index comparisons.
+
+    Parameters
+    ----------
+    value : object
+        Candidate value that might be converted to an integer.
+    default : int
+        Fallback value when conversion is not possible.
+
+    Returns
+    -------
+    int
+        Converted integer or the provided default.
+    """
+    if isinstance(value, (int, float, str)):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+    return default
+
+
+def _coerce_optional_int(value: object | None) -> int | None:
+    """Return ``value`` coerced to int when possible.
+
+    Parameters
+    ----------
+    value : object | None
+        Value to coerce to an integer. Accepts integers, floats, or strings.
+        Empty strings and ``None`` are converted to ``None``.
+
+    Returns
+    -------
+    int | None
+        Integer representation or ``None`` when the value is empty.
+
+    Raises
+    ------
+    TypeError
+        If ``value`` cannot be coerced to an integer.
+    """
+    if value is None:
+        return None
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return int(stripped)
+    msg = f"Unsupported integer override type: {type(value)!r}"
+    raise TypeError(msg)
+
+
+def _coerce_optional_float(value: object | None) -> float | None:
+    """Return ``value`` coerced to float when possible.
+
+    Parameters
+    ----------
+    value : object | None
+        Value to coerce to a float. Accepts booleans, numeric types, or strings.
+        Empty strings and ``None`` are converted to ``None``.
+
+    Returns
+    -------
+    float | None
+        Float representation or ``None`` when the value is empty.
+
+    Raises
+    ------
+    TypeError
+        If ``value`` cannot be coerced to a float.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, Real):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return float(stripped)
+    msg = f"Unsupported float override type: {type(value)!r}"
+    raise TypeError(msg)

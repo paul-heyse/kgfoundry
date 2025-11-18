@@ -35,7 +35,7 @@ def test_admin_tuning_updates_context(tmp_path: Path) -> None:
     ctx = build_application_context(tmp_path)
     app = build_test_app(ctx)
     app.include_router(index_admin.router)
-    app.dependency_overrides[index_admin._require_admin] = lambda: None  # noqa: SLF001
+    app.dependency_overrides[index_admin._require_admin] = lambda: None
     with TestClient(app) as client:
         resp = client.post(
             "/admin/index/tuning",
@@ -61,7 +61,7 @@ def test_admin_faiss_runtime_status_endpoint(tmp_path: Path) -> None:
     ctx.seed_runtime_cells_for_tests(coderank_faiss=cast("FAISSManager", manager))
     app = build_test_app(ctx)
     app.include_router(index_admin.router)
-    app.dependency_overrides[index_admin._require_admin] = lambda: None  # noqa: SLF001
+    app.dependency_overrides[index_admin._require_admin] = lambda: None
     with TestClient(app) as client:
         resp = client.get("/admin/index/tuning/faiss")
         assertions.expect_equal(resp.status_code, HTTPStatus.OK)
@@ -75,7 +75,7 @@ def test_admin_faiss_runtime_session_override(tmp_path: Path) -> None:
     ctx = replace(ctx, scope_store=cast("ScopeStore", stub))
     app = build_test_app(ctx)
     app.include_router(index_admin.router)
-    app.dependency_overrides[index_admin._require_admin] = lambda: None  # noqa: SLF001
+    app.dependency_overrides[index_admin._require_admin] = lambda: None
     with TestClient(app) as client:
         resp = client.post(
             "/admin/index/tuning/faiss",
@@ -94,7 +94,7 @@ def test_admin_faiss_runtime_reset_session(tmp_path: Path) -> None:
     ctx = replace(ctx, scope_store=cast("ScopeStore", stub))
     app = build_test_app(ctx)
     app.include_router(index_admin.router)
-    app.dependency_overrides[index_admin._require_admin] = lambda: None  # noqa: SLF001
+    app.dependency_overrides[index_admin._require_admin] = lambda: None
     with TestClient(app) as client:
         resp = client.delete("/admin/index/tuning/faiss", params={"session_id": "abc"})
         assertions.expect_equal(resp.status_code, HTTPStatus.OK)

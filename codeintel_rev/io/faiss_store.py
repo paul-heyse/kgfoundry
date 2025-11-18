@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, Any, cast
 
 import duckdb
 import numpy as np
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.duckdb_catalog import IdMapMeta, refresh_faiss_idmap_materialized
-from codeintel_rev.typing import FaissIndex, NDArrayI64, gate_import
+from codeintel_rev.typing import FaissIndex, NDArrayF32, NDArrayI64, gate_import
+
+if TYPE_CHECKING:
+    from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 
 _faiss = LazyModule("faiss", "FAISS store helpers")
 _pyarrow = LazyModule("pyarrow", "ID map export helpers")
@@ -176,3 +180,237 @@ def refresh_duckdb_materialization(
         idmap_parquet=str(idmap_parquet),
         chunks_parquet=str(chunks_parquet),
     )
+
+
+def write_profile(
+    index: FaissIndex | None, path: Path, faiss_family: str | None, refine_k_factor: float
+) -> None:
+    """Persist a minimal profile snapshot describing a FAISS index.
+
+    Parameters
+    ----------
+    index : FaissIndex | None
+        FAISS index to profile, or None.
+    path : Path
+        Destination path for the profile JSON.
+    faiss_family : str | None
+        Family name (e.g., "adaptive", "flat", "ivfpq"), or None.
+    refine_k_factor : float
+        Refinement k factor setting.
+    """
+    if index is None:
+        return
+    if faiss_family is None:
+        return
+    profile = {
+        "dims": int(getattr(index, "d", 0)),
+        "ntotal": int(getattr(index, "ntotal", 0)),
+        "is_trained": bool(getattr(index, "is_trained", False)),
+        "type_name": type(index).__name__,
+        "faiss_family": faiss_family,
+        "refine_k_factor": refine_k_factor,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(profile, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def meta_snapshot(  # noqa: PLR0913,PLR0917
+    index_path: Path,
+    vec_dim: int,
+    faiss_family: str | None,
+    default_nprobe: int | None,
+    hnsw_ef_search: int,
+    refine_k_factor: float,
+    meta_path: Path,
+) -> dict[str, object]:
+    """Return persisted metadata merged with current configuration.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary containing index metadata including index_path,
+        factory, dimension, and other configuration values.
+    """
+    snapshot: dict[str, object]
+    if meta_path.exists():
+        try:
+            snapshot = json.loads(meta_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            snapshot = {}
+    else:
+        snapshot = {}
+    snapshot.update(
+        {
+            "index_path": str(index_path),
+            "vec_dim": vec_dim,
+            "faiss_family": faiss_family,
+            "default_parameters": {
+                "nprobe": default_nprobe,
+                "efSearch": hnsw_ef_search,
+                "quantizer_efSearch": None,
+                "k_factor": refine_k_factor,
+            },
+        }
+    )
+    return snapshot
+
+
+def write_meta_snapshot(  # noqa: PLR0913
+    *,
+    index_path: Path,
+    vec_dim: int,
+    faiss_family: str | None,
+    default_nprobe: int | None,
+    hnsw_ef_search: int,
+    refine_k_factor: float,
+    meta_path: Path,
+    runtime_overrides: Mapping[str, float | int] | None = None,
+    factory: str | None = None,
+    vector_count: int | None = None,
+    parameter_space: str | None = None,
+) -> None:
+    """Write the metadata snapshot to disk with updated overrides."""
+    meta = meta_snapshot(
+        index_path,
+        vec_dim,
+        faiss_family,
+        default_nprobe,
+        hnsw_ef_search,
+        refine_k_factor,
+        meta_path,
+    )
+    if factory is not None:
+        meta["factory"] = factory
+    if vector_count is not None:
+        meta["vector_count"] = int(vector_count)
+    if parameter_space is not None:
+        meta["parameter_space"] = parameter_space
+    meta["runtime_overrides"] = dict(runtime_overrides or {})
+    meta["compile_options"] = get_compile_options()
+    meta["updated_at"] = datetime.now(UTC).isoformat()
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+
+
+def get_compile_options() -> str:
+    """Return FAISS compile options string when available.
+
+    Returns
+    -------
+    str
+        Compile-time configuration string for FAISS, including enabled
+        features and build flags. Returns an empty string if compile options
+        are not available.
+    """
+    try:
+        faiss_mod = _faiss.module()
+        return str(getattr(faiss_mod, "get_compile_options", lambda: "")())
+    except (AttributeError, ImportError, RuntimeError):
+        return ""
+
+
+def save_tuning_profile(profile: Mapping[str, Any], path: Path) -> Path:
+    """Persist tuning profile to tuning.json and return its path.
+
+    Parameters
+    ----------
+    profile : Mapping[str, Any]
+        Autotune profile dictionary containing tuning results.
+    path : Path
+        Destination path for the profile.
+
+    Returns
+    -------
+    Path
+        File system path where the tuning profile was saved.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+    return path
+
+
+def load_tuned_profile(path: Path) -> dict[str, Any] | None:
+    """Load a persisted tuning profile from disk.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the tuning.json profile file.
+
+    Returns
+    -------
+    dict[str, Any] | None
+        Loaded profile dictionary or None if file doesn't exist or is invalid.
+    """
+    if not path.exists():
+        return None
+    try:
+        return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def hydrate_by_ids(catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
+    """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
+
+    Parameters
+    ----------
+    catalog : DuckDBCatalog
+        Catalog used to hydrate chunk metadata.
+    ids : Sequence[int]
+        Chunk identifiers to hydrate.
+
+    Returns
+    -------
+    list[dict]
+        Hydrated chunk metadata entries.
+    """
+    if not ids:
+        return []
+    return catalog.query_by_ids(list(ids))
+
+
+def reconstruct_batch(index: FaissIndex, vec_dim: int, ids: Sequence[int]) -> NDArrayF32:
+    """Reconstruct vectors for a batch of external chunk IDs.
+
+    Parameters
+    ----------
+    index : FaissIndex
+        FAISS index to reconstruct from.
+    vec_dim : int
+        Vector dimensionality.
+    ids : Sequence[int]
+        Chunk identifiers to reconstruct.
+
+    Returns
+    -------
+    NDArrayI64
+        Array of reconstructed vectors with shape ``(len(ids), vec_dim)``.
+
+    Raises
+    ------
+    RuntimeError
+        If FAISS is unable to reconstruct a specific vector.
+    """
+    if not ids:
+        return np.empty((0, vec_dim), dtype=np.float32)
+
+    # Enable direct map for reconstruction
+    try:
+        if hasattr(index, "make_direct_map"):
+            index.make_direct_map()
+        inner = getattr(index, "index", None)
+        if inner is not None and hasattr(inner, "make_direct_map"):
+            inner.make_direct_map()
+    except (AttributeError, RuntimeError):
+        pass
+
+    vectors = np.empty((len(ids), vec_dim), dtype=np.float32)
+    for pos, chunk_id in enumerate(ids):
+        try:
+            reconstructed = index.reconstruct(int(chunk_id))
+        except (AttributeError, RuntimeError) as exc:
+            msg = f"Unable to reconstruct FAISS vector for chunk_id {chunk_id}"
+            raise RuntimeError(msg) from exc
+        vectors[pos] = np.asarray(reconstructed, dtype=np.float32)
+    return vectors

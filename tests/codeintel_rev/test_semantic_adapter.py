@@ -1,971 +1,144 @@
-"""Tests for semantic search adapter and MCP semantic search integration."""
+"""Regression tests for the thin semantic adapter."""
 
 from __future__ import annotations
 
-import fnmatch
-import tempfile
-import types
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from pathlib import Path
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Self, TypedDict, cast
-from unittest.mock import patch
+from typing import Any
 
-import numpy as np
 import pytest
+from codeintel_rev.errors import CatalogConsistencyError
+from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
+from codeintel_rev.retrieval.pipeline.stage0 import Stage0Metadata, Stage0Result
 
-if TYPE_CHECKING:
-    from codeintel_rev.app.config_context import ApplicationContext
-
-from codeintel_rev.io.duckdb_catalog import StructureAnnotations
-from codeintel_rev.io.hybrid_search import HybridSearchOptions
-from codeintel_rev.mcp_server.adapters.semantic import semantic_search
-from codeintel_rev.mcp_server.schemas import ScopeIn
-
-from kgfoundry_common.errors import EmbeddingError
 from tests._helpers import assertions
 
-# Test constants for chunk IDs
-_DEFAULT_CHUNK_ID = 123
 
+@dataclass
+class _FakeCatalog(AbstractContextManager["_FakeCatalog"]):
+    records: list[Mapping[str, Any]]
 
-class ChunkRow(TypedDict, total=False):
-    """Typed chunk row used by the stub catalog."""
-
-    id: int
-    uri: str
-    start_line: int
-    end_line: int
-    preview: str
-
-
-def _clone_chunk(chunk: ChunkRow) -> ChunkRow:
-    """Return a shallow copy of a chunk row with typed metadata.
-
-    Returns
-    -------
-    ChunkRow
-        New mapping that may be mutated without affecting the input.
-    """
-    return cast("ChunkRow", dict(chunk))
-
-
-class StubDuckDBCatalog:
-    """Stub DuckDB catalog for testing.
-
-    Parameters
-    ----------
-    _db_path : Path | None
-        Database path (unused in stub).
-    _vectors_dir : Path | None
-        Vectors directory (unused in stub).
-    chunks : list[ChunkRow] | None, optional
-        List of chunks to return. If None, uses default chunk.
-    """
-
-    def __init__(
-        self,
-        _db_path: Path | None,
-        _vectors_dir: Path | None,
-        *,
-        chunks: list[ChunkRow] | None = None,
-    ) -> None:
-        if chunks is None:
-            default_chunk: ChunkRow = {
-                "id": _DEFAULT_CHUNK_ID,
-                "uri": "src/module.py",
-                "start_line": 0,
-                "end_line": 0,
-                "preview": "code snippet",
-            }
-            self._chunks: list[ChunkRow] = [default_chunk]
-        else:
-            self._chunks = [_clone_chunk(chunk) for chunk in chunks]
-        self._chunk: ChunkRow = (
-            _clone_chunk(self._chunks[0]) if self._chunks else cast("ChunkRow", {})
-        )
-
-    def __enter__(self) -> Self:
-        """Enter context manager.
-
-        Returns
-        -------
-        Self
-            Self instance.
-        """
+    def __enter__(self) -> _FakeCatalog:  # pragma: no cover - trivial
         return self
 
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: types.TracebackType | None,
-    ) -> bool:  # pragma: no cover - passthrough
-        """Exit context manager.
-
-        Parameters
-        ----------
-        exc_type : type[BaseException] | None
-            Exception type.
-        exc : BaseException | None
-            Exception instance.
-        tb : types.TracebackType | None
-            Traceback.
-
-        Returns
-        -------
-        bool
-            Always returns False.
-        """
-        del tb
+    def __exit__(self, *exc: object) -> bool:  # pragma: no cover - trivial
         return False
 
-    def get_chunk_by_id(self, chunk_id: int) -> ChunkRow | None:
-        """Get chunk by ID.
+    def query_by_ids(self, chunk_ids: Sequence[int]) -> list[Mapping[str, Any]]:
+        return [record for record in self.records if record["id"] in chunk_ids]
 
-        Returns
-        -------
-        ChunkRow | None
-            Chunk dictionary if ID matches, None otherwise.
-        """
-        return self._chunk if chunk_id == _DEFAULT_CHUNK_ID else None
+    def query_by_filters(self, chunk_ids: Sequence[int], **_: object) -> list[Mapping[str, Any]]:
+        return self.query_by_ids(chunk_ids)
 
-    def query_by_ids(self, chunk_ids: list[int]) -> list[ChunkRow]:
-        """Query chunks by IDs.
-
-        Parameters
-        ----------
-        chunk_ids : list[int]
-            List of chunk IDs to query.
-
-        Returns
-        -------
-        list[ChunkRow]
-            List of chunks matching the IDs.
-        """
-        return [_clone_chunk(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
-
-    def query_by_filters(
-        self,
-        chunk_ids: list[int],
-        *,
-        include_globs: list[str] | None = None,
-        exclude_globs: list[str] | None = None,
-        languages: list[str] | None = None,
-    ) -> list[ChunkRow]:
-        """Query chunks by IDs with filters.
-
-        Parameters
-        ----------
-        chunk_ids : list[int]
-            List of chunk IDs to query.
-        include_globs : list[str] | None, optional
-            Glob patterns to include. Defaults to None.
-        exclude_globs : list[str] | None, optional
-            Glob patterns to exclude. Defaults to None.
-        languages : list[str] | None, optional
-            Languages to filter by. Defaults to None.
-
-        Returns
-        -------
-        list[ChunkRow]
-            Filtered list of chunks.
-        """
-        filtered = [_clone_chunk(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
-        filtered = self._filter_languages(filtered, languages)
-        filtered = self._filter_includes(filtered, include_globs)
-        return self._filter_excludes(filtered, exclude_globs)
-
-    @staticmethod
-    def _filter_languages(
-        chunks: list[ChunkRow],
-        languages: list[str] | None,
-    ) -> list[ChunkRow]:
-        if not languages:
-            return chunks
-        language_exts = {
-            "python": (".py", ".pyi"),
-            "typescript": (".ts", ".tsx"),
-            "javascript": (".js", ".jsx"),
-        }
-        extensions = [ext for lang in languages for ext in language_exts.get(lang.lower(), ())]
-        if not extensions:
-            return chunks
-        suffixes = tuple(extensions)
-        return [
-            chunk
-            for chunk in chunks
-            if (uri := chunk.get("uri")) is not None
-            and isinstance(uri, str)
-            and uri.endswith(suffixes)
-        ]
-
-    @staticmethod
-    def _filter_includes(
-        chunks: list[ChunkRow],
-        include_globs: list[str] | None,
-    ) -> list[ChunkRow]:
-        if not include_globs:
-            return chunks
-        return [
-            chunk
-            for chunk in chunks
-            if (uri := chunk.get("uri")) is not None
-            and isinstance(uri, str)
-            and any(fnmatch.fnmatch(uri, pattern) for pattern in include_globs)
-        ]
-
-    @staticmethod
-    def _filter_excludes(
-        chunks: list[ChunkRow],
-        exclude_globs: list[str] | None,
-    ) -> list[ChunkRow]:
-        if not exclude_globs:
-            return chunks
-        return [
-            chunk
-            for chunk in chunks
-            if (uri := chunk.get("uri")) is not None
-            and isinstance(uri, str)
-            and not any(fnmatch.fnmatch(uri, pattern) for pattern in exclude_globs)
-        ]
-
-    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
-        """Get structure annotations for chunk IDs.
-
-        Returns
-        -------
-        dict[int, StructureAnnotations]
-            Mapping of chunk ID to structure annotations.
-        """
-        annotations: dict[int, StructureAnnotations] = {}
-        for chunk_id in ids:
-            annotations[int(chunk_id)] = StructureAnnotations(
-                uri=str(self._chunk.get("uri", "")),
-                symbol_hits=("stub.symbol",),
-                ast_node_kinds=("FunctionDef",),
-                cst_matches=(),
-            )
-        return annotations
+    def get_structure_annotations(self, ids: Sequence[int]) -> Mapping[int, Any]:
+        return {int(chunk_id): None for chunk_id in ids}
 
 
-def _stub_vllm_embed_single(query: str) -> np.ndarray:
-    """Stub vLLM embed_single function for testing.
+@dataclass
+class _FakeContext:
+    catalog: _FakeCatalog
 
-    Parameters
-    ----------
-    query : str
-        Query text.
+    def __post_init__(self) -> None:
+        self.settings = type(
+            "Settings",
+            (),
+            {"index": type("Idx", (), {"rrf_k": 60})},
+        )()
 
-    Returns
-    -------
-    np.ndarray
-        Mock embedding vector (3584 dimensions).
-    """
-    assertions.expect_true(bool(query), reason="query should be non-empty")
-    return np.array([0.1] * 3584, dtype=np.float32)
+    def open_catalog(self) -> _FakeCatalog:
+        return self.catalog
 
 
-class StubVLLMClient:
-    """Stub vLLM client for testing.
-
-    Parameters
-    ----------
-    _config : object
-        Configuration (unused in stub).
-    """
-
-    def __init__(self, _config: object) -> None:
-        pass
-
-    @staticmethod
-    def embed_single(query: str) -> np.ndarray:
-        """Return mock embedding vector.
-
-        Parameters
-        ----------
-        query : str
-            Query text.
-
-        Returns
-        -------
-        np.ndarray
-            Mock embedding vector (3584 dimensions).
-        """
-        return _stub_vllm_embed_single(query)
-
-
-class _BaseStubFAISSManager:
-    """Base stub FAISS manager for testing CPU-only execution.
-
-    Parameters
-    ----------
-    search_ids : list[int] | None, optional
-        List of chunk IDs to return from search. If None, returns default chunk ID.
-    """
-
-    def __init__(self, *, search_ids: list[int] | None = None) -> None:
-        self.last_k: int | None = None
-        self.last_nprobe: int | None = None
-        self.last_ef_search: int | None = None
-        self.last_quantizer_ef_search: int | None = None
-        self.last_k_factor: float | None = None
-        self._search_ids = search_ids or [_DEFAULT_CHUNK_ID]
-        self._last_catalog: object | None = None
-
-    @staticmethod
-    def load_cpu_index() -> None:
-        """Load CPU index (no-op for testing)."""
-        return
-
-    def search(
-        self,
-        query: np.ndarray,
-        *,
-        k: int,
-        nprobe: int = 128,
-        runtime: object | None = None,
-        catalog: object | None = None,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Return mock search results.
-
-        Parameters
-        ----------
-        query : np.ndarray
-            Query vector.
-        k : int
-            Number of results to return.
-        nprobe : int, optional
-            Number of probes. Defaults to 128.
-        runtime : object | None, optional
-            Runtime override bundle captured for verification in tests.
-        catalog : object | None, optional
-            Catalog reference mirroring the production signature. Captured for
-            verification during tests.
-
-        Returns
-        -------
-        tuple[np.ndarray, np.ndarray]
-            Tuple of (distances, ids) arrays.
-        """
-        assertions.expect_equal(query.shape[0], 1, reason="Batch size should be 1")
-        assertions.expect_true(k >= 1, reason="k should be at least 1")
-        self.last_k = k
-        self.last_nprobe = nprobe
-        self.last_ef_search = getattr(runtime, "ef_search", None)
-        self.last_quantizer_ef_search = getattr(runtime, "quantizer_ef_search", None)
-        self.last_k_factor = getattr(runtime, "k_factor", None)
-        if catalog is not None:
-            self._last_catalog = catalog
-        assertions.expect_true(nprobe >= 1, reason="nprobe should be at least 1")
-        # Return k results (or fewer if k > available chunks)
-        # Use stored search_ids or default to default chunk ID
-        result_ids = self._search_ids[:k]
-        ids = np.array([result_ids], dtype=np.int64)
-        distances = np.array([[0.9] * len(result_ids)], dtype=np.float32)
-        return distances, ids
-
-
-def _default_stub_hybrid_search(
-    query: str,
-    *,
-    semantic_hits: Sequence[tuple[int, float]],
-    limit: int,
-    options: HybridSearchOptions | None = None,
-) -> SimpleNamespace:
-    """Return a default hybrid engine stub that yields no additional channels.
-
-    Parameters
-    ----------
-    query : str
-        Query text (unused in stub).
-    semantic_hits : Sequence[tuple[int, float]]
-        Semantic search hits (unused in stub).
-    limit : int
-        Result limit (unused in stub).
-    options : HybridSearchOptions | None, optional
-        Hybrid search options (unused in stub), by default None.
-
-    Returns
-    -------
-    SimpleNamespace
-        Empty hybrid search result.
-    """
-    del query, semantic_hits, limit, options
-    return SimpleNamespace(
-        docs=[],
-        contributions={},
-        channels=[],
-        warnings=[],
-        method=None,
+def _stage0_result() -> Stage0Result:
+    return Stage0Result(
+        ids=[1],
+        scores=[0.9],
+        warnings=["fanout:limited"],
+        method={"retrieval": ["semantic"]},
+        channels=["semantic"],
+        contributions={1: [("semantic", 1, 0.9)]},
     )
 
 
-class _DefaultStubHybridEngine:
-    """Default hybrid engine stub that yields no additional channels."""
-
-    @staticmethod
-    def search(
-        query: str,
-        *,
-        semantic_hits: Sequence[tuple[int, float]],
-        limit: int,
-        options: HybridSearchOptions | None = None,
-    ) -> SimpleNamespace:
-        return _default_stub_hybrid_search(
-            query, semantic_hits=semantic_hits, limit=limit, options=options
-        )
+def _stage0_metadata() -> Stage0Metadata:
+    return Stage0Metadata(limits=["limit:clamped"], effective_limit=5, requested_limit=5)
 
 
-@dataclass(frozen=True)
-class StubContextConfig:
-    """Configuration for StubContext initialization."""
-
-    limits: list[str] | None = None
-    error: str | None = None
-    max_results: int = 5
-    semantic_overfetch_multiplier: int = 2
-    catalog_chunks: list[ChunkRow] | None = None
-    faiss_nprobe: int = 128
-    hybrid_engine: object | None = None
-    enable_bm25_channel: bool = True
-    enable_splade_channel: bool = True
-    hybrid_top_k_per_channel: int = 50
-    rrf_k: int = 60
-
-
-class StubContext:
-    """Stub ApplicationContext for semantic adapter tests.
-
-    Parameters
-    ----------
-    faiss_manager : _BaseStubFAISSManager
-        FAISS manager stub.
-    config : StubContextConfig | None, optional
-        Configuration for stub context. Defaults to None (uses defaults).
-    """
-
-    def __init__(
-        self,
-        *,
-        faiss_manager: _BaseStubFAISSManager,
-        config: StubContextConfig | None = None,
-    ) -> None:
-        if config is None:
-            config = StubContextConfig()
-        self.faiss_manager = faiss_manager
-        self.vllm_client = StubVLLMClient(SimpleNamespace())
-        self.settings = SimpleNamespace(
-            limits=SimpleNamespace(
-                max_results=config.max_results,
-                semantic_overfetch_multiplier=config.semantic_overfetch_multiplier,
-            ),
-            vllm=SimpleNamespace(base_url="http://localhost"),
-            index=SimpleNamespace(
-                faiss_nprobe=config.faiss_nprobe,
-                enable_bm25_channel=config.enable_bm25_channel,
-                enable_splade_channel=config.enable_splade_channel,
-                hybrid_top_k_per_channel=config.hybrid_top_k_per_channel,
-                rrf_k=config.rrf_k,
-                semantic_min_score=0.0,
-            ),
-        )
-        # Use tempfile for secure temporary paths in tests
-        temp_dir = Path(tempfile.gettempdir())
-        self.paths = SimpleNamespace(
-            faiss_index=temp_dir / "index.faiss",
-            duckdb_path=temp_dir / "catalog.duckdb",
-            vectors_dir=temp_dir / "vectors",
-        )
-        self._limits = config.limits or []
-        self._error = config.error
-        self._catalog_chunks = config.catalog_chunks
-        self._hybrid_engine = config.hybrid_engine or _DefaultStubHybridEngine()
-
-    def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
-        """Return readiness tuple.
-
-        Returns
-        -------
-        tuple[bool, list[str], str | None]
-            Tuple of (ready, limits, error).
-        """
-        ready = self._error is None
-        return ready, list(self._limits), self._error
-
-    @contextmanager
-    def open_catalog(self) -> Iterator[StubDuckDBCatalog]:
-        """Yield stub catalog.
-
-        Yields
-        ------
-        StubDuckDBCatalog
-            Stub catalog instance.
-        """
-        yield StubDuckDBCatalog(None, None, chunks=self._catalog_chunks)
-
-    def get_hybrid_engine(self) -> object:
-        """Return configured hybrid engine stub.
-
-        Returns
-        -------
-        object
-            Hybrid engine stub instance.
-        """
-        return self._hybrid_engine
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_applies_scope_faiss_tuning() -> None:
-    """Test that semantic search applies FAISS tuning parameters from session scope."""
-    manager = _BaseStubFAISSManager()
-    context = StubContext(
-        faiss_manager=manager,
-        config=StubContextConfig(limits=[], error=None),
-    )
-    scope = {"faiss_tuning": {"nprobe": 256, "ef_search": 96, "k_factor": 2.0}}
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="session-tune",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=scope,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello scope", limit=1)
-
-    assertions.expect_true(bool(result.get("findings")), reason="should have findings")
-    assertions.expect_equal(manager.last_nprobe, 256)
-    assertions.expect_equal(manager.last_ef_search, 96)
-    assertions.expect_almost_equal(cast("float", manager.last_k_factor), 2.0)
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_limit_truncates_to_max_results() -> None:
-    """Test that semantic search truncates results to max_results limit."""
-    faiss_manager = _BaseStubFAISSManager()
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error=None, max_results=3),
-    )
-
-    # Mock session ID and scope (no scope for this test)
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-123",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello", limit=10)
-
-    assertions.expect_equal(faiss_manager.last_k, 3)
-    limits = result.get("limits")
-    assertions.expect_true(isinstance(limits, list), reason="should have limits")
-    if not isinstance(limits, list):  # pragma: no cover - defensive
-        pytest.fail("limits should be a list")
-    assertions.expect_true(
-        any("exceeds max_results" in message for message in limits),
-        reason="should warn about exceeding max_results",
-    )
-    method = result.get("method")
-    assertions.expect_true(isinstance(method, dict), reason="should have method")
-    if not isinstance(method, dict):  # pragma: no cover - defensive
-        pytest.fail("method should be present")
-    coverage = method.get("coverage")
-    assertions.expect_true(isinstance(coverage, str), reason="should have coverage")
-    if not isinstance(coverage, str):  # pragma: no cover - defensive
-        pytest.fail("coverage should be a string")
-    assertions.expect_in("/3 results", coverage)
-    assertions.expect_in("requested 10", coverage)
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_limit_enforces_minimum() -> None:
-    """Test that semantic search enforces minimum limit value."""
-    faiss_manager = _BaseStubFAISSManager()
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error=None, max_results=5),
-    )
-
-    # Mock session ID and scope (no scope for this test)
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-123",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello", limit=0)
-
-    assertions.expect_equal(faiss_manager.last_k, 1)
-    limits = result.get("limits")
-    assertions.expect_true(isinstance(limits, list), reason="should have limits")
-    if not isinstance(limits, list):  # pragma: no cover - defensive
-        pytest.fail("limits should be a list")
-    assertions.expect_true(
-        any("not positive" in message for message in limits),
-        reason="should warn about non-positive limit",
-    )
-    method = result.get("method")
-    assertions.expect_true(isinstance(method, dict), reason="should have method")
-    if not isinstance(method, dict):  # pragma: no cover - defensive
-        pytest.fail("method should be present")
-    coverage = method.get("coverage")
-    assertions.expect_true(isinstance(coverage, str), reason="should have coverage")
-    if not isinstance(coverage, str):  # pragma: no cover - defensive
-        pytest.fail("coverage should be a string")
-    assertions.expect_in("/1 results", coverage)
-    assertions.expect_in("requested 0", coverage)
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_respects_configured_nprobe() -> None:
-    """Test that semantic search respects configured FAISS nprobe parameter."""
-    faiss_manager = _BaseStubFAISSManager()
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error=None, max_results=5, faiss_nprobe=64),
-    )
-
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-123",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        await semantic_search(cast("ApplicationContext", context), "hello", limit=1)
-
-    assertions.expect_equal(faiss_manager.last_nprobe, 64)
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_with_scope_filters() -> None:
-    """Test semantic search applies scope filters (language filter).
-
-    Verifies that when session scope has language filters, only chunks
-    matching those languages are returned.
-    """
-    # Create catalog with mixed file types
-    catalog_chunks: list[ChunkRow] = [
-        {
-            "id": _DEFAULT_CHUNK_ID,
-            "uri": "src/main.py",
-            "start_line": 0,
-            "end_line": 10,
-            "preview": "def main():\n    pass",
-        },
-        {
-            "id": 456,
-            "uri": "src/app.ts",
-            "start_line": 0,
-            "end_line": 10,
-            "preview": "function app() {\n    return null;\n}",
-        },
-        {
-            "id": 789,
-            "uri": "src/utils.py",
-            "start_line": 0,
-            "end_line": 5,
-            "preview": "def helper():\n    pass",
-        },
-    ]
-
-    # FAISS returns all three chunk IDs
-    faiss_manager = _BaseStubFAISSManager(search_ids=[_DEFAULT_CHUNK_ID, 456, 789])
-
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error=None, catalog_chunks=catalog_chunks),
-    )
-
-    # Mock session scope with Python language filter
-    scope: ScopeIn = {"languages": ["python"]}
-
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-123",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=scope,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "function", limit=10)
-
-    findings = result.get("findings")
-    assertions.expect_true(isinstance(findings, list), reason="should have findings")
-    if not isinstance(findings, list):  # pragma: no cover - defensive
-        pytest.fail("findings should be a list")
-    assertions.expect_equal(len(findings), 2)  # Only Python files
-
-    # Verify all results are Python files
-    uris = [finding.get("location", {}).get("uri", "") for finding in findings]
-    assertions.expect_true(
-        all(uri.endswith(".py") for uri in uris), reason="all results should be Python files"
-    )
-    assertions.expect_in("src/main.py", uris)
-    assertions.expect_in("src/utils.py", uris)
-    assertions.expect_false("src/app.ts" in uris, reason="TypeScript files should be filtered out")
-
-    # Verify scope is included in response
-    assertions.expect_equal(result.get("scope"), scope)
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_no_scope() -> None:
-    """Test semantic search without scope filters returns all files.
-
-    Verifies that when no session scope is set, all chunks are returned
-    (no filtering applied).
-    """
-    # Create catalog with mixed file types
-    catalog_chunks: list[ChunkRow] = [
-        {
-            "id": _DEFAULT_CHUNK_ID,
-            "uri": "src/main.py",
-            "start_line": 0,
-            "end_line": 10,
-            "preview": "def main():\n    pass",
-        },
-        {
-            "id": 456,
-            "uri": "src/app.ts",
-            "start_line": 0,
-            "end_line": 10,
-            "preview": "function app() {\n    return null;\n}",
-        },
-    ]
-
-    # FAISS returns both chunk IDs
-    faiss_manager = _BaseStubFAISSManager(search_ids=[_DEFAULT_CHUNK_ID, 456])
-
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error=None, catalog_chunks=catalog_chunks),
-    )
-
-    # Mock no session scope
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-123",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "function", limit=10)
-
-    findings = result.get("findings")
-    assertions.expect_true(isinstance(findings, list), reason="should have findings")
-    if not isinstance(findings, list):  # pragma: no cover - defensive
-        pytest.fail("findings should be a list")
-    assertions.expect_equal(len(findings), 2)  # All files returned
-
-    # Verify both file types are present
-    uris = [finding.get("location", {}).get("uri", "") for finding in findings]
-    assertions.expect_in("src/main.py", uris)
-    assertions.expect_in("src/app.ts", uris)
-
-    # Verify query_by_ids was called (not query_by_filters)
-    # This is verified by the fact that all chunks are returned
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_hybrid_merges_channels() -> None:
-    """Test that semantic search merges channels when hybrid search is enabled."""
-
-    class _HybridStub:
-        @staticmethod
-        def search(
-            query: str,
-            *,
-            semantic_hits: Sequence[tuple[int, float]],
-            limit: int,
-            options: HybridSearchOptions | None = None,
-        ) -> SimpleNamespace:
-            del query, semantic_hits, limit, options
-            docs = [
-                SimpleNamespace(doc_id="101", score=0.42),
-                SimpleNamespace(doc_id="102", score=0.35),
+def test_semantic_search_sync_returns_findings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """semantic_search hydrates catalog rows and propagates limits metadata."""
+    context = _FakeContext(
+        catalog=_FakeCatalog(
+            records=[
+                {"id": 1, "uri": "src/file.py", "start_line": 1, "end_line": 2, "preview": "code"}
             ]
-            contributions = {
-                "101": [("semantic", 1, 0.1), ("bm25", 2, 8.5)],
-                "102": [("splade", 1, 12.0)],
-            }
-            return SimpleNamespace(
-                docs=docs,
-                contributions=contributions,
-                channels=["semantic", "bm25", "splade"],
-                warnings=["bm25 warmed up"],
-                method=None,
-            )
-
-    faiss_manager = _BaseStubFAISSManager(search_ids=[101, 102])
-    chunks: list[ChunkRow] = [
-        {"id": 101, "uri": "src/a.py", "start_line": 0, "end_line": 2, "preview": "a"},
-        {"id": 102, "uri": "src/b.py", "start_line": 5, "end_line": 9, "preview": "b"},
-    ]
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(
-            limits=[],
-            error=None,
-            catalog_chunks=chunks,
-            hybrid_engine=_HybridStub(),
         ),
     )
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="hybrid-session",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "hybrid query", limit=2)
-
-    answer = result.get("answer")
-    assertions.expect_true(isinstance(answer, str), reason="should have answer")
-    if not isinstance(answer, str):  # pragma: no cover - defensive
-        pytest.fail("answer should be a string")
-    assertions.expect_true(
-        answer.startswith("Found 2 hybrid"), reason="answer should start with Found 2 hybrid"
-    )
-    limits = result.get("limits")
-    assertions.expect_true(isinstance(limits, list), reason="should have limits")
-    if not isinstance(limits, list):  # pragma: no cover - defensive
-        pytest.fail("limits should be a list")
-    assertions.expect_in("bm25 warmed up", limits)
-    findings = result.get("findings")
-    assertions.expect_true(isinstance(findings, list), reason="should have findings")
-    if not isinstance(findings, list):  # pragma: no cover - defensive
-        pytest.fail("findings should be a list")
-    assertions.expect_equal(findings[0].get("chunk_id"), 101)
-    why_message = findings[0].get("why")
-    assertions.expect_true(isinstance(why_message, str), reason="should have why message")
-    if not isinstance(why_message, str):  # pragma: no cover - defensive
-        pytest.fail("why message should be a string")
-    assertions.expect_in("Hybrid RRF", why_message)
-    assertions.expect_in("bm25", why_message)
-    method = result.get("method")
-    assertions.expect_true(isinstance(method, dict), reason="should have method")
-    if not isinstance(method, dict):  # pragma: no cover - defensive
-        pytest.fail("method should be a dict")
-    retrieval = method.get("retrieval")
-    assertions.expect_true(isinstance(retrieval, list), reason="should have retrieval")
-    if not isinstance(retrieval, list):  # pragma: no cover - defensive
-        pytest.fail("retrieval should be a list")
-    retrieval_set = set(retrieval)
-    missing_channels = {"semantic", "faiss", "bm25", "splade"} - retrieval_set
-    assertions.expect_false(bool(missing_channels), reason="all channels should be present")
-
-
-# ==================== Error Handling Tests ====================
-
-
-async def test_semantic_search_faiss_not_ready() -> None:
-    """Test semantic_search falls back when FAISS is not ready."""
-    faiss_manager = _BaseStubFAISSManager()
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error="Index not built", catalog_chunks=None),
+    monkeypatch.setattr(
+        semantic_adapter,
+        "execute_semantic_stage0",
+        lambda _request: (_stage0_result(), _stage0_metadata()),
     )
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-error",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "query", limit=10)
-    raw_limits = result.get("limits")
-    limit_list = raw_limits if isinstance(raw_limits, list) else []
-    joined_limits = " ".join(limit_list)
-    assertions.expect_in("faiss_fallback", joined_limits)
-    assertions.expect_equal(result.get("findings"), [])
-
-
-async def test_semantic_search_embedding_error() -> None:
-    """Test semantic_search raises EmbeddingError when embedding fails."""
-    faiss_manager = _BaseStubFAISSManager()
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error=None, catalog_chunks=None),
+    envelope = semantic_adapter._semantic_search_sync(
+        context=context,
+        query="vector",
+        limit=5,
+        scope=None,
     )
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-embedding-error",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-        patch.object(
-            context.vllm_client,
-            "embed_single",
-            side_effect=RuntimeError("vLLM service unavailable"),
-        ),
-        pytest.raises(EmbeddingError, match="vLLM service unavailable"),
-    ):
-        await semantic_search(cast("ApplicationContext", context), "query", limit=10)
+    assertions.expect_true(envelope["findings"])
+    assertions.expect_equal(envelope["findings"][0]["chunk_id"], 1)
+    assertions.expect_in("Hybrid RRF", envelope["findings"][0]["why"])
+    assertions.expect_equal(envelope["limits"], ["limit:clamped"])
 
 
-async def test_semantic_search_faiss_search_error() -> None:
-    """Test semantic_search falls back when FAISS search fails."""
-    faiss_manager = _BaseStubFAISSManager()
-    context = StubContext(
-        faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error=None, catalog_chunks=None),
+def test_semantic_search_sync_raises_on_hydration_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hydration failures bubble up as CatalogConsistencyError."""
+    context = _FakeContext(catalog=_FakeCatalog(records=[]))
+
+    def _failing_hydrate(*_: object, **__: object) -> tuple[list[dict], Exception]:
+        return [], RuntimeError("boom")
+
+    monkeypatch.setattr(
+        semantic_adapter,
+        "execute_semantic_stage0",
+        lambda _request: (_stage0_result(), _stage0_metadata()),
+    )
+    monkeypatch.setattr(semantic_adapter, "_hydrate_findings", _failing_hydrate)
+
+    with pytest.raises(CatalogConsistencyError):
+        semantic_adapter._semantic_search_sync(context=context, query="test", limit=5, scope=None)
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_async_invokes_sync(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Public async API delegates to the sync helper."""
+    context = _FakeContext(
+        catalog=_FakeCatalog(
+            records=[
+                {
+                    "id": 1,
+                    "uri": "src/file.py",
+                    "start_line": 0,
+                    "end_line": 1,
+                    "preview": "snippet",
+                }
+            ]
+        ),
     )
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-search-error",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-        patch.object(
-            faiss_manager,
-            "search",
-            side_effect=RuntimeError("FAISS search failed"),
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "query", limit=10)
-    raw_limits = result.get("limits")
-    limit_list = raw_limits if isinstance(raw_limits, list) else []
-    assertions.expect_true(
-        any("faiss_fallback" in entry for entry in limit_list),
-        reason="should have faiss_fallback in limits",
+    async def _fake_scope(*_: object, **__: object) -> None:
+        return None
+
+    monkeypatch.setattr(semantic_adapter, "get_effective_scope", _fake_scope)
+    monkeypatch.setattr(
+        semantic_adapter,
+        "execute_semantic_stage0",
+        lambda _request: (_stage0_result(), _stage0_metadata()),
     )
-    assertions.expect_equal(result.get("findings"), [])
+    monkeypatch.setattr(semantic_adapter, "get_session_id", lambda: "session-1")
+
+    envelope = await semantic_adapter.semantic_search(context, "query", limit=5)
+    assertions.expect_equal(envelope["findings"][0]["chunk_id"], 1)

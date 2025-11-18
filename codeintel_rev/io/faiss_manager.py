@@ -1,48 +1,57 @@
 """FAISS manager for CPU vector search.
 
 Manages adaptive FAISS indexes (Flat, IVFFlat, or IVF-PQ) with CPU persistence.
-Index type is automatically selected based on
-corpus size for optimal performance.
+Index type is automatically selected based on corpus size for optimal performance.
+
+This is a thin facade that delegates to specialized modules:
+- faiss_build: Index construction and lifecycle
+- faiss_runtime: Query execution and runtime tuning
+- faiss_store: Persistence and metadata management
 """
 
 from __future__ import annotations
 
 import json
-import math
-from collections.abc import Callable, Mapping, Sequence
-from contextlib import suppress
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from numbers import Integral, Real
 from pathlib import Path
 from threading import RLock
-from time import perf_counter
-from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.errors import VectorIndexIncompatibleError, VectorIndexStateError
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.errors import VectorIndexStateError
 from codeintel_rev.io.faiss_build import (
     IndexBuildConfig,
     IndexFamily,
     build_primary_index,
+    choose_family,
 )
 from codeintel_rev.io.faiss_build import (
     add_vectors as builder_add_vectors,
 )
 from codeintel_rev.io.faiss_build import (
+    create_secondary_index as builder_create_secondary,
+)
+from codeintel_rev.io.faiss_build import (
     load_index as builder_load_index,
+)
+from codeintel_rev.io.faiss_build import (
+    merge_indexes as builder_merge_indexes,
 )
 from codeintel_rev.io.faiss_build import (
     save_index as builder_save_index,
 )
-from codeintel_rev.io.faiss_compat import load_faiss_module
 from codeintel_rev.io.faiss_runtime import (
     FAISSRuntimeOptions,
+    SearchRuntimeOverrides,
+    apply_runtime_parameters,
+    brute_force_truth_ids,
+    ensure_2d,
+    estimate_recall,
+    timed_search_with_params,
 )
 from codeintel_rev.io.faiss_runtime import (
-    apply_runtime_parameters as runtime_apply_parameters,
+    RefineSearchConfig as _RefineSearchConfig,
 )
 from codeintel_rev.io.faiss_runtime import (
     search_dual as runtime_search_dual,
@@ -50,205 +59,62 @@ from codeintel_rev.io.faiss_runtime import (
 from codeintel_rev.io.faiss_store import (
     IndexArtifactPaths,
     export_idmap_parquet,
+    get_idmap_array,
+    load_tuned_profile,
+    save_tuning_profile,
+    write_meta_snapshot,
 )
 from codeintel_rev.io.faiss_store import (
-    get_idmap_array as store_get_idmap_array,
+    get_compile_options as store_compile_options,
 )
 from codeintel_rev.io.faiss_store import (
     load_secondary_index as store_load_secondary,
+)
+from codeintel_rev.io.faiss_store import (
+    reconstruct_batch as store_reconstruct_batch,
 )
 from codeintel_rev.io.faiss_store import (
     save_secondary_index as store_save_secondary,
 )
 from codeintel_rev.retrieval.types import SearchHit
 from codeintel_rev.typing import FaissIndex, NDArrayF32, NDArrayI64
-from kgfoundry_common.errors import VectorSearchError
 
 if TYPE_CHECKING:
     import numpy as np
-else:
+
+    from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+else:  # pragma: no cover - lazy runtime imports
     np = cast("Any", LazyModule("numpy", "FAISS manager vector operations"))
+    DuckDBCatalog = Any
 
-_SEARCH_RESULT_DIM = 2
+RefineSearchConfig = _RefineSearchConfig
 
+# Lazy FAISS module
+_faiss = LazyModule("faiss", "FAISS manager operations")
+faiss = cast("Any", _faiss)
 
-def _run_index_search(
-    index: FaissIndex,
-    query: NDArrayF32,
-    k: int,
-) -> tuple[NDArrayF32, NDArrayI64]:
-    """Execute FAISS search and coerce results into typed NumPy arrays.
-
-    Parameters
-    ----------
-    index : FaissIndex
-        FAISS index instance to search.
-    query : NDArrayF32
-        Query vectors with shape (n_queries, vec_dim).
-    k : int
-        Number of nearest neighbors to retrieve per query.
-
-    Returns
-    -------
-    tuple[NDArrayF32, NDArrayI64]
-        Tuple of (distances, ids) arrays, both with shape (n_queries, k).
-
-    Raises
-    ------
-    RuntimeError
-        If FAISS search returns arrays that are not 2-dimensional.
-    """
-    raw_output = index.search(query, k)
-    distances, ids = cast("tuple[object, object]", raw_output)
-    dist_array = np.asarray(distances, dtype=np.float32)
-    id_array = np.asarray(ids, dtype=np.int64)
-    if dist_array.ndim != _SEARCH_RESULT_DIM or id_array.ndim != _SEARCH_RESULT_DIM:
-        msg = "FAISS search must return 2-D arrays"
-        raise RuntimeError(msg)
-    return dist_array, id_array
+_DEFAULT_SWEEP = ("nprobe=16", "nprobe=32", "nprobe=64", "nprobe=96", "nprobe=128")
 
 
-class _LazyFaissProxy:
-    """Deferred FAISS module loader to avoid import-time side effects."""
-
-    __slots__ = ("_module",)
-
-    def __init__(self) -> None:
-        self._module: ModuleType | None = None
-
-    def module(self) -> ModuleType:
-        """Return the cached FAISS module, importing it on demand.
-
-        Returns
-        -------
-        ModuleType
-            Materialized FAISS module.
-        """
-        if self._module is None:
-            imported = load_faiss_module("FAISS manager operations")
-            self._module = imported
-        return self._module
-
-    def __getattr__(self, name: str) -> object:
-        """Proxy attribute access to the underlying FAISS module.
-
-        Parameters
-        ----------
-        name : str
-            Attribute name to resolve from the proxied FAISS module.
-
-        Returns
-        -------
-        object
-            Attribute resolved from the proxied FAISS module.
-
-        Notes
-        -----
-        This method enables transparent attribute access to FAISS module
-        symbols without eagerly importing the module. The first access triggers
-        lazy import via `gate_import()`.
-        """
-        return getattr(self.module(), name)
-
-
-_FAISS_PROXY = _LazyFaissProxy()
-faiss = cast("Any", _FAISS_PROXY)
-
-
-def _faiss_module() -> ModuleType:
-    """Return the lazily imported FAISS module.
-
-    Returns
-    -------
-    ModuleType
-        Cached FAISS module instance.
-    """
-    return _FAISS_PROXY.module()
-
-
-def apply_parameters(index: FaissIndex, param_str: str) -> None:
-    """Apply a FAISS ParameterSpace string to ``index``.
-
-    This function applies runtime tuning parameters to a FAISS index using the
-    ParameterSpace API. The parameter string specifies index-specific tuning
-    knobs (e.g., nprobe for IVF indices, efSearch for HNSW indices) that control
-    search behavior and performance. The parameters are applied in-place to the
-    index object, modifying its runtime behavior for subsequent search operations.
-
-    Parameters
-    ----------
-    index : FaissIndex
-        FAISS index object to apply parameters to. Must support the ParameterSpace
-        API (typically IVF, HNSW, or other tunable index types). The index is
-        modified in-place with the new parameter values.
-    param_str : str
-        Parameter string specifying tuning parameters in FAISS ParameterSpace format
-        (e.g., "nprobe=32,efSearch=64"). Must be non-empty and contain valid
-        parameter specifications for the index type.
-
-    Raises
-    ------
-    ValueError
-        Raised in the following cases:
-        - ``param_str`` is empty or whitespace-only: parameter string must be
-          non-empty to apply valid tuning parameters
-        - Parameter application fails: FAISS ParameterSpace API raises
-          AttributeError, RuntimeError, or ValueError when the parameter string
-          is invalid, incompatible with the index type, or contains unsupported
-          parameters
-
-    Notes
-    -----
-    This function wraps the FAISS ParameterSpace API to provide a convenient
-    interface for applying runtime tuning parameters. The function validates input
-    and provides clear error messages when parameter application fails. Time
-    complexity: O(1) for parameter parsing and application. The function modifies
-    the index object in-place and is not thread-safe if the index is being used
-    concurrently. Parameters persist for the lifetime of the index object.
-    """
-    if not param_str or not param_str.strip():
-        msg = "Parameter string must be non-empty."
-        raise ValueError(msg)
-    try:
-        faiss.ParameterSpace().set_index_parameters(index, param_str)
-    except (AttributeError, RuntimeError, ValueError) as exc:
-        msg = f"Unable to apply FAISS parameters: {param_str}"
-        raise ValueError(msg) from exc
-
-
-class FAISSRuntimeController:
-    """Encapsulate runtime tuning operations for :class:`FAISSManager`."""
+class _RuntimeFacade:
+    """Helper exposing runtime tuning operations via :class:`FAISSManager`."""
 
     def __init__(self, manager: FAISSManager) -> None:
         self._manager = manager
 
     def get_runtime_tuning(self) -> dict[str, object]:
-        """Return the effective runtime tuning parameters and overrides.
-
-        Returns
-        -------
-        dict[str, object]
-            Dictionary with keys:
-            - "active": dict with current effective parameters (nprobe, efSearch,
-              quantizer_efSearch, k_factor)
-            - "overrides": dict with runtime override parameters
-            - "autotune_profile": dict with persisted autotune profile or empty dict
-        """
-        manager = self._manager
-        nprobe, ef_search, k_factor, quantizer = manager.resolve_search_knobs(None)
-        with manager.tuning_lock:
-            overrides = dict(manager.runtime_overrides)
-        profile = manager.load_tuned_profile()
-        return {
-            "active": {
-                "nprobe": nprobe,
-                "efSearch": ef_search,
-                "quantizer_efSearch": quantizer,
-                "k_factor": k_factor,
-            },
-            "overrides": overrides,
-            "autotune_profile": profile,
+        """Return active runtime parameters, overrides, and profile metadata."""
+        profile = self._manager._load_profile_payload(self._manager._resolve_profile_to_read())
+        snapshot = self._manager._current_runtime_parameters()
+        payload: dict[str, object] = {
+            "active": snapshot,
+            "overrides": dict(self._manager._runtime_overrides),
         }
+        if profile is not None:
+            payload["autotune_profile"] = profile
+        if self._manager._parameter_space is not None:
+            payload["parameter_space"] = self._manager._parameter_space
+        return payload
 
     def apply_runtime_tuning(
         self,
@@ -258,265 +124,46 @@ class FAISSRuntimeController:
         quantizer_ef_search: int | None = None,
         k_factor: float | None = None,
     ) -> dict[str, object]:
-        """Apply runtime overrides (nprobe/efSearch/k_factor) to the active index.
-
-        Parameters
-        ----------
-        nprobe : int | None, optional
-            Override for IVF nprobe parameter. If None, uses current value.
-        ef_search : int | None, optional
-            Override for HNSW ef_search parameter. If None, uses current value.
-        quantizer_ef_search : int | None, optional
-            Override for IVF quantizer ef_search parameter. If None, uses current value.
-        k_factor : float | None, optional
-            Override for search k factor (multiplier for candidate retrieval).
-            If None, uses current value.
-
-        Returns
-        -------
-        dict[str, object]
-            Updated runtime tuning dictionary (same format as :meth:`get_runtime_tuning`).
-
-        Raises
-        ------
-        ValueError
-            If no tuning parameters are provided (all parameters are None).
-        """
-        manager = self._manager
-        sanitized = manager.sanitize_runtime_overrides(
+        """Apply runtime overrides to the active FAISS index."""
+        overrides = self._manager._normalize_runtime_payload(
             nprobe=nprobe,
             ef_search=ef_search,
             quantizer_ef_search=quantizer_ef_search,
             k_factor=k_factor,
         )
-        if not sanitized:
-            msg = "No tuning parameters provided."
+        if not overrides:
+            msg = "No overrides provided"
             raise ValueError(msg)
-        with manager.tuning_lock:
-            manager.runtime_overrides.update(sanitized)
-        manager.apply_runtime_parameters(sanitized)
-        manager.write_meta_snapshot(
-            parameter_space=manager.format_parameter_string(manager.runtime_overrides)
-        )
+        self._manager._apply_runtime_overrides(overrides)
         return self.get_runtime_tuning()
 
     def reset_runtime_tuning(self) -> dict[str, object]:
-        """Clear runtime overrides and revert to default (or autotuned) parameters.
-
-        Returns
-        -------
-        dict[str, object]
-            Updated runtime tuning dictionary with cleared overrides (same format
-            as :meth:`get_runtime_tuning`).
-        """
-        manager = self._manager
-        with manager.tuning_lock:
-            manager.runtime_overrides.clear()
-        manager.apply_runtime_parameters(
-            {
-                "nprobe": manager.default_nprobe,
-                "efSearch": manager.hnsw_ef_search,
-            }
-        )
+        """Clear runtime overrides and revert to defaults."""
+        self._manager._reset_runtime_overrides()
         return self.get_runtime_tuning()
-
-    def apply_tuning_profile(self, profile: Mapping[str, Any]) -> dict[str, object]:
-        """Apply a persisted tuning profile (typically from ``tuning.json``).
-
-        Parameters
-        ----------
-        profile : Mapping[str, Any]
-            Tuning profile dictionary containing runtime parameter overrides.
-            Expected keys include "param_str", "nprobe", "efSearch", "k_factor",
-            etc. The profile is typically loaded from a tuning.json file created
-            by the tuning process.
-
-        Returns
-        -------
-        dict[str, object]
-            Current runtime tuning parameters after applying the profile. Returns
-            the same dictionary as :meth:`get_runtime_tuning`, containing all active
-            runtime parameter overrides.
-
-        Raises
-        ------
-        VectorIndexIncompatibleError
-            Raised when the profile is empty or invalid. Profiles must contain
-            at least one valid parameter override.
-        """
-        if not profile:
-            msg = "Tuning profile payload is empty."
-            raise VectorIndexIncompatibleError(msg)
-        return self._manager.apply_profile_payload(profile, persist=True)
 
     def set_search_parameters(self, param_str: str) -> dict[str, object]:
-        """Apply FAISS ParameterSpace string and persist overrides.
-
-        Parameters
-        ----------
-        param_str : str
-            Comma-separated FAISS ParameterSpace string
-            (e.g., ``"nprobe=64,efSearch=128"``).
-
-        Returns
-        -------
-        dict[str, object]
-            Runtime tuning snapshot as returned by :meth:`get_runtime_tuning`.
-
-        Raises
-        ------
-        ValueError
-            If the parameter string is invalid or FAISS rejects the override.
-        """
-        manager = self._manager
-        faiss_spec, sanitized = manager.prepare_parameter_string(param_str)
-        if faiss_spec:
-            try:
-                apply_parameters(manager.active_index(), faiss_spec)
-            except ValueError as exc:
-                raise ValueError(str(exc)) from exc
-        with manager.tuning_lock:
-            manager.runtime_overrides.update(sanitized)
-        manager.write_meta_snapshot(
-            parameter_space=manager.format_parameter_string(manager.runtime_overrides)
-        )
+        """Apply FAISS ParameterSpace string (``nprobe=32,efSearch=64``)."""
+        overrides, normalized = self._manager._parse_parameter_string(param_str)
+        self._manager._apply_runtime_overrides(overrides, parameter_space=normalized)
         return self.get_runtime_tuning()
 
 
-# Adaptive indexing thresholds
-_SMALL_CORPUS_THRESHOLD = 5000
-_MEDIUM_CORPUS_THRESHOLD = 50000
+class FAISSManager:
+    """FAISS index manager with adaptive indexing and incremental updates."""
 
-_LOG_EXTRA_BASE: dict[str, object] = {"component": "faiss_manager"}
-
-
-def _log_extra(**kwargs: object) -> dict[str, object]:
-    """Build structured logging extras for FAISS manager events.
-
-    Parameters
-    ----------
-    **kwargs : object
-        Additional key-value pairs to include in logging extras. These are
-        merged with the base component name.
-
-    Returns
-    -------
-    dict[str, object]
-        Merged dictionary with component name and provided kwargs.
-    """
-    return {**_LOG_EXTRA_BASE, **kwargs}
-
-
-@dataclass(frozen=True, slots=True)
-class SearchRuntimeOverrides:
-    """Per-search overrides for HNSW/quantizer parameters."""
-
-    ef_search: int | None = None
-    quantizer_ef_search: int | None = None
-    k_factor: float | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class RefineSearchConfig:
-    """Configuration bundle for refine searches."""
-
-    nprobe: int | None = None
-    runtime: SearchRuntimeOverrides | None = None
-    source: str = "faiss"
-
-
-@dataclass(frozen=True, slots=True)
-class SecondaryUpdateSnapshot:
-    """Metadata recorded for the most recent secondary index refresh."""
-
-    added: int
-    total_secondary_vectors: int
-    skipped_duplicates: int
-    recorded_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
-class _TuningOverrides:
-    """Normalized tuning overrides extracted from a profile payload."""
-
-    param_str: str
-    nprobe: int | None
-    ef_search: int | None
-    quantizer_ef_search: int | None
-    k_factor: float | None
-
-
-@dataclass(frozen=True, slots=True)
-class _SearchExecutionParams:
-    """Runtime parameters applied during dual search execution."""
-
-    nprobe: int
-    ef_search: int | None
-    quantizer_ef_search: int | None
-
-
-@dataclass(frozen=True, slots=True)
-class _SearchPlan:
-    """Resolved parameters and query buffer for a search."""
-
-    queries: NDArrayF32
-    k: int
-    search_k: int
-    params: _SearchExecutionParams
-
-
-class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
-    """FAISS index manager with adaptive indexing and incremental updates.
-
-    Uses a dual-index architecture for fast incremental updates.
-
-    **Primary Index** (built via `build_index()`):
-    - Adaptive type selection based on corpus size
-    - Small (<5K vectors): Flat index for exact search
-    - Medium (5K-50K vectors): IVFFlat with dynamic nlist
-    - Large (>50K vectors): IVF-PQ with dynamic nlist
-    - Trained on initial corpus, expensive to rebuild
-
-    **Secondary Index** (updated via `update_index()`):
-    - Flat index (IndexFlatIP) for fast incremental additions
-    - No training required - instant updates (seconds)
-    - Used for new vectors added after initial build
-    - Automatically searched alongside primary index
-
-    **Architecture Diagram**:
-    ```
-    Search Query
-        |
-        ├─> Primary Index (IVF-PQ/IVFFlat/Flat)
-        |       └─> Returns top-k results
-        |
-        └─> Secondary Index (Flat) [if exists]
-                └─> Returns top-k results
-        |
-        └─> Merge Results by Score
-                └─> Return top-k combined results
-    ```
-
-    The secondary index is optional and controlled by usage of `update_index()`.
-    When `update_index()` is called, the secondary index is automatically created
-    if it doesn't exist.     Use `merge_indexes()` periodically to merge secondary
-    into primary and rebuild for optimal performance.
-
-    Parameters
-    ----------
-    index_path : Path
-        Path to CPU index file.
-    vec_dim : int
-        Vector dimension.
-    nlist : int
-        Number of IVF centroids (used as fallback for large corpora if dynamic
-        calculation yields smaller value). For adaptive indexing, this parameter
-        is typically overridden by dynamic nlist calculation.
-    runtime : FAISSRuntimeOptions | None, optional
-        Runtime configuration overrides for FAISS index behavior (nprobe, PQ
-        shape, HNSW tuning). If None, uses default options from
-        ``FAISSRuntimeOptions()``.
-    """
+    _PARAMETER_ALIASES = {
+        "nprobe": "nprobe",
+        "efsearch": "efSearch",
+        "ef_search": "efSearch",
+        "efSearch": "efSearch",
+        "quantizer_efsearch": "quantizer_efSearch",
+        "quantizer_ef_search": "quantizer_efSearch",
+        "quantizer_efSearch": "quantizer_efSearch",
+        "k_factor": "k_factor",
+        "kfactor": "k_factor",
+        "kFactor": "k_factor",
+    }
 
     def __init__(
         self,
@@ -526,550 +173,104 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         *,
         runtime: FAISSRuntimeOptions | None = None,
     ) -> None:
-        self.index_path = index_path
+        """Initialize FAISS manager state and runtime configuration."""
+        self.index_path = Path(index_path)
         self.vec_dim = vec_dim
         self.nlist = nlist
+
         opts = runtime or FAISSRuntimeOptions()
-        self.faiss_family: str | None = opts.faiss_family
-        self.pq_m = opts.pq_m
-        self.pq_nbits = opts.pq_nbits
-        self.opq_m = opts.opq_m
-        self.default_nprobe = opts.default_nprobe or 128
+        self.runtime_opts = opts
         self.default_k = opts.default_k
-        self.hnsw_m = opts.hnsw_m
-        self.hnsw_ef_construction = opts.hnsw_ef_construction
+        self.default_nprobe = opts.default_nprobe or 128
         self.hnsw_ef_search = opts.hnsw_ef_search
         self.refine_k_factor = opts.refine_k_factor
         self.autotune_on_start = opts.autotune_on_start
-        self.enable_range_search = opts.enable_range_search
-        self.semantic_min_score = opts.semantic_min_score
-        self.cpu_index: FaissIndex | None = None
 
-        # Secondary index for incremental updates (dual-index architecture)
+        # Live indexes
+        self.cpu_index: FaissIndex | None = None
         self.secondary_index: FaissIndex | None = None
         self.incremental_ids: set[int] = set()
-        self.tuned_parameters: dict[str, float | str] | None = None
-        self._last_latency_ms: float | None = None
+
+        # Runtime state
+        self._runtime_overrides: dict[str, float] = {}
+        self._tuning_lock = RLock()
+        self._paths = IndexArtifactPaths(self.index_path)
         self.autotune_profile_path = self.index_path.with_name("tuning.json")
         self._legacy_autotune_profile_path = self.index_path.with_suffix(".tune.json")
         self._meta_path = Path(f"{self.index_path}.meta.json")
-        self._runtime_overrides: dict[str, float] = {}
-        self._tuning_lock = RLock()
-        self._runtime_controller = FAISSRuntimeController(self)
-        self._last_secondary_update: SecondaryUpdateSnapshot | None = None
-
-    @property
-    def runtime(self) -> FAISSRuntimeController:
-        """Runtime tuning controller for this manager.
-
-        Returns
-        -------
-        FAISSRuntimeController
-            Helper object that exposes runtime tuning and override operations.
-        """
-        return self._runtime_controller
-
-    @property
-    def tuning_lock(self) -> RLock:
-        """Lock guarding runtime tuning mutations.
-
-        Returns
-        -------
-        RLock
-            Re-entrant lock used to serialize runtime tuning mutations.
-        """
-        return self._tuning_lock
-
-    @property
-    def runtime_overrides(self) -> dict[str, float]:
-        """Mutable mapping of runtime search overrides.
-
-        Returns
-        -------
-        dict[str, float]
-            Dictionary storing the currently applied runtime overrides.
-        """
-        return self._runtime_overrides
-
-    @property
-    def last_secondary_update(self) -> SecondaryUpdateSnapshot | None:
-        """Metadata for the most recent secondary index ingestion.
-
-        Returns
-        -------
-        SecondaryUpdateSnapshot | None
-            Snapshot describing the latest incremental update, or ``None`` if
-            ``update_index`` has not run yet.
-        """
-        return self._last_secondary_update
-
-    def _write_profile(self, path: Path) -> None:
-        """Persist a minimal profile snapshot describing the active CPU index."""
-        cpu_index = self.cpu_index
-        if cpu_index is None:
-            return
-        profile = {
-            "dims": int(cpu_index.d),
-            "ntotal": int(cpu_index.ntotal),
-            "is_trained": bool(getattr(cpu_index, "is_trained", False)),
-            "type_name": type(cpu_index).__name__,
-            "faiss_family": self.faiss_family,
-            "refine_k_factor": self.refine_k_factor,
-        }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(profile, indent=2, sort_keys=True), encoding="utf-8")
+        self._vector_count: int | None = None
+        self._faiss_factory: str | None = None
+        self._parameter_space: str | None = None
+        self._default_refine_k_factor = self.refine_k_factor
+        self._runtime_facade = _RuntimeFacade(self)
 
     def build_index(self, vectors: NDArrayF32, *, family: str | None = None) -> None:
-        """Build and train FAISS index with adaptive type selection.
+        """Build and train FAISS index with adaptive type selection."""
+        if vectors is None or vectors.size == 0:
+            msg = "vectors must be a non-empty array"
+            raise VectorIndexStateError(msg)
 
-        Chooses the optimal index type based on corpus size:
-        - Small corpus (<5K vectors): IndexFlatIP (exact search, no training)
-        - Medium corpus (5K-50K vectors): IVFFlat with dynamic nlist
-        - Large corpus (>50K vectors): IVF-PQ with dynamic nlist
-
-        This adaptive selection provides 10-100x faster training for small/medium
-        corpora while maintaining high recall (>95%) and search performance.
-
-        Parameters
-        ----------
-        vectors : NDArrayF32
-            Training vectors of shape (n, vec_dim). Vectors are automatically
-            L2-normalized for cosine similarity.
-
-        family : str | None, optional
-            Override the configured FAISS family when building the index. When
-            ``None`` the manager uses the configured family (or adaptive mode).
-
-        Notes
-        -----
-        The index type is selected automatically based on the number of vectors.
-        Small corpora use flat indexes (exact search) for simplicity and speed.
-        Medium corpora use IVFFlat for balanced training time and recall.
-        Large corpora use IVF-PQ for memory efficiency and fast search.
-
-        Examples
-        --------
-        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
-        >>> vectors = np.random.randn(1000, 3584).astype(np.float32)
-        >>> manager.build_index(vectors)
-        >>> # Uses IndexFlatIP for 1000 vectors (small corpus)
-        """
-        with self._tuning_lock:
-            self._runtime_overrides.clear()
-
-        cfg_family = (self.faiss_family or "auto").lower()
-        n_vectors = len(vectors)
+        resolved_family: IndexFamily = cast("IndexFamily", family or "adaptive")
         cfg = IndexBuildConfig(
             vec_dim=self.vec_dim,
             default_nlist=self.nlist,
-            family=cast("IndexFamily", "adaptive" if cfg_family == "auto" else cfg_family),
-            pq_m=self.pq_m,
-            pq_bits=self.pq_nbits,
-            opq_m=self.opq_m,
-            hnsw_m=self.hnsw_m,
+            family=resolved_family,
         )
-        override_family: IndexFamily | None = None
-        if family is not None:
-            override_family = cast("IndexFamily", family.lower())
-        cpu_id_map, factory_label = build_primary_index(
-            vectors,
-            cfg=cfg,
-            override_family=override_family,
-        )
-        self.cpu_index = cpu_id_map
-        self._record_factory_choice(
-            cpu_id_map,
-            factory_label,
-            parameter_space=self.format_parameter_string(self._runtime_overrides),
-            vector_count=n_vectors,
-        )
-
-    def estimate_memory_usage(self, n_vectors: int) -> dict[str, int]:
-        """Estimate memory usage in bytes for a given number of vectors.
-
-        Provides memory estimates for CPU indexes based on the adaptive index
-        type that would be selected for the given corpus size. This is useful for
-        capacity planning and resource allocation.
-
-        Parameters
-        ----------
-        n_vectors : int
-            Number of vectors to estimate memory for.
-
-        Returns
-        -------
-        dict[str, int]
-            Dictionary with memory estimates in bytes:
-            - ``cpu_index_bytes``: Estimated CPU index memory usage
-            - ``total_bytes``: Total estimated memory (CPU)
-
-        Examples
-        --------
-        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
-        >>> estimates = manager.estimate_memory_usage(10000)
-        >>> print(f"CPU index: {estimates['cpu_index_bytes'] / 1e9:.2f} GB")
-        CPU index: 0.26 GB
-        >>> print(f"Total: {estimates['total_bytes'] / 1e9:.2f} GB")
-        Total: 0.57 GB
-
-        Notes
-        -----
-        Memory estimates are approximate and may vary based on:
-        - Actual index type selected (flat vs IVFFlat vs IVF-PQ)
-        - FAISS internal overhead
-        - Operating system memory management
-
-        Estimates are typically within ±20% of actual usage for most workloads.
-        """
-        vec_size = self.vec_dim * 4  # float32 = 4 bytes per dimension
-
-        if n_vectors < _SMALL_CORPUS_THRESHOLD:
-            # Flat index: stores all vectors directly
-            cpu_mem = n_vectors * vec_size
-        elif n_vectors < _MEDIUM_CORPUS_THRESHOLD:
-            # IVFFlat: quantizer (nlist vectors) + inverted lists (n_vectors * 8 bytes overhead)
-            nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
-            nlist = max(nlist, 100)
-            cpu_mem = (nlist * vec_size) + (n_vectors * 8)  # 8 bytes overhead per vector
-        else:
-            # IVF-PQ: quantizer (nlist vectors) + PQ codes (n_vectors * 64 bytes)
-            nlist = int(np.sqrt(n_vectors))
-            nlist = max(nlist, 1024)
-            cpu_mem = (nlist * vec_size) + (n_vectors * 64)  # 64 bytes per vector for PQ
-
-        return {
-            "cpu_index_bytes": cpu_mem,
-            "total_bytes": cpu_mem,
-        }
+        index, factory = build_primary_index(vectors, cfg=cfg, override_family=resolved_family)
+        self.cpu_index = index
+        self.secondary_index = None
+        self.incremental_ids.clear()
+        self._faiss_factory = factory
+        self._vector_count = int(vectors.shape[0])
+        self._write_meta_snapshot(vector_count=self._vector_count, factory=factory)
 
     def add_vectors(self, vectors: NDArrayF32, ids: NDArrayI64) -> None:
-        """Add vectors with IDs to the index.
-
-        Adds a batch of vectors to the FAISS index with their associated IDs.
-        The vectors are normalized for cosine similarity (L2 normalization) before
-        being added. IDs are used for retrieval - they should match the chunk IDs
-        stored in DuckDB.
-
-        This method requires that build_index() has been called first to create
-        and train the index structure.
-
-        Parameters
-        ----------
-        vectors : NDArrayF32
-            Vectors to add, shape (n, vec_dim) where n is the number of vectors
-            and vec_dim matches the index dimension. Dtype should be float32.
-        ids : NDArrayI64
-            Unique IDs for each vector, shape (n,). IDs are stored as int64 in
-            FAISS. These should correspond to chunk IDs from the indexing pipeline.
-
-        Raises
-        ------
-        RuntimeError
-            If the index has not been built yet. Call build_index() first.
-        """
-        try:
-            cpu_index = self._require_cpu_index()
-        except RuntimeError as exc:
-            msg = "Cannot add vectors: FAISS index has not been built or loaded."
-            raise RuntimeError(msg) from exc
-
-        builder_add_vectors(cpu_index, vectors, ids.astype(np.int64))
-
-    def update_index(self, new_vectors: NDArrayF32, new_ids: NDArrayI64) -> None:
-        """Add new vectors to secondary index for fast incremental updates.
-
-        Extended Summary
-        ----------------
-        This method adds new vectors to a secondary flat index (IndexFlatIP) which
-        requires no training and provides instant updates. This enables fast incremental
-        indexing without rebuilding the primary index. The method filters out vectors
-        that already exist in the primary index to avoid duplicates, then adds only
-        unique vectors to the secondary index. This is used for real-time index updates
-        during active codebase indexing workflows.
-
-        Parameters
-        ----------
-        new_vectors : NDArrayF32
-            Array of new embedding vectors to add, shape (N, dim) where N is the number
-            of vectors and dim matches the index dimensionality. Must be float32 and
-            normalized if the index uses cosine similarity.
-        new_ids : NDArrayI64
-            Array of document/chunk IDs corresponding to new_vectors, shape (N,).
-            Must be integer type. IDs that already exist in the primary index will be
-            filtered out before adding to the secondary index.
-
-        Raises
-        ------
-        RuntimeError
-            If the secondary index is unexpectedly missing during the update. This
-            indicates a configuration or initialization error that should be resolved
-            before attempting updates.
-
-        Notes
-        -----
-        Time complexity O(N * log(M)) where N is new_vectors count and M is existing
-        index size, due to duplicate checking. Space complexity O(N) for temporary
-        storage. The method performs I/O to update the FAISS index on disk. Thread-safe
-        if called sequentially; concurrent updates may cause race conditions.
-        """
-        self._ensure_secondary_index()
-        primary_contains = self._build_primary_contains()
-        unique_indices = self._collect_unique_indices(new_ids, primary_contains)
-
-        if not unique_indices:
-            return
-
-        unique_vectors = new_vectors[unique_indices]
-        unique_ids = new_ids[unique_indices]
-
-        vectors_norm = unique_vectors.copy()
-        faiss.normalize_L2(vectors_norm)
-
-        secondary_index = self.secondary_index
-        if secondary_index is None:
-            msg = "Secondary index missing during update_index"
+        """Add vectors to the primary index after build."""
+        if self.cpu_index is None:
+            msg = "Primary index not initialized; call build_index() first."
             raise RuntimeError(msg)
-        secondary_index.add_with_ids(vectors_norm, unique_ids.astype(np.int64))
-        self.incremental_ids.update(unique_ids.tolist())
+        builder_add_vectors(self.cpu_index, vectors, ids)
 
-        skipped = len(new_ids) - len(unique_ids)
-        self._log_secondary_added(
-            added=len(unique_ids),
-            total_secondary_vectors=len(self.incremental_ids),
-            skipped_duplicates=skipped,
-        )
+    def update_index(self, new_vectors: NDArrayF32, new_ids: NDArrayI64) -> int:
+        """Add vectors to the secondary (incremental) index."""
+        if self.cpu_index is None:
+            msg = "Primary index not initialized. Run build_index() or load_cpu_index() first."
+            raise RuntimeError(msg)
 
-    def _ensure_secondary_index(self) -> None:
-        """Ensure the secondary flat index exists, creating it if necessary.
+        self._ensure_secondary()
 
-        This method lazily initializes the secondary index used for fast incremental
-        updates. The secondary index is a flat (IndexFlatIP) index wrapped with
-        IndexIDMap2 for ID management. It requires no training and enables instant
-        vector additions without rebuilding the primary index.
+        ids_arr = np.asarray(new_ids, dtype=np.int64).reshape(-1)
+        vectors_arr = np.asarray(new_vectors, dtype=np.float32)
+        keep_mask = np.ones_like(ids_arr, dtype=bool)
+        seen = set()
 
-        The secondary index is created only once per manager instance. Subsequent
-        calls to this method are no-ops if the index already exists. The index is
-        configured with direct map support to enable vector reconstruction.
+        for pos, cid in enumerate(ids_arr.tolist()):
+            if cid in seen or cid in self.incremental_ids:
+                keep_mask[pos] = False
+            else:
+                seen.add(cid)
 
-        Notes
-        -----
-        The secondary index uses IndexFlatIP (inner product) for exact search over
-        newly added vectors. This provides fast incremental updates at the cost of
-        linear search time. The index is automatically searched alongside the primary
-        index during dual-index search operations. Time complexity: O(1) if index
-        exists, O(1) for creation (no training required). The method performs no I/O
-        operations and is idempotent.
-        """
-        if self.secondary_index is not None:
-            return
-        flat_index = faiss.IndexFlatIP(self.vec_dim)
-        index = faiss.IndexIDMap2(flat_index)
-        _configure_direct_map(index)
-        self.secondary_index = index
+        kept = int(keep_mask.sum())
+        if kept > 0:
+            if self.secondary_index is None:
+                msg = "Secondary index should be created but is None"
+                raise RuntimeError(msg)
+            builder_add_vectors(self.secondary_index, vectors_arr[keep_mask], ids_arr[keep_mask])
+            self.incremental_ids.update(ids_arr[keep_mask].tolist())
 
-    def _build_primary_contains(self) -> Callable[[int], bool]:
-        """Build a function to check if chunk IDs exist in the primary index.
+        return kept
 
-        This method constructs a callable that checks whether a given chunk ID exists
-        in the primary FAISS index. It attempts multiple strategies in order of
-        efficiency: (1) use native contains() method if available, (2) use search()
-        or find() methods that return index positions, (3) fall back to building a
-        set of all existing IDs for O(1) lookup. The method handles cases where the
-        index is unavailable or lacks ID mapping support.
-
-        Returns
-        -------
-        Callable[[int], bool]
-            Function that accepts a chunk ID (int) and returns True if the ID exists
-            in the primary index, False otherwise. The function is optimized for the
-            available FAISS ID map interface. Returns a no-op function (always False)
-            if the primary index is unavailable or lacks ID mapping support.
-
-        Notes
-        -----
-        This method is used by update_index() to filter out duplicate IDs before
-        adding vectors to the secondary index. The returned function is thread-safe
-        if the underlying FAISS index is thread-safe. Time complexity of the returned
-        function depends on the strategy: O(1) for native contains() or set lookup,
-        O(log n) for search-based methods. The method itself is O(1) if native
-        methods are available, O(n) if building an ID set is required.
-        """
-        try:
-            cpu_index = self._require_cpu_index()
-        except (RuntimeError, VectorIndexStateError):
-            return lambda _id: False
-
-        id_map_obj = getattr(cpu_index, "id_map", None)
-        if id_map_obj is None:
-            return lambda _id: False
-
-        for attr, builder in (
-            ("contains", _wrap_bool_contains),
-            ("search", _wrap_index_contains),
-            ("find", _wrap_index_contains),
-        ):
-            raw = getattr(id_map_obj, attr, None)
-            if callable(raw):
-                return builder(cast("Callable[[int], object]", raw))
-
-        existing_ids = self._build_existing_ids_set(cpu_index, id_map_obj)
-        return lambda id_val: int(id_val) in existing_ids
-
-    @staticmethod
-    def _build_existing_ids_set(cpu_index: FaissIndex, id_map_obj: object) -> set[int]:
-        """Build a set of all existing chunk IDs from the FAISS index.
-
-        This helper method extracts all chunk IDs stored in the FAISS index by
-        iterating through the ID map and collecting external IDs. It uses the
-        id_map.at() method to retrieve the external ID for each internal index
-        position. This set is used as a fallback for duplicate checking when
-        native contains() methods are unavailable.
-
-        Parameters
-        ----------
-        cpu_index : FaissIndex
-            FAISS CPU index to extract IDs from. Must have an ntotal attribute
-            indicating the number of vectors in the index.
-        id_map_obj : object
-            ID map object from the FAISS index (typically from index.id_map).
-            Must expose an at() method that accepts an index position and returns
-            the external chunk ID.
-
-        Returns
-        -------
-        set[int]
-            Set containing all external chunk IDs stored in the index. Returns an
-            empty set if the index has no vectors, lacks ID mapping support, or
-            if extraction fails (e.g., missing at() method, type errors).
-
-        Notes
-        -----
-        This method is used as a fallback strategy when native contains() methods
-        are unavailable. Building the set requires O(n) time and O(n) space where
-        n is the number of vectors. The set enables O(1) ID lookups for duplicate
-        checking. The method handles errors gracefully, returning an empty set
-        when extraction is not possible.
-        """
-        try:
-            n_total = cpu_index.ntotal
-        except AttributeError:
-            return set()
-
-        try:
-            if id_map_obj is None:
-                return set()
-            at_raw = getattr(id_map_obj, "at", None)
-            if not callable(at_raw):
-                return set()
-            at_callable = cast("Callable[[int], int]", at_raw)
-            return {int(at_callable(idx)) for idx in range(n_total)}
-        except (AttributeError, TypeError, ValueError):
-            return set()
-
-    def _collect_unique_indices(
-        self, new_ids: NDArrayI64, primary_contains: Callable[[int], bool]
-    ) -> list[int]:
-        """Collect indices of unique IDs that should be added to the secondary index.
-
-        This method filters the input ID array to identify which IDs are truly new
-        and should be added to the secondary index. An ID is considered unique if
-        it (1) appears only once in the current batch (no duplicates within batch),
-        (2) is not already in the secondary index (not in incremental_ids), and
-        (3) is not already in the primary index (checked via primary_contains).
-
-        Parameters
-        ----------
-        new_ids : NDArrayI64
-            Array of chunk IDs to check for uniqueness, shape (n,) or (n, 1).
-            The array is flattened before processing. IDs are converted to integers
-            for comparison.
-        primary_contains : Callable[[int], bool]
-            Function that checks if a chunk ID exists in the primary index. Returns
-            True if the ID exists, False otherwise. Used to filter out IDs that are
-            already indexed in the primary index.
-
-        Returns
-        -------
-        list[int]
-            List of array indices (offsets) corresponding to unique IDs that should
-            be added to the secondary index. The indices can be used to slice the
-            corresponding vectors array to extract only unique vectors. Returns an
-            empty list if all IDs are duplicates or already indexed.
-
-        Notes
-        -----
-        This method is used by update_index() to filter vectors before adding them
-        to the secondary index. It performs three levels of deduplication: within
-        batch, against secondary index, and against primary index. Time complexity:
-        O(n) where n is the number of IDs, plus O(k) for primary_contains checks
-        where k is the number of unique IDs in the batch. Space complexity: O(n) for
-        the seen_in_batch set. The method is deterministic and preserves the order
-        of first occurrence for unique IDs.
-        """
-        unique_indices: list[int] = []
-        seen_in_batch: set[int] = set()
-
-        flat_ids = new_ids.reshape(-1)
-        for offset, id_val in enumerate(flat_ids):
-            id_int = int(id_val)
-            if id_int in seen_in_batch:
-                continue
-            seen_in_batch.add(id_int)
-            if id_int in self.incremental_ids:
-                continue
-            if primary_contains(id_int):
-                continue
-            unique_indices.append(offset)
-
-        return unique_indices
-
-    def _log_secondary_added(
-        self,
-        *,
-        added: int,
-        total_secondary_vectors: int,
-        skipped_duplicates: int,
-    ) -> None:
-        """Record metadata for secondary index updates without emitting logs.
-
-        Parameters
-        ----------
-        added : int
-            Number of vectors successfully added to the secondary index.
-        total_secondary_vectors : int
-            Total number of vectors in the secondary index after the update.
-        skipped_duplicates : int
-            Number of duplicate IDs skipped during the update.
-        """
-        self._last_secondary_update = SecondaryUpdateSnapshot(
-            added=added,
-            total_secondary_vectors=total_secondary_vectors,
-            skipped_duplicates=skipped_duplicates,
-            recorded_at=datetime.now(tz=UTC),
-        )
+    def _ensure_secondary(self) -> None:
+        """Lazily create secondary index (flat IP) for incremental updates."""
+        if self.secondary_index is None:
+            self.secondary_index = builder_create_secondary(self.vec_dim)
 
     def save_cpu_index(self) -> None:
-        """Save CPU index to disk for persistence.
-
-        Writes the current CPU index to the file specified by index_path. The
-        index can be loaded later with load_cpu_index() to avoid rebuilding.
-        The parent directory is created if it doesn't exist.
-
-        The saved index includes all vectors and IDs that have been added. Only
-        CPU indexes are persisted; GPU acceleration is no longer supported.
-
-        Raises
-        ------
-        RuntimeError
-            If the index has not been built yet. Call build_index() first.
-        """
-        try:
-            cpu_index = self._require_cpu_index()
-        except RuntimeError as exc:
-            msg = "Cannot save index: FAISS index has not been built or loaded."
-            raise RuntimeError(msg) from exc
-
-        builder_save_index(cpu_index, self.index_path)
+        """Persist the primary CPU index to disk."""
+        if self.cpu_index is None:
+            msg = "Primary index not initialized."
+            raise RuntimeError(msg)
+        builder_save_index(self.cpu_index, self.index_path)
 
     def load_cpu_index(
         self,
@@ -1077,196 +278,46 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         export_idmap: Path | None = None,
         profile_path: Path | None = None,
     ) -> None:
-        """Load CPU index from disk.
-
-        Reads a previously saved FAISS index from index_path and loads it into
-        memory. This allows reusing an index without rebuilding it, which is much
-        faster for large indexes. Optionally exports the ID map and writes tuning
-        profile files for debugging and performance analysis.
-
-        After loading, the manager is ready for CPU-based search immediately.
-
-        Parameters
-        ----------
-        export_idmap : Path | None
-            Optional path to export the FAISS ID map as a Parquet file. If provided,
-            the ID map is written to this location. Defaults to None.
-        profile_path : Path | None
-            Optional path to write the autotune profile JSON. If provided, the
-            current tuning profile is persisted. If None, uses autotune_profile_path.
-            Defaults to None.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the index file does not exist at index_path. Ensure the index was
-            saved with save_cpu_index() or that the path is correct.
-        """
-        if not self.index_path.exists():
-            msg = f"Index not found: {self.index_path}"
-            raise FileNotFoundError(msg)
-
-        cpu_index = builder_load_index(self.index_path)
-        if not isinstance(cpu_index, faiss.IndexIDMap2):
-            cpu_index = faiss.IndexIDMap2(cpu_index)
-        _configure_direct_map(cpu_index)
-        self.cpu_index = cpu_index
-        profile = self.load_tuned_profile()
-        if profile:
-            self.apply_profile_payload(profile, persist=False)
-        self.write_meta_snapshot(
-            vector_count=cpu_index.ntotal,
-            parameter_space=self.format_parameter_string(self._runtime_overrides),
-        )
+        """Load the primary CPU index from disk and apply persisted tuning."""
+        self.cpu_index = builder_load_index(self.index_path)
+        self.secondary_index = None
+        self.incremental_ids.clear()
         if export_idmap is not None:
             self.export_idmap(export_idmap)
-        profile_target = profile_path or self.autotune_profile_path
-        if profile_target is not None:
-            self._write_profile(profile_target)
+        self._sync_runtime_from_meta()
+        profile = self._load_profile_payload(profile_path or self._resolve_profile_to_read())
+        if profile is not None:
+            self._apply_profile_payload(profile)
+        elif self._runtime_overrides:
+            self._apply_runtime_overrides(self._runtime_overrides, persist=False)
 
     def save_secondary_index(self) -> None:
-        """Save secondary index to disk.
-
-        Writes the current secondary index (if it exists) to a separate file
-        alongside the primary index. The secondary index file uses the same
-        name as the primary index with a `.secondary` suffix.
-
-        This allows persisting incremental updates so they can be restored
-        after restart. The secondary index is saved independently from the
-        primary index.
-
-        Raises
-        ------
-        RuntimeError
-            If the secondary index has not been created yet. Call update_index()
-            first to create the secondary index.
-        """
+        """Persist the secondary index to disk (.secondary suffix)."""
         if self.secondary_index is None:
-            msg = "Cannot save secondary index: secondary index has not been created."
+            msg = "Secondary index not created yet."
             raise RuntimeError(msg)
-
-        paths = IndexArtifactPaths(self.index_path)
-        store_save_secondary(self.secondary_index, paths)
+        store_save_secondary(self.secondary_index, self._paths)
 
     def load_secondary_index(self) -> None:
-        """Load secondary index from disk.
-
-        Reads a previously saved secondary FAISS index from disk and loads it
-        into memory. This restores incremental updates that were made in a
-        previous session.
-
-        After loading, the secondary index will be automatically searched
-        alongside the primary index when using search(). The incremental_ids
-        set is restored from the index contents.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the secondary index file does not exist. This is normal if no
-            incremental updates have been made yet.
-        """
-        paths = IndexArtifactPaths(self.index_path)
-        secondary_path = paths.secondary_index_path
-        if not secondary_path.exists():
-            msg = f"Secondary index not found: {secondary_path}"
-            raise FileNotFoundError(msg)
-
-        index = store_load_secondary(paths)
-        _configure_direct_map(index)
-        self.secondary_index = index
-
-        # Restore incremental_ids from the loaded index
-        if self.secondary_index is not None:
-            n_vectors = self.secondary_index.ntotal
-            id_map_obj = getattr(self.secondary_index, "id_map", None)
-            if id_map_obj is not None and callable(getattr(id_map_obj, "at", None)):
-                at_callable = cast("Callable[[int], int]", id_map_obj.at)
-                self.incremental_ids = {at_callable(i) for i in range(n_vectors)}
-            else:
-                self.incremental_ids = set(range(n_vectors))
+        """Load the secondary index from disk (.secondary suffix)."""
+        try:
+            self.secondary_index = store_load_secondary(self._paths)
+        except FileNotFoundError:
+            self.secondary_index = None
 
     def export_idmap(self, out_path: Path) -> int:
-        """Persist ``{faiss_row -> external_id}`` to Parquet and return row count.
-
-        Parameters
-        ----------
-        out_path : Path
-            Destination for the Parquet sidecar.
-
-        Returns
-        -------
-        int
-            Number of ID rows exported.
-        """
-        cpu_index = self._require_cpu_index()
-        return export_idmap_parquet(
-            cpu_index,
-            out_path,
-            index_name=self.index_path.name,
-        )
+        """Export {faiss_row -> external_id} mapping to Parquet."""
+        if self.cpu_index is None:
+            msg = "Primary index not initialized."
+            raise RuntimeError(msg)
+        return export_idmap_parquet(self.cpu_index, out_path)
 
     def get_idmap_array(self) -> NDArrayI64:
-        """Return the mapping from FAISS row IDs to external chunk IDs.
-
-        Returns
-        -------
-        NDArrayI64
-            Array where ``array[row]`` equals the external chunk ID.
-        """
-        cpu_index = self._require_cpu_index()
-        return store_get_idmap_array(cpu_index)
-
-    @staticmethod
-    def hydrate_by_ids(catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
-        """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
-
-        Parameters
-        ----------
-        catalog : DuckDBCatalog
-            Catalog used to hydrate chunk metadata.
-        ids : Sequence[int]
-            Chunk identifiers to hydrate.
-
-        Returns
-        -------
-        list[dict]
-            Hydrated chunk metadata entries.
-        """
-        if not ids:
-            return []
-        return catalog.query_by_ids(list(ids))
-
-    def reconstruct_batch(self, ids: Sequence[int]) -> NDArrayF32:
-        """Reconstruct vectors for a batch of external chunk IDs.
-
-        Parameters
-        ----------
-        ids : Sequence[int]
-            Chunk identifiers to reconstruct.
-
-        Returns
-        -------
-        NDArrayF32
-            Array of reconstructed vectors with shape ``(len(ids), vec_dim)``.
-
-        Raises
-        ------
-        RuntimeError
-            If FAISS is unable to reconstruct a specific vector.
-        """
-        if not ids:
-            return np.empty((0, self.vec_dim), dtype=np.float32)
-        cpu_index = self.require_cpu_index()
-        _configure_direct_map(cpu_index)
-        vectors = np.empty((len(ids), self.vec_dim), dtype=np.float32)
-        for pos, chunk_id in enumerate(ids):
-            try:
-                reconstructed = cpu_index.reconstruct(int(chunk_id))
-            except (AttributeError, RuntimeError) as exc:
-                msg = f"Unable to reconstruct FAISS vector for chunk_id {chunk_id}"
-                raise RuntimeError(msg) from exc
-            vectors[pos] = np.asarray(reconstructed, dtype=np.float32)
-        return vectors
+        """Get the ID map array from the primary index."""
+        if self.cpu_index is None:
+            msg = "Primary index not initialized."
+            raise RuntimeError(msg)
+        return get_idmap_array(self.cpu_index)
 
     def search(
         self,
@@ -1275,95 +326,29 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         *,
         nprobe: int | None = None,
         runtime: SearchRuntimeOverrides | None = None,
-        catalog: object | None = None,
+        catalog: DuckDBCatalog | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
-        """Search for nearest neighbors using cosine similarity with dual-index support.
+        """Execute dual-index search with optional exact rerank."""
+        if self.cpu_index is None:
+            msg = "Primary index not initialized."
+            raise RuntimeError(msg)
 
-        Performs approximate nearest neighbor search using the FAISS index(es).
-        When a secondary index exists (from incremental updates), searches both
-        the primary and secondary indexes, then merges results by score to return
-        the top-k most similar vectors overall.
+        eff_k = int(k or self.default_k)
+        eff_nprobe = int(nprobe or self.default_nprobe)
 
-        The nprobe parameter controls the trade-off between search speed and
-        recall—higher values search more cells and improve recall but slow down
-        search.
+        k_factor = self.refine_k_factor
+        if runtime is not None and runtime.k_factor is not None:
+            k_factor = runtime.k_factor
 
-        Parameters
-        ----------
-        query : NDArrayF32
-            Query vector(s) of shape (n_queries, vec_dim) or (vec_dim,) for
-            single query. Dtype should be float32. Vectors are automatically
-            normalized for cosine similarity.
-        k : int | None, optional
-            Number of nearest neighbors to return per query. If None, uses
-            `default_k` from runtime options (default: 50). Higher k improves
-            recall but increases computation and memory usage.
-        nprobe : int | None, optional
-            Number of IVF cells to probe during search. If None, uses
-            `default_nprobe` from runtime options. Higher values improve recall
-            but slow down search. Should match or be less than the nlist parameter
-            used during index construction. Only applies to IVF-family indexes.
-        runtime : SearchRuntimeOverrides | None, optional
-            Optional overrides controlling HNSW and refinement parameters.
-        catalog : object | None, optional
-            Optional catalog object (typically DuckDBCatalog) for candidate hydration
-            and exact reranking. When provided and ``refine_k_factor`` > 1, candidate
-            embeddings are hydrated from the catalog and reranked exactly before
-            returning results. The catalog must expose get_embeddings_by_ids() or
-            similar methods for embedding retrieval. When None, reranking is skipped.
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64]
-            Tuple of (distances, ids) arrays:
-            - distances: shape (n_queries, k), cosine similarity scores (higher
-              is more similar, range typically 0-1 after normalization)
-            - ids: shape (n_queries, k), chunk IDs of the nearest neighbors.
-              IDs correspond to the ids passed to add_vectors() or update_index().
-
-        Raises
-        ------
-        VectorSearchError
-            If the FAISS search fails (e.g., index unavailable or invalid parameters).
-            The error contains context about the index path and runtime settings
-            for observability.
-
-        Notes
-        -----
-        When both primary and secondary indexes exist, the method:
-        1. Searches primary index with nprobe parameter
-        2. Searches secondary index (flat, no nprobe)
-        3. Merges results by score (inner product distance)
-        4. Returns top-k combined results
-
-        This ensures incremental updates are immediately searchable without
-        rebuilding the primary index. Time complexity depends on index type:
-        O(n) for Flat, O(nprobe * k) for IVF-family, O(log n * ef_search) for HNSW.
-        """
-        plan = self._prepare_search_plan(query, k, nprobe, runtime)
-        duck_catalog = catalog if isinstance(catalog, DuckDBCatalog) else None
-
-        start = perf_counter()
-        try:
-            distances, identifiers = self._execute_dual_search(
-                query=plan.queries,
-                plan=plan,
-                catalog=duck_catalog,
-            )
-            result = (distances[:, : plan.k], identifiers[:, : plan.k])
-        except Exception as exc:
-            msg = "FAISS search failed"
-            raise VectorSearchError(
-                msg,
-                cause=exc,
-                context={
-                    "index_path": str(self.index_path),
-                    "search_k": plan.k,
-                },
-            ) from exc
-        elapsed_total = (perf_counter() - start) * 1000.0
-        self._last_latency_ms = elapsed_total
-        return result
+        return runtime_search_dual(
+            primary=self.cpu_index,
+            secondary=self.secondary_index,
+            query=query,
+            k=eff_k,
+            nprobe=eff_nprobe,
+            refine_k_factor=k_factor,
+            catalog=catalog,
+        )
 
     def search_with_refine(
         self,
@@ -1373,675 +358,100 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         catalog: DuckDBCatalog,
         config: RefineSearchConfig | None = None,
     ) -> list[SearchHit]:
-        """Return structured hits with ANN search + exact rerank metadata.
-
-        Parameters
-        ----------
-        query : NDArrayF32
-            Query vector for ANN search. Must match the index dimension.
-        k : int
-            Number of results to return after reranking.
-        catalog : DuckDBCatalog
-            DuckDB catalog for fetching chunk metadata and embeddings for
-            reranking. Used to hydrate candidate IDs into full chunk records.
-        config : RefineSearchConfig | None, optional
-            Optional configuration bundle controlling nprobe, runtime overrides,
-            When None, uses default settings (nprobe from manager configuration).
-
-        Returns
-        -------
-        list[SearchHit]
-            List of SearchHit objects containing chunk metadata, scores, and
-            rerank information. Results are sorted by rerank score (descending)
-            when reranking is enabled, or by ANN distance (ascending) otherwise.
-        """
-        config = config or RefineSearchConfig()
-        runtime = config.runtime or SearchRuntimeOverrides()
-        _, _, resolved_k_factor, _ = self.resolve_search_knobs(
-            override_nprobe=config.nprobe,
-            override_ef=runtime.ef_search,
-            override_k_factor=runtime.k_factor,
-            override_quantizer=runtime.quantizer_ef_search,
-        )
-        distances, identifiers = self.search(
-            query,
+        """Execute ANN search and return structured :class:`SearchHit` rows."""
+        cfg = config or RefineSearchConfig()
+        distances, ids = self.search(
+            query=query,
             k=k,
-            nprobe=config.nprobe,
-            runtime=runtime,
+            nprobe=cfg.nprobe,
+            runtime=cfg.runtime,
             catalog=catalog,
         )
-        if distances.size == 0 or identifiers.size == 0:
+        if distances.size == 0:
             return []
-        top_scores = distances[0]
-        top_ids = identifiers[0]
+        k_factor = (
+            cfg.runtime.k_factor
+            if cfg.runtime and cfg.runtime.k_factor is not None
+            else self.refine_k_factor
+        )
+        nprobe = cfg.nprobe or self._runtime_overrides.get("nprobe") or self.default_nprobe
         hits: list[SearchHit] = []
-        for rank, (chunk_id, score) in enumerate(zip(top_ids, top_scores, strict=True)):
-            if chunk_id < 0:
+        for rank, (score, chunk_id) in enumerate(zip(distances[0], ids[0], strict=False)):
+            if int(chunk_id) < 0:
                 continue
+            explain = {
+                "k_factor": float(k_factor),
+                "nprobe": int(nprobe) if nprobe is not None else None,
+            }
             hits.append(
                 SearchHit(
                     doc_id=str(int(chunk_id)),
                     rank=rank,
                     score=float(score),
-                    source=config.source,
+                    source=cfg.source,
                     faiss_row=None,
-                    explain={
-                        "family": self.faiss_family or "auto",
-                        "k_factor": resolved_k_factor,
-                    },
+                    explain=explain,
                 )
             )
         return hits
 
-    def _prepare_search_plan(
-        self,
-        query: NDArrayF32,
-        k: int | None,
-        nprobe: int | None,
-        runtime: SearchRuntimeOverrides | None,
-    ) -> _SearchPlan:
-        """Normalize query and resolve runtime knobs for a FAISS search.
-
-        Extended Summary
-        ----------------
-        This helper method prepares a search plan by normalizing the query vector
-        (L2 normalization), resolving effective k and search_k values, and applying
-        runtime tuning overrides. It consolidates all search parameters into a
-        _SearchPlan dataclass for consistent execution. Used internally by search()
-        to prepare search parameters before executing FAISS queries.
-
-        Parameters
-        ----------
-        query : NDArrayF32
-            Query vector(s) to normalize and search. Shape (n_queries, vec_dim) or
-            (vec_dim,). Normalized to unit length using L2 normalization.
-        k : int | None
-            Requested number of results. If None, uses default_k from settings.
-        nprobe : int | None
-            Optional override for number of IVF cells to probe. If None, uses
-            default_nprobe or runtime overrides.
-        runtime : SearchRuntimeOverrides | None
-            Optional runtime tuning overrides (ef_search, quantizer_ef_search, k_factor).
-            Applied to resolve final search parameters.
-
-        Returns
-        -------
-        _SearchPlan
-            Search plan containing normalized queries, effective k, search_k (with
-            k_factor applied), and execution parameters (nprobe, ef_search, legacy flags).
-            The plan is ready for use in FAISS search execution.
-
-        Notes
-        -----
-        This method performs L2 normalization on query vectors and resolves all
-        search parameters including k_factor expansion. Time complexity: O(n_queries * vec_dim)
-        for normalization plus O(1) for parameter resolution.
-        """
-        self._require_cpu_index()
-        normalized = self.ensure_2d(query).copy().astype(np.float32)
-        faiss.normalize_L2(normalized)
-        k_eff = max(1, int(k or self.default_k))
-        runtime = runtime or SearchRuntimeOverrides()
-        nprobe_eff, ef_eff, k_factor, quantizer_ef = self.resolve_search_knobs(
-            override_nprobe=nprobe,
-            override_ef=runtime.ef_search,
-            override_k_factor=runtime.k_factor,
-            override_quantizer=runtime.quantizer_ef_search,
+    def apply_runtime_parameters(self, overrides: dict[str, float | int]) -> None:
+        """Apply runtime parameter overrides to the active index."""
+        if self.cpu_index is None:
+            return
+        apply_runtime_parameters(
+            self.cpu_index,
+            nprobe=int(overrides.get("nprobe")) if overrides.get("nprobe") is not None else None,
+            ef_search=int(overrides.get("efSearch")) if overrides.get("efSearch") is not None else None,
+            quantizer_ef_search=(
+                int(overrides.get("quantizer_efSearch"))
+                if overrides.get("quantizer_efSearch") is not None
+                else None
+            ),
         )
-        search_k = max(k_eff, math.ceil(k_eff * max(1.0, k_factor)))
-        resolved_nprobe = nprobe_eff if nprobe_eff is not None else self.default_nprobe
-        if resolved_nprobe is None:
-            resolved_nprobe = 1
-        params = _SearchExecutionParams(
-            nprobe=resolved_nprobe,
-            ef_search=ef_eff,
-            quantizer_ef_search=quantizer_ef,
-        )
-        return _SearchPlan(
-            queries=normalized,
-            k=k_eff,
-            search_k=search_k,
-            params=params,
-        )
-
-    # Runtime tuning is handled by FAISSRuntimeController via the ``runtime`` property.
-
-    def apply_profile_payload(
-        self,
-        profile: Mapping[str, Any],
-        *,
-        persist: bool,
-    ) -> dict[str, object]:
-        """Apply a persisted tuning profile to the runtime configuration.
-
-        Parameters
-        ----------
-        profile : Mapping[str, Any]
-            Tuning profile dictionary containing search parameter overrides.
-            May include param_str (FAISS ParameterSpace string) or individual
-            parameters (nprobe, ef_search, quantizer_ef_search, k_factor).
-        persist : bool
-            Whether to persist the profile to disk. If True, the profile is
-            written to the autotune profile path. If False, the profile is
-            cached in memory only.
-
-        Returns
-        -------
-        dict[str, object]
-            Applied profile payload dictionary containing the effective runtime
-            tuning state after applying the profile.
-
-        Raises
-        ------
-        VectorIndexIncompatibleError
-            When the profile parameters are invalid or incompatible with the
-            current index configuration. Wraps ValueError or TypeError from
-            parameter validation with context about the failing parameter.
-        """
-        overrides = _parse_tuning_overrides(profile)
-        try:
-            if overrides.param_str:
-                snapshot = self.runtime.set_search_parameters(overrides.param_str)
-            else:
-                snapshot = self.runtime.apply_runtime_tuning(
-                    nprobe=overrides.nprobe,
-                    ef_search=overrides.ef_search,
-                    quantizer_ef_search=overrides.quantizer_ef_search,
-                    k_factor=overrides.k_factor,
-                )
-        except (ValueError, TypeError) as exc:
-            error_msg = "Unable to apply tuning profile."
-            raise VectorIndexIncompatibleError(
-                error_msg,
-                context={"param_str": overrides.param_str or "runtime_overrides"},
-                cause=exc,
-            ) from exc
-
-        if overrides.k_factor is not None:
-            with self._tuning_lock:
-                self.refine_k_factor = overrides.k_factor
-        if persist:
-            _persist_tuning_profile(self, profile)
-        else:
-            self.tuned_parameters = dict(profile)
-        return snapshot
-
-    def _search_primary(
-        self, query: NDArrayF32, k: int, nprobe: int
-    ) -> tuple[NDArrayF32, NDArrayI64]:
-        """Search the primary index (adaptive type: Flat/IVFFlat/IVF-PQ).
-
-        Parameters
-        ----------
-        query : NDArrayF32
-            Query vector(s), shape (n_queries, vec_dim) or (vec_dim,).
-        k : int
-            Number of nearest neighbors to return.
-        nprobe : int
-            Number of IVF cells to probe (for IVF indexes).
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64]
-            Tuple of (distances, ids) from primary index search.
-
-        Notes
-        -----
-        Flat indexes (``IndexFlat*``) do not expose the ``nprobe`` attribute.
-        The method checks for attribute support before assigning so that flat
-        indexes skip the IVF-only parameter while IVF indexes continue to use
-        ``nprobe`` for recall control.
-
-        Raises
-        ------
-        RuntimeError
-            If primary index is not available.
-        """
-        try:
-            index = self.active_index()
-        except RuntimeError as exc:
-            msg = "Cannot search primary index: no FAISS index is available."
-            raise RuntimeError(msg) from exc
-
-        # Set nprobe (only affects IVF indexes)
-        if hasattr(index, "nprobe"):
-            index.nprobe = nprobe
-
-        # Reshape query if needed
-        if query.ndim == 1:
-            query = query.reshape(1, -1)
-
-        # Normalize query
-        query_norm = query.copy().astype(np.float32)
-        faiss.normalize_L2(query_norm)
-
-        # Search primary index
-        return _run_index_search(index, query_norm, k)
-
-    def _execute_dual_search(
-        self,
-        *,
-        query: NDArrayF32,
-        plan: _SearchPlan,
-        catalog: DuckDBCatalog | None,
-    ) -> tuple[NDArrayF32, NDArrayI64]:
-        """Run primary + optional secondary search with tracing.
-
-        Parameters
-        ----------
-        query : NDArrayF32
-            Query vector(s) of shape (n_queries, vec_dim) or (vec_dim,).
-            Automatically normalized for cosine similarity.
-        plan : _SearchPlan
-            Prepared search plan containing normalization buffers and runtime
-            execution parameters.
-        catalog : DuckDBCatalog | None
-            Catalog used for optional exact rerank when available.
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64]
-            Result set prior to top-k truncation. Distances and IDs from
-            merged primary and secondary searches.
-
-        Notes
-        -----
-        This is an internal method that orchestrates dual-index search with the
-        new runtime module helpers. It applies runtime parameters via the
-        ParameterSpace API, executes searches across both indexes, merges them,
-        and optionally reranks against the DuckDB catalog.
-        """
-        params = plan.params
-        self._apply_runtime_parameters(
-            nprobe=params.nprobe,
-            ef_search=params.ef_search,
-            quantizer_ef_search=params.quantizer_ef_search,
-        )
-        refine_factor = 1.0
-        if plan.k > 0:
-            refine_factor = max(1.0, plan.search_k / plan.k)
-        distances, identifiers = runtime_search_dual(
-            primary=self.active_index(),
-            secondary=self.secondary_index,
-            query=query,
-            k=plan.k,
-            nprobe=params.nprobe,
-            refine_k_factor=refine_factor,
-            catalog=catalog,
-        )
-        return distances, identifiers
-
-    def _search_secondary(self, query: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
-        """Search the secondary index (flat, no training required).
-
-        This method is public for testing and advanced use cases where
-        separate primary/secondary search results are needed.
-
-        Parameters
-        ----------
-        query : NDArrayF32
-            Query vector(s), shape (n_queries, vec_dim) or (vec_dim,).
-        k : int
-            Number of nearest neighbors to return.
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64]
-            Tuple of (distances, ids) from secondary index search.
-
-        Raises
-        ------
-        RuntimeError
-            If secondary index is not available (should not happen if called
-            from search() after checking existence).
-        """
-        if self.secondary_index is None:
-            msg = "Cannot search secondary index: secondary index not initialized."
-            raise RuntimeError(msg)
-
-        # Reshape query if needed
-        if query.ndim == 1:
-            query = query.reshape(1, -1)
-
-        # Normalize query
-        query_norm = query.copy().astype(np.float32)
-        faiss.normalize_L2(query_norm)
-
-        # Search secondary index (flat, no nprobe needed)
-        return _run_index_search(self.secondary_index, query_norm, k)
-
-    def _primary_index_impl(self) -> FaissIndex:
-        """Return the underlying FAISS index implementation for primary CPU index.
-
-        Returns
-        -------
-        FaissIndex
-            Downcast FAISS index representing the current primary structure.
-        """
-        cpu_index = self._require_cpu_index()
-        base = getattr(cpu_index, "index", cpu_index)
-        return self._downcast_index(base)
-
-    @staticmethod
-    def _merge_results(
-        dists1: NDArrayF32,
-        ids1: NDArrayI64,
-        dists2: NDArrayF32,
-        ids2: NDArrayI64,
-        k: int,
-    ) -> tuple[NDArrayF32, NDArrayI64]:
-        """Merge search results from two indexes by score.
-
-        Combines results from primary and secondary indexes, sorts by distance
-        (inner product, higher is better), and returns the top-k combined results.
-
-        Parameters
-        ----------
-        dists1 : NDArrayF32
-            Distances from first index, shape (n_queries, k1).
-        ids1 : NDArrayI64
-            IDs from first index, shape (n_queries, k1).
-        dists2 : NDArrayF32
-            Distances from second index, shape (n_queries, k2).
-        ids2 : NDArrayI64
-            IDs from second index, shape (n_queries, k2).
-        k : int
-            Number of top results to return after merging.
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64]
-            Tuple of (merged_distances, merged_ids), both shape (n_queries, k).
-            Results are sorted by distance (descending for inner product).
-
-        Notes
-        -----
-        Uses inner product distance (cosine similarity after normalization),
-        where higher values indicate better matches. Results are sorted in
-        descending order and top-k is selected.
-        """
-        # Combine distances and IDs along the k dimension
-        all_dists = np.concatenate([dists1, dists2], axis=1)
-        all_ids = np.concatenate([ids1, ids2], axis=1)
-
-        # Sort by distance (descending for inner product - higher is better)
-        sorted_indices = np.argsort(-all_dists, axis=1)
-
-        n_queries = all_dists.shape[0]
-        filler = np.finfo(all_dists.dtype).min
-        merged_dists = np.full((n_queries, k), filler, dtype=all_dists.dtype)
-        merged_ids = np.full((n_queries, k), -1, dtype=all_ids.dtype)
-
-        for query_idx in range(n_queries):
-            seen: set[int] = set()
-            out_pos = 0
-            for candidate_idx in sorted_indices[query_idx]:
-                candidate_id = int(all_ids[query_idx, candidate_idx])
-                if candidate_id < 0 or candidate_id in seen:
-                    continue
-                seen.add(candidate_id)
-                merged_dists[query_idx, out_pos] = all_dists[query_idx, candidate_idx]
-                merged_ids[query_idx, out_pos] = candidate_id
-                out_pos += 1
-                if out_pos == k:
-                    break
-
-        return merged_dists, merged_ids
 
     def merge_indexes(self) -> None:
-        """Merge secondary index into primary index (periodic rebuild).
-
-        Rebuilds the primary index to include all vectors from both the primary
-        and secondary indexes. After merging, the secondary index is cleared,
-        allowing for a fresh start for future incremental updates.
-
-        This operation is expensive (requires rebuilding the primary index) but
-        should be performed periodically to maintain optimal search performance.
-        After merging, search operations will only query the primary index,
-        which is faster than dual-index search.
-
-        The merge process:
-        1. Extracts all vectors and IDs from both primary and secondary indexes
-        2. Combines them into a single dataset
-        3. Rebuilds the primary index with adaptive type selection
-        4. Adds all vectors to the rebuilt primary index
-        5. Clears the secondary index and incremental IDs
-
-        Notes
-        -----
-        This method requires that vectors can be reconstructed from the indexes.
-        For IVF-PQ indexes, reconstruction may be approximate (quantized).
-        The method will raise RuntimeError if reconstruction is not supported.
-
-        Examples
-        --------
-        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
-        >>> manager.build_index(initial_vectors)
-        >>> manager.update_index(new_vectors, new_ids)  # Add incrementally
-        >>> # Periodically merge to optimize performance
-        >>> manager.merge_indexes()  # Rebuilds primary with all vectors
-
-        Raises
-        ------
-        RuntimeError
-            If the primary index is not available, or if vector extraction fails
-            (e.g., index does not support reconstruction or ID mapping).
-        """
-        if self.secondary_index is None or len(self.incremental_ids) == 0:
+        """Merge secondary index into primary and rebuild."""
+        if self.cpu_index is None:
+            msg = "Primary index not initialized."
+            raise RuntimeError(msg)
+        if self.secondary_index is None:
             return
 
-        try:
-            cpu_index = self._require_cpu_index()
-        except RuntimeError as exc:
-            msg = "Cannot merge indexes: primary index not available."
-            raise RuntimeError(msg) from exc
-
-        # Extract vectors from both indexes
-        primary_vectors, primary_ids = self._extract_all_vectors(cpu_index)
-        secondary_vectors, secondary_ids = self._extract_all_vectors(self.secondary_index)
-
-        # Combine vectors and IDs
-        all_vectors = np.vstack([primary_vectors, secondary_vectors])
-        all_ids = np.concatenate([primary_ids, secondary_ids])
-
-        # Rebuild primary index with combined dataset
-        # Note: build_index normalizes vectors internally
-        self.build_index(all_vectors)
-        self.add_vectors(all_vectors, all_ids)
-
-        # Clear secondary index
+        self.cpu_index = builder_merge_indexes(self.cpu_index, self.secondary_index, self.vec_dim)
         self.secondary_index = None
         self.incremental_ids.clear()
 
-    def _extract_all_vectors(self, index: FaissIndex) -> tuple[NDArrayF32, NDArrayI64]:
-        """Extract all vectors and IDs from a FAISS index.
-
-        Reconstructs vectors from the index and retrieves their associated IDs.
-        For quantized indexes (e.g., IVF-PQ), reconstruction returns approximate
-        vectors (dequantized from the codebook).
-
-        Parameters
-        ----------
-        index : FaissIndex
-            FAISS index to extract vectors from. Must support `reconstruct()` and
-            have an `id_map` attribute (IndexIDMap2 wrapper).
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64]
-            Tuple of (vectors, ids):
-            - vectors: shape (n_vectors, vec_dim), dtype float32
-            - ids: shape (n_vectors,), dtype int64
-
-        Raises
-        ------
-        RuntimeError
-            If the index does not support vector reconstruction or ID mapping.
-            This can occur with certain index types or if the index is not wrapped
-            with IndexIDMap2.
-        TypeError
-            If the index's ``id_map`` interface is invalid (missing ``at`` or not callable),
-            or if the id_map interface is missing required methods.
-        """
-        n_vectors = index.ntotal
-        if n_vectors == 0:
-            return np.empty((0, self.vec_dim), dtype=np.float32), np.empty(0, dtype=np.int64)
-
-        _configure_direct_map(index)
-        vectors = np.empty((n_vectors, self.vec_dim), dtype=np.float32)
-        ids = np.empty(n_vectors, dtype=np.int64)
-
-        # Check if index has id_map (IndexIDMap2 wrapper)
-        if not hasattr(index, "id_map"):
-            msg = (
-                f"Index type {type(index).__name__} does not support ID mapping. "
-                "Index must be wrapped with IndexIDMap2."
-            )
-            raise RuntimeError(msg)
-
-        # Extract vectors and IDs
-        id_map_obj = getattr(index, "id_map", None)
-        if id_map_obj is None or not callable(getattr(id_map_obj, "at", None)):
-            msg = f"Index type {type(index).__name__} has invalid id_map interface."
-            raise TypeError(msg)
-        at_callable = cast("Callable[[int], int]", id_map_obj.at)
-
-        base_index = getattr(index, "index", index)
-        for i in range(n_vectors):
-            try:
-                stored_id = int(at_callable(i))
-                reconstructed = base_index.reconstruct(i)
-                vectors[i] = np.asarray(reconstructed, dtype=np.float32)
-                ids[i] = stored_id
-            except (AttributeError, RuntimeError) as exc:
-                msg = f"Failed to extract vector at index {i}: {exc}"
-                raise RuntimeError(msg) from exc
-
-        return vectors, ids
-
-    def _require_cpu_index(self) -> FaissIndex:
-        """Return the CPU index if initialized.
-
-        Returns
-        -------
-        FaissIndex
-            Initialized CPU FAISS index.
-
-        Raises
-        ------
-        VectorIndexStateError
-            If the index has not been built or loaded yet.
-        """
+    def require_cpu_index(self) -> FaissIndex:
+        """Get the primary CPU index or raise if not initialized."""
         if self.cpu_index is None:
-            msg = "FAISS index not built or loaded"
-            raise VectorIndexStateError(msg, context={"index_path": str(self.index_path)})
+            msg = "Primary index not initialized."
+            raise RuntimeError(msg)
         return self.cpu_index
 
-    def require_cpu_index(self) -> FaissIndex:
-        """Return the CPU FAISS index via the public interface.
+    def active_index(self) -> FaissIndex:
+        """Get the currently active index (primary or secondary)."""
+        if self.cpu_index is not None:
+            return self.cpu_index
+        if self.secondary_index is not None:
+            return self.secondary_index
+        msg = "No index is active."
+        raise RuntimeError(msg)
 
-        Returns
-        -------
-        FaissIndex
-            Initialized CPU FAISS index.
-        """
-        return self._require_cpu_index()
+    @property
+    def runtime(self) -> _RuntimeFacade:
+        """Expose runtime tuning helpers (GET/POST /tuning/faiss)."""
+        return self._runtime_facade
 
-    # ---------------------------------------------------------------------
-    # Modern helper utilities (factory management, tuning)
-    # ---------------------------------------------------------------------
+    @property
+    def tuning_lock(self) -> RLock:
+        """Lock for runtime tuning mutations."""
+        return self._tuning_lock
 
-    def _search_with_params(
-        self,
-        query: NDArrayF32,
-        k: int,
-        *,
-        param_str: str | None = None,
-        refine_k_factor: float | None = None,
-    ) -> tuple[NDArrayF32, NDArrayI64]:
-        """Direct search utility that applies ParameterSpace overrides ad-hoc.
-
-        Parameters
-        ----------
-        query : NDArrayF32
-            Query vector(s) of shape (n_queries, vec_dim) or (vec_dim,).
-            Automatically normalized for cosine similarity.
-        k : int
-            Number of nearest neighbors to return per query.
-        param_str : str | None, optional
-            FAISS ParameterSpace parameter string (e.g., "nprobe=64,ef_search=128").
-            Applied directly to the index before search. If None, uses index defaults.
-        refine_k_factor : float | None, optional
-            If > 1.0, refines results by running exact search over primary index
-            with k * refine_k_factor candidates. Improves recall at cost of latency.
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64]
-            Distances/IDs pair for the provided query batch. Distances are cosine
-            similarity scores; IDs are chunk identifiers.
-
-        Notes
-        -----
-        This method bypasses the dual-index search path and applies FAISS
-        ParameterSpace settings directly. Useful for ad-hoc tuning experiments.
-        Time complexity depends on index type and param_str settings.
-        """
-        xq = self.ensure_2d(query)
-        faiss.normalize_L2(xq)
-        index = self.active_index()
-        if param_str:
-            apply_parameters(index, param_str)
-        distances, ids = _run_index_search(index, xq, k)
-        if refine_k_factor and refine_k_factor > 1.0:
-            distances, ids = self._refine_with_flat(xq, ids, k)
-        return distances, ids
-
-    def save_tuning_profile(
-        self,
-        profile: Mapping[str, Any],
-        *,
-        path: Path | None = None,
-    ) -> Path:
-        """Persist ``profile`` to ``tuning.json`` and return its path.
-
-        This method saves an autotune profile (containing parameter strings, recall
-        metrics, latency measurements, and other tuning metadata) to a JSON file.
-        The profile is serialized with indentation for readability and stored at
-        the configured autotune profile path or a custom path if specified. The
-        parent directory is created if it doesn't exist.
-
-        Parameters
-        ----------
-        profile : Mapping[str, Any]
-            Autotune profile dictionary containing tuning results. Typically includes
-            keys like "param_str" (parameter string), "recall_at_k" (recall metric),
-            "latency_ms" (search latency), and "refine_k_factor" (refinement factor).
-            The dictionary is serialized to JSON format.
-        path : Path | None, optional
-            Custom file system path to save the profile to. If None, uses the
-            configured autotune_profile_path. The parent directory is created
-            automatically if it doesn't exist.
-
-        Returns
-        -------
-        Path
-            File system path where the tuning profile was saved. This is either
-            the provided path or the default autotune_profile_path. The path
-            points to a JSON file containing the serialized profile data.
-
-        Notes
-        -----
-        This method performs file I/O to persist autotune results for later use.
-        The profile JSON file can be loaded to restore optimal tuning parameters
-        without re-running autotune. Time complexity: O(n) where n is the size of
-        the profile dictionary. The method creates parent directories if needed and
-        overwrites existing files. Thread-safe if file system operations are atomic.
-        """
-        target = path or self.autotune_profile_path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(profile, indent=2), encoding="utf-8")
-        return target
+    @property
+    def runtime_overrides(self) -> dict[str, float]:
+        """Mutable runtime override dictionary."""
+        return self._runtime_overrides
 
     def autotune(
         self,
@@ -2050,1302 +460,282 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         *,
         k: int = 10,
         sweep: Sequence[str] | None = None,
-    ) -> Mapping[str, Any]:
-        """Sweep FAISS ParameterSpace settings and persist the best profile.
+    ) -> dict[str, object]:
+        """Sweep ParameterSpace strings and persist the best profile."""
+        if self.cpu_index is None:
+            msg = "Primary index not initialized."
+            raise RuntimeError(msg)
+        params = tuple(sweep or _DEFAULT_SWEEP)
+        if not params:
+            msg = "Sweep list must contain at least one parameter string"
+            raise ValueError(msg)
 
-        Parameters
-        ----------
-        queries : NDArrayF32
-            Query vectors of shape (n_queries, vec_dim) for evaluation.
-            Automatically normalized for cosine similarity.
-        truths : NDArrayF32
-            Ground truth vectors of shape (n_truths, vec_dim) used to compute
-            recall. Automatically normalized for cosine similarity.
-        k : int, optional
-            Number of nearest neighbors to retrieve during evaluation (default: 10).
-        sweep : Sequence[str] | None, optional
-            List of ParameterSpace parameter strings to evaluate (e.g.,
-            ["nprobe=16", "nprobe=32", "nprobe=64"]). If None, uses default
-            sweep over nprobe values [16, 32, 64, 96, 128].
+        queries_arr = ensure_2d(np.asarray(queries, dtype=np.float32))
+        truths_arr = ensure_2d(np.asarray(truths, dtype=np.float32))
+        truth_ids = brute_force_truth_ids(queries_arr, truths_arr, k)
 
-        Returns
-        -------
-        Mapping[str, Any]
-            Summary dictionary with keys:
-            - "recall_at_k": float, best recall achieved
-            - "latency_ms": float, latency in milliseconds for best config
-            - "param_str": str, ParameterSpace string for best config
-            - Additional keys parsed from param_str (e.g., "nprobe", "ef_search")
+        best_profile: dict[str, object] | None = None
+        best_recall = float("-inf")
+        best_latency = float("inf")
 
-        Notes
-        -----
-        This method performs brute-force ground truth computation, then evaluates
-        each parameter combination in the sweep. The best configuration (highest
-        recall, breaking ties by lowest latency) is persisted to
-        `autotune_profile_path` and stored in `tuned_parameters` for future use.
-        Time complexity: O(n_queries * n_truths) for ground truth + O(len(sweep) * search_time).
-        """
-        tuner = AutoTuner(self)
-        profile = tuner.run_sweep(queries, truths, k=k, sweep=sweep)
-        timestamp = datetime.now(UTC).isoformat()
-        profile["profile_at"] = timestamp
-        profile.setdefault("updated_at", timestamp)
-        self.save_tuning_profile(profile)
-        self.tuned_parameters = dict(profile)
-        return profile
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _build_adaptive_index(self, vectors: NDArrayF32, n_vectors: int) -> tuple[FaissIndex, str]:
-        """Construct an index structure using heuristics for corpus size.
-
-        Parameters
-        ----------
-        vectors : NDArrayF32
-            Training vectors of shape (n_vectors, vec_dim). Must match
-            `self.vec_dim`. Automatically normalized for cosine similarity.
-        n_vectors : int
-            Number of vectors in the corpus. Used to select index type:
-            - < 5K: Flat (exact search)
-            - 5K-50K: IVFFlat (approximate, fast training)
-            - > 50K: IVF-PQ (approximate, compressed)
-
-        Returns
-        -------
-        tuple[FaissIndex, str]
-            Trained FAISS index and a descriptive factory label ("Flat", "IVFFlat",
-            or "IVFPQ"). The index is ready for search after training completes.
-
-        Notes
-        -----
-        This method implements adaptive index selection based on corpus size to
-        balance search speed, recall, and memory usage. Small corpora use exact
-        search (Flat), medium corpora use IVFFlat for fast approximate search,
-        and large corpora use IVF-PQ for memory-efficient approximate search.
-        Training time: O(n_vectors) for Flat, O(n_vectors * log(nlist)) for IVF-family.
-        """
-        if n_vectors < _SMALL_CORPUS_THRESHOLD:
-            return faiss.IndexFlatIP(self.vec_dim), "Flat"
-        if n_vectors < _MEDIUM_CORPUS_THRESHOLD:
-            nlist = self._dynamic_nlist(n_vectors, minimum=100)
-            quantizer = faiss.IndexFlatIP(self.vec_dim)
-            cpu_index = faiss.IndexIVFFlat(
-                quantizer,
-                self.vec_dim,
-                nlist,
-                faiss.METRIC_INNER_PRODUCT,
+        for param_str in params:
+            latency_ms, (_, cand_ids) = timed_search_with_params(
+                self.require_cpu_index(),
+                queries_arr,
+                k,
+                param_str,
             )
-            cpu_index.train(vectors)
-            return cpu_index, f"IVF{nlist},Flat"
-        nlist = self._dynamic_nlist(n_vectors, minimum=1024)
-        index_string = f"OPQ64,IVF{nlist},PQ64"
-        cpu_index = faiss.index_factory(self.vec_dim, index_string, faiss.METRIC_INNER_PRODUCT)
-        cpu_index.train(vectors)
-        return cpu_index, index_string
+            recall = estimate_recall(cand_ids, truth_ids)
+            if recall > best_recall or (recall == best_recall and latency_ms < best_latency):
+                overrides, normalized = self._parse_parameter_string(param_str)
+                profile = {
+                    "param_str": normalized,
+                    "recall_at_k": recall,
+                    "latency_ms": latency_ms,
+                    "k": k,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "refine_k_factor": self.refine_k_factor,
+                }
+                profile.update({key: value for key, value in overrides.items()})
+                best_profile = profile
+                best_recall = recall
+                best_latency = latency_ms
 
-    def _dynamic_nlist(self, n_vectors: int, *, minimum: int) -> int:
-        """Calculate the number of IVF centroids (nlist) based on corpus size.
+        if best_profile is None:
+            msg = "Unable to evaluate sweep"
+            raise RuntimeError(msg)
 
-        This method computes the optimal number of IVF centroids (nlist) for
-        building IVF-family indexes. When faiss_family is "auto", it uses a
-        square-root heuristic (sqrt(n_vectors)) which balances training time
-        and search recall. When a specific family is configured, it uses the
-        configured nlist value. The result is always bounded by the minimum
-        parameter to ensure reasonable index structure.
+        save_tuning_profile(best_profile, self.autotune_profile_path)
+        self._apply_profile_payload(best_profile)
+        return best_profile
 
-        Parameters
-        ----------
-        n_vectors : int
-            Number of vectors in the corpus. Used to compute nlist when in auto
-            mode. Must be positive. Larger corpora result in larger nlist values
-            (up to the configured maximum).
-        minimum : int
-            Minimum nlist value to return. Ensures the index has at least this
-            many centroids even for small corpora. Typically 100 for medium
-            corpora, 1024 for large corpora.
+    def reconstruct_batch(self, ids: Sequence[int]) -> NDArrayF32:
+        """Reconstruct vectors for a batch of chunk IDs."""
+        return store_reconstruct_batch(self.require_cpu_index(), self.vec_dim, ids)
 
-        Returns
-        -------
-        int
-            Computed nlist value for IVF index construction. When faiss_family
-            is "auto", returns max(sqrt(n_vectors), minimum). When a specific
-            family is configured, returns max(configured_nlist, minimum). The
-            value is always >= minimum.
-
-        Notes
-        -----
-        The square-root heuristic (sqrt(n_vectors)) is a common practice in
-        FAISS indexing that balances training time (O(nlist * log(nlist))) and
-        search recall. More centroids improve recall but increase training time
-        and memory usage. The method is deterministic and has O(1) time complexity.
-        """
-        if self.faiss_family != "auto":
-            return max(self.nlist, minimum)
-        return max(int(np.sqrt(n_vectors)), minimum)
-
-    def _factory_string_for(self, family: str, _n_vectors: int) -> str:
-        """Generate a FAISS index factory string for the specified family.
-
-        This method converts a family name (e.g., "ivf_pq", "hnsw") into a
-        FAISS index factory string that can be passed to faiss.index_factory().
-        The factory string encodes the index structure, including quantization
-        parameters (PQ codes, OPQ preprocessing), IVF centroids (nlist), and
-        HNSW graph parameters (m). The string format follows FAISS conventions
-        for index construction.
-
-        Parameters
-        ----------
-        family : str
-            Index family name (case-insensitive). Valid values: "flat", "ivf_flat",
-            "ivf_pq", "ivf_pq_refine", "hnsw". Determines the index structure
-            and quantization strategy. Unknown families default to "Flat".
-        _n_vectors : int
-            Number of vectors (unused, kept for API compatibility). The factory
-            string does not depend on corpus size, only on the configured family
-            and runtime options.
-
-        Returns
-        -------
-        str
-            FAISS index factory string suitable for faiss.index_factory(). Examples:
-            - "Flat" for exact search
-            - "IVF8192,Flat" for IVFFlat with 8192 centroids
-            - "OPQ64,IVF8192,PQ64x8" for IVF-PQ with OPQ preprocessing
-            - "HNSW32" for HNSW with m=32
-            The string format matches FAISS ParameterSpace conventions.
-
-        Notes
-        -----
-        This method is used by build_index() when a specific family is requested
-        (non-auto mode). The factory string incorporates runtime options like
-        pq_m, pq_nbits, opq_m, hnsw_m, and nlist. Time complexity: O(1). The
-        method is deterministic and case-insensitive for family names.
-        """
-        fam = family.lower()
-        resolved_nlist = max(self.nlist, 1)
-        if fam == "flat":
-            return "Flat"
-        if fam == "ivf_flat":
-            return f"IVF{resolved_nlist},Flat"
-        if fam == "ivf_pq":
-            opq = f"OPQ{self.opq_m}," if self.opq_m > 0 else ""
-            return f"{opq}IVF{resolved_nlist},PQ{self.pq_m}x{self.pq_nbits}"
-        if fam == "ivf_pq_refine":
-            opq = f"OPQ{self.opq_m}," if self.opq_m > 0 else ""
-            return f"{opq}IVF{resolved_nlist},PQ{self.pq_m}x{self.pq_nbits},Refine(Flat)"
-        if fam == "hnsw":
-            return f"HNSW{self.hnsw_m}"
-        return "Flat"
-
-    def _record_factory_choice(
-        self,
-        index: FaissIndex,
-        label: str | None = None,
-        parameter_space: str | None = None,
-        vector_count: int | None = None,
-    ) -> None:
-        """Record the selected index factory and persist metadata.
-
-        This method logs the index factory choice,
-        and persists index metadata to disk. It extracts the index type name
-        (either from the provided label or by inspecting the index object),
-        and writes a metadata snapshot including factory
-        name, vector count, and parameter space configuration.
-
-        Parameters
-        ----------
-        index : FaissIndex
-            FAISS index object that was built or loaded. Used to extract the
-            index type name if label is not provided. The index must be
-            initialized (ntotal >= 0).
-        label : str | None, optional
-            Optional factory label to use instead of inferring from the index
-            type. When provided, this label is used for logging.
-            When None, the method attempts to extract the type name from the
-            index object via downcast_index().
-        parameter_space : str | None, optional
-            Optional FAISS ParameterSpace parameter string (e.g., "nprobe=64").
-            When provided, included in the metadata snapshot. Used to track
-            runtime tuning parameters applied to the index.
-        vector_count : int | None, optional
-            Optional vector count to record in metadata. When None, uses
-            index.ntotal to determine the count. When provided, overrides the
-            index's ntotal value. Used to record the number of vectors used
-            during index construction.
-
-        Notes
-        -----
-        This method is called after index construction or loading to record the
-        index configuration for persistence. It writes metadata to the meta JSON
-        file. Time complexity: O(1) for logging, O(n) for metadata
-        serialization where n is the metadata size. The method performs file I/O
-        to persist metadata and is not thread-safe if called concurrently.
-        """
-        try:
-            name = label or type(self._downcast_index(index)).__name__
-        except (AttributeError, RuntimeError):
-            name = label or type(index).__name__
-        effective_count = index.ntotal if vector_count is None else int(vector_count)
-        self.write_meta_snapshot(
-            factory=name,
-            vector_count=effective_count,
-            parameter_space=parameter_space,
+    def estimate_memory_usage(self, n_vectors: int) -> dict[str, int]:
+        """Estimate memory usage in bytes for a given number of vectors."""
+        if n_vectors <= 0:
+            return {"cpu_index_bytes": 0, "total_bytes": 0}
+        cfg = IndexBuildConfig(
+            vec_dim=self.vec_dim,
+            default_nlist=self.nlist,
+            family=cast("IndexFamily", self.runtime_opts.faiss_family or "adaptive"),
+            pq_m=self.runtime_opts.pq_m,
+            pq_bits=self.runtime_opts.pq_nbits,
+            opq_m=self.runtime_opts.opq_m,
+            hnsw_m=self.runtime_opts.hnsw_m,
         )
+        family = choose_family(n_vectors, cfg)
+        if family == "flat":
+            cpu_bytes = n_vectors * self.vec_dim * 4
+        elif family == "ivfflat":
+            sqrt_n = int(np.sqrt(n_vectors))
+            alt = n_vectors // 39 if n_vectors >= 39 else sqrt_n
+            nlist = max(100, min(sqrt_n, alt))
+            cpu_bytes = (nlist * self.vec_dim * 4) + (n_vectors * 8)
+        else:
+            nlist = max(1024, int(np.sqrt(n_vectors)))
+            code_bytes = self.runtime_opts.pq_m * max(1, self.runtime_opts.pq_nbits // 8)
+            cpu_bytes = (nlist * self.vec_dim * 4) + (n_vectors * code_bytes)
+        return {
+            "cpu_index_bytes": int(cpu_bytes),
+            "total_bytes": int(cpu_bytes),
+        }
 
-    def _apply_runtime_parameters(
+    def get_compile_options(self) -> str:
+        """Return FAISS compile options string when available."""
+        return store_compile_options()
+
+    def _write_meta_snapshot(
         self,
         *,
-        nprobe: int | None,
-        ef_search: int | None,
-        quantizer_ef_search: int | None = None,
+        vector_count: int | None = None,
+        factory: str | None = None,
+        parameter_space: str | None = None,
     ) -> None:
-        """Apply runtime search knobs to the active FAISS index."""
-        if nprobe is None and ef_search is None and quantizer_ef_search is None:
-            return
-        try:
-            index = self.active_index()
-        except RuntimeError:
-            return
-        runtime_apply_parameters(
-            index,
-            nprobe=nprobe,
-            ef_search=ef_search,
-            quantizer_ef_search=quantizer_ef_search,
+        write_meta_snapshot(
+            index_path=self.index_path,
+            vec_dim=self.vec_dim,
+            faiss_family=self.runtime_opts.faiss_family,
+            default_nprobe=self.default_nprobe,
+            hnsw_ef_search=self.hnsw_ef_search,
+            refine_k_factor=self.refine_k_factor,
+            meta_path=self._meta_path,
+            runtime_overrides=self._runtime_overrides,
+            factory=factory or self._faiss_factory,
+            vector_count=vector_count or self._vector_count,
+            parameter_space=parameter_space or self._parameter_space,
         )
 
-    def apply_runtime_parameters(self, overrides: Mapping[str, float | int]) -> None:
-        """Best-effort application of overrides to the live index if available.
+    def _resolve_profile_to_read(self) -> Path | None:
+        for path in (self.autotune_profile_path, self._legacy_autotune_profile_path):
+            if path and Path(path).exists():
+                return Path(path)
+        return None
 
-        This method attempts to apply runtime parameter overrides to the active
-        FAISS index, but gracefully handles failures without raising exceptions.
-        It extracts nprobe, efSearch, and quantizer_efSearch from the overrides
-        dictionary and applies them via _apply_runtime_parameters(). If the index
-        is unavailable or parameter application fails, the method logs a debug
-        message and continues without error.
+    def _load_profile_payload(self, path: Path | None) -> dict[str, object] | None:
+        if path is None:
+            return None
+        return load_tuned_profile(Path(path))
 
-        Parameters
-        ----------
-        overrides : Mapping[str, float | int]
-            Dictionary of runtime parameter overrides with keys "nprobe", "efSearch",
-            or "quantizer_efSearch". Values are converted to integers before
-            application. Empty dictionaries result in no-op. Unrecognized keys are
-            ignored.
+    def _apply_profile_payload(
+        self,
+        payload: Mapping[str, object],
+        *,
+        persist: bool = True,
+    ) -> None:
+        overrides = self._normalize_runtime_payload(
+            nprobe=payload.get("nprobe"),
+            ef_search=payload.get("efSearch"),
+            quantizer_ef_search=payload.get("quantizer_efSearch"),
+            k_factor=payload.get("k_factor") or payload.get("refine_k_factor"),
+        )
+        param_str = payload.get("param_str")
+        normalized = str(param_str).strip() if isinstance(param_str, str) else None
+        self._apply_runtime_overrides(overrides, parameter_space=normalized, persist=persist)
+        factory = payload.get("factory")
+        if isinstance(factory, str):
+            self._faiss_factory = factory
+            if persist:
+                self._write_meta_snapshot(factory=factory)
 
-        Notes
-        -----
-        This method is used by apply_runtime_tuning() and reset_runtime_tuning()
-        to update the live index when overrides are changed. The method is
-        best-effort: it does not raise exceptions if the index is unavailable
-        or parameter application fails, allowing the override dictionary to be
-        updated even when the index is not ready. Time complexity: O(1) plus
-        the cost of _apply_runtime_parameters(). The method performs no I/O
-        operations and is safe to call even when the index is not initialized.
-        """
+    def _sync_runtime_from_meta(self) -> None:
+        if not self._meta_path.exists():
+            return
+        try:
+            meta = json.loads(self._meta_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        runtime_overrides = meta.get("runtime_overrides")
+        if isinstance(runtime_overrides, Mapping):
+            self._runtime_overrides = {
+                key: float(value)
+                for key, value in runtime_overrides.items()
+                if isinstance(value, (int, float))
+            }
+        self._faiss_factory = cast("str | None", meta.get("factory"))
+        self._vector_count = cast("int | None", meta.get("vector_count"))
+        parameter_space = meta.get("parameter_space")
+        if isinstance(parameter_space, str):
+            self._parameter_space = parameter_space
+
+    def _current_runtime_parameters(self) -> dict[str, object]:
+        return {
+            "nprobe": self._runtime_overrides.get("nprobe", self.default_nprobe),
+            "efSearch": self._runtime_overrides.get("efSearch", self.hnsw_ef_search),
+            "quantizer_efSearch": self._runtime_overrides.get("quantizer_efSearch"),
+            "k_factor": self._runtime_overrides.get("k_factor", self.refine_k_factor),
+        }
+
+    def _normalize_runtime_payload(
+        self,
+        *,
+        nprobe: object | None = None,
+        ef_search: object | None = None,
+        quantizer_ef_search: object | None = None,
+        k_factor: object | None = None,
+    ) -> dict[str, float]:
+        overrides: dict[str, float] = {}
+        if nprobe is not None:
+            overrides["nprobe"] = float(self._coerce_positive_int(nprobe, "nprobe"))
+        if ef_search is not None:
+            overrides["efSearch"] = float(self._coerce_positive_int(ef_search, "ef_search"))
+        if quantizer_ef_search is not None:
+            overrides["quantizer_efSearch"] = float(
+                self._coerce_positive_int(quantizer_ef_search, "quantizer_ef_search")
+            )
+        if k_factor is not None:
+            overrides["k_factor"] = self._coerce_positive_float(k_factor, "k_factor", minimum=1.0)
+        return overrides
+
+    def _apply_runtime_overrides(
+        self,
+        overrides: Mapping[str, float],
+        *,
+        parameter_space: str | None = None,
+        persist: bool = True,
+    ) -> None:
         if not overrides:
             return
-        self._apply_runtime_parameters(
-            nprobe=int(overrides["nprobe"]) if "nprobe" in overrides else None,
-            ef_search=int(overrides["efSearch"]) if "efSearch" in overrides else None,
-            quantizer_ef_search=(
-                int(overrides["quantizer_efSearch"]) if "quantizer_efSearch" in overrides else None
-            ),
-        )
-
-    @staticmethod
-    def sanitize_runtime_overrides(
-        *,
-        nprobe: int | None,
-        ef_search: int | None,
-        quantizer_ef_search: int | None,
-        k_factor: float | None,
-    ) -> dict[str, float]:
-        """Normalize and validate runtime override parameters.
-
-        Parameters
-        ----------
-        nprobe : int | None, optional
-            Number of IVF clusters to search. Must be positive if provided.
-            Defaults to None (not set).
-        ef_search : int | None, optional
-            HNSW search width parameter. Must be positive if provided.
-            Defaults to None (not set).
-        quantizer_ef_search : int | None, optional
-            Quantizer search width for IVF-PQ indexes. Must be positive if provided.
-            Defaults to None (not set).
-        k_factor : float | None, optional
-            Refinement factor for hybrid search. Must be >= 1.0 if provided.
-            Defaults to None (not set).
-
-        Returns
-        -------
-        dict[str, float]
-            Sanitized override dictionary with validated parameters. Keys use
-            camelCase for FAISS compatibility (nprobe, efSearch, quantizer_efSearch,
-            k_factor). Only includes parameters that were provided and validated.
-
-        Raises
-        ------
-        ValueError
-            When any provided parameter fails validation (e.g., negative values
-            for integer parameters, k_factor < 1.0). The error message indicates
-            which parameter failed and the invalid value.
-        """
-        sanitized: dict[str, float] = {}
-        if nprobe is not None:
-            nprobe_int = int(nprobe)
-            if nprobe_int <= 0:
-                msg = f"nprobe must be positive, got {nprobe_int}"
-                raise ValueError(msg)
-            sanitized["nprobe"] = nprobe_int
-        if ef_search is not None:
-            ef_int = int(ef_search)
-            if ef_int <= 0:
-                msg = f"efSearch must be positive, got {ef_int}"
-                raise ValueError(msg)
-            sanitized["efSearch"] = ef_int
-        if quantizer_ef_search is not None:
-            q_int = int(quantizer_ef_search)
-            if q_int <= 0:
-                msg = f"quantizer_efSearch must be positive, got {q_int}"
-                raise ValueError(msg)
-            sanitized["quantizer_efSearch"] = q_int
-        if k_factor is not None:
-            kf_val = float(k_factor)
-            if kf_val < 1.0:
-                msg = f"k_factor must be >= 1.0, got {kf_val}"
-                raise ValueError(msg)
-            sanitized["k_factor"] = kf_val
-        return sanitized
-
-    def prepare_parameter_string(self, param_str: str) -> tuple[str | None, dict[str, float]]:
-        """Return FAISS ParameterSpace spec and sanitized overrides for ``param_str``.
-
-        Parameters
-        ----------
-        param_str : str
-            Comma-separated parameter string (e.g., "nprobe=32,ef=128").
-
-        Returns
-        -------
-        tuple[str | None, dict[str, float]]
-            Tuple of (FAISS parameter spec string, override dictionary).
-
-        Raises
-        ------
-        ValueError
-            If param_str is empty or whitespace-only.
-        """
-        if not param_str or not param_str.strip():
-            msg = "Parameter string must be non-empty."
-            raise ValueError(msg)
-        faiss_pairs: list[str] = []
-        int_params: dict[str, int] = {}
-        k_factor_value: float | None = None
-        for chunk in param_str.split(","):
-            key, sep, raw_value = chunk.partition("=")
-            key = key.strip()
-            value = raw_value.strip()
-            if not key or not sep or not value:
-                msg = f"Invalid parameter fragment: '{chunk}'"
-                raise ValueError(msg)
-            try:
-                numeric_value = float(value)
-            except ValueError as exc:
-                msg = f"Parameter '{key}' value '{value}' is not numeric"
-                raise ValueError(msg) from exc
+        for key, value in overrides.items():
+            self._runtime_overrides[key] = float(value)
             if key == "k_factor":
-                k_factor_value = numeric_value
-                continue
-            if key not in {"nprobe", "efSearch", "quantizer_efSearch"}:
-                msg = f"Unsupported FAISS parameter '{key}'"
-                raise ValueError(msg)
-            int_params[key] = int(numeric_value)
-            faiss_pairs.append(f"{key}={value}")
-        sanitized = self.sanitize_runtime_overrides(
-            nprobe=int_params.get("nprobe"),
-            ef_search=int_params.get("efSearch"),
-            quantizer_ef_search=int_params.get("quantizer_efSearch"),
-            k_factor=k_factor_value,
-        )
-        if not sanitized:
-            msg = "Parameter string must include at least one supported override."
-            raise ValueError(msg)
-        return (",".join(faiss_pairs) if faiss_pairs else None, sanitized)
-
-    @staticmethod
-    def format_parameter_string(overrides: Mapping[str, float]) -> str | None:
-        """Format runtime override dictionary into a parameter string.
-
-        This method converts a dictionary of runtime parameter overrides into a
-        comma-separated parameter string suitable for display or persistence.
-        Parameters are formatted in a canonical order (nprobe, efSearch,
-        quantizer_efSearch, k_factor) with integer parameters formatted as integers
-        and k_factor formatted as a float. The resulting string can be parsed back
-        by _prepare_parameter_string().
-
-        Parameters
-        ----------
-        overrides : Mapping[str, float]
-            Dictionary of runtime parameter overrides with keys "nprobe", "efSearch",
-            "quantizer_efSearch", and/or "k_factor". Values are expected to be
-            numeric (integers or floats). Only recognized keys are included in the
-            output; unknown keys are ignored.
-
-        Returns
-        -------
-        str | None
-            Comma-separated parameter string (e.g., "nprobe=64,efSearch=128,k_factor=2.0")
-            with parameters in canonical order. Integer parameters are formatted without
-            decimal points; k_factor retains decimal precision. Returns None if the
-            dictionary is empty or contains no recognized parameters.
-
-        Notes
-        -----
-        This method is used by _write_meta_snapshot() and get_runtime_tuning() to
-        serialize override dictionaries for persistence and display. The method
-        ensures consistent formatting and ordering for readability. Time complexity:
-        O(1) since the number of parameters is fixed. The method is deterministic
-        and produces consistent output for the same input dictionary.
-        """
-        ordered: list[str] = []
-        for key in ("nprobe", "efSearch", "quantizer_efSearch", "k_factor"):
-            if key not in overrides:
-                continue
-            value = overrides[key]
-            if key == "k_factor":
-                ordered.append(f"{key}={value}")
-            else:
-                ordered.append(f"{key}={int(value)}")
-        return ",".join(ordered) if ordered else None
-
-    def meta_snapshot(self) -> dict[str, object]:
-        """Return persisted metadata merged with current configuration.
-
-        Returns
-        -------
-        dict[str, object]
-            Dictionary containing index metadata including index_path,
-            factory, dimension, and other configuration values.
-        """
-        snapshot: dict[str, object]
-        if self._meta_path.exists():
-            try:
-                snapshot = json.loads(self._meta_path.read_text())
-            except json.JSONDecodeError:
-                snapshot = {}
-        else:
-            snapshot = {}
-        snapshot.update(
-            {
-                "index_path": str(self.index_path),
-                "vec_dim": self.vec_dim,
-                "faiss_family": self.faiss_family,
-                "default_parameters": {
-                    "nprobe": self.default_nprobe,
-                    "efSearch": self.hnsw_ef_search,
-                    "quantizer_efSearch": None,
-                    "k_factor": self.refine_k_factor,
-                },
-            }
-        )
-        return snapshot
-
-    def write_meta_snapshot(
-        self,
-        *,
-        factory: str | None = None,
-        vector_count: int | None = None,
-        parameter_space: str | None = None,
-    ) -> None:
-        """Write the metadata snapshot to disk with updated overrides."""
-        meta = self.meta_snapshot()
-        if factory is not None:
-            meta["factory"] = factory
-        if vector_count is not None:
-            meta["vector_count"] = int(vector_count)
-        if parameter_space is not None:
-            meta["parameter_space"] = parameter_space
-        meta["runtime_overrides"] = dict(self._runtime_overrides)
-        meta["compile_options"] = self.get_compile_options()
-        meta["updated_at"] = datetime.now(UTC).isoformat()
-        self._meta_path.parent.mkdir(parents=True, exist_ok=True)
-        self._meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-
-    @staticmethod
-    def get_compile_options() -> str:
-        """Return FAISS compile options string when available.
-
-        Returns
-        -------
-        str
-            Compile-time configuration string for FAISS, including enabled
-            features and build flags. Returns an empty string if compile options
-            are not available.
-        """
-        return _get_compile_options()
-
-    def resolve_search_knobs(
-        self,
-        override_nprobe: int | None,
-        *,
-        override_ef: int | None = None,
-        override_k_factor: float | None = None,
-        override_quantizer: int | None = None,
-    ) -> tuple[int | None, int | None, float, int | None]:
-        """Resolve effective search parameters from overrides, runtime state, and profile.
-
-        This method determines the final search parameters by checking multiple
-        sources in priority order: explicit overrides > runtime overrides >
-        persisted profile > defaults. This allows callers to provide immediate
-        overrides while respecting runtime configuration and persisted tuning.
-
-        Parameters
-        ----------
-        override_nprobe : int | None
-            Explicit override for nprobe parameter. Takes highest priority if provided.
-        override_ef : int | None, optional
-            Explicit override for ef_search parameter. Takes highest priority if provided.
-            Defaults to None.
-        override_k_factor : float | None, optional
-            Explicit override for k_factor parameter. Takes highest priority if provided.
-            Defaults to None.
-        override_quantizer : int | None, optional
-            Explicit override for quantizer_ef_search parameter. Takes highest priority
-            if provided. Defaults to None.
-
-        Returns
-        -------
-        tuple[int | None, int | None, float, int | None]
-            Tuple of (nprobe, ef_search, k_factor, quantizer_ef_search) representing
-            the effective search parameters. Values are resolved from overrides,
-            runtime state, profile, or defaults in that priority order. k_factor
-            always returns a float (defaults to refine_k_factor if not overridden).
-
-        Notes
-        -----
-        Parameter resolution priority:
-        1. Explicit override arguments (highest priority)
-        2. Runtime overrides dictionary (set via apply_runtime_tuning)
-        3. Persisted tuning profile (loaded from disk)
-        4. Manager defaults (default_nprobe, hnsw_ef_search, refine_k_factor)
-
-        Runtime overrides use camelCase keys (efSearch, quantizer_efSearch) for
-        FAISS compatibility, but snake_case keys are also checked for convenience.
-        """
-        profile = self.load_tuned_profile()
-        with self._tuning_lock:
-            overrides = dict(self._runtime_overrides)
-
-        # runtime overrides stored using camelCase for FAISS parity
-        def _lookup_override(key: str, snake_key: str | None = None) -> float | int | None:
-            if key in overrides:
-                return overrides[key]
-            if snake_key and snake_key in overrides:
-                return overrides[snake_key]
-            return None
-
-        def _pick(
-            override_value: float | None,
-            *,
-            runtime_key: str,
-            snake_key: str | None,
-            profile_key: str,
-            default: float | None,
-        ) -> float | int | None:
-            if override_value is not None:
-                return override_value
-            candidate = _lookup_override(runtime_key, snake_key)
-            if candidate is not None:
-                return candidate
-            if profile:
-                prof_val = profile.get(profile_key)
-                if isinstance(prof_val, (int, float)):
-                    return prof_val
-            return default
-
-        nprobe_source = _pick(
-            override_nprobe,
-            runtime_key="nprobe",
-            snake_key=None,
-            profile_key="nprobe",
-            default=self.default_nprobe,
-        )
-        ef_candidate = _pick(
-            override_ef,
-            runtime_key="efSearch",
-            snake_key="ef_search",
-            profile_key="efSearch",
-            default=self.hnsw_ef_search,
-        )
-        kf_candidate = _pick(
-            override_k_factor,
-            runtime_key="k_factor",
-            snake_key="k_factor",
-            profile_key="k_factor",
-            default=self.refine_k_factor,
-        )
-        quantizer_candidate = _pick(
-            override_quantizer,
-            runtime_key="quantizer_efSearch",
-            snake_key="quantizer_ef_search",
-            profile_key="quantizer_efSearch",
-            default=None,
-        )
-        nprobe_eff = int(nprobe_source) if nprobe_source is not None else None
-        ef_eff = int(ef_candidate) if ef_candidate is not None else None
-        k_factor = float(kf_candidate) if kf_candidate is not None else self.refine_k_factor
-        quantizer_ef = int(quantizer_candidate) if quantizer_candidate is not None else None
-        return nprobe_eff, ef_eff, k_factor, quantizer_ef
-
-    def load_tuned_profile(self) -> dict[str, float | str]:
-        """Load the autotune profile from disk, caching the result.
-
-        Returns
-        -------
-        dict[str, float | str]
-            Dictionary containing tuned FAISS parameters. Returns empty
-            dictionary if no profile exists or loading fails.
-        """
-        if self.tuned_parameters is not None:
-            return self.tuned_parameters
-        profile_path = self._profile_path_for_read()
-        if profile_path is None:
-            return {}
-        try:
-            raw = profile_path.read_text()
-        except OSError:
-            return {}
-        try:
-            profile = cast("dict[str, float | str]", json.loads(raw))
-        except json.JSONDecodeError:
-            return {}
-        self.tuned_parameters = profile
-        return profile
-
-    def _profile_path_for_read(self) -> Path | None:
-        """Determine the autotune profile file path for reading.
-
-        This method checks for the existence of autotune profile files in order of
-        preference: (1) primary autotune profile path (autotune_profile_path),
-        (2) legacy autotune profile path (_legacy_autotune_profile_path). Returns
-        the first path that exists, or None if neither file exists. This enables
-        backward compatibility with older profile file locations while preferring
-        the new location.
-
-        Returns
-        -------
-        Path | None
-            Path to the autotune profile JSON file if it exists, or None if neither
-            the primary nor legacy profile files are present. The returned path can
-            be used to read the profile data. Returns the primary path if both exist.
-
-        Notes
-        -----
-        This method performs file system checks to determine which profile file to
-        use. The legacy path uses a different naming convention (.tune.json suffix
-        vs tuning.json filename) for backward compatibility. Time complexity: O(1)
-        for file existence checks. The method performs no I/O operations beyond
-        existence checks and is deterministic.
-        """
-        if self.autotune_profile_path.exists():
-            return self.autotune_profile_path
-        if self._legacy_autotune_profile_path.exists():
-            return self._legacy_autotune_profile_path
-        return None
-
-    def timed_search_with_params(
-        self, queries: NDArrayF32, k: int, param_str: str
-    ) -> tuple[float, tuple[NDArrayF32, NDArrayI64]]:
-        """Execute a parameterized search and measure its latency.
-
-        This method performs a FAISS search with the specified parameter string
-        and measures the execution time in milliseconds. It wraps _search_with_params()
-        with timing instrumentation, recording the elapsed time from start to completion.
-        Used by autotune sweeps to evaluate parameter configurations and select optimal
-        settings based on recall and latency trade-offs.
-
-        Parameters
-        ----------
-        queries : NDArrayF32
-            Query vector(s) to search, shape (n_queries, vec_dim) or (vec_dim,).
-            Automatically normalized for cosine similarity by _search_with_params().
-        k : int
-            Number of nearest neighbors to return per query. Must be positive.
-            Used to retrieve top-k results for evaluation.
-        param_str : str
-            FAISS ParameterSpace parameter string (e.g., "nprobe=64,efSearch=128").
-            Applied to the index before search. Used to test different parameter
-            configurations during autotune sweeps.
-
-        Returns
-        -------
-        tuple[float, tuple[NDArrayF32, NDArrayI64]]
-            Tuple containing:
-            - Elapsed time in milliseconds (float): Search execution time measured
-              using perf_counter() for high-resolution timing
-            - Search results tuple: (distances, ids) arrays from _search_with_params(),
-              both with shape (n_queries, k). Distances are cosine similarity scores;
-              IDs are chunk identifiers.
-
-        Notes
-        -----
-        This method is used by AutoTuner.run_sweep() to evaluate parameter
-        configurations during autotune sweeps. The timing measurement uses
-        perf_counter() for high-resolution, monotonic timing that is not affected
-        by system clock adjustments. Time complexity: O(search_time) where search_time
-        depends on index type and parameters, plus O(1) for timing overhead. The
-        method modifies the index parameters in-place before search, affecting
-        subsequent searches until parameters are changed again.
-        """
-        start = perf_counter()
-        result = self._search_with_params(queries, k, param_str=param_str)
-        elapsed = (perf_counter() - start) * 1000.0
-        return elapsed, result
-
-    @staticmethod
-    def brute_force_truth_ids(queries: NDArrayF32, truths: NDArrayF32, k: int) -> NDArrayI64:
-        """Compute ground-truth nearest neighbor IDs via exact brute-force search.
-
-        This method performs exact nearest neighbor search by computing the full
-        similarity matrix (queries @ truths.T) and selecting the top-k most similar
-        truth vectors for each query. It uses argpartition for efficient top-k
-        selection without full sorting. The result provides ground-truth IDs for
-        recall evaluation during autotune sweeps.
-
-        Parameters
-        ----------
-        queries : NDArrayF32
-            Query vectors with shape (n_queries, vec_dim) and dtype float32.
-            Used to compute similarities against truth vectors. Vectors should be
-            normalized for cosine similarity (inner product).
-        truths : NDArrayF32
-            Ground-truth vectors with shape (n_truths, vec_dim) and dtype float32.
-            Used as the corpus for exact nearest neighbor search. Vectors should be
-            normalized for cosine similarity. The number of truth vectors determines
-            the maximum k value (clamped to n_truths).
-        k : int
-            Number of nearest neighbors to retrieve per query. Must be positive.
-            Clamped to min(k, n_truths) to avoid exceeding the truth corpus size.
-            When k <= 0 or k > n_truths, returns an empty array.
-
-        Returns
-        -------
-        NDArrayI64
-            Array of ground-truth nearest neighbor indices with shape (n_queries, k_eff)
-            where k_eff = min(k, n_truths). Each row contains the indices (0-based) of
-            the top-k most similar truth vectors for the corresponding query, sorted
-            by similarity (descending). Returns an empty array with shape (n_queries, 0)
-            when k <= 0 or n_truths == 0.
-
-        Notes
-        -----
-        This method is used by AutoTuner.run_sweep() to compute ground-truth nearest
-        neighbors for recall evaluation. It performs exact search via matrix
-        multiplication (O(n_queries * n_truths * vec_dim)) and argpartition
-        (O(n_queries * n_truths * log(k))) for top-k selection. The method assumes
-        vectors are normalized for cosine similarity (inner product). Time complexity:
-        O(n_queries * n_truths * vec_dim) for similarity computation plus O(n_queries
-        * n_truths * log(k)) for top-k selection. Space complexity: O(n_queries * n_truths)
-        for the similarity matrix.
-        """
-        sims = queries @ truths.T
-        k = min(k, sims.shape[1])
-        if k <= 0:
-            return np.empty((queries.shape[0], 0), dtype=np.int64)
-        idx = np.argpartition(-sims, kth=k - 1, axis=1)[:, :k]
-        return idx.astype(np.int64)
-
-    @staticmethod
-    def estimate_recall(candidates: NDArrayI64, truth: NDArrayI64) -> float:
-        """Compute average recall@k between candidate and ground-truth IDs.
-
-        Parameters
-        ----------
-        candidates : NDArrayI64
-            Candidate ID arrays with shape (n_queries, k).
-        truth : NDArrayI64
-            Ground-truth ID arrays with shape (n_queries, k).
-
-        Returns
-        -------
-        float
-            Average recall@k score in the range [0.0, 1.0]. Returns 0.0
-            if either array is empty.
-        """
-        if candidates.size == 0 or truth.size == 0:
-            return 0.0
-        total = candidates.shape[0]
-        hits = 0.0
-        for found, expected in zip(candidates, truth, strict=False):
-            truth_set = {int(val) for val in expected if int(val) >= 0}
-            if not truth_set:
-                continue
-            hit_count = sum(1 for cand in found if int(cand) in truth_set)
-            hits += float(hit_count) / len(truth_set)
-        return hits / max(1, total)
-
-    @staticmethod
-    def ensure_2d(array: NDArrayF32) -> NDArrayF32:
-        """Normalize query arrays to shape (n_queries, vec_dim).
-
-        Parameters
-        ----------
-        array : NDArrayF32
-            Input array that may be 1-D or 2-D.
-
-        Returns
-        -------
-        NDArrayF32
-            Array guaranteed to be 2-D with shape (n_queries, vec_dim).
-            If input is 1-D, reshaped to (1, vec_dim).
-        """
-        arr = np.asarray(array, dtype=np.float32)
-        if arr.ndim == 1:
-            return arr.reshape(1, -1)
-        return arr
-
-    def _refine_with_flat(
-        self, queries: NDArrayF32, _candidate_ids: NDArrayI64, k: int
-    ) -> tuple[NDArrayF32, NDArrayI64]:
-        """Refine candidates by running an exact search over the primary index.
-
-        Parameters
-        ----------
-        queries : NDArrayF32
-            Query vector(s) of shape (n_queries, vec_dim) or (vec_dim,).
-            Automatically normalized for cosine similarity.
-        _candidate_ids : NDArrayI64
-            Candidate IDs from initial approximate search (unused, kept for
-            API compatibility). The method performs a fresh exact search instead.
-        k : int
-            Number of nearest neighbors to return per query.
-
-        Returns
-        -------
-        tuple[NDArrayF32, NDArrayI64]
-            Distances and IDs computed via exact search over the primary index.
-            Distances are cosine similarity scores; IDs are chunk identifiers.
-
-        Notes
-        -----
-        This method performs exact (Flat) search over the primary index to refine
-        results from approximate search. Improves recall at the cost of higher
-        latency. Time complexity: O(n_vectors * k) for Flat index.
-        """
-        return self._search_primary(queries, k, self.default_nprobe)
-
-    @staticmethod
-    def _downcast_index(index: FaissIndex) -> FaissIndex:
-        """Return a concrete FAISS index implementation when possible.
-
-        Parameters
-        ----------
-        index : FaissIndex
-            FAISS index handle, which may be a base Index type or wrapper.
-
-        Returns
-        -------
-        FaissIndex
-            Downcast index when supported (e.g., IndexIVFFlat from Index),
-            otherwise the provided handle unchanged.
-
-        Notes
-        -----
-        This helper uses `faiss.downcast_index()` to extract concrete index
-        implementations from wrapper types. Useful for accessing index-specific
-        attributes (e.g., `nprobe` on IVF indexes). No-op if downcast is not
-        supported or index is already concrete.
-        """
-        try:
-            return faiss.downcast_index(index)
-        except (AttributeError, RuntimeError):
-            return index
-
-    def active_index(self) -> FaissIndex:
-        """Return the active CPU search index.
-
-        Returns
-        -------
-        FaissIndex
-            The CPU index ready for search.
-
-        Raises
-        ------
-        RuntimeError
-            If the CPU index has not been built or loaded.
-        """
+                self.refine_k_factor = float(value)
         if self.cpu_index is not None:
-            return self.cpu_index
-        msg = "No index available"
-        raise RuntimeError(msg)
+            self.apply_runtime_parameters(self._runtime_overrides)
+        if parameter_space:
+            self._parameter_space = parameter_space
+        if persist:
+            self._write_meta_snapshot(parameter_space=self._parameter_space)
 
+    def _reset_runtime_overrides(self) -> None:
+        self._runtime_overrides.clear()
+        self.refine_k_factor = self._default_refine_k_factor
+        if self.cpu_index is not None:
+            self.apply_runtime_parameters(self._runtime_overrides)
+        self._parameter_space = None
+        self._write_meta_snapshot()
 
-class AutoTuner:
-    """Evaluate FAISS ParameterSpace candidates for a given manager."""
-
-    _DEFAULT_SWEEP: tuple[str, ...] = (
-        "nprobe=16",
-        "nprobe=32",
-        "nprobe=64",
-        "nprobe=96",
-        "nprobe=128",
-    )
-
-    def __init__(self, manager: FAISSManager) -> None:
-        self._manager = manager
-
-    def run_sweep(
-        self,
-        queries: NDArrayF32,
-        truths: NDArrayF32,
-        *,
-        k: int = 10,
-        sweep: Sequence[str] | None = None,
-        refine_k_factor: float | None = None,
-    ) -> dict[str, Any]:
-        """Sweep FAISS parameter strings and return the best-performing profile.
-
-        Parameters
-        ----------
-        queries : NDArrayF32
-            Query vectors used to evaluate each candidate configuration.
-        truths : NDArrayF32
-            Ground-truth vectors for recall evaluation.
-        k : int, optional
-            Neighbor count used for recall@k evaluation. Defaults to 10.
-        sweep : Sequence[str] | None, optional
-            Explicit ParameterSpace strings to evaluate. When ``None`` the
-            built-in defaults (:attr:`_DEFAULT_SWEEP`) are used.
-        refine_k_factor : float | None, optional
-            Refinement factor to attach to the result when auto-tuning. Falls
-            back to :attr:`FAISSManager.refine_k_factor` when ``None``. Values
-            greater than 1.0 enable candidate expansion plus reranking.
-
-        Returns
-        -------
-        dict[str, Any]
-            Dictionary describing the selected operating point with keys
-            ``param_str``, ``recall_at_k``, ``latency_ms``, and
-            ``refine_k_factor`` (float). Additional metadata such as the index
-            ``factory`` is included when available.
-        """
-        xq = self._manager.ensure_2d(queries).astype(np.float32)
-        xt = self._manager.ensure_2d(truths).astype(np.float32)
-        faiss.normalize_L2(xq)
-        faiss.normalize_L2(xt)
-        eval_sweep = tuple(sweep) if sweep else self._DEFAULT_SWEEP
-        truth_ids = self._manager.brute_force_truth_ids(xq, xt, min(k, xt.shape[0]))
-        candidates: list[dict[str, float | str]] = []
-        for spec in eval_sweep:
-            latency_ms, (_, ids) = self._manager.timed_search_with_params(xq, k, spec)
-            recall = self._manager.estimate_recall(ids, truth_ids)
-            candidates.append(
-                {
-                    "param_str": spec,
-                    "recall_at_k": float(recall),
-                    "latency_ms": float(latency_ms),
-                }
-            )
-        profile = self._select_candidate(candidates)
-        profile["refine_k_factor"] = float(
-            refine_k_factor if refine_k_factor is not None else self._manager.refine_k_factor
+    def _parse_parameter_string(self, param_str: str) -> tuple[dict[str, float], str]:
+        if not param_str or not param_str.strip():
+            msg = "Parameter string cannot be empty"
+            raise ValueError(msg)
+        overrides: dict[str, float] = {}
+        segments = [segment.strip() for segment in param_str.split(",") if segment.strip()]
+        if not segments:
+            msg = "Parameter string did not contain assignments"
+            raise ValueError(msg)
+        for segment in segments:
+            if "=" not in segment:
+                msg = f"Unsupported parameter fragment: {segment}"
+                raise ValueError(msg)
+            key, raw_value = (part.strip() for part in segment.split("=", 1))
+            normalized_key = self._PARAMETER_ALIASES.get(key)
+            if normalized_key is None:
+                msg = f"Unsupported parameter: {key}"
+                raise ValueError(msg)
+            if normalized_key == "k_factor":
+                overrides[normalized_key] = self._coerce_positive_float(raw_value, key, minimum=1.0)
+            else:
+                overrides[normalized_key] = float(self._coerce_positive_int(raw_value, key))
+        normalized = ",".join(
+            f"{key}={value if key == 'k_factor' else int(value)}"
+            for key, value in overrides.items()
         )
-        meta = self._manager.meta_snapshot()
-        if "factory" in meta:
-            profile["factory"] = meta["factory"]
-        return profile
+        return overrides, normalized
 
-    @staticmethod
-    def _select_candidate(rows: Sequence[dict[str, float | str]]) -> dict[str, Any]:
-        if not rows:
-            return {"param_str": "", "recall_at_k": 0.0, "latency_ms": float("inf")}
-        ordered = sorted(
-            rows,
-            key=lambda row: (-float(row["recall_at_k"]), float(row["latency_ms"])),
-        )
-        best_recall = float(ordered[0]["recall_at_k"])
-        pareto = [row for row in ordered if float(row["recall_at_k"]) >= best_recall - 0.005]
-        pareto.sort(key=lambda row: float(row["latency_ms"]))
-        profile = dict(pareto[0])
-        for token in str(profile["param_str"]).split(","):
-            key, sep, raw_value = token.partition("=")
-            if not sep:
-                continue
-            try:
-                profile[key.strip()] = float(raw_value)
-            except ValueError:
-                continue
-        return profile
+    def _coerce_positive_int(self, value: object, field: str) -> int:
+        if isinstance(value, bool):
+            msg = f"Invalid integer override for {field}"
+            raise ValueError(msg)
+        if isinstance(value, (int, float)):
+            result = int(value)
+        elif isinstance(value, str):
+            result = int(value.strip())
+        else:
+            msg = f"Invalid integer override for {field}"
+            raise ValueError(msg)
+        if result <= 0:
+            msg = f"{field} must be positive"
+            raise ValueError(msg)
+        return result
 
-
-def _coerce_to_int(value: object, default: int = -1) -> int:
-    """Safely round arbitrary objects to integers for index comparisons.
-
-    Parameters
-    ----------
-    value : object
-        Candidate value that might be converted to an integer.
-    default : int
-        Fallback value when conversion is not possible.
-
-    Returns
-    -------
-    int
-        Converted integer or the provided default.
-    """
-    if isinstance(value, (int, float, str)):
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return default
-    return default
+    def _coerce_positive_float(self, value: object, field: str, *, minimum: float = 0.0) -> float:
+        if isinstance(value, bool):
+            msg = f"Invalid float override for {field}"
+            raise ValueError(msg)
+        if isinstance(value, (int, float)):
+            result = float(value)
+        elif isinstance(value, str):
+            result = float(value.strip())
+        else:
+            msg = f"Invalid float override for {field}"
+            raise ValueError(msg)
+        if result < minimum:
+            msg = f"{field} must be >= {minimum}"
+            raise ValueError(msg)
+        return result
 
 
-def _configure_direct_map(index: FaissIndex) -> None:
-    """Ensure FAISS direct maps are array-backed for reconstruction."""
-    _set_direct_map_type(index)
-    base_index = getattr(index, "index", None)
-    if base_index is not None:
-        _set_direct_map_type(base_index)
-
-
-def _set_direct_map_type(index: FaissIndex) -> None:
-    """Enable direct map support on FAISS indexes when available.
-
-    This function attempts to enable direct map support on FAISS indexes that
-    support it (primarily IVF-family indexes). Direct maps enable efficient vector
-    reconstruction by storing array-backed mappings from index positions to vectors.
-    The function downcasts the index to a concrete type (if possible) and calls
-    make_direct_map() if available. Failures are logged but do not raise exceptions,
-    allowing the index to function without direct map support.
-
-    Parameters
-    ----------
-    index : FaissIndex
-        FAISS index object to enable direct map support on. May be a base Index
-        type or wrapper (IndexIDMap2, etc.). The function attempts to downcast
-        to concrete types to access index-specific methods.
-
-    Notes
-    -----
-    This function is called by _configure_direct_map() to enable vector reconstruction
-    capabilities. Direct maps are required for reconstruct_batch() and _extract_all_vectors()
-    operations. Not all index types support direct maps (e.g., Flat indexes don't
-    need them). The function handles errors gracefully, logging debug messages when
-    direct map setup fails. Time complexity: O(1) for method lookup, O(n) for direct
-    map construction where n is the number of vectors (if supported). The function
-    modifies the index object in-place and is not thread-safe if the index is being
-    used concurrently.
-    """
-    concrete = index
-    with suppress(AttributeError, RuntimeError):
-        concrete = faiss.downcast_index(index)
-    make_direct_map = getattr(concrete, "make_direct_map", None)
-    if callable(make_direct_map):
-        with suppress(AttributeError, RuntimeError):
-            make_direct_map()
-
-
-def _wrap_bool_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
-    """Wrap a raw contains function that returns a boolean-like value.
-
-    Parameters
-    ----------
-    raw : Callable[[int], object]
-        Raw contains function that returns a boolean-like value (truthy/falsy).
-
-    Returns
-    -------
-    Callable[[int], bool]
-        Callable that returns ``True`` when ``raw`` reports membership.
-    """
-
-    def contains(id_val: int) -> bool:
-        """Check if an ID value is contained in the wrapped collection.
-
-        Parameters
-        ----------
-        id_val : int
-            ID value to check for membership.
-
-        Returns
-        -------
-        bool
-            ``True`` if the ID is found, ``False`` otherwise. Returns ``False``
-            if type coercion fails.
-        """
-        try:
-            return bool(raw(int(id_val)))
-        except (TypeError, ValueError):
-            return False
-
-    return contains
-
-
-def _wrap_index_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
-    """Wrap a raw contains function that returns an index position.
-
-    Parameters
-    ----------
-    raw : Callable[[int], object]
-        Raw contains function that returns an index position (non-negative int)
-        when found, or a negative value/exception when not found.
-
-    Returns
-    -------
-    Callable[[int], bool]
-        Callable that returns ``True`` when ``raw`` returns a non-negative index.
-    """
-
-    def contains(id_val: int) -> bool:
-        """Check if an ID value is contained in the wrapped collection.
-
-        Parameters
-        ----------
-        id_val : int
-            ID value to check for membership.
-
-        Returns
-        -------
-        bool
-            ``True`` if the ID is found (non-negative index), ``False`` otherwise.
-            Returns ``False`` if type coercion fails or the index is negative.
-        """
-        try:
-            result = raw(int(id_val))
-        except (TypeError, ValueError):
-            return False
-        return _coerce_to_int(result) >= 0
-
-    return contains
-
-
-def _coerce_optional_int(value: object | None) -> int | None:
-    """Return ``value`` coerced to int when possible.
-
-    Parameters
-    ----------
-    value : object | None
-        Value to coerce to an integer. Accepts integers, floats, or strings.
-        Empty strings and ``None`` are converted to ``None``.
-
-    Returns
-    -------
-    int | None
-        Integer representation or ``None`` when the value is empty.
-
-    Raises
-    ------
-    TypeError
-        If ``value`` cannot be coerced to an integer.
-    """
-    if value is None:
-        return None
-    if isinstance(value, Integral):
-        return int(value)
-    if isinstance(value, float):
-        return int(value)
-    if isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            return None
-        return int(stripped)
-    msg = f"Unsupported integer override type: {type(value)!r}"
-    raise TypeError(msg)
-
-
-def _coerce_optional_float(value: object | None) -> float | None:
-    """Return ``value`` coerced to float when possible.
-
-    Parameters
-    ----------
-    value : object | None
-        Value to coerce to a float. Accepts booleans, numeric types, or strings.
-        Empty strings and ``None`` are converted to ``None``.
-
-    Returns
-    -------
-    float | None
-        Float representation or ``None`` when the value is empty.
-
-    Raises
-    ------
-    TypeError
-        If ``value`` cannot be coerced to a float.
-    """
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return float(value)
-    if isinstance(value, Real):
-        return float(value)
-    if isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            return None
-        return float(stripped)
-    msg = f"Unsupported float override type: {type(value)!r}"
-    raise TypeError(msg)
-
-
-def _parse_tuning_overrides(profile: Mapping[str, Any]) -> _TuningOverrides:
-    """Normalize raw profile payload into structured overrides.
-
-    Parameters
-    ----------
-    profile : Mapping[str, Any]
-        Raw tuning profile dictionary containing runtime parameter overrides.
-        Expected keys include ``nprobe``, ``ef``, ``k_factor``, and ``quantizer``.
-
-    Returns
-    -------
-    _TuningOverrides
-        Structured overrides with coerced numeric values.
-
-    """
-    param_str = str(profile.get("param_str") or "").strip()
-    k_factor = profile.get("k_factor") or profile.get("refine_k_factor")
-    return _TuningOverrides(
-        param_str=param_str,
-        nprobe=_coerce_optional_int(profile.get("nprobe")),
-        ef_search=_coerce_optional_int(profile.get("efSearch")),
-        quantizer_ef_search=_coerce_optional_int(profile.get("quantizer_efSearch")),
-        k_factor=_coerce_optional_float(k_factor),
-    )
-
-
-def _persist_tuning_profile(manager: FAISSManager, profile: Mapping[str, Any]) -> None:
-    """Persist tuning metadata without interrupting the caller."""
-    try:
-        manager.save_tuning_profile(dict(profile))
-    except OSError:  # pragma: no cover - best effort
-        return
-    manager.tuned_parameters = dict(profile)
-
-
-def _get_compile_options() -> str:
-    """Return FAISS compile options for readiness logs.
-
-    Returns
-    -------
-    str
-        Compile option string or ``"unknown"`` when unavailable.
-    """
-    get_opts = getattr(faiss, "get_compile_options", None)
-    options = "unknown"
-    if callable(get_opts):
-        options = str(get_opts())
-    return options
-
-
-__all__ = [
-    "AutoTuner",
-    "FAISSManager",
-    "FAISSRuntimeController",
-    "FAISSRuntimeOptions",
-    "RefineSearchConfig",
-    "SearchRuntimeOverrides",
-    "apply_parameters",
-]
+__all__ = ["FAISSManager", "FAISSRuntimeOptions", "RefineSearchConfig"]

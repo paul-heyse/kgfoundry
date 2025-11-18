@@ -3,12 +3,7 @@
 
 from __future__ import annotations
 
-from codeintel_rev.cli.enrich import analytics as _analytics  # noqa: F401
 from codeintel_rev.cli.enrich import app
-from codeintel_rev.cli.enrich import exports as _exports  # noqa: F401
-from codeintel_rev.cli.enrich import overlays as _overlays  # noqa: F401
-from codeintel_rev.cli.enrich import scan as _scan  # noqa: F401
-from codeintel_rev.cli.enrich import to_duckdb as _to_duckdb  # noqa: F401
 
 
 def main() -> None:  # pragma: no cover - entrypoint

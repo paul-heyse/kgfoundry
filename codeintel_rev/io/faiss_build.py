@@ -8,6 +8,7 @@ manager itself can focus on wiring, orchestration, and state.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
@@ -312,6 +313,111 @@ def load_index(path: Path) -> FaissIndex:
     gate_import("faiss", "Loading FAISS index")
     faiss_mod = _resolve_faiss_module()
     return faiss_mod.read_index(str(path))
+
+
+def extract_all_vectors(index: FaissIndex, vec_dim: int) -> tuple[NDArrayF32, NDArrayI64]:
+    """Extract all vectors and IDs from a FAISS index.
+
+    Reconstructs vectors from the index and retrieves their associated IDs.
+    For quantized indexes (e.g., IVF-PQ), reconstruction returns approximate
+    vectors (dequantized from the codebook).
+
+    Parameters
+    ----------
+    index : FaissIndex
+        FAISS index to extract vectors from. Must support `reconstruct()` and
+        have an `id_map` attribute (IndexIDMap2 wrapper).
+    vec_dim : int
+        Vector dimension.
+
+    Returns
+    -------
+    tuple[NDArrayF32, NDArrayI64]
+        Tuple of (vectors, ids):
+        - vectors: shape (n_vectors, vec_dim), dtype float32
+        - ids: shape (n_vectors,), dtype int64
+
+    Raises
+    ------
+    RuntimeError
+        If the index does not support vector reconstruction or ID mapping.
+    TypeError
+        If the index's ``id_map`` interface is invalid.
+    """
+    n_vectors = int(getattr(index, "ntotal", 0))
+    if n_vectors == 0:
+        return np.empty((0, vec_dim), dtype=np.float32), np.empty(0, dtype=np.int64)
+
+    _configure_direct_map(index)
+    vectors = np.empty((n_vectors, vec_dim), dtype=np.float32)
+    ids = np.empty(n_vectors, dtype=np.int64)
+
+    # Check if index has id_map (IndexIDMap2 wrapper)
+    if not hasattr(index, "id_map"):
+        msg = (
+            f"Index type {type(index).__name__} does not support ID mapping. "
+            "Index must be wrapped with IndexIDMap2."
+        )
+        raise RuntimeError(msg)
+
+    # Extract vectors and IDs
+    id_map_obj = getattr(index, "id_map", None)
+    if id_map_obj is None or not callable(getattr(id_map_obj, "at", None)):
+        msg = f"Index type {type(index).__name__} has invalid id_map interface."
+        raise TypeError(msg)
+    at_callable = cast("Callable[[int], int]", id_map_obj.at)
+
+    base_index = getattr(index, "index", index)
+    for i in range(n_vectors):
+        try:
+            stored_id = int(at_callable(i))
+            reconstructed = base_index.reconstruct(i)
+            vectors[i] = np.asarray(reconstructed, dtype=np.float32)
+            ids[i] = stored_id
+        except (AttributeError, RuntimeError) as exc:
+            msg = f"Failed to extract vector at index {i}: {exc}"
+            raise RuntimeError(msg) from exc
+
+    return vectors, ids
+
+
+def merge_indexes(primary: FaissIndex, secondary: FaissIndex, vec_dim: int) -> FaissIndex:
+    """Merge secondary index into primary index.
+
+    Rebuilds the primary index to include all vectors from both indexes.
+    This operation is expensive but improves search performance by consolidating
+    the dual-index structure back into a single optimized index.
+
+    Parameters
+    ----------
+    primary : FaissIndex
+        Primary index to merge into.
+    secondary : FaissIndex
+        Secondary index to merge from.
+    vec_dim : int
+        Vector dimension.
+
+    Returns
+    -------
+    FaissIndex
+        New merged primary index.
+    """
+    # Extract vectors from both indexes
+    primary_vectors, primary_ids = extract_all_vectors(primary, vec_dim)
+    secondary_vectors, secondary_ids = extract_all_vectors(secondary, vec_dim)
+
+    # Combine vectors and IDs
+    all_vectors = np.vstack([primary_vectors, secondary_vectors])
+    all_ids = np.concatenate([primary_ids, secondary_ids])
+
+    # Build a new primary index with combined dataset
+    cfg = IndexBuildConfig(vec_dim=vec_dim, family="adaptive")
+    new_primary, _ = build_primary_index(all_vectors, cfg=cfg)
+
+    # Add all vectors to the new primary index
+    add_vectors(new_primary, all_vectors, all_ids)
+
+    return new_primary
 
 
 def create_secondary_index(vec_dim: int) -> FaissIndex:
