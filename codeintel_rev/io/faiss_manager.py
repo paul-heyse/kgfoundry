@@ -751,10 +751,18 @@ class FAISSManager:
         )
 
     def _secondary_ids_path(self) -> Path:
+        """Return path to secondary index IDs JSON file.
+
+        Returns
+        -------
+        Path
+            Path to IDs JSON file alongside secondary index.
+        """
         secondary_path = self._paths.secondary_index_path
         return secondary_path.with_suffix(".ids.json")
 
     def _persist_incremental_ids(self) -> None:
+        """Persist incremental IDs set to JSON file, or delete file if empty."""
         path = self._secondary_ids_path()
         if not self.incremental_ids:
             if path.exists():
@@ -764,6 +772,7 @@ class FAISSManager:
         path.write_text(json.dumps(sorted(self.incremental_ids)), encoding="utf-8")
 
     def _load_incremental_ids(self) -> None:
+        """Load incremental IDs set from JSON file, clearing if file missing or invalid."""
         path = self._secondary_ids_path()
         if not path.exists():
             self.incremental_ids.clear()
@@ -776,6 +785,7 @@ class FAISSManager:
         self.incremental_ids = {int(value) for value in payload}
 
     def _ensure_primary_ids(self) -> None:
+        """Ensure primary IDs set is populated from CPU index if needed."""
         if self.cpu_index is None:
             self._primary_ids.clear()
             return
@@ -783,6 +793,7 @@ class FAISSManager:
             self._refresh_primary_ids()
 
     def _refresh_primary_ids(self) -> None:
+        """Refresh primary IDs set from CPU index ID map array."""
         if self.cpu_index is None:
             self._primary_ids.clear()
             return
@@ -794,6 +805,13 @@ class FAISSManager:
         self._primary_ids = {int(value) for value in ids.tolist()}
 
     def _resolve_profile_to_read(self) -> Path | None:
+        """Resolve path to autotune profile file, checking current and legacy locations.
+
+        Returns
+        -------
+        Path | None
+            Path to existing profile file, or None if neither location exists.
+        """
         for path in (self.autotune_profile_path, self._legacy_autotune_profile_path):
             if path and Path(path).exists():
                 return Path(path)
@@ -801,6 +819,18 @@ class FAISSManager:
 
     @staticmethod
     def _load_profile_payload(path: Path | None) -> dict[str, object] | None:
+        """Load autotune profile payload from file.
+
+        Parameters
+        ----------
+        path : Path | None
+            Path to profile file, or None to skip loading.
+
+        Returns
+        -------
+        dict[str, object] | None
+            Profile dictionary if path exists, None otherwise.
+        """
         if path is None:
             return None
         return load_tuned_profile(Path(path))
@@ -811,6 +841,15 @@ class FAISSManager:
         *,
         persist: bool = True,
     ) -> None:
+        """Apply autotune profile payload to runtime overrides.
+
+        Parameters
+        ----------
+        payload : Mapping[str, object]
+            Profile dictionary containing runtime parameter overrides.
+        persist : bool, optional
+            Whether to persist changes to metadata snapshot. Defaults to True.
+        """
         overrides = self._normalize_runtime_payload(
             nprobe=payload.get("nprobe"),
             ef_search=payload.get("efSearch"),
@@ -827,6 +866,7 @@ class FAISSManager:
                 self._write_meta_snapshot(factory=factory)
 
     def _sync_runtime_from_meta(self) -> None:
+        """Synchronize runtime overrides and factory from metadata file."""
         if not self._meta_path.exists():
             return
         try:
@@ -847,6 +887,14 @@ class FAISSManager:
             self._parameter_space = parameter_space
 
     def _describe_runtime_state(self) -> dict[str, object]:
+        """Describe current runtime state including active parameters and overrides.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary containing active parameters, overrides, autotune profile,
+            and parameter space if available.
+        """
         profile = self._load_profile_payload(self._resolve_profile_to_read())
         snapshot = self._current_runtime_parameters()
         payload: dict[str, object] = {
