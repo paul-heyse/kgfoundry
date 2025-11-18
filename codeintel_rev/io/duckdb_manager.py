@@ -201,6 +201,17 @@ class DuckDBManager:
         *,
         context: DuckDBManagerContext | None = None,
     ) -> None:
+        """Initialize DuckDB manager.
+
+        Parameters
+        ----------
+        db_path : Path
+            Path to DuckDB database file.
+        config : DuckDBConfig | None, optional
+            DuckDB configuration. If None, uses default config.
+        context : DuckDBManagerContext | None, optional
+            Dependency overrides for connection creation. If None, uses production context.
+        """
         self._db_path = db_path
         self._config = config or DuckDBConfig()
         self._context = context or DuckDBManagerContext.production()

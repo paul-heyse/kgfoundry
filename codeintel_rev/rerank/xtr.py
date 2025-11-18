@@ -17,6 +17,13 @@ class XTRReranker(Reranker):
     requires = frozenset({"xtr_index_present", "torch_importable"})
 
     def __init__(self, index: XTRIndex) -> None:
+        """Initialize XTR reranker.
+
+        Parameters
+        ----------
+        index : XTRIndex
+            XTR index for MaxSim scoring.
+        """
         self._index = index
 
     def rescore(self, request: RerankRequest) -> Sequence[RerankResult]:

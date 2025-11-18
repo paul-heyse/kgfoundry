@@ -109,6 +109,24 @@ class BM25SearchProvider:
         b: float,
         rm3: BM25Rm3Config | None = None,
     ) -> None:
+        """Initialize BM25 search provider.
+
+        Parameters
+        ----------
+        index_dir : Path
+            Path to BM25 Lucene index directory.
+        k1 : float
+            BM25 k1 parameter (term frequency saturation).
+        b : float
+            BM25 b parameter (length normalization).
+        rm3 : BM25Rm3Config | None, optional
+            RM3 query expansion configuration. If None, RM3 is disabled.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the BM25 index directory does not exist.
+        """
         if not index_dir.exists():
             msg = f"BM25 index not found: {index_dir}"
             raise FileNotFoundError(msg)
@@ -327,6 +345,24 @@ class SpladeSearchProvider:
         onnx_dir: Path,
         index_dir: Path,
     ) -> None:
+        """Initialize SPLADE search provider.
+
+        Parameters
+        ----------
+        config : SpladeConfig
+            SPLADE configuration settings.
+        model_dir : Path
+            Directory containing SPLADE model files.
+        onnx_dir : Path
+            Directory containing ONNX model files.
+        index_dir : Path
+            Path to SPLADE impact index directory.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the SPLADE impact index directory does not exist.
+        """
         if not index_dir.exists():
             msg = f"SPLADE impact index not found: {index_dir}"
             raise FileNotFoundError(msg)
@@ -619,6 +655,17 @@ class HybridSearchEngine:
         *,
         context: HybridSearchContext | None = None,
     ) -> None:
+        """Initialize hybrid search engine.
+
+        Parameters
+        ----------
+        settings : Settings
+            Application settings.
+        paths : ResolvedPaths
+            Resolved application paths.
+        context : HybridSearchContext | None, optional
+            Optional context for dependency injection. If None, creates default context.
+        """
         ctx = context or HybridSearchContext()
         self._settings = settings
         self._paths = paths

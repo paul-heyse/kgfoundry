@@ -941,6 +941,11 @@ class HFEmbeddingProvider(_ProviderBase):
             Embedding service configuration.
         index : IndexConfig
             Index configuration for dimension and normalization.
+
+        Raises
+        ------
+        EmbeddingRuntimeError
+            If a CUDA device is requested but unavailable.
         """
         torch_mod = cast("Any", gate_import("torch", "Hugging Face embedding provider"))
         transformers_mod = cast(

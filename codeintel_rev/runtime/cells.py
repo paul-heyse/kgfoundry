@@ -170,6 +170,19 @@ class RuntimeCell[T]:
         max_waiters: int = 0,
         wait_timeout_ms: int = 1500,
     ) -> None:
+        """Initialize runtime cell.
+
+        Parameters
+        ----------
+        name : str | None, optional
+            Optional name identifier for this cell (for debugging/logging).
+        observer : RuntimeCellObserver | None, optional
+            Optional observer for lifecycle events.
+        max_waiters : int, optional
+            Maximum number of concurrent waiters (0 = unlimited).
+        wait_timeout_ms : int, optional
+            Timeout in milliseconds for wait operations (default: 1500).
+        """
         self._lock = RLock()
         self._condition = Condition(self._lock)
         self._value: T | None = None

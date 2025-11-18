@@ -110,6 +110,17 @@ class BM25IndexManager:
         logger_: logging.Logger | None = None,
         build_context: BM25BuildContext | None = None,
     ) -> None:
+        """Initialize BM25 index manager.
+
+        Parameters
+        ----------
+        settings : Settings
+            Application settings containing BM25 configuration.
+        logger_ : logging.Logger | None, optional
+            Custom logger instance. If None, uses module logger.
+        build_context : BM25BuildContext | None, optional
+            Build context for index construction. If None, uses production context.
+        """
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()

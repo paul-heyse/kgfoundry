@@ -72,6 +72,21 @@ class SCIPCoverageEvaluator:
         faiss_manager: SupportsFaissSearch,
         vllm_client: SupportsEmbedSingle,
     ) -> None:
+        """Initialize SCIP coverage evaluator.
+
+        Parameters
+        ----------
+        settings : Settings
+            Application settings.
+        repo_root : str | Path
+            Repository root directory path.
+        duckdb_manager : DuckDBManager
+            DuckDB manager for catalog queries.
+        faiss_manager : SupportsFaissSearch
+            FAISS manager for vector search.
+        vllm_client : SupportsEmbedSingle
+            VLLM client for query embedding.
+        """
         self._settings = settings
         self._repo_root = Path(repo_root)
         self._duckdb = duckdb_manager

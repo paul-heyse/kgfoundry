@@ -45,5 +45,14 @@ class ChannelError(RuntimeError):
     """Raised by channels when they cannot satisfy a search request."""
 
     def __init__(self, message: str, *, reason: str = "provider_error") -> None:
+        """Initialize channel error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        reason : str, optional
+            Error reason code (default: "provider_error").
+        """
         super().__init__(message)
         self.reason = reason

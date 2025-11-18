@@ -586,7 +586,6 @@ This pattern keeps `python -c "import codeintel_rev"` working on minimal hosts w
   - Parametrize edge cases with `@pytest.mark.parametrize`
   - No reliance on test order or realtime; use fixed seeds
 - **Helper fixtures:** prefer the utilities in `tests/_helpers/` (e.g.,
-  `tests/_helpers/adapters.py` for semantic adapter/pro hooks and catalog
   contexts) and the typed gate overrides (`kgfoundry_common.typing.override_gate_import`,
   `faiss_runtime.override_parameter_application`) instead of ad-hoc monkeypatching.
 - Entire suite runs on CPU; GPU markers have been removed

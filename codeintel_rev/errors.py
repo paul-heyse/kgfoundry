@@ -272,6 +272,17 @@ class PathNotFoundError(KgFoundryError):
         *,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize path not found error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str
+            Repository path that was not found.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         super().__init__(
             message,
             code=ErrorCode.PATH_NOT_FOUND,

@@ -20,6 +20,8 @@ from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.duckdb_dao import (
     DuckDBQueryBuilder,
     DuckDBQueryOptions,
+    create_chunk_symbols_view,
+    create_pool_coverage_view,
     ensure_chunks,
     ensure_faiss_idmap_view,
     ensure_v_faiss_join,
@@ -611,6 +613,26 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         options: DuckDBCatalogOptions | None = None,
         **legacy_kwargs: Unpack[_LegacyOptions],
     ) -> None:
+        """Initialize DuckDB catalog.
+
+        Parameters
+        ----------
+        db_path : Path
+            Path to DuckDB database file.
+        vectors_dir : Path
+            Directory containing Parquet files with chunk embeddings.
+        options : DuckDBCatalogOptions | None, optional
+            Configuration options dataclass. Cannot be mixed with legacy_kwargs.
+        **legacy_kwargs : Unpack[_LegacyOptions]
+            Legacy keyword arguments for backward compatibility.
+
+        Raises
+        ------
+        ValueError
+            If both options and legacy_kwargs are provided.
+        TypeError
+            If legacy_kwargs contains unsupported keyword arguments.
+        """
         if options is not None and legacy_kwargs:
             msg = "Cannot mix DuckDBCatalog options dataclass with keyword overrides."
             raise ValueError(msg)
@@ -881,18 +903,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
             DuckDB connection to create view on.
         """
         try:
-            conn.execute(
-                """
-                CREATE OR REPLACE VIEW v_chunk_symbols AS
-                SELECT
-                    c.id AS chunk_id,
-                    symbol
-                FROM chunks AS c,
-                     LATERAL UNNEST(
-                        COALESCE(c.symbols, []::VARCHAR[])
-                     ) AS t(symbol)
-                """
-            )
+            create_chunk_symbols_view(conn)
         except duckdb.Error:  # pragma: no cover - defensive fallback for legacy schemas
             return
 
@@ -985,6 +996,8 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
             configured idmap path.
         """
         target = override_path or self._idmap_path
+        if target and not target.exists():
+            target = None
         ensure_faiss_idmap_view(conn, idmap_parquet=target)
 
     def ensure_faiss_idmap_views(self, idmap_path: Path | None = None) -> None:
@@ -1056,12 +1069,20 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
                     asset_path=asset_path,
                 )
 
-    def materialize_faiss_join(self) -> None:
-        """Persist ``v_faiss_join`` into ``faiss_join_mat`` for BI workloads."""
+    def materialize_faiss_join(self) -> int:
+        """Persist ``v_faiss_join`` into ``faiss_join_mat`` for BI workloads.
+
+        Returns
+        -------
+        int
+            Number of rows materialized into ``faiss_join_mat``.
+        """
         with self.connection() as conn:
             if not relation_exists(conn, VIEW_V_FAISS_JOIN):
-                return
-            materialize_v_faiss_join(conn)
+                return 0
+            rows = materialize_v_faiss_join(conn)
+            LOGGER.debug("faiss_join_mat rows: %d", rows)
+            return rows
 
     def set_idmap_path(self, path: Path) -> None:
         """Override the FAISS id map path used for view installation."""
@@ -1132,31 +1153,9 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
             relation = conn.sql(sql, params=params)
             relation.create_view("v_faiss_pool", replace=True)
             try:
-                conn.execute(
-                    """
-                    CREATE OR REPLACE VIEW v_pool_coverage AS
-                    SELECT
-                        pool.*,
-                        chunks.lang,
-                        modules.repo_path AS repo_path,
-                        modules.module_name,
-                        modules.tags
-                    FROM v_faiss_pool AS pool
-                    LEFT JOIN chunks ON chunks.id = pool.chunk_id
-                    LEFT JOIN modules ON modules.repo_path = pool.uri
-                    """
-                )
+                create_pool_coverage_view(conn, include_modules=True)
             except duckdb.Error:
-                conn.execute(
-                    """
-                    CREATE OR REPLACE VIEW v_pool_coverage AS
-                    SELECT
-                        pool.*,
-                        chunks.lang
-                    FROM v_faiss_pool AS pool
-                    LEFT JOIN chunks ON chunks.id = pool.chunk_id
-                    """
-                )
+                create_pool_coverage_view(conn, include_modules=False)
 
     def refresh_faiss_idmap_mat_if_changed(self, idmap_parquet: Path) -> dict[str, Any]:
         """Materialize FAISS ID map when the Parquet sidecar content changes.
@@ -1179,13 +1178,13 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
             ensure_v_faiss_join(conn)
             meta = _dao_refresh_faiss_idmap_materialized(
                 conn,
-                idmap_parquet=resolved,
+                _idmap_parquet=resolved,
                 checksum=checksum,
             )
             stats: dict[str, Any] = {
                 "refreshed": meta.refreshed,
-                "checksum": meta.parquet_hash,
-                "rows": meta.row_count,
+                "checksum": meta.checksum,
+                "rows": meta.rows,
             }
         return stats
 
@@ -1882,7 +1881,7 @@ def refresh_faiss_idmap_materialized(
     _ = chunks_parquet  # Maintained for compatibility with legacy callers.
     path = Path(idmap_parquet)
     checksum = _parquet_hash(path)
-    return _dao_refresh_faiss_idmap_materialized(conn, idmap_parquet=path, checksum=checksum)
+    return _dao_refresh_faiss_idmap_materialized(conn, _idmap_parquet=path, checksum=checksum)
 
 
 __all__ = [

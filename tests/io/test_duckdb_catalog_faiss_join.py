@@ -87,7 +87,7 @@ def test_refresh_faiss_idmap_materialized_skips_when_unchanged(tmp_path: Path) -
         chunks_parquet=str(chunks),
     )
     assertions.expect_true(first.refreshed, reason="first refresh should be True")
-    assertions.expect_equal(first.row_count, 2)
+    assertions.expect_equal(first.rows, 2)
 
     second = refresh_faiss_idmap_materialized(
         conn,
@@ -95,4 +95,4 @@ def test_refresh_faiss_idmap_materialized_skips_when_unchanged(tmp_path: Path) -
         chunks_parquet=str(chunks),
     )
     assertions.expect_false(second.refreshed, reason="second refresh should be False")
-    assertions.expect_equal(second.row_count, first.row_count)
+    assertions.expect_equal(second.rows, first.rows)

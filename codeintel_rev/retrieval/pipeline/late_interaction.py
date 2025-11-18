@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Final, Protocol, cast
 
 from codeintel_rev.io.xtr_manager import XTRIndex
 
+_DEFAULT_TOPK_EXPLANATIONS: Final[int] = 5
+_EXPLANATION_INDEX: Final[int] = 2
 
-@dataclass(slots=True, frozen=True)
+
+@dataclass(frozen=True, slots=True)
 class LateInteractionResult:
     """Rescoring payload returned by late-interaction engines."""
 
@@ -19,13 +22,17 @@ class LateInteractionResult:
 
 
 class LateInteraction(Protocol):
-    """Protocol implemented by late-interaction rescoring engines.
+    """Protocol implemented by late-interaction rescoring engines."""
 
-    Methods
-    -------
-    rescore(query, candidate_ids, *, explain, topk_explanations)
-        Rescore candidate chunks using late-interaction methods.
-    """
+    def rescore(
+        self,
+        query: str,
+        candidate_ids: Iterable[int],
+        *,
+        explain: bool = False,
+    ) -> LateInteractionResult:
+        """Rescore candidate documents."""
+        ...
 
 
 @dataclass(slots=True)
@@ -40,26 +47,16 @@ class XTRLateInteraction:
         candidate_ids: Iterable[int],
         *,
         explain: bool = False,
-        topk_explanations: int = 5,
+        topk_explanations: int = _DEFAULT_TOPK_EXPLANATIONS,
     ) -> LateInteractionResult:
-        """Rescore candidate chunks using XTR late-interaction.
-
-        Parameters
-        ----------
-        query : str
-            Query text for rescoring.
-        candidate_ids : Iterable[int]
-            Chunk IDs to rescore.
-        explain : bool, optional
-            Whether to include explanation metadata (default: False).
-        topk_explanations : int, optional
-            Number of top explanations to include (default: 5).
+        """Rescore candidate IDs using the XTR narrow-mode API.
 
         Returns
         -------
         LateInteractionResult
-            Rescored results with IDs, scores, and optional explanations.
+            Rescored identifiers, scores, and optional explanations.
         """
+        triples: Sequence[tuple[int, float, Mapping[str, object] | None]]
         triples = self.index.rescore(
             query=query,
             candidate_chunk_ids=list(candidate_ids),
@@ -69,7 +66,14 @@ class XTRLateInteraction:
         ids = [int(row[0]) for row in triples]
         scores = [float(row[1]) for row in triples]
         explanations = (
-            [(int(row[0]), dict(row[2])) for row in triples if len(row) > 2 and row[2] is not None]  # noqa: PLR2004
+            [
+                (
+                    int(row[0]),
+                    dict(cast("Mapping[str, object]", row[_EXPLANATION_INDEX])),
+                )
+                for row in triples
+                if len(row) > _EXPLANATION_INDEX and row[_EXPLANATION_INDEX] is not None
+            ]
             if explain
             else None
         )

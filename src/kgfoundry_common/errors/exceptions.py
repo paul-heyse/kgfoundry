@@ -206,6 +206,17 @@ class KgFoundryError(Exception):
         config: KgFoundryErrorConfig | None = None,
         **legacy_kwargs: object,
     ) -> None:
+        """Initialize kgfoundry error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        config : KgFoundryErrorConfig | None, optional
+            Error configuration dataclass. If None, uses defaults.
+        **legacy_kwargs : object
+            Legacy keyword arguments for backward compatibility.
+        """
         resolved_config = _coerce_error_config(config, dict(legacy_kwargs))
         self.message = message
         self.code = resolved_config.code
@@ -310,6 +321,17 @@ class DownloadError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize download error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.DOWNLOAD_FAILED,
@@ -349,6 +371,17 @@ class UnsupportedMIMEError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize unsupported MIME error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.UNSUPPORTED_MIME,
@@ -387,6 +420,17 @@ class DoclingError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize Docling error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.DOCLING_ERROR,
@@ -425,6 +469,17 @@ class OCRTimeoutError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize OCR timeout error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the timeout.
+        cause : Exception | None, optional
+            Underlying exception that caused the timeout.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.OCR_TIMEOUT,
@@ -463,6 +518,17 @@ class ChunkingError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize chunking error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the chunking failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.CHUNKING_ERROR,
@@ -503,6 +569,17 @@ class EmbeddingError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize embedding error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the embedding failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.EMBEDDING_ERROR,
@@ -542,6 +619,17 @@ class SpladeOOMError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize SPLADE out-of-memory error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the OOM.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.SPLADE_OOM,
@@ -580,6 +668,17 @@ class IndexBuildError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize index build error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the index build failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the build failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.INDEX_BUILD_ERROR,
@@ -619,6 +718,17 @@ class OntologyParseError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize ontology parse error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the parsing failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the parsing failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.ONTOLOGY_PARSE_ERROR,
@@ -658,6 +768,17 @@ class LinkerCalibrationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize linker calibration error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the calibration failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the calibration failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.LINKER_CALIBRATION_ERROR,
@@ -696,6 +817,17 @@ class Neo4jError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize Neo4j error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the Neo4j operation failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the Neo4j failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.NEO4J_ERROR,
@@ -736,6 +868,17 @@ class ConfigurationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize configuration error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the configuration failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the configuration failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.CONFIGURATION_ERROR,
@@ -821,6 +964,19 @@ class SettingsError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize settings error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the settings validation failure.
+        errors : list[dict[str, object]] | None, optional
+            List of validation error dictionaries with field/issue details.
+        cause : Exception | None, optional
+            Underlying exception that caused the validation failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         combined_context: dict[str, object] = dict(context or {})
         if errors:
             combined_context.setdefault(
@@ -866,6 +1022,17 @@ class SerializationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize serialization error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the serialization failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the serialization failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.SERIALIZATION_ERROR,
@@ -905,6 +1072,17 @@ class RegistryError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize registry error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the registry operation failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the registry failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.REGISTRY_ERROR,
@@ -944,6 +1122,17 @@ class DeserializationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize deserialization error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the deserialization failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the deserialization failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.DESERIALIZATION_ERROR,
@@ -989,6 +1178,19 @@ class SchemaValidationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize schema validation error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the validation failure.
+        errors : list[str] | None, optional
+            List of validation error messages with path and constraint details.
+        cause : Exception | None, optional
+            Underlying exception that caused the validation failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         combined_context: dict[str, object] = dict(context or {})
         if errors:
             combined_context.setdefault("validation_errors", list(errors))
@@ -1036,6 +1238,21 @@ class RetryExhaustedError(KgFoundryError):
         last_error: Exception | None = None,
         retry_after_seconds: int | None = None,
     ) -> None:
+        """Initialize retry exhausted error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        operation : str | None, optional
+            Name of the operation that exhausted retries.
+        attempts : int | None, optional
+            Number of retry attempts made.
+        last_error : Exception | None, optional
+            Last exception encountered before retries were exhausted.
+        retry_after_seconds : int | None, optional
+            Suggested retry delay in seconds.
+        """
         super().__init__(
             message,
             code=ErrorCode.RETRY_EXHAUSTED,
@@ -1118,6 +1335,17 @@ class VectorSearchError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize vector search error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the search failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.VECTOR_SEARCH_ERROR,
@@ -1159,6 +1387,17 @@ class AgentCatalogSearchError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize agent catalog search error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the search failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.AGENT_CATALOG_SEARCH_ERROR,
@@ -1197,6 +1436,17 @@ class CatalogSessionError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize catalog session error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the session failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.SESSION_ERROR,
@@ -1237,6 +1487,17 @@ class CatalogLoadError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize catalog load error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the load failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.CATALOG_LOAD_ERROR,
@@ -1278,6 +1539,17 @@ class SymbolAttachmentError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize symbol attachment error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the attachment failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.SYMBOL_ATTACHMENT_ERROR,
@@ -1319,6 +1591,17 @@ class ArtifactModelError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize artifact model error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the model loading failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the model loading failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_MODEL_ERROR,
@@ -1360,6 +1643,17 @@ class ArtifactValidationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize artifact validation error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the validation failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_VALIDATION_ERROR,
@@ -1401,6 +1695,17 @@ class ArtifactSerializationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize artifact serialization error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        cause : Exception | None, optional
+            Underlying exception that caused the serialization failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_SERIALIZATION_ERROR,
@@ -1442,6 +1747,17 @@ class ArtifactDeserializationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize artifact deserialization error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the deserialization failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the deserialization failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_DESERIALIZATION_ERROR,
@@ -1484,6 +1800,17 @@ class ArtifactDependencyError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize artifact dependency error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the dependency resolution failure.
+        cause : Exception | None, optional
+            Underlying exception that caused the dependency resolution failure.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details.
+        """
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_DEPENDENCY_ERROR,

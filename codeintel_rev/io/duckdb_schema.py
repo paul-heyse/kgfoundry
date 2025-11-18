@@ -56,11 +56,11 @@ WHERE 1 = 0
 """
 
 _SQL_CREATE_CHUNKS_VIEW_FROM_PARQUET = (
-    'CREATE OR REPLACE VIEW "chunks" AS SELECT * FROM read_parquet(?)'
+    'CREATE OR REPLACE VIEW "chunks" AS SELECT * FROM read_parquet({})'
 )
 _SQL_CREATE_EMPTY_CHUNKS_VIEW = 'CREATE OR REPLACE VIEW "chunks" AS ' + EMPTY_CHUNKS_SELECT
 _SQL_CREATE_CHUNKS_MATERIALIZED = (
-    'CREATE OR REPLACE TABLE "chunks_materialized" AS SELECT * FROM read_parquet(?)'
+    'CREATE OR REPLACE TABLE "chunks_materialized" AS SELECT * FROM read_parquet({})'
 )
 _SQL_CREATE_EMPTY_CHUNKS_MATERIALIZED = (
     'CREATE OR REPLACE TABLE "chunks_materialized" AS ' + EMPTY_CHUNKS_SELECT
@@ -76,7 +76,7 @@ CREATE OR REPLACE VIEW "faiss_idmap" AS
 SELECT
     faiss_row,
     external_id
-FROM read_parquet(?)
+FROM read_parquet({})
 """
 _SQL_CREATE_EMPTY_FAISS_IDMAP_VIEW = """
 CREATE OR REPLACE VIEW "faiss_idmap" AS
@@ -98,6 +98,34 @@ LEFT JOIN "chunks" AS c
 _SQL_MATERIALIZE_V_FAISS_JOIN = (
     'CREATE OR REPLACE TABLE "faiss_join_mat" AS SELECT * FROM "v_faiss_join"'
 )
+_SQL_CREATE_CHUNK_SYMBOLS_VIEW = """
+CREATE OR REPLACE VIEW "v_chunk_symbols" AS
+SELECT
+    c.id AS chunk_id,
+    symbol
+FROM chunks AS c,
+     LATERAL UNNEST(COALESCE(c.symbols, []::VARCHAR[])) AS t(symbol)
+"""
+_SQL_CREATE_POOL_COVERAGE_VIEW = """
+CREATE OR REPLACE VIEW "v_pool_coverage" AS
+SELECT
+    pool.*,
+    chunks.lang,
+    modules.repo_path AS repo_path,
+    modules.module_name,
+    modules.tags
+FROM v_faiss_pool AS pool
+LEFT JOIN chunks ON chunks.id = pool.chunk_id
+LEFT JOIN modules ON modules.repo_path = pool.uri
+"""
+_SQL_CREATE_POOL_COVERAGE_BASIC_VIEW = """
+CREATE OR REPLACE VIEW "v_pool_coverage" AS
+SELECT
+    pool.*,
+    chunks.lang
+FROM v_faiss_pool AS pool
+LEFT JOIN chunks ON chunks.id = pool.chunk_id
+"""
 _SQL_CREATE_IDMAP_MAT = """
 CREATE TABLE IF NOT EXISTS "faiss_idmap_mat" AS
 SELECT * FROM "v_faiss_join" LIMIT 0
@@ -118,8 +146,13 @@ _SQL_INSERT_IDMAP_META = """
 INSERT INTO "faiss_idmap_mat_meta"(checksum, updated_at)
 VALUES (?, CURRENT_TIMESTAMP)
 """
+_COUNTABLE_TABLES: Final[dict[str, str]] = {
+    TABLE_FAISS_JOIN_MAT: 'SELECT COUNT(*)::BIGINT FROM "faiss_join_mat"',
+    TABLE_FAISS_IDMAP_MAT: 'SELECT COUNT(*)::BIGINT FROM "faiss_idmap_mat"',
+}
 
-def sql_create_chunks_view_from_parquet() -> str:
+
+def sql_create_chunks_view_from_parquet(parquet_literal: str) -> str:
     """Return SQL for creating chunks view from Parquet files.
 
     Returns
@@ -127,7 +160,7 @@ def sql_create_chunks_view_from_parquet() -> str:
     str
         SQL statement with placeholder for Parquet path parameter.
     """
-    return _SQL_CREATE_CHUNKS_VIEW_FROM_PARQUET
+    return _SQL_CREATE_CHUNKS_VIEW_FROM_PARQUET.format(parquet_literal)
 
 
 def sql_create_empty_chunks_view() -> str:
@@ -141,7 +174,7 @@ def sql_create_empty_chunks_view() -> str:
     return _SQL_CREATE_EMPTY_CHUNKS_VIEW
 
 
-def sql_create_chunks_materialized() -> str:
+def sql_create_chunks_materialized(parquet_literal: str) -> str:
     """Return SQL for creating materialized chunks table from Parquet.
 
     Returns
@@ -149,7 +182,7 @@ def sql_create_chunks_materialized() -> str:
     str
         SQL statement with placeholder for Parquet path parameter.
     """
-    return _SQL_CREATE_CHUNKS_MATERIALIZED
+    return _SQL_CREATE_CHUNKS_MATERIALIZED.format(parquet_literal)
 
 
 def sql_create_empty_chunks_materialized() -> str:
@@ -185,7 +218,7 @@ def sql_create_chunks_materialized_index() -> str:
     return _SQL_CREATE_CHUNKS_MAT_INDEX
 
 
-def sql_create_faiss_idmap_view() -> str:
+def sql_create_faiss_idmap_view(parquet_literal: str) -> str:
     """Return SQL for creating FAISS ID map view from Parquet.
 
     Returns
@@ -193,7 +226,7 @@ def sql_create_faiss_idmap_view() -> str:
     str
         SQL statement with placeholder for Parquet path parameter.
     """
-    return _SQL_CREATE_FAISS_IDMAP_VIEW
+    return _SQL_CREATE_FAISS_IDMAP_VIEW.format(parquet_literal)
 
 
 def sql_create_empty_faiss_idmap_view() -> str:
@@ -205,7 +238,6 @@ def sql_create_empty_faiss_idmap_view() -> str:
         SQL statement creating an empty view with correct schema.
     """
     return _SQL_CREATE_EMPTY_FAISS_IDMAP_VIEW
-
 
 
 def sql_create_v_faiss_join() -> str:
@@ -228,6 +260,35 @@ def sql_materialize_v_faiss_join() -> str:
         SQL statement creating a table from the view.
     """
     return _SQL_MATERIALIZE_V_FAISS_JOIN
+
+
+def sql_create_chunk_symbols_view() -> str:
+    """Return SQL for creating v_chunk_symbols view.
+
+    Returns
+    -------
+    str
+        SQL statement creating the chunk symbol view.
+    """
+    return _SQL_CREATE_CHUNK_SYMBOLS_VIEW
+
+
+def sql_create_pool_coverage_view(*, include_modules: bool) -> str:
+    """Return SQL for creating v_pool_coverage with optional module joins.
+
+    Parameters
+    ----------
+    include_modules : bool
+        When ``True``, joins against modules for repo metadata.
+
+    Returns
+    -------
+    str
+        SQL statement creating the pool coverage view.
+    """
+    if include_modules:
+        return _SQL_CREATE_POOL_COVERAGE_VIEW
+    return _SQL_CREATE_POOL_COVERAGE_BASIC_VIEW
 
 
 def sql_create_idmap_mat() -> str:
@@ -308,14 +369,38 @@ def sql_insert_idmap_meta() -> str:
 
 
 def sql_count(table: str) -> str:
-    """Return SQL for counting rows in a relation."""
+    """Return SQL for counting rows in supported relations.
 
-    return f'SELECT COUNT(*)::BIGINT FROM "{table}"'
+    Parameters
+    ----------
+    table : str
+        Name of the relation to count.
+
+    Returns
+    -------
+    str
+        SQL statement returning the row count for ``table``.
+
+    Raises
+    ------
+    ValueError
+        If ``table`` is not part of the supported mapping.
+    """
+    try:
+        return _COUNTABLE_TABLES[table]
+    except KeyError as exc:  # pragma: no cover - defensive
+        msg = f"Unsupported table for row counting: {table}"
+        raise ValueError(msg) from exc
 
 
 def sql_relation_exists() -> str:
-    """Return SQL for checking relation existence."""
+    """Return SQL for checking relation existence.
 
+    Returns
+    -------
+    str
+        SQL statement checking DuckDB information_schema for a relation.
+    """
     return """
     SELECT 1 FROM information_schema.tables
     WHERE table_name = ? COLLATE NOCASE

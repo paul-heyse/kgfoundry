@@ -1174,6 +1174,17 @@ class SpladeArtifactsManager:
         logger_: logging.Logger | None = None,
         artifacts_context: SpladeArtifactsContext | None = None,
     ) -> None:
+        """Initialize SPLADE artifacts manager.
+
+        Parameters
+        ----------
+        settings : Settings
+            Application settings containing SPLADE configuration.
+        logger_ : logging.Logger | None, optional
+            Custom logger instance. If None, uses module logger.
+        artifacts_context : SpladeArtifactsContext | None, optional
+            Context for artifact management. If None, uses production context.
+        """
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
@@ -1581,6 +1592,17 @@ class SpladeIndexManager:
         logger_: logging.Logger | None = None,
         index_context: SpladeIndexContext | None = None,
     ) -> None:
+        """Initialize SPLADE index manager.
+
+        Parameters
+        ----------
+        settings : Settings
+            Application settings containing SPLADE configuration.
+        logger_ : logging.Logger | None, optional
+            Custom logger instance. If None, uses module logger.
+        index_context : SpladeIndexContext | None, optional
+            Context for index management. If None, uses production context.
+        """
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()

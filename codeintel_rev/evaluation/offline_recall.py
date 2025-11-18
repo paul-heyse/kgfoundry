@@ -42,6 +42,21 @@ class OfflineRecallEvaluator:
         vllm_client: VLLMClient,
         duckdb_manager: DuckDBManager,
     ) -> None:
+        """Initialize offline recall evaluator.
+
+        Parameters
+        ----------
+        settings : Settings
+            Application settings.
+        paths : PathsConfig | ResolvedPaths
+            Resolved application paths.
+        faiss_manager : FAISSManager
+            FAISS manager for vector search.
+        vllm_client : VLLMClient
+            VLLM client for query embedding.
+        duckdb_manager : DuckDBManager
+            DuckDB manager for catalog access.
+        """
         self._settings = settings
         self._repo_root = Path(paths.repo_root)
         self._faiss = faiss_manager

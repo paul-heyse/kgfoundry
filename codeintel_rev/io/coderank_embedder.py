@@ -135,6 +135,15 @@ class CodeRankEmbedder:
         settings: SupportsCodeRankSettings,
         context: CodeRankEmbedderContext | None = None,
     ) -> None:
+        """Initialize CodeRank embedder.
+
+        Parameters
+        ----------
+        settings : SupportsCodeRankSettings
+            Settings containing model ID, device, and embedding configuration.
+        context : CodeRankEmbedderContext | None, optional
+            Optional context for dependency injection. If None, uses production context.
+        """
         self.model_id = settings.model_id
         self.device = settings.device
         self.trust_remote_code = settings.trust_remote_code

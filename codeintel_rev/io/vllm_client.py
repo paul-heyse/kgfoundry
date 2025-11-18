@@ -341,6 +341,15 @@ class VLLMClient:
         *,
         transport_context: VLLMTransportContext | None = None,
     ) -> None:
+        """Initialize VLLM client.
+
+        Parameters
+        ----------
+        config : VLLMConfig
+            VLLM configuration (model, host, port, etc.).
+        transport_context : VLLMTransportContext | None, optional
+            Optional transport context for HTTP client customization.
+        """
         self.config = config
         self._encoder = msgspec.json.Encoder()
         self._decoder = msgspec.json.Decoder(EmbeddingResponse)

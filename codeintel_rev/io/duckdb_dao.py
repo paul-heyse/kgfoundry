@@ -14,14 +14,18 @@ from codeintel_rev.io.duckdb_schema import (
     VIEW_CHUNKS,
     IdMapMeta,
     sql_count,
+    sql_create_chunk_symbols_view,
     sql_create_chunks_materialized,
+    sql_create_chunks_materialized_index,
     sql_create_chunks_view_from_materialized,
     sql_create_chunks_view_from_parquet,
+    sql_create_empty_chunks_materialized,
     sql_create_empty_chunks_view,
     sql_create_empty_faiss_idmap_view,
     sql_create_faiss_idmap_view,
     sql_create_idmap_mat,
     sql_create_idmap_mat_meta,
+    sql_create_pool_coverage_view,
     sql_create_v_faiss_join,
     sql_delete_idmap_mat,
     sql_delete_idmap_meta,
@@ -38,9 +42,20 @@ else:
     duckdb = cast("duckdb", LazyModule("duckdb", "DuckDB DAO operations"))
 
 
-def relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
-    """Return True when a relation with ``name`` exists."""
+def _quote_literal(value: str) -> str:
+    """Return a DuckDB-safe string literal."""
+    escaped = value.replace("'", "''")
+    return f"'{escaped}'"
 
+
+def relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
+    """Return True when a relation with ``name`` exists.
+
+    Returns
+    -------
+    bool
+        ``True`` if the relation exists, otherwise ``False``.
+    """
     cur = conn.execute(sql_relation_exists(), [name, name])
     return cur.fetchone() is not None
 
@@ -62,16 +77,18 @@ def ensure_chunks(
         Whether Parquet files matching the glob pattern exist.
     """
     if materialize:
+        literal = _quote_literal(parquet_glob)
         if parquet_exists:
-            conn.execute(_apply_parquet_path(sql_create_chunks_materialized(), Path(parquet_glob)))
+            conn.execute(sql_create_chunks_materialized(literal))
         else:
             conn.execute(sql_create_empty_chunks_materialized())
-        conn.execute(sql_create_chunks_view_from_materialized())
         conn.execute(sql_create_chunks_materialized_index())
+        conn.execute(sql_create_chunks_view_from_materialized())
         return
 
     if parquet_exists:
-        conn.execute(_apply_parquet_path(sql_create_chunks_view_from_parquet(), Path(parquet_glob)))
+        literal = _quote_literal(parquet_glob)
+        conn.execute(sql_create_chunks_view_from_parquet(literal))
         return
 
     conn.execute(sql_create_empty_chunks_view())
@@ -89,37 +106,12 @@ def ensure_faiss_idmap_view(conn: duckdb.DuckDBPyConnection, *, idmap_parquet: P
         creates view from Parquet. Otherwise, creates view from materialized
         table or empty view.
     """
-    if idmap_parquet and idmap_parquet.exists() and _is_valid_parquet_file(idmap_parquet):
-        conn.execute(_apply_parquet_path(sql_create_faiss_idmap_view(), idmap_parquet))
-        return
-
-    if relation_exists(conn, TABLE_FAISS_IDMAP_MAT):
-        column = _choose_idmap_column(conn)
-        conn.execute(sql_create_faiss_idmap_from_materialized(column))
+    if idmap_parquet and idmap_parquet.exists():
+        literal = _quote_literal(str(idmap_parquet))
+        conn.execute(sql_create_faiss_idmap_view(literal))
         return
 
     conn.execute(sql_create_empty_faiss_idmap_view())
-
-
-def _choose_idmap_column(conn: duckdb.DuckDBPyConnection) -> str | None:
-    """Choose the appropriate ID column name from the ID map table.
-
-    Parameters
-    ----------
-    conn : duckdb.DuckDBPyConnection
-        DuckDB connection to query for table schema.
-
-    Returns
-    -------
-    str | None
-        Column name to use ("chunk_id" or "external_id"). ``None`` when neither exists.
-    """
-    columns = {row[1] for row in conn.execute("PRAGMA table_info('faiss_idmap_mat')").fetchall()}
-    if "chunk_id" in columns:
-        return "chunk_id"
-    if "external_id" in columns:
-        return "external_id"
-    return None
 
 
 def ensure_v_faiss_join(conn: duckdb.DuckDBPyConnection) -> None:
@@ -151,10 +143,21 @@ def materialize_v_faiss_join(conn: duckdb.DuckDBPyConnection) -> int:
     return int(count[0]) if count and count[0] is not None else 0
 
 
+def create_chunk_symbols_view(conn: duckdb.DuckDBPyConnection) -> None:
+    """Create or replace the chunk symbols view."""
+    conn.execute(sql_create_chunk_symbols_view())
+
+
+def create_pool_coverage_view(conn: duckdb.DuckDBPyConnection, *, include_modules: bool) -> None:
+    """Create or replace the pool coverage view."""
+    conn.execute(sql_create_pool_coverage_view(include_modules=include_modules))
+
+
 def refresh_faiss_idmap_materialized(
     conn: duckdb.DuckDBPyConnection,
     *,
-    idmap_parquet: Path,
+    _idmap_parquet: Path,
+    _chunks_parquet: Path | None = None,
     checksum: str,
 ) -> IdMapMeta:
     """Refresh the materialized FAISS ID map table with checksum-based logic.
@@ -163,8 +166,8 @@ def refresh_faiss_idmap_materialized(
     ----------
     conn : duckdb.DuckDBPyConnection
         DuckDB connection to use for executing SQL operations.
-    idmap_parquet : Path
-        Path to the FAISS ID map Parquet file.
+    _idmap_parquet : Path
+        Path to the FAISS ID map Parquet file (unused at the DAO layer).
     checksum : str
         Checksum of the ID map Parquet file for change detection.
 
@@ -184,15 +187,13 @@ def refresh_faiss_idmap_materialized(
     if prev_checksum != checksum:
         conn.execute(sql_delete_idmap_mat())
         conn.execute(sql_insert_idmap_mat())
+        conn.execute(sql_delete_idmap_meta())
+        conn.execute(sql_insert_idmap_meta(), [checksum])
         refreshed = True
 
     row = conn.execute(sql_count(TABLE_FAISS_IDMAP_MAT)).fetchone()
     rows = int(row[0]) if row and row[0] is not None else 0
-    conn.execute(sql_delete_idmap_meta())
-    conn.execute(sql_insert_idmap_meta(), [str(idmap_parquet), checksum, checksum, rows])
-    return IdMapMeta(
-        parquet_path=str(idmap_parquet), parquet_hash=checksum, row_count=rows, refreshed=refreshed
-    )
+    return IdMapMeta(checksum=checksum, rows=rows, refreshed=refreshed)
 
 
 @dataclass(slots=True)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+from collections.abc import Iterator
 from types import ModuleType
 
 import pytest
@@ -12,7 +13,7 @@ from tests._helpers import assertions
 
 
 @pytest.fixture(autouse=True)
-def _restore_numpy_module() -> None:
+def _restore_numpy_module() -> Iterator[None]:
     """Restore the original ``numpy`` module after each test."""
     original = sys.modules.get("numpy")
     try:

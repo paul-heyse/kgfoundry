@@ -121,7 +121,7 @@ def test_materialize_and_refresh(tmp_path: Path) -> None:
         checksum = _parquet_checksum(idmap_path)
         meta = refresh_faiss_idmap_materialized(
             conn,
-            idmap_parquet=idmap_path,
+            _idmap_parquet=idmap_path,
             checksum=checksum,
         )
         assertions.expect_equal(meta.rows, 1)
@@ -129,7 +129,7 @@ def test_materialize_and_refresh(tmp_path: Path) -> None:
 
         second = refresh_faiss_idmap_materialized(
             conn,
-            idmap_parquet=idmap_path,
+            _idmap_parquet=idmap_path,
             checksum=checksum,
         )
         assertions.expect_false(second.refreshed)

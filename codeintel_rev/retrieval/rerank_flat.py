@@ -552,6 +552,15 @@ class FlatReranker:
     """Rerank ANN candidates using exact similarities from DuckDB embeddings."""
 
     def __init__(self, catalog: DuckDBCatalog, *, metric: str = "ip") -> None:
+        """Initialize flat reranker.
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog
+            DuckDB catalog for querying exact embeddings.
+        metric : str, optional
+            Similarity metric: "ip" (inner product) or "cosine" (default: "ip").
+        """
         self._catalog = catalog
         self._metric = metric
 
