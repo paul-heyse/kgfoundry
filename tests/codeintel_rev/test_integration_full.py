@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 from kgfoundry_common.errors import ConfigurationError
 from tests._helpers import assertions
 from tests._helpers.http import RepoAppHandle, build_test_app
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_settings_for_repo, scaffold_repo_root
 from tests.conftest import HAS_FAISS_SUPPORT
 
 
@@ -50,11 +50,11 @@ def test_repo(tmp_path: Path) -> RepoHandle:
         Handle exposing repo root, context, and FastAPI application.
     """
     repo_root = tmp_path / "repo"
-    repo_root.mkdir()
+    scaffold_repo_root(repo_root)
     data_dir = repo_root / "data"
-    data_dir.mkdir()
-    (data_dir / "vectors").mkdir()
-    (data_dir / "faiss").mkdir()
+    data_dir.mkdir(exist_ok=True)
+    (data_dir / "vectors").mkdir(exist_ok=True)
+    (data_dir / "faiss").mkdir(exist_ok=True)
     (data_dir / "faiss" / "code.ivfpq.faiss").touch()
     (data_dir / "catalog.duckdb").touch()
     (repo_root / "test.py").write_text('print("hello world")\n')

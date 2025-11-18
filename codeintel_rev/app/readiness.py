@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -22,6 +23,11 @@ __all__ = [
     "raise_on_errors",
     "validate_paths",
 ]
+
+FAISS_INDEX_SOURCE_ENV = "CODEINTEL_FAISS_INDEX_SOURCE"
+FAISS_IDMAP_SOURCE_ENV = "CODEINTEL_FAISS_IDMAP_SOURCE"
+DUCKDB_CATALOG_SOURCE_ENV = "CODEINTEL_DUCKDB_SOURCE"
+STUB_NOTICE = "# Auto-generated stub by readiness bootstrap.\n"
 
 
 @dataclass(slots=True)
@@ -201,19 +207,146 @@ def validate_paths(paths: ResolvedPaths) -> list[ProbeResult]:
     -------
     list[ProbeResult]
         Collected probe results for logging and readiness reporting.
+
+    Notes
+    -----
+    Critical roots (``repo_root`` and ``config_dir``) are probed before any
+    bootstrapping. When either path is missing or inaccessible the error is
+    reported immediately and no directories are created implicitly. For all
+    other assets we probe first to capture the failure signal, then create
+    stub directories/files so the next execution has the necessary structure.
     """
-    results: list[ProbeResult] = [
-        check_directory(paths.repo_root),
+    results: list[ProbeResult] = []
+
+    repo_probe = check_directory(paths.repo_root)
+    if repo_probe.status == "error" and repo_probe.message == "directory missing":
+        repo_probe = _err(paths.repo_root, "Repository root does not exist")
+    preflight = [
+        repo_probe,
         check_directory(paths.config_dir, writable=False),
-        check_file(paths.config_file),
-        check_directory(paths.data_dir),
-        check_directory(paths.vectors_dir),
-        check_directory(paths.logs_dir, writable=True),
-        check_directory(paths.cache_dir),
-        check_directory(paths.tmp_dir),
-        check_directory(paths.plugins_dir, writable=False),
     ]
+    results.extend(preflight)
+    if any(probe.status == "error" for probe in preflight):
+        return results
+
+    results.extend(
+        [
+            check_file(paths.config_file),
+            check_directory(paths.data_dir),
+            check_directory(paths.vectors_dir),
+            check_directory(paths.logs_dir, writable=True),
+            check_directory(paths.cache_dir),
+            check_directory(paths.tmp_dir),
+            check_directory(paths.plugins_dir, writable=False),
+        ]
+    )
+    _bootstrap_paths(paths)
     return results
+
+
+def _bootstrap_paths(paths: ResolvedPaths) -> None:
+    """Ensure key directories/files exist with stubs until production assets arrive."""
+    directories = {
+        paths.repo_root,
+        paths.config_dir,
+        paths.data_dir,
+        paths.vectors_dir,
+        paths.lucene_dir,
+        paths.splade_dir,
+        paths.logs_dir,
+        paths.cache_dir,
+        paths.tmp_dir,
+        paths.plugins_dir,
+    }
+    for directory in directories:
+        _ensure_directory_stub(directory)
+
+    _ensure_text_stub(
+        paths.config_file,
+        STUB_NOTICE + "# Replace with real configuration content or set CODEINTEL_CONFIG_FILE.\n",
+    )
+
+    _ensure_file_with_pivot(
+        paths.faiss_index,
+        env_var=FAISS_INDEX_SOURCE_ENV,
+        stub_payload=b"FAISS index stub - replace with production artifact.\n",
+    )
+    _ensure_file_with_pivot(
+        paths.faiss_idmap_path,
+        env_var=FAISS_IDMAP_SOURCE_ENV,
+        stub_payload=b"faiss_row,external_id\n0,-1\n",
+    )
+    _ensure_file_with_pivot(
+        paths.duckdb_path,
+        env_var=DUCKDB_CATALOG_SOURCE_ENV,
+        stub_payload=b"",
+    )
+
+
+def _ensure_directory_stub(path: Path) -> None:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        msg = f"Unable to create directory '{path}': {exc.strerror or exc}"
+        raise ReadinessError(msg) from exc
+    marker = path / ".stub"
+    if marker.exists():
+        return
+    try:
+        marker.write_text(
+            STUB_NOTICE + "# Remove when replacing with real assets.\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        msg = f"Unable to write stub marker '{marker}': {exc.strerror or exc}"
+        raise ReadinessError(msg) from exc
+
+
+def _ensure_text_stub(path: Path, payload: str) -> None:
+    if path.exists():
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(payload, encoding="utf-8")
+    except OSError as exc:
+        msg = f"Unable to create text stub '{path}': {exc.strerror or exc}"
+        raise ReadinessError(msg) from exc
+
+
+def _ensure_file_with_pivot(path: Path, *, env_var: str, stub_payload: bytes) -> None:
+    if _pivot_from_env(path, env_var):
+        return
+    if path.exists():
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(stub_payload)
+    except OSError as exc:
+        msg = f"Unable to create stub file '{path}': {exc.strerror or exc}"
+        raise ReadinessError(msg) from exc
+
+
+def _pivot_from_env(target: Path, env_var: str) -> bool:
+    source_value = os.getenv(env_var)
+    if not source_value:
+        return False
+    source = Path(source_value).expanduser()
+    if not source.exists():
+        return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        return True
+    try:
+        if source.is_dir():
+            Path(target).symlink_to(source, target_is_directory=True)
+        else:
+            Path(target).symlink_to(source)
+    except OSError:
+        if source.is_dir():
+            shutil.copytree(source, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(source, target)
+    return True
 
 
 def raise_on_errors(results: Iterable[ProbeResult]) -> None:

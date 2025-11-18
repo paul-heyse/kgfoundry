@@ -4,10 +4,21 @@ from __future__ import annotations
 
 import importlib
 from types import ModuleType
+from typing import TYPE_CHECKING
 
 import typer
 
-from codeintel_rev.cli import enrich_analytics, enrich_overlays, enrich_pipeline
+_LAZY_EXPORTS = {
+    "enrich_analytics": "codeintel_rev.cli.enrich_analytics",
+    "enrich_overlays": "codeintel_rev.cli.enrich_overlays",
+    "enrich_pipeline": "codeintel_rev.cli.enrich_pipeline",
+}
+
+
+if TYPE_CHECKING:
+    enrich_analytics: ModuleType
+    enrich_overlays: ModuleType
+    enrich_pipeline: ModuleType
 
 app = typer.Typer(
     help="CodeIntel operational commands.",
@@ -38,6 +49,46 @@ def _load_cli_module(path: str) -> ModuleType:
         return the cached module instance.
     """
     return importlib.import_module(path)
+
+
+def __getattr__(name: str) -> ModuleType:
+    """Lazily import CLI helper modules on first access.
+
+    This keeps ``python -m codeintel_rev.cli.<module>`` invocations import-clean
+    by avoiding eager submodule imports during package initialization.
+
+    Parameters
+    ----------
+    name :
+        Export requested via attribute access or ``from codeintel_rev.cli import``.
+
+    Returns
+    -------
+    ModuleType
+        The imported submodule referenced by ``name``.
+
+    Raises
+    ------
+    AttributeError
+        If the requested attribute is not a lazily-exported CLI module.
+    """
+    if name in _LAZY_EXPORTS:
+        module = importlib.import_module(_LAZY_EXPORTS[name])
+        globals()[name] = module
+        return module
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)
+
+
+def __dir__() -> list[str]:
+    """Return module attributes including lazily exported submodules.
+
+    Returns
+    -------
+    list[str]
+        Sorted attribute names available on this module.
+    """
+    return sorted({*globals(), *_LAZY_EXPORTS})
 
 
 bm25_cli = _load_cli_module("codeintel_rev.cli.bm25")

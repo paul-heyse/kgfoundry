@@ -29,6 +29,7 @@ from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.xtr_manager import XTRIndex
+from kgfoundry_common.errors import ConfigurationError
 
 APP = typer.Typer(add_completion=False, no_args_is_help=True)
 PROBLEM_INSTANCE = "/ops/runtime/xtr-open"
@@ -158,7 +159,14 @@ def xtr_open(
     context = _cli_context()
     settings = context.settings_factory()
     paths = context.paths_resolver(settings)
-    fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
+    try:
+        fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
+    except ConfigurationError as exc:
+        _exit_with_problem(
+            "Invalid repository configuration",
+            detail=str(exc),
+            cause=exc,
+        )
     xtr_root = root or paths.xtr_dir
     if root is not None and not root.is_dir():
         _exit_with_problem(

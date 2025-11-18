@@ -61,17 +61,13 @@ from codeintel_rev.io.faiss_store import (
     save_secondary_index as store_save_secondary,
 )
 from codeintel_rev.retrieval.types import SearchHit
-from codeintel_rev.typing import NDArrayF32, NDArrayI64
+from codeintel_rev.typing import FaissIndex, NDArrayF32, NDArrayI64
 from kgfoundry_common.errors import VectorSearchError
 
 if TYPE_CHECKING:
-    import faiss as _faiss
     import numpy as np
-
-    FaissIndex = _faiss.Index
 else:
     np = cast("Any", LazyModule("numpy", "FAISS manager vector operations"))
-    FaissIndex = object
 
 _SEARCH_RESULT_DIM = 2
 
@@ -547,10 +543,10 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         self.autotune_on_start = opts.autotune_on_start
         self.enable_range_search = opts.enable_range_search
         self.semantic_min_score = opts.semantic_min_score
-        self.cpu_index: _faiss.Index | None = None
+        self.cpu_index: FaissIndex | None = None
 
         # Secondary index for incremental updates (dual-index architecture)
-        self.secondary_index: _faiss.Index | None = None
+        self.secondary_index: FaissIndex | None = None
         self.incremental_ids: set[int] = set()
         self.tuned_parameters: dict[str, float | str] | None = None
         self._last_latency_ms: float | None = None
@@ -920,7 +916,7 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         return lambda id_val: int(id_val) in existing_ids
 
     @staticmethod
-    def _build_existing_ids_set(cpu_index: _faiss.Index, id_map_obj: object) -> set[int]:
+    def _build_existing_ids_set(cpu_index: FaissIndex, id_map_obj: object) -> set[int]:
         """Build a set of all existing chunk IDs from the FAISS index.
 
         This helper method extracts all chunk IDs stored in the FAISS index by
@@ -931,7 +927,7 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
 
         Parameters
         ----------
-        cpu_index : _faiss.Index
+        cpu_index : FaissIndex
             FAISS CPU index to extract IDs from. Must have an ntotal attribute
             indicating the number of vectors in the index.
         id_map_obj : object
@@ -1203,7 +1199,11 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
             Number of ID rows exported.
         """
         cpu_index = self._require_cpu_index()
-        return export_idmap_parquet(cpu_index, out_path)
+        return export_idmap_parquet(
+            cpu_index,
+            out_path,
+            index_name=self.index_path.name,
+        )
 
     def get_idmap_array(self) -> NDArrayI64:
         """Return the mapping from FAISS row IDs to external chunk IDs.
@@ -1710,12 +1710,12 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         # Search secondary index (flat, no nprobe needed)
         return _run_index_search(self.secondary_index, query_norm, k)
 
-    def _primary_index_impl(self) -> _faiss.Index:
+    def _primary_index_impl(self) -> FaissIndex:
         """Return the underlying FAISS index implementation for primary CPU index.
 
         Returns
         -------
-        _faiss.Index
+        FaissIndex
             Downcast FAISS index representing the current primary structure.
         """
         cpu_index = self._require_cpu_index()
@@ -1853,7 +1853,7 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         self.secondary_index = None
         self.incremental_ids.clear()
 
-    def _extract_all_vectors(self, index: _faiss.Index) -> tuple[NDArrayF32, NDArrayI64]:
+    def _extract_all_vectors(self, index: FaissIndex) -> tuple[NDArrayF32, NDArrayI64]:
         """Extract all vectors and IDs from a FAISS index.
 
         Reconstructs vectors from the index and retrieves their associated IDs.
@@ -1862,7 +1862,7 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
 
         Parameters
         ----------
-        index : _faiss.Index
+        index : FaissIndex
             FAISS index to extract vectors from. Must support `reconstruct()` and
             have an `id_map` attribute (IndexIDMap2 wrapper).
 
@@ -1919,12 +1919,12 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
 
         return vectors, ids
 
-    def _require_cpu_index(self) -> _faiss.Index:
+    def _require_cpu_index(self) -> FaissIndex:
         """Return the CPU index if initialized.
 
         Returns
         -------
-        _faiss.Index
+        FaissIndex
             Initialized CPU FAISS index.
 
         Raises
@@ -1937,12 +1937,12 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
             raise VectorIndexStateError(msg, context={"index_path": str(self.index_path)})
         return self.cpu_index
 
-    def require_cpu_index(self) -> _faiss.Index:
+    def require_cpu_index(self) -> FaissIndex:
         """Return the CPU FAISS index via the public interface.
 
         Returns
         -------
-        _faiss.Index
+        FaissIndex
             Initialized CPU FAISS index.
         """
         return self._require_cpu_index()
@@ -2098,9 +2098,7 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_adaptive_index(
-        self, vectors: NDArrayF32, n_vectors: int
-    ) -> tuple[_faiss.Index, str]:
+    def _build_adaptive_index(self, vectors: NDArrayF32, n_vectors: int) -> tuple[FaissIndex, str]:
         """Construct an index structure using heuristics for corpus size.
 
         Parameters
@@ -2116,7 +2114,7 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
 
         Returns
         -------
-        tuple[_faiss.Index, str]
+        tuple[FaissIndex, str]
             Trained FAISS index and a descriptive factory label ("Flat", "IVFFlat",
             or "IVFPQ"). The index is ready for search after training completes.
 
@@ -2243,7 +2241,7 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
 
     def _record_factory_choice(
         self,
-        index: _faiss.Index,
+        index: FaissIndex,
         label: str | None = None,
         parameter_space: str | None = None,
         vector_count: int | None = None,
@@ -2258,7 +2256,7 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
 
         Parameters
         ----------
-        index : _faiss.Index
+        index : FaissIndex
             FAISS index object that was built or loaded. Used to extract the
             index type name if label is not provided. The index must be
             initialized (ntotal >= 0).
@@ -2939,17 +2937,17 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         return self._search_primary(queries, k, self.default_nprobe)
 
     @staticmethod
-    def _downcast_index(index: _faiss.Index) -> _faiss.Index:
+    def _downcast_index(index: FaissIndex) -> FaissIndex:
         """Return a concrete FAISS index implementation when possible.
 
         Parameters
         ----------
-        index : _faiss.Index
+        index : FaissIndex
             FAISS index handle, which may be a base Index type or wrapper.
 
         Returns
         -------
-        _faiss.Index
+        FaissIndex
             Downcast index when supported (e.g., IndexIVFFlat from Index),
             otherwise the provided handle unchanged.
 
@@ -2965,12 +2963,12 @@ class FAISSManager:  # noqa: PLR0904 - manager orchestrates many subsystems
         except (AttributeError, RuntimeError):
             return index
 
-    def active_index(self) -> _faiss.Index:
+    def active_index(self) -> FaissIndex:
         """Return the active CPU search index.
 
         Returns
         -------
-        _faiss.Index
+        FaissIndex
             The CPU index ready for search.
 
         Raises
@@ -3105,7 +3103,7 @@ def _coerce_to_int(value: object, default: int = -1) -> int:
     return default
 
 
-def _configure_direct_map(index: _faiss.Index) -> None:
+def _configure_direct_map(index: FaissIndex) -> None:
     """Ensure FAISS direct maps are array-backed for reconstruction."""
     _set_direct_map_type(index)
     base_index = getattr(index, "index", None)
@@ -3113,7 +3111,7 @@ def _configure_direct_map(index: _faiss.Index) -> None:
         _set_direct_map_type(base_index)
 
 
-def _set_direct_map_type(index: _faiss.Index) -> None:
+def _set_direct_map_type(index: FaissIndex) -> None:
     """Enable direct map support on FAISS indexes when available.
 
     This function attempts to enable direct map support on FAISS indexes that
@@ -3125,7 +3123,7 @@ def _set_direct_map_type(index: _faiss.Index) -> None:
 
     Parameters
     ----------
-    index : _faiss.Index
+    index : FaissIndex
         FAISS index object to enable direct map support on. May be a base Index
         type or wrapper (IndexIDMap2, etc.). The function attempts to downcast
         to concrete types to access index-specific methods.

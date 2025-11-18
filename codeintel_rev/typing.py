@@ -30,6 +30,7 @@ else:  # pragma: no cover
 
 __all__ = [
     "HEAVY_DEPS",
+    "FaissIndex",
     "FaissModule",
     "NDArrayAny",
     "NDArrayF32",
@@ -289,9 +290,210 @@ class TorchModule(Protocol):
 
 
 class FaissIndex(Protocol):
-    """Minimal FAISS index surface used in diagnostics."""
+    """Subset of ``faiss.Index`` methods used across kgfoundry."""
 
     ntotal: int
+    d: int
+    nprobe: int
+    is_trained: bool
+
+    def add(self, vectors: NDArrayF32) -> None:
+        """Add normalized vectors to the index.
+
+        Extended Summary
+        ----------------
+        Appends a batch of normalized vectors to the FAISS index. Vectors must
+        be L2-normalized (unit length) for inner product metrics or properly
+        scaled for L2 distance metrics. This is the primary method for populating
+        an index with vectors for subsequent similarity search operations.
+
+        Parameters
+        ----------
+        vectors : NDArrayF32
+            Array of shape (n_vectors, d) where n_vectors is the number of vectors
+            to add and d matches the index dimension. Vectors must be normalized
+            according to the index metric (L2-normalized for inner product).
+
+        Notes
+        -----
+        The index must be trained (for IVF/PQ families) before adding vectors.
+        Time complexity: O(n_vectors * d) for flat indexes, varies for approximate
+        indexes. This operation modifies the index in-place and increments ntotal.
+        """
+        ...
+
+    def add_with_ids(self, vectors: NDArrayF32, ids: NDArrayI64) -> None:
+        """Add vectors with explicit identifiers.
+
+        Extended Summary
+        ----------------
+        Appends vectors to the index with user-specified integer identifiers.
+        Used when you need to maintain a mapping between vectors and external
+        identifiers (e.g., document IDs, row indices). The IDs must be unique
+        and non-negative.
+
+        Parameters
+        ----------
+        vectors : NDArrayF32
+            Array of shape (n_vectors, d) containing normalized vectors to add.
+        ids : NDArrayI64
+            Array of shape (n_vectors,) containing integer identifiers for each
+            vector. Must be unique and non-negative. Length must match n_vectors.
+
+        Notes
+        -----
+        This method is required when using IDMap wrappers or when you need to
+        preserve external identifiers. Time complexity matches add() plus ID
+        mapping overhead. IDs are stored internally and returned in search results.
+        """
+        ...
+
+    def train(self, vectors: NDArrayF32) -> None:
+        """Train the index when required (IVF/PQ families).
+
+        Extended Summary
+        ----------------
+        Trains the index on a representative sample of vectors. Required for
+        approximate indexes that use clustering (IVF) or quantization (PQ).
+        Training learns the index structure (cluster centroids, codebooks) from
+        the provided vectors. Must be called before add() for trainable indexes.
+
+        Parameters
+        ----------
+        vectors : NDArrayF32
+            Training vectors of shape (n_train, d) where n_train should be
+            sufficient for the index type (typically >= nlist for IVF indexes).
+            The d dimension must match the index dimension.
+
+        Notes
+        -----
+        Training is a one-time operation that must complete before adding vectors.
+        Time complexity: O(n_train * d * iterations) for clustering-based methods.
+        After training, is_trained becomes True. Flat indexes (IndexFlat*) do not
+        require training and this method is a no-op.
+        """
+        ...
+
+    def search(self, vectors: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
+        """Search the index for ``k`` nearest neighbors.
+
+        Extended Summary
+        ----------------
+        Performs approximate nearest neighbor search for a batch of query vectors.
+        Returns the k closest vectors in the index along with their distances and
+        identifiers. This is the core retrieval operation used for similarity search
+        and vector database queries.
+
+        Parameters
+        ----------
+        vectors : NDArrayF32
+            Query vectors of shape (n_queries, d) where n_queries is the number
+            of queries and d matches the index dimension. Vectors should be
+            normalized according to the index metric.
+        k : int
+            Number of nearest neighbors to retrieve per query. Must be positive
+            and not exceed ntotal. Larger k values improve recall but increase
+            computation time.
+
+        Returns
+        -------
+        tuple[NDArrayF32, NDArrayI64]
+            Tuple of (distances, indices) where:
+            - distances: Array of shape (n_queries, k) containing similarity scores
+              or distances (higher is better for inner product, lower is better
+              for L2 distance).
+            - indices: Array of shape (n_queries, k) containing the indices of
+              the k nearest neighbors in the index (or external IDs if IDMap is used).
+
+        Notes
+        -----
+        Search performance depends on index type and nprobe parameter (for IVF
+        indexes). Time complexity: O(n_queries * k * d) for flat indexes,
+        O(n_queries * nprobe * d) for IVF indexes. Results are sorted by distance
+        (descending for inner product, ascending for L2).
+        """
+        ...
+
+    def reconstruct(self, idx: int) -> NDArrayAny:
+        """Reconstruct a vector stored in the index by identifier."""
+        ...
+
+    def make_direct_map(self) -> None:
+        """Enable FAISS direct-map support when available.
+
+        Extended Summary
+        ----------------
+        Enables direct access to stored vectors by their index positions. This
+        allows reconstructing vectors from their compressed representations
+        (e.g., PQ codes) without requiring a separate storage backend. Useful
+        for applications that need to retrieve the original vectors after search.
+
+        Notes
+        -----
+        Direct map support is only available for certain index types (e.g., IndexIVF
+        with direct_map enabled). Enabling direct maps increases memory usage but
+        enables fast vector reconstruction. This operation modifies the index
+        structure and may require re-adding vectors depending on the index type.
+        """
+        ...
+
+
+class FaissParameterSpace(Protocol):
+    """Runtime tuning surface exposed by ``faiss.ParameterSpace``."""
+
+    def initialize(self, index: FaissIndex) -> None:
+        """Initialize the parameter space for the provided index.
+
+        Extended Summary
+        ----------------
+        Prepares the parameter space object for runtime tuning of the given index.
+        This must be called before set_index_parameters() to establish the mapping
+        between parameter names and index internals. Used for optimizing search
+        performance (e.g., adjusting nprobe for IVF indexes).
+
+        Parameters
+        ----------
+        index : FaissIndex
+            FAISS index instance to initialize parameter space for. The index
+            must be trained and populated before parameter tuning.
+
+        Notes
+        -----
+        Initialization analyzes the index structure to determine which parameters
+        can be tuned at runtime. This is a lightweight operation that prepares
+        the parameter space for subsequent tuning calls.
+        """
+        ...
+
+    def set_index_parameters(self, index: FaissIndex, params: str) -> None:
+        """Apply parameter overrides (``nprobe=64``) to ``index``.
+
+        Extended Summary
+        ----------------
+        Dynamically adjusts runtime parameters of a FAISS index to optimize
+        search performance. Common parameters include nprobe (number of clusters
+        to search in IVF indexes) which trades off search speed vs. recall.
+        Parameters are specified as a string in key=value format.
+
+        Parameters
+        ----------
+        index : FaissIndex
+            FAISS index instance to modify. Must have been initialized via
+            initialize() before calling this method.
+        params : str
+            Parameter string in key=value format, e.g., "nprobe=64". Multiple
+            parameters can be specified separated by commas. Valid parameters
+            depend on the index type.
+
+        Notes
+        -----
+        Parameter changes take effect immediately for subsequent search() calls.
+        This allows runtime tuning without rebuilding the index. Common use case:
+        increase nprobe for higher recall at the cost of slower search. Time
+        complexity: O(1) for parameter updates, but affects subsequent search
+        performance.
+        """
+        ...
 
 
 class FaissModule(Protocol):
@@ -301,9 +503,32 @@ class FaissModule(Protocol):
     METRIC_L2: int
     IndexFlatIP: Callable[[int], FaissIndex]
     IndexIDMap2: Callable[[FaissIndex], FaissIndex]
+    IndexIVFFlat: Callable[[FaissIndex, int, int, int], FaissIndex]
 
     def normalize_l2(self, vectors: NDArrayF32) -> None:
-        """Normalize vectors using L2 norm in-place."""
+        """Normalize vectors using L2 norm in-place.
+
+        Extended Summary
+        ----------------
+        Normalizes vectors to unit length (L2 norm = 1) by dividing each vector
+        by its Euclidean norm. This is required before adding vectors to indexes
+        that use inner product metric, as inner product on normalized vectors
+        is equivalent to cosine similarity.
+
+        Parameters
+        ----------
+        vectors : NDArrayF32
+            Array of shape (n_vectors, d) containing vectors to normalize.
+            Modified in-place. Zero vectors remain unchanged (division by zero
+            is avoided).
+
+        Notes
+        -----
+        Normalization is performed in-place, modifying the input array. Time
+        complexity: O(n_vectors * d). This operation is idempotent (normalizing
+        already-normalized vectors has no effect). Required for IndexFlatIP and
+        other inner product indexes.
+        """
         ...
 
     def __getattr__(self, name: Literal["normalize_L2"]) -> Callable[[NDArrayF32], None]:
@@ -311,15 +536,103 @@ class FaissModule(Protocol):
         ...
 
     def index_factory(self, dimension: int, factory: str, metric: int) -> FaissIndex:
-        """Build an index via factory string."""
+        """Build an index via factory string.
+
+        Extended Summary
+        ----------------
+        Creates a FAISS index from a factory string specification. Factory strings
+        provide a concise way to specify index types and parameters (e.g.,
+        "IVF1024,Flat" for IVF index with 1024 clusters). This is the preferred
+        method for creating indexes as it's more flexible than individual constructors.
+
+        Parameters
+        ----------
+        dimension : int
+            Vector dimension (d). All vectors added to the index must have this
+            dimension. Must be positive.
+        factory : str
+            Factory string specifying index type and parameters. Examples:
+            "Flat" (exact search), "IVF1024,Flat" (IVF with 1024 clusters),
+            "IVF1024,PQ64" (IVF with PQ quantization). See FAISS documentation
+            for full syntax.
+        metric : int
+            Distance metric constant. Use METRIC_INNER_PRODUCT for cosine similarity
+            (requires normalized vectors) or METRIC_L2 for Euclidean distance.
+
+        Returns
+        -------
+        FaissIndex
+            Newly created FAISS index instance matching the factory specification.
+            The index is untrained and empty (ntotal=0). Call train() and add()
+            to populate it.
+
+        Notes
+        -----
+        Factory strings provide a declarative way to specify index configurations.
+        Time complexity: O(1) for index creation (training and adding vectors
+        are separate operations). The factory string is parsed to determine the
+        appropriate index type and parameters.
+        """
         ...
 
     def write_index(self, index: FaissIndex, path: str | PathLike[str]) -> None:
-        """Persist an index to disk."""
+        """Persist an index to disk.
+
+        Extended Summary
+        ----------------
+        Serializes a FAISS index to a file on disk. This allows saving trained
+        and populated indexes for later use without rebuilding. The index can
+        be loaded later using read_index(). Useful for production deployments
+        where indexes are built once and reused.
+
+        Parameters
+        ----------
+        index : FaissIndex
+            FAISS index instance to serialize. The index can be trained or untrained,
+            populated or empty.
+        path : str | PathLike[str]
+            File path where the index will be written. The file format is FAISS-specific
+            binary format. Existing files are overwritten.
+
+        Notes
+        -----
+        Serialization includes the index structure, trained parameters (if applicable),
+        and all stored vectors. File size depends on index type and ntotal. Time
+        complexity: O(ntotal * d) for writing vectors. This operation performs
+        file I/O and may take time for large indexes.
+        """
         ...
 
     def read_index(self, path: str | PathLike[str]) -> FaissIndex:
-        """Load an index from disk."""
+        """Load an index from disk.
+
+        Extended Summary
+        ----------------
+        Deserializes a FAISS index from a file previously written with write_index().
+        This allows loading pre-built indexes without retraining or re-adding vectors.
+        The loaded index is ready for search operations (if it was populated when saved).
+
+        Parameters
+        ----------
+        path : str | PathLike[str]
+            File path to the serialized FAISS index file. The file must exist
+            and be a valid FAISS index format.
+
+        Returns
+        -------
+        FaissIndex
+            Loaded FAISS index instance. The index retains its trained state and
+            all stored vectors (ntotal matches the saved value). Ready for search()
+            operations if vectors were present when saved.
+
+        Notes
+        -----
+        Loading restores the complete index state including structure, trained
+        parameters, and vectors. Time complexity: O(file_size) for I/O plus
+        O(ntotal * d) for deserializing vectors. This operation performs file I/O
+        and may take time for large indexes. Raises IOError if the file doesn't
+        exist or is corrupted.
+        """
         ...
 
 

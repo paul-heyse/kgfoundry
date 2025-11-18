@@ -10,19 +10,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Literal, cast
 
 import numpy as np
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    import faiss as _faiss_module
-
-    FaissIndex = _faiss_module.Index
-else:  # pragma: no cover - runtime fallback
-    FaissIndex = Any
+from codeintel_rev.typing import FaissIndex, FaissModule, NDArrayF32, NDArrayI64, gate_import
 
 _faiss = LazyModule("faiss", "FAISS builder operations")
 
@@ -158,8 +151,26 @@ def _factory_string_for(family: str, cfg: IndexBuildConfig) -> str:
     return "Flat"
 
 
+def _resolve_faiss_module() -> FaissModule:
+    """Return the lazily imported FAISS module as a typed Protocol.
+
+    Extended Summary
+    ----------------
+    Resolves the FAISS module via lazy import and casts it to the FaissModule
+    Protocol type. This provides type-safe access to FAISS operations while
+    deferring the actual import until needed.
+
+    Returns
+    -------
+    FaissModule
+        FAISS module instance conforming to the FaissModule Protocol interface.
+        The module is lazily imported on first access.
+    """
+    return cast("FaissModule", _faiss.module())
+
+
 def _build_adaptive_index(
-    faiss_mod: Any,
+    faiss_mod: FaissModule,
     vectors: NDArrayF32,
     cfg: IndexBuildConfig,
 ) -> tuple[FaissIndex, str]:
@@ -167,8 +178,8 @@ def _build_adaptive_index(
 
     Parameters
     ----------
-    faiss_mod : object
-        Resolved FAISS module.
+    faiss_mod : FaissModule
+        Resolved FAISS module implementing the builder operations.
     vectors : NDArrayF32
         Training vectors used for clustering.
     cfg : IndexBuildConfig
@@ -176,7 +187,7 @@ def _build_adaptive_index(
 
     Returns
     -------
-    tuple[object, str]
+    tuple[FaissIndex, str]
         Trained FAISS index and label describing the selected family.
     """
     n_vectors = len(vectors)
@@ -220,7 +231,7 @@ def build_primary_index(
 
     Returns
     -------
-    tuple[object, str]
+    tuple[FaissIndex, str]
         ID-mapped FAISS index and the descriptive factory label.
 
     Raises
@@ -229,7 +240,7 @@ def build_primary_index(
         If the provided vectors do not match ``cfg.vec_dim``.
     """
     gate_import("faiss", "Building FAISS indexes")
-    faiss_mod = _faiss.module()
+    faiss_mod = _resolve_faiss_module()
     normalized = _l2_normalize(vectors)
     _, dims = normalized.shape
     if dims != cfg.vec_dim:
@@ -256,7 +267,7 @@ def add_vectors(index: FaissIndex, vectors: NDArrayF32, ids: NDArrayI64) -> None
 
     Parameters
     ----------
-    index : object
+    index : FaissIndex
         Target FAISS index.
     vectors : NDArrayF32
         Vectors to add.
@@ -274,13 +285,13 @@ def save_index(index: FaissIndex, path: Path) -> None:
 
     Parameters
     ----------
-    index : object
+    index : FaissIndex
         Index to serialize.
     path : Path
         Destination path for persistence.
     """
     gate_import("faiss", "Saving FAISS index")
-    faiss_mod = _faiss.module()
+    faiss_mod = _resolve_faiss_module()
     path.parent.mkdir(parents=True, exist_ok=True)
     faiss_mod.write_index(index, str(path))
 
@@ -295,11 +306,11 @@ def load_index(path: Path) -> FaissIndex:
 
     Returns
     -------
-    object
+    FaissIndex
         Materialized FAISS index instance.
     """
     gate_import("faiss", "Loading FAISS index")
-    faiss_mod = _faiss.module()
+    faiss_mod = _resolve_faiss_module()
     return faiss_mod.read_index(str(path))
 
 
@@ -313,11 +324,11 @@ def create_secondary_index(vec_dim: int) -> FaissIndex:
 
     Returns
     -------
-    object
+    FaissIndex
         Newly constructed ``IndexIDMap2(IndexFlatIP)`` instance.
     """
     gate_import("faiss", "Creating FAISS secondary index")
-    faiss_mod = _faiss.module()
+    faiss_mod = _resolve_faiss_module()
     flat = faiss_mod.IndexFlatIP(vec_dim)
     wrapped = faiss_mod.IndexIDMap2(flat)
     _configure_direct_map(wrapped)

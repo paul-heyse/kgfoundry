@@ -87,4 +87,22 @@ def build_settings_for_repo(
     return msgspec.structs.replace(base, paths=paths, bm25=bm25, splade=splade, index=index_cfg)
 
 
-__all__ = ["build_settings_for_repo"]
+def scaffold_repo_root(repo_root: Path) -> None:
+    """Create the minimum filesystem layout expected by readiness checks."""
+    repo_root.mkdir(parents=True, exist_ok=True)
+    for relative in (
+        "config",
+        "data",
+        "data/vectors",
+        "logs",
+        ".cache",
+        ".tmp",
+        "plugins",
+    ):
+        (repo_root / relative).mkdir(parents=True, exist_ok=True)
+    config_file = repo_root / "config" / "config.yaml"
+    if not config_file.exists():
+        config_file.write_text("tests: true", encoding="utf-8")
+
+
+__all__ = ["build_settings_for_repo", "scaffold_repo_root"]

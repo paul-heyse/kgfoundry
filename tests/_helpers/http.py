@@ -20,7 +20,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_settings_for_repo, scaffold_repo_root
 
 
 def build_test_context(
@@ -43,7 +43,9 @@ def build_test_context(
     ApplicationContext
         Context instance ready for use with FastAPI/TestClient.
     """
-    settings = build_settings_for_repo(Path(repo_root))
+    repo_root = Path(repo_root)
+    scaffold_repo_root(repo_root)
+    settings = build_settings_for_repo(repo_root)
     return ApplicationContext.create(settings=settings, overrides=context_overrides)
 
 

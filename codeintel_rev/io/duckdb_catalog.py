@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -36,6 +37,7 @@ else:
     np = cast("np", LazyModule("numpy", "DuckDB catalog embeddings"))
 
 LOGGER = logging.getLogger(__name__)
+_PARQUET_MAGIC = b"PAR1"
 
 
 @dataclass(slots=True, frozen=True)
@@ -66,6 +68,28 @@ def _escape_identifier(expr: str) -> str:
         return str(escape_fn(expr))
     escaped = expr.replace('"', '""')
     return f'"{escaped}"'
+
+
+def _is_valid_parquet_file(path: Path) -> bool:
+    """Return ``True`` when ``path`` appears to contain a valid Parquet file.
+
+    Returns
+    -------
+    bool
+        ``True`` when both the header and footer contain the Parquet magic value.
+    """
+    try:
+        if path.stat().st_size < len(_PARQUET_MAGIC) * 2:
+            return False
+        with path.open("rb") as handle:
+            header = handle.read(len(_PARQUET_MAGIC))
+            if header != _PARQUET_MAGIC:
+                return False
+            handle.seek(-len(_PARQUET_MAGIC), os.SEEK_END)
+            footer = handle.read(len(_PARQUET_MAGIC))
+            return footer == _PARQUET_MAGIC
+    except (OSError, ValueError):
+        return False
 
 
 _EMPTY_CHUNKS_SELECT = """
@@ -851,11 +875,27 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - catalog exposes many 
     ) -> None:
         path = override_path or self._idmap_path
         if path.exists():
-            params = [str(path)]
-            self._log_query("SELECT faiss_row, external_id FROM read_parquet(?)", params)
-            relation = conn.sql("SELECT faiss_row, external_id FROM read_parquet(?)", params=params)
-            relation.create_view("faiss_idmap", replace=True)
-            return
+            if _is_valid_parquet_file(path):
+                params = [str(path)]
+                self._log_query("SELECT faiss_row, external_id FROM read_parquet(?)", params)
+                try:
+                    relation = conn.sql(
+                        "SELECT faiss_row, external_id FROM read_parquet(?)", params=params
+                    )
+                except duckdb.Error as exc:
+                    LOGGER.warning(
+                        "Unable to read FAISS id map parquet",
+                        extra={"path": str(path)},
+                        exc_info=exc,
+                    )
+                else:
+                    relation.create_view("faiss_idmap", replace=True)
+                    return
+            else:
+                LOGGER.warning(
+                    "Skipping FAISS id map stub because it is not a valid Parquet file",
+                    extra={"path": str(path)},
+                )
 
         if _relation_exists(conn, "faiss_idmap_mat"):
             columns = {

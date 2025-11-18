@@ -1,0 +1,114 @@
+"""Tests for FAISS runtime parameter application helpers."""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+from codeintel_rev.io import faiss_runtime
+
+from tests._helpers import assertions
+
+_PRIMARY_NPROBE = 64
+_PRIMARY_EF_SEARCH = 128
+_PRIMARY_QUANTIZER_EF = 256
+
+_SECONDARY_NPROBE = 32
+_SECONDARY_EF_SEARCH = 96
+_SECONDARY_QUANTIZER_EF = 11
+
+
+class _BaseStubIndex:
+    """Minimal stub satisfying :class:`FaissIndex` for unit tests."""
+
+    def __init__(self) -> None:
+        self.ntotal = 0
+        self.d = 0
+        self.nprobe = 1
+        self.is_trained = True
+
+    def add(self, vectors: object) -> None:  # pragma: no cover - interface stub
+        del vectors
+        self.ntotal += 0
+
+    def add_with_ids(self, vectors: object, ids: object) -> None:  # pragma: no cover
+        del vectors, ids
+        self.ntotal += 0
+
+    def train(self, vectors: object) -> None:  # pragma: no cover
+        del vectors
+        self.is_trained = True
+
+    def search(self, vectors: object, k: int) -> tuple[np.ndarray, np.ndarray]:  # pragma: no cover
+        del vectors, k
+        self.ntotal += 0
+        return (
+            np.empty((0, 0), dtype=np.float32),
+            np.empty((0, 0), dtype=np.int64),
+        )
+
+    def make_direct_map(self) -> None:  # pragma: no cover
+        self.ntotal += 0
+
+    def reconstruct(self, idx: int) -> np.ndarray:  # pragma: no cover
+        del idx
+        self.ntotal += 0
+        return np.empty((0, 0), dtype=np.float32)
+
+
+class _QuantizerStub(_BaseStubIndex):
+    def __init__(self) -> None:
+        super().__init__()
+        self.efSearch = 5
+
+
+class _HnswIndexStub(_BaseStubIndex):
+    def __init__(self) -> None:
+        super().__init__()
+        self.efSearch = 16
+        self.quantizer = _QuantizerStub()
+
+
+class _FlatIndexStub(_BaseStubIndex):
+    """Flat indexes lack HNSW and quantizer-specific attributes."""
+
+
+@pytest.fixture(autouse=True)
+def _skip_parameter_space(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Avoid touching real FAISS by patching parameter space helpers."""
+
+    def _no_parameter_space(*_args: object, **_kwargs: object) -> bool:
+        return False
+
+    def _fake_gate_import(*_args: object, **_kwargs: object) -> object:
+        return object()
+
+    monkeypatch.setattr(faiss_runtime, "gate_import", _fake_gate_import)
+    monkeypatch.setattr(faiss_runtime, "_set_parameter_space", _no_parameter_space)
+
+
+def test_apply_runtime_parameters_updates_all_supported_attributes() -> None:
+    """Runtime parameters fall back to attribute assignment when needed."""
+    index = _HnswIndexStub()
+    faiss_runtime.apply_runtime_parameters(
+        index,
+        nprobe=_PRIMARY_NPROBE,
+        ef_search=_PRIMARY_EF_SEARCH,
+        quantizer_ef_search=_PRIMARY_QUANTIZER_EF,
+    )
+    assertions.expect_equal(index.nprobe, _PRIMARY_NPROBE)
+    assertions.expect_equal(index.efSearch, _PRIMARY_EF_SEARCH)
+    assertions.expect_equal(index.quantizer.efSearch, _PRIMARY_QUANTIZER_EF)
+
+
+def test_apply_runtime_parameters_handles_missing_optional_attributes() -> None:
+    """Indexes lacking optional knobs still succeed when applying overrides."""
+    index = _FlatIndexStub()
+    faiss_runtime.apply_runtime_parameters(
+        index,
+        nprobe=_SECONDARY_NPROBE,
+        ef_search=_SECONDARY_EF_SEARCH,
+        quantizer_ef_search=_SECONDARY_QUANTIZER_EF,
+    )
+    assertions.expect_equal(index.nprobe, _SECONDARY_NPROBE)
+    assertions.expect_false(hasattr(index, "efSearch"))
+    assertions.expect_false(hasattr(index, "quantizer"))

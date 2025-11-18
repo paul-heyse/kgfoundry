@@ -4,22 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import cast
 
 import duckdb
 import numpy as np
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.duckdb_catalog import IdMapMeta, refresh_faiss_idmap_materialized
-from codeintel_rev.typing import NDArrayI64, gate_import
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    import faiss as _faiss_module
-
-    FaissIndex = _faiss_module.Index
-else:  # pragma: no cover - runtime fallback
-    FaissIndex = Any
+from codeintel_rev.typing import FaissIndex, NDArrayI64, gate_import
 
 _faiss = LazyModule("faiss", "FAISS store helpers")
 _pyarrow = LazyModule("pyarrow", "ID map export helpers")
@@ -83,7 +77,13 @@ def get_idmap_array(index: FaissIndex) -> NDArrayI64:
     raise TypeError(msg)
 
 
-def export_idmap_parquet(index: FaissIndex, out_path: Path) -> int:
+def export_idmap_parquet(
+    index: FaissIndex,
+    out_path: Path,
+    *,
+    index_name: str | None = None,
+    timestamp: datetime | None = None,
+) -> int:
     """Persist ``{faiss_row -> external_id}`` to Parquet for DuckDB sync.
 
     Parameters
@@ -92,6 +92,11 @@ def export_idmap_parquet(index: FaissIndex, out_path: Path) -> int:
         FAISS index to export from.
     out_path : Path
         Destination Parquet file.
+    index_name : str | None, optional
+        Logical name of the FAISS index that produced this mapping. Defaults to
+        ``out_path.name`` when not provided.
+    timestamp : datetime | None, optional
+        Timestamp applied to every exported row. Defaults to ``datetime.now(UTC)``.
 
     Returns
     -------
@@ -104,7 +109,19 @@ def export_idmap_parquet(index: FaissIndex, out_path: Path) -> int:
     ids = get_idmap_array(index)
     row_count = int(ids.shape[0])
     rows = np.arange(row_count, dtype=np.int64)
-    table = pa_mod.table({"faiss_row": pa_mod.array(rows), "external_id": pa_mod.array(ids)})
+    now = timestamp or datetime.now(UTC)
+    resolved_index_name = index_name or out_path.name
+    index_col = pa_mod.array([resolved_index_name] * row_count, type=pa_mod.string())
+    ts_type = pa_mod.timestamp("us", tz="UTC")
+    ts_col = pa_mod.array([now] * row_count, type=ts_type)
+    table = pa_mod.table(
+        {
+            "faiss_row": pa_mod.array(rows),
+            "external_id": pa_mod.array(ids),
+            "index_name": index_col,
+            "ts": ts_col,
+        }
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pq_mod.write_table(table, str(out_path))
     return int(table.num_rows)

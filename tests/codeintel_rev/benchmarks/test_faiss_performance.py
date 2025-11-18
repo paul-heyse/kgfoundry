@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.typing import FaissIndex
 
 from tests._helpers import assertions
 from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
@@ -48,7 +49,7 @@ else:
     pytestmark = [_benchmark_gate]
 
 
-def _get_underlying_index(cpu_index: faiss.Index | None) -> faiss.Index:
+def _get_underlying_index(cpu_index: FaissIndex | None) -> FaissIndex:
     """Return the underlying FAISS index from an ID map wrapper.
 
     Extended Summary

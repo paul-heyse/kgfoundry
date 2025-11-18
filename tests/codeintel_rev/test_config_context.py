@@ -127,7 +127,7 @@ def test_application_context_create_invalid_config() -> None:
     settings = build_settings_for_repo(Path("/nonexistent/path"))
 
     # Act & Assert
-    with pytest.raises(ConfigurationError, match="directory missing"):
+    with pytest.raises(ConfigurationError, match="Repository root does not exist"):
         ApplicationContext.create(settings=settings)
 
 

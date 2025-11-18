@@ -5,34 +5,51 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
-from types import SimpleNamespace
 from typing import cast
 
+import msgspec
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.ops.runtime.xtr_open import APP, XtrOpenContext
 from typer.testing import CliRunner
 
 from tests._helpers import assertions
+from tests._helpers.settings import build_settings_for_repo
 
 RUNNER = CliRunner(mix_stderr=False)
 
 
-class _PathsWrapper:
-    def __init__(self, root: Path) -> None:
-        self._root = root
+def _prepare_repo(repo_root: Path) -> None:
+    repo_root.mkdir(parents=True, exist_ok=True)
+    config_dir = repo_root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "config.yaml").write_text("tests: true", encoding="utf-8")
+    for relative in (
+        "data",
+        "data/vectors",
+        "logs",
+        ".cache",
+        ".tmp",
+        "plugins",
+    ):
+        (repo_root / relative).mkdir(parents=True, exist_ok=True)
 
-    @property
-    def xtr_dir(self) -> Path:
-        return self._root
 
-
-def _settings_factory(*, enabled: bool) -> Callable[[], Settings]:
-    settings_ns = SimpleNamespace(xtr=SimpleNamespace(enable=enabled, dtype="float32"))
-    settings = cast("Settings", settings_ns)
+def _settings_factory(
+    repo_root: Path,
+    *,
+    enabled: bool,
+    xtr_dir_override: Path | None = None,
+) -> Callable[[], Settings]:
+    settings = build_settings_for_repo(repo_root)
+    if xtr_dir_override is not None:
+        paths_cfg = msgspec.structs.replace(settings.paths, xtr_dir=str(xtr_dir_override))
+        settings = msgspec.structs.replace(settings, paths=paths_cfg)
+    xtr_cfg = msgspec.structs.replace(settings.xtr, enable=enabled)
+    configured = msgspec.structs.replace(settings, xtr=xtr_cfg)
 
     def _factory() -> Settings:
-        return settings
+        return configured
 
     return _factory
 
@@ -69,9 +86,10 @@ def test_xtr_open_disabled_feature(
     xtr_cli_context_builder: Callable[..., XtrOpenContext],
 ) -> None:
     """Verify XTR open returns ready=False when feature is disabled."""
+    repo_root = tmp_path / "repo"
+    _prepare_repo(repo_root)
     context = xtr_cli_context_builder(
-        settings_factory=_settings_factory(enabled=False),
-        paths_resolver=lambda _settings: _PathsWrapper(tmp_path),
+        settings_factory=_settings_factory(repo_root, enabled=False),
     )
     result = RUNNER.invoke(
         APP,
@@ -88,10 +106,15 @@ def test_xtr_open_missing_artifacts(
     xtr_cli_context_builder: Callable[..., XtrOpenContext],
 ) -> None:
     """Verify XTR open returns 503 when artifacts are missing."""
-    missing_root = tmp_path / "nope"
+    repo_root = tmp_path / "repo"
+    _prepare_repo(repo_root)
+    missing_root = repo_root / "missing"
     context = xtr_cli_context_builder(
-        settings_factory=_settings_factory(enabled=True),
-        paths_resolver=lambda _settings: _PathsWrapper(missing_root),
+        settings_factory=_settings_factory(
+            repo_root,
+            enabled=True,
+            xtr_dir_override=missing_root,
+        ),
     )
     result = RUNNER.invoke(
         APP,
@@ -109,11 +132,12 @@ def test_xtr_open_success(
     xtr_cli_context_builder: Callable[..., XtrOpenContext],
 ) -> None:
     """Verify XTR open succeeds when artifacts are present."""
-    root = tmp_path / "xtr"
-    root.mkdir()
+    repo_root = tmp_path / "repo"
+    _prepare_repo(repo_root)
+    root = repo_root / "data" / "xtr"
+    root.mkdir(parents=True, exist_ok=True)
     context = xtr_cli_context_builder(
-        settings_factory=_settings_factory(enabled=True),
-        paths_resolver=lambda _settings: _PathsWrapper(root),
+        settings_factory=_settings_factory(repo_root, enabled=True),
         index_factory=lambda *_args, **_kwargs: cast("XTRIndex", _ReadyIndex()),
     )
     result = RUNNER.invoke(
@@ -133,11 +157,12 @@ def test_xtr_open_reports_corruption(
     xtr_cli_context_builder: Callable[..., XtrOpenContext],
 ) -> None:
     """Verify XTR open reports corruption errors correctly."""
-    root = tmp_path / "xtr"
-    root.mkdir()
+    repo_root = tmp_path / "repo"
+    _prepare_repo(repo_root)
+    root = repo_root / "data" / "xtr"
+    root.mkdir(parents=True, exist_ok=True)
     context = xtr_cli_context_builder(
-        settings_factory=_settings_factory(enabled=True),
-        paths_resolver=lambda _settings: _PathsWrapper(root),
+        settings_factory=_settings_factory(repo_root, enabled=True),
         index_factory=lambda *_args, **_kwargs: cast("XTRIndex", _ExplodingIndex()),
     )
     result = RUNNER.invoke(
