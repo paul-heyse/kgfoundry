@@ -198,6 +198,19 @@ class PurePythonBM25:
         b: float = 0.4,
         field_boosts: Mapping[str, float] | None = None,
     ) -> None:
+        """Initialize in-memory BM25 index.
+
+        Parameters
+        ----------
+        index_dir : str
+            Directory path containing the BM25 index files.
+        k1 : float, optional
+            BM25 k1 parameter (term frequency saturation). Defaults to 0.9.
+        b : float, optional
+            BM25 b parameter (length normalization). Defaults to 0.4.
+        field_boosts : Mapping[str, float] | None, optional
+            Field boost multipliers for multi-field scoring.
+        """
         self.index_dir = index_dir
         self.k1 = k1
         self.b = b
@@ -560,6 +573,19 @@ class LuceneBM25:
         b: float = 0.4,
         field_boosts: Mapping[str, float] | None = None,
     ) -> None:
+        """Initialize Lucene-backed BM25 searcher.
+
+        Parameters
+        ----------
+        index_dir : str
+            Directory path containing the Lucene BM25 index.
+        k1 : float, optional
+            BM25 k1 parameter (term frequency saturation). Defaults to 0.9.
+        b : float, optional
+            BM25 b parameter (length normalization). Defaults to 0.4.
+        field_boosts : Mapping[str, float] | None, optional
+            Field boost multipliers for multi-field scoring.
+        """
         self.index_dir = index_dir
         self.k1 = k1
         self.b = b

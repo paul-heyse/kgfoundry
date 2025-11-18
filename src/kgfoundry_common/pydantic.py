@@ -32,6 +32,18 @@ if TYPE_CHECKING:
         model_config: ClassVar[object]
 
         def __init__(self, **data: object) -> None:
+            """Initialize Pydantic model stub.
+
+            Parameters
+            ----------
+            **data : object
+                Model field values.
+
+            Raises
+            ------
+            NotImplementedError
+                This is a stub implementation.
+            """
             raise NotImplementedError
 
         @classmethod

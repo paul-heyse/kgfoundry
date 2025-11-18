@@ -146,6 +146,20 @@ class SpladeIndex:
         chunks_dataset_root: str | None = None,
         sparse_root: str | None = None,
     ) -> None:
+        """Initialize SPLADE index.
+
+        Parameters
+        ----------
+        db_path : str
+            Path to DuckDB catalog database file. Must exist for documents
+            to be loaded.
+        chunks_dataset_root : str | None, optional
+            Optional override path to chunks dataset root directory. If None,
+            queries the catalog for the latest chunks dataset.
+        sparse_root : str | None, optional
+            Optional sparse embeddings root (retained for interface compatibility).
+            Currently unused and ignored.
+        """
         _ = sparse_root  # retained for interface compatibility
         self.db_path = db_path
         self.docs: list[SpladeDoc] = []

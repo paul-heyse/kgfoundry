@@ -79,12 +79,12 @@ async def test_semantic_search_pro_runs_late_interaction(monkeypatch: pytest.Mon
 
     def _fake_rescore(
         _self: semantic_pro.XTRLateInteraction,
-        _query: str,
-        _candidate_ids: Sequence[int],
+        query: str,
+        candidate_ids: Sequence[int],
         *,
         explain: bool = False,
     ) -> LateInteractionResult:
-        del explain
+        del explain, query, candidate_ids
         return LateInteractionResult(ids=[_SECOND_STAGE_CHUNK_ID, 1], scores=[1.0, 0.7])
 
     monkeypatch.setattr(semantic_pro.XTRLateInteraction, "rescore", _fake_rescore)

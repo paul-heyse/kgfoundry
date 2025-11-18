@@ -60,6 +60,13 @@ class OntologyCatalog:
     """
 
     def __init__(self, concepts: list[Concept]) -> None:
+        """Initialize ontology catalog with concepts.
+
+        Parameters
+        ----------
+        concepts : list[Concept]
+            List of concepts to include in the catalog.
+        """
         self.by_id = {concept.id: concept for concept in concepts}
 
     def neighbors(self, concept_id: str, depth: int = 1) -> set[str]:

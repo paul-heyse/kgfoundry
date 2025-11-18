@@ -88,6 +88,19 @@ class OptionalDependencyError(ArtifactDependencyError):
         extra: Mapping[str, object] | None = None,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize optional dependency error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the missing dependency.
+        module_name : str, optional
+            Name of the missing module (e.g., "griffe", "autoapi"). Defaults to "".
+        extra : Mapping[str, object] | None, optional
+            Additional context fields for Problem Details. Defaults to None.
+        cause : Exception | None, optional
+            Underlying exception that caused the import failure.
+        """
         context = dict(extra or {})
         context["module_name"] = module_name
         context["correlation_id"] = str(uuid.uuid4())

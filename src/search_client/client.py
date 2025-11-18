@@ -165,6 +165,13 @@ class RequestsHttp(SupportsHttp):
     """
 
     def __init__(self, session: requests.Session | None = None) -> None:
+        """Initialize HTTP adapter.
+
+        Parameters
+        ----------
+        session : requests.Session | None, optional
+            Pre-configured requests.Session instance. If None, creates a new Session.
+        """
         self._session = session or requests.Session()
 
     def get(
@@ -281,6 +288,19 @@ class KGFoundryClient:
         timeout: float = 30.0,
         http: SupportsHttp | None = None,
     ) -> None:
+        """Initialize kgfoundry search client.
+
+        Parameters
+        ----------
+        base_url : str, optional
+            Base URL for the search API. Defaults to "http://localhost:8080".
+        api_key : str | None, optional
+            Optional API key for authentication.
+        timeout : float, optional
+            Request timeout in seconds. Defaults to 30.0.
+        http : SupportsHttp | None, optional
+            Optional HTTP adapter. If None, uses default RequestsHttp adapter.
+        """
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout

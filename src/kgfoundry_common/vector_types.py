@@ -67,6 +67,15 @@ class VectorValidationError(ValueError):
     """
 
     def __init__(self, message: str, *, errors: Sequence[str] | None = None) -> None:
+        """Initialize vector validation error.
+
+        Parameters
+        ----------
+        message : str
+            Error message describing the validation failure.
+        errors : Sequence[str] | None, optional
+            List of validation error messages.
+        """
         super().__init__(message)
         self.errors: tuple[str, ...] = tuple(errors or (message,))
 

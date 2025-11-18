@@ -907,6 +907,15 @@ class CorrelationContext:
     """
 
     def __init__(self, correlation_id: str | None) -> None:
+        """Initialize correlation context.
+
+        Parameters
+        ----------
+        correlation_id : str | None
+            Correlation ID to set in context. This ID will be automatically
+            injected into all log entries within the context. Set to None to
+            clear the correlation ID.
+        """
         self.correlation_id = correlation_id
         self._token: contextvars.Token[str | None] | None = None
 
@@ -1080,6 +1089,7 @@ class _DefaultLoggingCache:
     """
 
     def __init__(self) -> None:
+        """Initialize the logging cache with empty formatter cache."""
         self._formatter_cache: JsonFormatter | None = None
 
     def get_formatter(self) -> JsonFormatter:

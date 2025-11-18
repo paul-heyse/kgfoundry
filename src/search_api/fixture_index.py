@@ -187,6 +187,17 @@ class FixtureIndex:
     """
 
     def __init__(self, root: str = "/data", db_path: str = "/data/catalog/catalog.duckdb") -> None:
+        """Initialize fixture index.
+
+        Parameters
+        ----------
+        root : str, optional
+            Root directory path for data files. Used for resolving relative
+            paths in the catalog. Defaults to "/data".
+        db_path : str, optional
+            Path to DuckDB catalog database file. Must exist for documents
+            to be loaded. Defaults to "/data/catalog/catalog.duckdb".
+        """
         self.root = Path(root)
         self.db_path = db_path
         self.docs: list[FixtureDoc] = []

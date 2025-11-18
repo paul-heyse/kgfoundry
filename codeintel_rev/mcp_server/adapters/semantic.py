@@ -43,14 +43,22 @@ def _semantic_search_sync(context: ApplicationContext, query: str, limit: int) -
     if not text:
         return _error_envelope("missing query text")
 
-    engine = context.get_hybrid_engine()
-    stage0 = run_stage0(
-        engine,
-        query=text,
-        semantic_hits=[],
-        limit=int(limit),
-        options=Stage0Options(weights=None),
-    )
+    ready, readiness_limits, _ = context.ensure_faiss_ready()
+    try:
+        stage0 = run_stage0(
+            context.get_hybrid_engine(),
+            query=text,
+            semantic_hits=[],
+            limit=int(limit),
+            options=Stage0Options(weights=None, faiss_ready=ready),
+        )
+    except RuntimeError as exc:
+        stage0 = Stage0Result(
+            ids=[],
+            scores=[],
+            warnings=["faiss_fallback:unavailable"],
+            method={"error": str(exc)},
+        )
 
     with context.open_catalog() as catalog:
         findings = _hydrate_findings(catalog, stage0.ids, stage0.scores)
@@ -67,10 +75,27 @@ def _semantic_search_sync(context: ApplicationContext, query: str, limit: int) -
 
     method = _build_method(stage0, decision)
     confidence = float(stage0.scores[0]) if stage0.scores else 0.0
+    limits = [f"k={int(limit)}"]
+    limits.extend(readiness_limits)
+    warning_entries = list(stage0.warnings)
+    limits.extend(
+        warning for warning in warning_entries if warning.startswith("faiss_fallback:")
+    )
+    fallback_detected = any(
+        warning.startswith("faiss_fallback:")
+        or "faiss" in warning.lower()
+        or "missing index" in warning.lower()
+        or "channel failed" in warning.lower()
+        for warning in warning_entries
+    )
+    if fallback_detected and not any(
+        entry.startswith("faiss_fallback:") for entry in limits
+    ):
+        limits.append("faiss_fallback:unavailable")
     envelope: AnswerEnvelope = {
         "findings": findings,
         "method": method,
-        "limits": [f"k={int(limit)}"],
+        "limits": limits,
         "answer": "",
         "confidence": confidence,
     }

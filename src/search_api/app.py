@@ -195,6 +195,18 @@ class ResponseValidationMiddleware(BaseHTTPMiddleware):
         enabled: bool = False,
         schema_path: Path | None = None,
     ) -> None:
+        """Initialize response validation middleware.
+
+        Parameters
+        ----------
+        app : FastAPI
+            FastAPI application to wrap.
+        enabled : bool, optional
+            Whether to enable response validation. Defaults to False.
+        schema_path : Path | None, optional
+            Path to search_response.json schema file. If None, searches for
+            schema/search/search_response.json relative to repo root.
+        """
         super().__init__(cast("ASGIApp", app))
         self.enabled = enabled
         if schema_path is None:

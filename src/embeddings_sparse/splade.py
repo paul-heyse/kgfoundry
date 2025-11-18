@@ -248,6 +248,19 @@ class SPLADEv3Encoder:
         topk: int = 256,
         max_seq_len: int = 512,
     ) -> None:
+        """Initialize in-memory SPLADE encoder.
+
+        Parameters
+        ----------
+        model_id : str, optional
+            Hugging Face model identifier. Defaults to "naver/splade-v3-distilbert".
+        device : str, optional
+            Device to run model on ("cuda" or "cpu"). Defaults to "cuda".
+        topk : int, optional
+            Number of top-k tokens to retain in sparse vectors. Defaults to 256.
+        max_seq_len : int, optional
+            Maximum sequence length for tokenization. Defaults to 512.
+        """
         self.model_id = model_id
         self.device = device
         self.topk = topk
@@ -321,6 +334,13 @@ class PureImpactIndex:
     """
 
     def __init__(self, index_dir: str) -> None:
+        """Initialize in-memory SPLADE impact index.
+
+        Parameters
+        ----------
+        index_dir : str
+            Directory path containing the SPLADE impact index files.
+        """
         self.index_dir = index_dir
         self.df: dict[str, int] = {}
         self.N = 0
@@ -541,6 +561,15 @@ class LuceneImpactIndex:
     """
 
     def __init__(self, index_dir: str, query_encoder: str = "naver/splade-v3-distilbert") -> None:
+        """Initialize Lucene-backed SPLADE impact searcher.
+
+        Parameters
+        ----------
+        index_dir : str
+            Directory path containing the Lucene SPLADE impact index.
+        query_encoder : str, optional
+            Hugging Face model identifier for query encoding. Defaults to "naver/splade-v3-distilbert".
+        """
         self.index_dir = index_dir
         self.query_encoder = query_encoder
         self._searcher: LuceneImpactSearcherProtocol | None = None

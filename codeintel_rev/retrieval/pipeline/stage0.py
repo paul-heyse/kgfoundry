@@ -14,6 +14,7 @@ class Stage0Options:
     """Optional knobs passed to the hybrid search engine."""
 
     weights: Mapping[str, float] | None = None
+    faiss_ready: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +43,10 @@ def run_stage0(
         Normalized identifiers, scores, warnings, and method metadata.
     """
     opts = options or Stage0Options()
-    hybrid_options = HybridSearchOptions(weights=opts.weights)  # type: ignore[arg-type]
+    hybrid_options = HybridSearchOptions(
+        weights=opts.weights,  # type: ignore[arg-type]
+        faiss_ready=opts.faiss_ready,
+    )
     fused: HybridSearchResult = engine.search(
         query=query,
         semantic_hits=list(semantic_hits or []),

@@ -64,6 +64,13 @@ class DuckDBRegistryHelper:
     """
 
     def __init__(self, db_path: str) -> None:
+        """Initialize registry helper.
+
+        Parameters
+        ----------
+        db_path : str
+            Path to the DuckDB database file.
+        """
         self.db_path = db_path
 
     def _connect(self) -> DuckDBPyConnection:

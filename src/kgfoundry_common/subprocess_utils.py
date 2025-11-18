@@ -115,6 +115,17 @@ class ToolExecutionError(RuntimeError):
         command: list[str] | None = None,
         problem: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize subprocess execution error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the subprocess execution failure.
+        command : list[str] | None, optional
+            Command that failed execution, as a list of strings.
+        problem : Mapping[str, object] | None, optional
+            Additional structured problem details (e.g., return code, stderr).
+        """
         super().__init__(message)
         self.command = list(command or [])
         self.problem = problem
@@ -512,6 +523,17 @@ class SubprocessTimeoutError(TimeoutError):
         command: list[str] | None = None,
         timeout_seconds: int | None = None,
     ) -> None:
+        """Initialize subprocess timeout error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error description.
+        command : list[str] | None, optional
+            The command sequence that timed out.
+        timeout_seconds : int | None, optional
+            The timeout duration in seconds that was configured.
+        """
         super().__init__(message)
         self.command = command
         self.timeout_seconds = timeout_seconds
@@ -549,6 +571,19 @@ class SubprocessError(RuntimeError):
         returncode: int | None = None,
         stderr: str | None = None,
     ) -> None:
+        """Initialize subprocess execution failure error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error description.
+        command : Sequence[str] | None, optional
+            Command that failed execution, as a sequence of strings.
+        returncode : int | None, optional
+            Exit code from subprocess. None if the process did not exit normally.
+        stderr : str | None, optional
+            Captured stderr output from the failed process.
+        """
         super().__init__(message)
         self.command = list(command or [])
         self.returncode = returncode

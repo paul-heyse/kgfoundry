@@ -85,6 +85,17 @@ class OpenAccessHarvester:
         contact_email: str,
         config: HarvesterConfig | None = None,
     ) -> None:
+        """Initialize harvester.
+
+        Parameters
+        ----------
+        user_agent : str
+            User agent string for API requests.
+        contact_email : str
+            Contact email address for API requests (required by OpenAlex API).
+        config : HarvesterConfig | None, optional
+            Optional configuration object. If None, uses default HarvesterConfig.
+        """
         cfg = config or HarvesterConfig()
         self.ua = user_agent
         self.email = contact_email

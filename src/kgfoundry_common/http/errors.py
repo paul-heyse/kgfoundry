@@ -36,6 +36,17 @@ class HttpStatusError(HttpError):
         body_excerpt: str | None = None,
         headers: dict[str, str] | None = None,
     ) -> None:
+        """Initialize HTTP status error.
+
+        Parameters
+        ----------
+        status : int
+            HTTP status code.
+        body_excerpt : str | None, optional
+            Optional excerpt from response body for error message.
+        headers : dict[str, str] | None, optional
+            Optional response headers. If None, defaults to empty dict.
+        """
         super().__init__(f"HTTP {status}: {body_excerpt or ''}")
         self.status = status
         self.headers = headers or {}

@@ -113,6 +113,15 @@ class UnsafeSerializationError(ValueError):
     """
 
     def __init__(self, message: str, reason: str | None = None) -> None:
+        """Initialize safe pickle error.
+
+        Parameters
+        ----------
+        message : str
+            Error description.
+        reason : str | None, optional
+            Specific reason (e.g., "signature_mismatch", "disallowed_type").
+        """
         super().__init__(message)
         self.reason = reason
 
@@ -470,6 +479,13 @@ class SignedPickleWrapper:
     """
 
     def __init__(self, signing_key: bytes) -> None:
+        """Initialize signed pickle wrapper.
+
+        Parameters
+        ----------
+        signing_key : bytes
+            HMAC signing key for pickle integrity verification.
+        """
         self.signing_key = signing_key
         if len(signing_key) < _MIN_SIGNING_KEY_BYTES:
             LOGGER.warning("Signing key < %d bytes; security is degraded.", _MIN_SIGNING_KEY_BYTES)

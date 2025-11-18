@@ -126,6 +126,13 @@ class ParquetVectorWriter:
         )
 
     def __init__(self, root: str) -> None:
+        """Initialize vector writer.
+
+        Parameters
+        ----------
+        root : str
+            Root directory path for Parquet output.
+        """
         self.root = Path(root)
 
     def write_dense(
@@ -346,6 +353,17 @@ class ParquetChunkWriter:
         return pa.schema(chunk_fields)
 
     def __init__(self, root: str, model: str = "docling_hybrid", run_id: str = "dev") -> None:
+        """Initialize chunk writer.
+
+        Parameters
+        ----------
+        root : str
+            Root directory path for Parquet output.
+        model : str, optional
+            Model identifier for partitioning. Defaults to "docling_hybrid".
+        run_id : str, optional
+            Run identifier for partitioning. Defaults to "dev".
+        """
         self.root = Path(root) / f"model={model}" / f"run_id={run_id}" / "shard=00000"
         self.root.mkdir(parents=True, exist_ok=True)
 

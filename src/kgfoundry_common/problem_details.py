@@ -142,6 +142,15 @@ class ProblemDetailsValidationError(Exception):
     """
 
     def __init__(self, message: str, validation_errors: list[str] | None = None) -> None:
+        """Initialize problem details validation error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the validation failure.
+        validation_errors : list[str] | None, optional
+            List of specific validation error messages from the schema validator.
+        """
         super().__init__(message)
         self.validation_errors = validation_errors or []
 

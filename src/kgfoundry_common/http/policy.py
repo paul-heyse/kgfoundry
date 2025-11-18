@@ -150,6 +150,13 @@ class PolicyRegistry:
     """
 
     def __init__(self, root: Path) -> None:
+        """Initialize retry policy loader.
+
+        Parameters
+        ----------
+        root : Path
+            Root directory containing policy YAML files.
+        """
         self.root = root
 
     def get(self, name: str) -> RetryPolicyDoc:

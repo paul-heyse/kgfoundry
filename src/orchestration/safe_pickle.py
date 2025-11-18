@@ -45,6 +45,15 @@ class UnsafePickleError(ValueError):
     """
 
     def __init__(self, message: str, type_name: str | None = None) -> None:
+        """Initialize unsafe type error.
+
+        Parameters
+        ----------
+        message : str
+            Error description.
+        type_name : str | None, optional
+            Attempted type name that was rejected.
+        """
         super().__init__(message)
         self.type_name = type_name
 
@@ -203,6 +212,21 @@ class SafeUnpickler(_StdlibUnpickler):
         errors: str = "strict",
         buffers: object | None = None,
     ) -> None:
+        """Initialize safe unpickler.
+
+        Parameters
+        ----------
+        file : BinaryIO
+            Binary file handle to read from.
+        fix_imports : bool, optional
+            Whether to fix imports for Python 2 compatibility. Defaults to True.
+        encoding : str, optional
+            Text encoding for Python 2 compatibility. Defaults to "ASCII".
+        errors : str, optional
+            Error handling mode for encoding. Defaults to "strict".
+        buffers : object | None, optional
+            Buffer protocol support. Defaults to None.
+        """
         super().__init__(
             file,
             fix_imports=fix_imports,

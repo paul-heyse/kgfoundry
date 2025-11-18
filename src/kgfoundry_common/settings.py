@@ -160,6 +160,18 @@ class RuntimeSettings(BaseSettings):
     faiss: FaissConfig = Field(default_factory=FaissConfig, description="FAISS index configuration")
 
     def __init__(self, **overrides: object) -> None:
+        """Initialize settings with optional field overrides.
+
+        Parameters
+        ----------
+        **overrides : object
+            Field name to value mappings to override defaults.
+
+        Raises
+        ------
+        SettingsError
+            If configuration validation fails.
+        """
         try:
             cast_overrides: dict[str, Any] = {
                 key: cast("Any", value) for key, value in overrides.items()

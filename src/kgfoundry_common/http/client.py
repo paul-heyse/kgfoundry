@@ -100,6 +100,15 @@ class HttpClient:
     """
 
     def __init__(self, settings: HttpSettings, retry_strategy: RetryStrategy | None = None) -> None:
+        """Initialize HTTP client.
+
+        Parameters
+        ----------
+        settings : HttpSettings
+            HTTP client configuration settings.
+        retry_strategy : RetryStrategy | None, optional
+            Optional retry strategy. If None, requests are single-attempt only.
+        """
         self.s = settings
         self.retry_strategy = retry_strategy  # may be None for single-attempt
 

@@ -28,6 +28,10 @@ class MockKG:
     """
 
     def __init__(self) -> None:
+        """Initialize empty mock knowledge graph.
+
+        Creates empty mappings for chunk-to-concepts and concept neighbors.
+        """
         self.chunk2concepts: dict[str, set[str]] = {}
         self.neighbors: dict[str, set[str]] = {}
 

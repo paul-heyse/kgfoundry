@@ -310,6 +310,17 @@ class FaissAdapter:
         config: FaissAdapterConfig | None = None,
         **legacy_options: object,
     ) -> None:
+        """Initialize FAISS adapter.
+
+        Parameters
+        ----------
+        db_path : str
+            Path to DuckDB database containing FAISS index metadata.
+        config : FaissAdapterConfig | None, optional
+            FAISS adapter configuration. If None, uses defaults.
+        **legacy_options : object
+            Legacy keyword arguments for backward compatibility.
+        """
         self.db_path = db_path
         resolved_config = self._resolve_config(config, legacy_options)
         self.factory = resolved_config.factory

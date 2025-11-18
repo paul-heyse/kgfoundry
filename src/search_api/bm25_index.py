@@ -309,6 +309,15 @@ class BM25Index:
     """
 
     def __init__(self, k1: float = 0.9, b: float = 0.4) -> None:
+        """Initialize BM25 index.
+
+        Parameters
+        ----------
+        k1 : float, optional
+            BM25 k1 parameter (term frequency saturation). Defaults to 0.9.
+        b : float, optional
+            BM25 b parameter (length normalization). Defaults to 0.4.
+        """
         self.k1 = k1
         self.b = b
         self.docs: list[BM25Doc] = []
