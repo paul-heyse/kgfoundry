@@ -1,12 +1,8 @@
 """DAO helpers for the DuckDB catalog, executing schema SQL."""
 
-# DuckDB refuses bind parameters inside CREATE VIEW / read_parquet statements,
-# so paths are safely quoted/escaped in this module instead.
-
 from __future__ import annotations
 
-import os
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -19,13 +15,10 @@ from codeintel_rev.io.duckdb_schema import (
     IdMapMeta,
     sql_count,
     sql_create_chunks_materialized,
-    sql_create_chunks_materialized_index,
     sql_create_chunks_view_from_materialized,
     sql_create_chunks_view_from_parquet,
-    sql_create_empty_chunks_materialized,
     sql_create_empty_chunks_view,
     sql_create_empty_faiss_idmap_view,
-    sql_create_faiss_idmap_from_materialized,
     sql_create_faiss_idmap_view,
     sql_create_idmap_mat,
     sql_create_idmap_mat_meta,
@@ -44,90 +37,12 @@ if TYPE_CHECKING:
 else:
     duckdb = cast("duckdb", LazyModule("duckdb", "DuckDB DAO operations"))
 
-_PARQUET_MAGIC = b"PAR1"
-
-
-def _quote_parquet_literal(parquet_path: Path) -> str:
-    """Return a safely quoted Parquet path literal for unsupported parametrization.
-
-    Parameters
-    ----------
-    parquet_path : Path
-        File path to quote and escape for SQL literal usage.
-
-    Returns
-    -------
-    str
-        Quoted literal safe for inclusion in DDL statements.
-    """
-    literal = str(parquet_path)
-    escape_fn = cast("Callable[[str], str] | None", getattr(duckdb, "escape_string", None))
-    escaped = escape_fn(literal) if callable(escape_fn) else literal.replace("'", "''")
-    return f"'{escaped}'"
-
-
-def _apply_parquet_path(sql: str, parquet_path: Path) -> str:
-    """Inline a Parquet path literal for DDL statements that disallow parameters.
-
-    Parameters
-    ----------
-    sql : str
-        SQL statement template with a single '?' placeholder.
-    parquet_path : Path
-        File path to substitute into the SQL template.
-
-    Returns
-    -------
-    str
-        SQL statement with the literal substituted once.
-    """
-    return sql.replace("?", _quote_parquet_literal(parquet_path), 1)
-
-
-def _is_valid_parquet_file(path: Path) -> bool:
-    """Return True when path appears to contain a valid Parquet file.
-
-    Parameters
-    ----------
-    path : Path
-        File path to check for Parquet format.
-
-    Returns
-    -------
-    bool
-        True when both the header and footer contain the Parquet magic value.
-    """
-    try:
-        if path.stat().st_size < len(_PARQUET_MAGIC) * 2:
-            return False
-        with path.open("rb") as handle:
-            header = handle.read(len(_PARQUET_MAGIC))
-            if header != _PARQUET_MAGIC:
-                return False
-            handle.seek(-len(_PARQUET_MAGIC), os.SEEK_END)
-            footer = handle.read(len(_PARQUET_MAGIC))
-            return footer == _PARQUET_MAGIC
-    except OSError:
-        return False
-
 
 def relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
-    """Return True when a table or view with the given name exists.
+    """Return True when a relation with ``name`` exists."""
 
-    Parameters
-    ----------
-    conn : duckdb.DuckDBPyConnection
-        Active DuckDB connection to query.
-    name : str
-        Name of the table or view to check for existence.
-
-    Returns
-    -------
-    bool
-        True when the relation exists, otherwise False.
-    """
-    result = conn.execute(sql_relation_exists(), [name]).fetchone()
-    return bool(result and result[0])
+    cur = conn.execute(sql_relation_exists(), [name, name])
+    return cur.fetchone() is not None
 
 
 def ensure_chunks(

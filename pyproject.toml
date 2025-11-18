@@ -256,6 +256,7 @@ dependencies = [
     "grafana-client>=5.0.1",
     "uuid6>=2025.0.1",
     "faiss-cpu>=1.12",
+    "pytest-xdist[psutil]>=3.8.0",
 ]
 
 [project.scripts]

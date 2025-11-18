@@ -85,6 +85,17 @@ class FileOperationError(KgFoundryError):
         path: str,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize file operation error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str
+            File path where the operation failed.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         super().__init__(
             message,
             code=ErrorCode.FILE_OPERATION_ERROR,
@@ -197,6 +208,18 @@ class InvalidLineRangeError(FileOperationError):
         path: str,
         line_range: tuple[int | None, int | None] | None = None,
     ) -> None:
+        """Initialize invalid line range error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str
+            File path where the invalid range was specified.
+        line_range : tuple[int | None, int | None] | None, optional
+            Invalid line range tuple (start_line, end_line). If provided,
+            included in error context.
+        """
         context: dict[str, object] = {"path": path}
         if line_range is not None:
             context["start_line"] = line_range[0]
@@ -222,6 +245,15 @@ class CatalogConsistencyError(KgFoundryError):
         *,
         context: Mapping[str, object] | None = None,
     ) -> None:
+        """Initialize catalog consistency error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the consistency violation.
+        context : Mapping[str, object] | None, optional
+            Additional context about the consistency error.
+        """
         super().__init__(
             message,
             code=ErrorCode.RUNTIME_ERROR,
@@ -259,6 +291,17 @@ class PathNotDirectoryError(KgFoundryError):
         *,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize path not directory error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str
+            Repository path that is not a directory.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         super().__init__(
             message,
             code=ErrorCode.PATH_NOT_DIRECTORY,
@@ -335,6 +378,19 @@ class GitOperationError(KgFoundryError):
         git_command: str | None = None,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize Git operation error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str | None, optional
+            Repository path where Git operation failed.
+        git_command : str | None, optional
+            Git command that failed (e.g., "blame", "log").
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         context: dict[str, object] = {}
         if path is not None:
             context["path"] = path
@@ -360,6 +416,17 @@ class RuntimeLifecycleError(KgFoundryError):
         runtime: str,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize runtime lifecycle error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        runtime : str
+            Name of the runtime that failed (e.g., "faiss", "duckdb").
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         super().__init__(
             message,
             code=ErrorCode.RUNTIME_ERROR,
@@ -380,6 +447,19 @@ class RuntimeUnavailableError(KgFoundryError):
         detail: str | None = None,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize runtime unavailable error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        runtime : str
+            Name of the runtime that is unavailable (e.g., "faiss", "duckdb").
+        detail : str | None, optional
+            Additional details about why the runtime is unavailable.
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         context: dict[str, object] = {"runtime": runtime}
         if detail:
             context["detail"] = detail
@@ -431,6 +511,19 @@ class RequestContextError(KgFoundryError):
         method: str,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize request context error.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message.
+        path : str
+            HTTP request path where error occurred.
+        method : str
+            HTTP request method (e.g., "GET", "POST").
+        cause : Exception | None, optional
+            Underlying exception that caused this error.
+        """
         context = {"path": path, "method": method}
         super().__init__(
             message,

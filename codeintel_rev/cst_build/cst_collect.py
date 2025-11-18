@@ -63,6 +63,21 @@ class _CollectorStatsBuilder:
         qname_hits: int = 0,
         scope_resolved: int = 0,
     ) -> None:
+        """Initialize stats builder with counters.
+
+        Parameters
+        ----------
+        files_indexed : int, optional
+            Initial count of files indexed (default: 0).
+        node_rows : int, optional
+            Initial count of node rows collected (default: 0).
+        parse_errors : int, optional
+            Initial count of parse errors (default: 0).
+        qname_hits : int, optional
+            Initial count of qualified name resolution hits (default: 0).
+        scope_resolved : int, optional
+            Initial count of scope resolution hits (default: 0).
+        """
         self.files_indexed = files_indexed
         self.node_rows = node_rows
         self.parse_errors = parse_errors

@@ -104,10 +104,7 @@ SELECT * FROM "v_faiss_join" LIMIT 0
 """
 _SQL_CREATE_IDMAP_MAT_META = """
 CREATE TABLE IF NOT EXISTS "faiss_idmap_mat_meta" (
-    parquet_path TEXT,
-    parquet_hash TEXT,
-    checksum TEXT,
-    row_count BIGINT,
+    checksum   TEXT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 """
@@ -118,14 +115,9 @@ _SQL_DELETE_IDMAP_MAT = 'DELETE FROM "faiss_idmap_mat"'
 _SQL_INSERT_IDMAP_MAT = 'INSERT INTO "faiss_idmap_mat" SELECT * FROM "v_faiss_join"'
 _SQL_DELETE_IDMAP_META = 'DELETE FROM "faiss_idmap_mat_meta"'
 _SQL_INSERT_IDMAP_META = """
-INSERT INTO "faiss_idmap_mat_meta"(parquet_path, parquet_hash, checksum, row_count)
-VALUES (?, ?, ?, ?)
+INSERT INTO "faiss_idmap_mat_meta"(checksum, updated_at)
+VALUES (?, CURRENT_TIMESTAMP)
 """
-_COUNTABLE_TABLES: Final[dict[str, str]] = {
-    TABLE_FAISS_JOIN_MAT: 'SELECT COUNT(*)::BIGINT FROM "faiss_join_mat"',
-    TABLE_FAISS_IDMAP_MAT: 'SELECT COUNT(*)::BIGINT FROM "faiss_idmap_mat"',
-}
-
 
 def sql_create_chunks_view_from_parquet() -> str:
     """Return SQL for creating chunks view from Parquet files.
@@ -316,48 +308,20 @@ def sql_insert_idmap_meta() -> str:
 
 
 def sql_count(table: str) -> str:
-    """Return SQL for counting rows in a table.
+    """Return SQL for counting rows in a relation."""
 
-    Parameters
-    ----------
-    table : str
-        Name of the table to count rows from.
-
-    Returns
-    -------
-    str
-        SQL statement returning row count as BIGINT.
-
-    Raises
-    ------
-    ValueError
-        If ``table`` is not part of the supported countable relations.
-    """
-    try:
-        return _COUNTABLE_TABLES[table]
-    except KeyError as exc:  # pragma: no cover - defensive guard
-        msg = f"Unsupported table for row counting: {table}"
-        raise ValueError(msg) from exc
+    return f'SELECT COUNT(*)::BIGINT FROM "{table}"'
 
 
 def sql_relation_exists() -> str:
-    """Return SQL for checking if a table or view exists.
+    """Return SQL for checking relation existence."""
 
-    Returns
-    -------
-    str
-        SQL statement with placeholder for relation name parameter.
-    """
     return """
-SELECT 1
-FROM (
-    SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'
-    UNION
-    SELECT table_name FROM information_schema.views WHERE table_schema = 'main'
-) AS relations
-WHERE relations.table_name = ? COLLATE NOCASE
-LIMIT 1
-"""
+    SELECT 1 FROM information_schema.tables
+    WHERE table_name = ? COLLATE NOCASE
+       OR table_name = REPLACE(?, '"', '')
+    LIMIT 1
+    """
 
 
 STRUCT_PLANS: dict[str, StructMaterializationPlan] = {

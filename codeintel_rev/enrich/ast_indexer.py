@@ -554,6 +554,11 @@ class _MetricsVisitor(ast.NodeVisitor):
     )
 
     def __init__(self) -> None:
+        """Initialize metrics visitor with zero counters.
+
+        Creates a new visitor instance with all metric counters initialized to zero.
+        Counters are incremented during AST traversal via visit methods.
+        """
         self.func_count = 0
         self.class_count = 0
         self.assign_count = 0

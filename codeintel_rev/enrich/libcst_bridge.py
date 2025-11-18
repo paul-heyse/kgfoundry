@@ -435,6 +435,14 @@ class _IndexVisitor(cst.CSTVisitor):
     NODE_HANDLERS: ClassVar[dict[type[cst.CSTNode], NodeHandler]]
 
     def __init__(self, code: str) -> None:
+        """Initialize index visitor with source code.
+
+        Parameters
+        ----------
+        code : str
+            Source code text to analyze. Used for computing metrics like LOC
+            and inferring side effects.
+        """
         self.imports: list[ImportEntry] = []
         self.defs: list[DefEntry] = []
         self.exports: set[str] = set()

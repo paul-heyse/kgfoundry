@@ -696,6 +696,11 @@ class _FaissRuntimeState:
     __slots__ = ("loaded", "lock")
 
     def __init__(self) -> None:
+        """Initialize FAISS runtime state tracking.
+
+        Creates a new state tracker with a lock for thread-safe initialization
+        tracking and a loaded flag indicating whether FAISS has been initialized.
+        """
         self.lock = Lock()
         self.loaded = False
 

@@ -6,7 +6,22 @@ import importlib
 import sys
 from types import ModuleType
 
+import pytest
+
 from tests._helpers import assertions
+
+
+@pytest.fixture(autouse=True)
+def _restore_numpy_module() -> None:
+    """Restore the original ``numpy`` module after each test."""
+    original = sys.modules.get("numpy")
+    try:
+        yield
+    finally:
+        if original is not None:
+            sys.modules["numpy"] = original
+        else:
+            sys.modules.pop("numpy", None)
 
 
 def _clear(mod: str) -> None:

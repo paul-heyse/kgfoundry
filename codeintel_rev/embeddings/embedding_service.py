@@ -148,6 +148,13 @@ class _FailureCounter:
     """Increment error counters when an exception bubbles out of a context."""
 
     def __init__(self, provider_name: str) -> None:
+        """Initialize failure counter for a provider.
+
+        Parameters
+        ----------
+        provider_name : str
+            Name of the provider being tracked.
+        """
         self._provider_name = provider_name
 
     def __enter__(self) -> Self:
@@ -166,6 +173,13 @@ class _BatchResultHandler:
     """Resolve futures when a fused batch completes or fails."""
 
     def __init__(self, jobs: Sequence[_ExecutorJob]) -> None:
+        """Initialize batch result handler with executor jobs.
+
+        Parameters
+        ----------
+        jobs : Sequence[_ExecutorJob]
+            Sequence of executor jobs to handle results for.
+        """
         self._jobs = list(jobs)
 
     def __enter__(self) -> Self:
@@ -235,6 +249,24 @@ class _BoundedBatchExecutor:
         max_wait_ms: int,
         emit: Callable[[Sequence[str]], NDArrayF32],
     ) -> None:
+        """Initialize bounded batch executor for embedding coalescing.
+
+        Parameters
+        ----------
+        micro_batch : int
+            Target batch size for coalesced embeddings.
+        max_pending : int
+            Maximum number of pending jobs in queue.
+        max_wait_ms : int
+            Maximum wait time in milliseconds before emitting a partial batch.
+        emit : Callable[[Sequence[str]], NDArrayF32]
+            Function to call with coalesced text batches.
+
+        Raises
+        ------
+        EmbeddingConfigError
+            If micro_batch is not positive.
+        """
         if micro_batch <= 0:
             msg = "micro_batch must be positive"
             raise EmbeddingConfigError(msg)
@@ -769,6 +801,17 @@ class VLLMProvider(_ProviderBase):
         index: IndexConfig,
         vllm_config: VLLMConfig,
     ) -> None:
+        """Initialize vLLM embedding provider.
+
+        Parameters
+        ----------
+        embeddings : EmbeddingsConfig
+            Embedding service configuration.
+        index : IndexConfig
+            Index configuration for dimension and normalization.
+        vllm_config : VLLMConfig
+            vLLM-specific configuration (model, host, port, etc.).
+        """
         super().__init__(
             provider_name="vllm",
             config=embeddings,
@@ -890,6 +933,15 @@ class HFEmbeddingProvider(_ProviderBase):
     """Hugging Face transformers fallback provider."""
 
     def __init__(self, *, embeddings: EmbeddingsConfig, index: IndexConfig) -> None:
+        """Initialize Hugging Face transformers embedding provider.
+
+        Parameters
+        ----------
+        embeddings : EmbeddingsConfig
+            Embedding service configuration.
+        index : IndexConfig
+            Index configuration for dimension and normalization.
+        """
         torch_mod = cast("Any", gate_import("torch", "Hugging Face embedding provider"))
         transformers_mod = cast(
             "Any", gate_import("transformers", "Hugging Face embedding provider")
