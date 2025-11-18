@@ -420,6 +420,19 @@ class _ProviderBase(EmbeddingProvider):
         index: IndexConfig,
         device_label: str,
     ) -> None:
+        """Initialize base provider with shared batching and metrics.
+
+        Parameters
+        ----------
+        provider_name : str
+            Name identifier for this provider (e.g., "vllm", "hf").
+        config : EmbeddingsConfig
+            Embedding service configuration.
+        index : IndexConfig
+            Index configuration for dimension and normalization settings.
+        device_label : str
+            Device identifier (e.g., "cuda", "cpu").
+        """
         self._state = _ProviderState(
             config=config,
             index=index,

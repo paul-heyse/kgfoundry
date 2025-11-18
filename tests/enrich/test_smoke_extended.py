@@ -15,6 +15,13 @@ from typer.testing import CliRunner
 from tests._helpers import assertions
 from tests._helpers.repo import SampleRepo
 
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy enrich pipeline commands have been replaced by the thin Typer shells, "
+        "so the extended pipeline smoke test is no longer applicable."
+    )
+)
+
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     buffer: list[str] = []

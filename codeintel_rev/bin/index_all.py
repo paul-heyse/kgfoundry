@@ -210,6 +210,18 @@ def _resolve_paths(settings: Settings) -> PipelinePaths:
     repo_root = Path(settings.paths.repo_root).expanduser().resolve()
 
     def _resolve(path_str: str) -> Path:
+        """Resolve a path string relative to repo_root or as absolute.
+
+        Parameters
+        ----------
+        path_str : str
+            Path string to resolve.
+
+        Returns
+        -------
+        Path
+            Resolved absolute path.
+        """
         path = Path(path_str)
         if path.is_absolute():
             return path.expanduser().resolve()
@@ -753,6 +765,20 @@ def _write_symbols(paths: PipelinePaths, index: SCIPIndex, chunks: Sequence[Chun
         by_file.setdefault(chunk.uri, []).append((chunk_id, chunk.start_line, chunk.end_line))
 
     def _chunk_for(uri: str, line: int) -> int:
+        """Find chunk ID containing the given line number.
+
+        Parameters
+        ----------
+        uri : str
+            File URI to search.
+        line : int
+            Line number to locate.
+
+        Returns
+        -------
+        int
+            Chunk ID if found, -1 otherwise.
+        """
         for cid, start, end in by_file.get(uri, []):
             if start <= line <= end:
                 return cid

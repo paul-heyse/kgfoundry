@@ -166,6 +166,20 @@ class CSTCollector:
         config: CollectorConfig | None = None,
         use_full_repo_manager: bool = True,
     ) -> None:
+        """Initialize CST collector for a repository.
+
+        Parameters
+        ----------
+        root : Path
+            Root directory of the repository to collect from.
+        files : Sequence[Path] | None, optional
+            Optional list of specific files to process. If None, all Python files
+            under root are discovered.
+        config : CollectorConfig | None, optional
+            Collector configuration. If None, uses default config.
+        use_full_repo_manager : bool, optional
+            Whether to use FullRepoManager for metadata providers (default: True).
+        """
         self._root = root.resolve()
         self._config = config or CollectorConfig()
         self._manager: FullRepoManager | None = None

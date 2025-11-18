@@ -11,34 +11,11 @@ from typing import Final
 
 @dataclass(frozen=True, slots=True)
 class IdMapMeta:
-    """Metadata describing a materialized FAISS ID map join."""
+    """Observability summary for FAISS idmap materialization."""
 
-    parquet_path: str
-    parquet_hash: str
-    row_count: int
+    checksum: str
+    rows: int
     refreshed: bool
-
-    @property
-    def checksum(self) -> str:
-        """Return the checksum (parquet_hash) for the ID map.
-
-        Returns
-        -------
-        str
-            Checksum value matching parquet_hash.
-        """
-        return self.parquet_hash
-
-    @property
-    def rows(self) -> int:
-        """Return the row count for the ID map.
-
-        Returns
-        -------
-        int
-            Number of rows matching row_count.
-        """
-        return self.row_count
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,27 +84,6 @@ SELECT
     CAST(NULL AS BIGINT) AS faiss_row,
     CAST(NULL AS BIGINT) AS external_id
 WHERE FALSE
-"""
-_SQL_FAISS_IDMAP_FROM_CHUNK = """
-CREATE OR REPLACE VIEW "faiss_idmap" AS
-SELECT
-    faiss_row,
-    chunk_id AS external_id
-FROM "faiss_idmap_mat"
-"""
-_SQL_FAISS_IDMAP_FROM_EXTERNAL = """
-CREATE OR REPLACE VIEW "faiss_idmap" AS
-SELECT
-    faiss_row,
-    external_id
-FROM "faiss_idmap_mat"
-"""
-_SQL_FAISS_IDMAP_FROM_NULL = """
-CREATE OR REPLACE VIEW "faiss_idmap" AS
-SELECT
-    faiss_row,
-    NULL AS external_id
-FROM "faiss_idmap_mat"
 """
 _SQL_CREATE_V_FAISS_JOIN = """
 CREATE OR REPLACE VIEW "v_faiss_join" AS
@@ -258,27 +214,6 @@ def sql_create_empty_faiss_idmap_view() -> str:
     """
     return _SQL_CREATE_EMPTY_FAISS_IDMAP_VIEW
 
-
-def sql_create_faiss_idmap_from_materialized(column: str | None) -> str:
-    """Return SQL for creating FAISS ID map view from the materialized table.
-
-    Parameters
-    ----------
-    column : str | None
-        Column in the materialized table to project as ``external_id``. Supported
-        values are ``"chunk_id"`` and ``"external_id"``. Defaults to NULL when
-        column is None or unrecognized.
-
-    Returns
-    -------
-    str
-        SQL statement selecting the requested column (or NULL) as ``external_id``.
-    """
-    if column == "chunk_id":
-        return _SQL_FAISS_IDMAP_FROM_CHUNK
-    if column == "external_id":
-        return _SQL_FAISS_IDMAP_FROM_EXTERNAL
-    return _SQL_FAISS_IDMAP_FROM_NULL
 
 
 def sql_create_v_faiss_join() -> str:

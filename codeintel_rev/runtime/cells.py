@@ -63,6 +63,14 @@ class RuntimeCellInitResult:
 
 
 def _seed_allowed() -> bool:
+    """Check if RuntimeCell.seed() is allowed in the current context.
+
+    Returns
+    -------
+    bool
+        True if seeding is allowed via environment variable or context
+        override, False otherwise.
+    """
     flag = os.getenv(_SEED_ENV, "")
     explicit = flag.strip().lower() in {"1", "true", "yes", "on"}
     return explicit or _SEED_OVERRIDE.get()
@@ -456,11 +464,27 @@ class RuntimeCell[T]:
 
     @staticmethod
     def _resolve_disposer(value: T) -> tuple[Callable[[], None] | None, bool]:
+        """Resolve a disposal function for the given value.
+
+        Parameters
+        ----------
+        value : T
+            Runtime value that may have a close method or context manager
+            __exit__ method.
+
+        Returns
+        -------
+        tuple[Callable[[], None] | None, bool]
+            Tuple of (disposer function, close_called flag). If value has
+            a close() method, returns (_run_close, True). If value has
+            __exit__, returns (_run_exit, False). Otherwise returns (None, False).
+        """
         closer = getattr(value, "close", None)
         if callable(closer):
             close_callable = closer
 
             def _run_close() -> None:
+                """Invoke the value's close() method."""
                 close_callable()
 
             return _run_close, True
@@ -470,16 +494,37 @@ class RuntimeCell[T]:
             exit_callable = exit_fn
 
             def _run_exit() -> None:
+                """Invoke the value's __exit__ method with None args."""
                 exit_callable(None, None, None)
 
             return _run_exit, False
         return None, False
 
     def _adjust_factory(self, factory: Callable[[], T]) -> Callable[[], T]:
+        """Apply factory adjuster to wrap the factory function.
+
+        Parameters
+        ----------
+        factory : Callable[[], T]
+            Original factory function to adjust.
+
+        Returns
+        -------
+        Callable[[], T]
+            Adjusted factory function, possibly wrapped with tuning hooks.
+        """
         return self._adjuster.adjust(cell=self._name, factory=factory)
 
     @staticmethod
     def _capture_init_context() -> RuntimeCellInitContext | None:
+        """Capture request-scoped context variables for initialization.
+
+        Returns
+        -------
+        RuntimeCellInitContext | None
+            Context with session_id and capability_stamp if either is present,
+            None if both are absent.
+        """
         session_id = session_id_var.get()
         capability_stamp = capability_stamp_var.get()
         if session_id is None and capability_stamp is None:
@@ -490,14 +535,35 @@ class RuntimeCell[T]:
         )
 
     def _next_generation_locked(self) -> int:
+        """Increment and return the next generation number.
+
+        Returns
+        -------
+        int
+            New generation number after incrementing the counter.
+        """
         self._generation_counter += 1
         return self._generation_counter
 
     def _clear_cooldown_locked(self) -> None:
+        """Clear cooldown state after expiry or successful initialization."""
         self._cooldown_until = None
         self._cooldown_error = None
 
     def _cooldown_error_locked(self, now: float) -> Exception | None:
+        """Check if cooldown period is active and return error if so.
+
+        Parameters
+        ----------
+        now : float
+            Current monotonic time for comparison.
+
+        Returns
+        -------
+        Exception | None
+            Cooldown error if cooldown period is active, None if expired
+            or not set. Clears cooldown state if expired.
+        """
         expiry = self._cooldown_until
         if expiry is None:
             return None
@@ -507,6 +573,21 @@ class RuntimeCell[T]:
         return self._cooldown_error or self._last_error
 
     def _wait_for_initializer(self, deadline: float) -> None:
+        """Wait for another thread to complete initialization.
+
+        Parameters
+        ----------
+        deadline : float
+            Monotonic time deadline for waiting. Raises RuntimeUnavailableError
+            if deadline is exceeded.
+
+        Raises
+        ------
+        RuntimeUnavailableError
+            If max waiters limit is exceeded or deadline is exceeded.
+        RuntimeLifecycleError
+            If initialization failed and last_error is set.
+        """
         if self._max_waiters and self._waiters >= self._max_waiters:
             message = "runtime warming_up"
             raise RuntimeUnavailableError(message, runtime=self._name)
@@ -538,6 +619,24 @@ class RuntimeCell[T]:
         generation: int,
         context: RuntimeCellInitContext | None,
     ) -> T:
+        """Execute factory function and handle success/failure.
+
+        Parameters
+        ----------
+        factory : Callable[[], T]
+            Factory function to invoke for initialization.
+        generation : int
+            Generation number for this initialization attempt.
+        context : RuntimeCellInitContext | None
+            Request context captured at initialization start.
+
+        Returns
+        -------
+        T
+            Created payload instance from factory.
+
+        Any exception raised by ``factory`` is re-raised after recording the failure.
+        """
         start = time.monotonic()
         self._observer.on_init_start(cell=self._name, generation=generation, context=context)
         try:
@@ -557,6 +656,19 @@ class RuntimeCell[T]:
         generation: int,
         context: RuntimeCellInitContext | None,
     ) -> None:
+        """Update cell state and notify observer after successful initialization.
+
+        Parameters
+        ----------
+        payload : T
+            Successfully created payload instance.
+        duration_ms : float
+            Initialization duration in milliseconds.
+        generation : int
+            Generation number for this initialization.
+        context : RuntimeCellInitContext | None
+            Request context captured at initialization start.
+        """
         with self._condition:
             self._value = payload
             self._initialized = True
@@ -584,6 +696,19 @@ class RuntimeCell[T]:
         generation: int,
         context: RuntimeCellInitContext | None,
     ) -> None:
+        """Update cell state and notify observer after initialization failure.
+
+        Parameters
+        ----------
+        exc : Exception
+            Exception raised during initialization.
+        duration_ms : float
+            Initialization duration in milliseconds before failure.
+        generation : int
+            Generation number for this initialization attempt.
+        context : RuntimeCellInitContext | None
+            Request context captured at initialization start.
+        """
         with self._condition:
             self._value = None
             self._initialized = False

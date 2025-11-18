@@ -80,6 +80,24 @@ def splade_factory(context: ChannelContext) -> Channel:
 
 
 class _BM25Channel(Channel):
+    """Built-in BM25 retrieval channel implementation.
+
+    This channel wraps the BM25SearchProvider to provide keyword-based sparse
+    retrieval. BM25 ranks documents based on term frequency and inverse document
+    frequency, providing effective keyword matching for code search. The channel
+    lazily initializes the provider on first search call and handles provider
+    errors gracefully.
+
+    Attributes
+    ----------
+    name : str
+        Channel name identifier ("bm25").
+    cost : float
+        Relative cost factor for this channel (1.0).
+    requires : frozenset[str]
+        Set of capability requirements: "warp_index_present", "lucene_importable".
+    """
+
     name = "bm25"
     cost = 1.0
     requires = frozenset({"warp_index_present", "lucene_importable"})
@@ -149,6 +167,21 @@ class _BM25Channel(Channel):
             raise ChannelError(message, reason="provider_error") from exc
 
     def _ensure_provider(self) -> BM25SearchProvider | None:
+        """Ensure BM25 provider is initialized, returning it if available.
+
+        Returns
+        -------
+        BM25SearchProvider | None
+            Initialized BM25 provider if available, None if disabled or
+            initialization failed. Sets _provider_error and _skip_reason
+            on failure.
+
+        Notes
+        -----
+        Thread-safe lazy initialization. Checks configuration, initializes
+        provider with RM3 settings if enabled, and handles initialization
+        errors. Provider is cached after successful initialization.
+        """
         if self._provider is not None:
             return self._provider
         if self._provider_error is not None:
@@ -205,6 +238,25 @@ class _BM25Channel(Channel):
 
 
 class _SpladeChannel(Channel):
+    """Built-in SPLADE retrieval channel implementation.
+
+    This channel wraps the SpladeSearchProvider to provide learned sparse
+    retrieval. SPLADE generates high-dimensional sparse vectors with learned
+    term weights, providing better semantic matching than BM25 while maintaining
+    sparse retrieval efficiency. The channel lazily initializes the provider
+    on first search call and handles provider errors gracefully.
+
+    Attributes
+    ----------
+    name : str
+        Channel name identifier ("splade").
+    cost : float
+        Relative cost factor for this channel (3.0, higher than BM25 due to
+        ONNX inference overhead).
+    requires : frozenset[str]
+        Set of capability requirements: "lucene_importable", "onnxruntime_importable".
+    """
+
     name = "splade"
     cost = 3.0
     requires = frozenset({"lucene_importable", "onnxruntime_importable"})
@@ -276,6 +328,21 @@ class _SpladeChannel(Channel):
             raise ChannelError(message, reason="provider_error") from exc
 
     def _ensure_provider(self) -> SpladeSearchProvider | None:
+        """Ensure SPLADE provider is initialized, returning it if available.
+
+        Returns
+        -------
+        SpladeSearchProvider | None
+            Initialized SPLADE provider if available, None if disabled or
+            initialization failed. Sets _provider_error and _skip_reason
+            on failure.
+
+        Notes
+        -----
+        Thread-safe lazy initialization. Checks configuration, initializes
+        provider with model/ONNX/index directories, and handles initialization
+        errors. Provider is cached after successful initialization.
+        """
         if self._provider is not None:
             return self._provider
         if self._provider_error is not None:
@@ -306,6 +373,21 @@ class _SpladeChannel(Channel):
 
 
 def _resolve_path(repo_root: Path, value: str) -> Path:
+    """Resolve a path string relative to repo root or as absolute.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory for resolving relative paths.
+    value : str
+        Path string to resolve. May be absolute, relative, or contain ~ expansion.
+
+    Returns
+    -------
+    Path
+        Resolved absolute path. If value is absolute, returns it as-is.
+        If relative, resolves it relative to repo_root.
+    """
     candidate = Path(value).expanduser()
     if candidate.is_absolute():
         return candidate
@@ -313,6 +395,20 @@ def _resolve_path(repo_root: Path, value: str) -> Path:
 
 
 def _classify_skip_reason(exc: Exception) -> str:
+    """Classify exception into a skip reason code.
+
+    Parameters
+    ----------
+    exc : Exception
+        Exception raised during provider initialization.
+
+    Returns
+    -------
+    str
+        Skip reason code: "missing_assets" for FileNotFoundError,
+        "capability_off" for capability/disabled errors, "provider_error"
+        for other errors.
+    """
     if isinstance(exc, FileNotFoundError):
         return "missing_assets"
     message = str(exc).lower()

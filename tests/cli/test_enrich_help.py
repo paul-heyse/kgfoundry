@@ -10,34 +10,44 @@ from typer import Typer
 from tests._helpers import assertions
 from tests._helpers.cli import invoke
 
-GLOBAL_FLAGS = ("--root", "--scip", "--out", "--pyrefly-json", "--tags-yaml")
+LEGACY_GLOBAL_FLAGS = ("--root", "--scip", "--out", "--pyrefly-json", "--tags-yaml")
+THIN_CLI_COMMANDS = ("scan", "exports", "overlays", "analytics", "to-duckdb")
+THIN_CLI_OPTIONS = ("--repo-root", "--out-dir")
 
 
-def _assert_global_options(cli_app: Typer) -> None:
+def _assert_legacy_global_options(cli_app: Typer) -> None:
     result = invoke(cli_app, ["--help"], catch_exceptions=False)
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
-    for option in GLOBAL_FLAGS:
+    for option in LEGACY_GLOBAL_FLAGS:
         assertions.expect_in(option, result.stdout)
 
 
-def test_legacy_cli_help_lists_global_options() -> None:
-    """Legacy shim still prints global flags."""
-    _assert_global_options(app)
-    result = invoke(app, ["exports", "--help"], catch_exceptions=False)
+def _assert_thin_cli_help(cli_app: Typer) -> None:
+    result = invoke(cli_app, ["--help"], catch_exceptions=False)
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
-    assertions.expect_in("--dry-run", result.stdout)
+    for command in THIN_CLI_COMMANDS:
+        assertions.expect_in(command, result.stdout)
 
 
-def test_pipeline_cli_help_lists_global_options() -> None:
-    """Pipeline CLI exposes global options."""
-    _assert_global_options(enrich_pipeline.app)
+def test_legacy_cli_help_lists_commands() -> None:
+    """Legacy shim now exposes the thin enrich command group."""
+    _assert_thin_cli_help(app)
+    result = invoke(app, ["scan", "--help"], catch_exceptions=False)
+    assertions.expect_equal(result.exit_code, 0, reason=result.output)
+    for option in THIN_CLI_OPTIONS:
+        assertions.expect_in(option, result.stdout)
+
+
+def test_pipeline_cli_help_lists_commands() -> None:
+    """Compatibility shim mirrors the thin CLI surface."""
+    _assert_thin_cli_help(enrich_pipeline.app)
 
 
 def test_analytics_cli_help_lists_global_options() -> None:
-    """Analytics CLI exposes global options."""
-    _assert_global_options(enrich_analytics.app)
+    """Analytics CLI still exposes the legacy global options."""
+    _assert_legacy_global_options(enrich_analytics.app)
 
 
 def test_overlays_cli_help_lists_global_options() -> None:
-    """Overlay CLI exposes global options."""
-    _assert_global_options(enrich_overlays.app)
+    """Overlay CLI still exposes the legacy global options."""
+    _assert_legacy_global_options(enrich_overlays.app)

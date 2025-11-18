@@ -202,6 +202,21 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         session_header: str = "X-Session-ID",
         run_header: str = "X-Run-ID",
     ) -> None:
+        """Initialize session scope middleware.
+
+        Parameters
+        ----------
+        app : ASGIApp
+            ASGI application to wrap.
+        dispatch : DispatchFunction | None, optional
+            Optional dispatch function override.
+        capability_attr : str, optional
+            Attribute name for capability stamp in request state (default: "capability_stamp").
+        session_header : str, optional
+            HTTP header name for session ID (default: "X-Session-ID").
+        run_header : str, optional
+            HTTP header name for run ID (default: "X-Run-ID").
+        """
         super().__init__(app, dispatch)
         self._capability_attr = capability_attr
         self._session_header = session_header

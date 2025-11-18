@@ -37,6 +37,19 @@ class PooledHit:
 
 
 def _minmax_norm(scores: Sequence[float]) -> list[float]:
+    """Normalize scores using min-max scaling to [0, 1] range.
+
+    Parameters
+    ----------
+    scores : Sequence[float]
+        Raw scores to normalize.
+
+    Returns
+    -------
+    list[float]
+        Normalized scores in [0, 1] range. Returns uniform scores (1.0)
+        if all scores are equal or sequence is empty.
+    """
     if not scores:
         return []
     lo = min(scores)
@@ -48,6 +61,19 @@ def _minmax_norm(scores: Sequence[float]) -> list[float]:
 
 
 def _softmax_norm(scores: Sequence[float]) -> list[float]:
+    """Normalize scores using softmax to probability distribution.
+
+    Parameters
+    ----------
+    scores : Sequence[float]
+        Raw scores to normalize.
+
+    Returns
+    -------
+    list[float]
+        Normalized scores that sum to 1.0 (probability distribution).
+        Uses numerical stability trick (subtract max before exp).
+    """
     if not scores:
         return []
     max_score = max(scores)

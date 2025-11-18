@@ -78,7 +78,7 @@ if TYPE_CHECKING:
 
     from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 else:  # pragma: no cover - lazy runtime imports
-    np = cast("Any", LazyModule("numpy", "FAISS manager vector operations"))
+    np = cast("np", LazyModule("numpy", "FAISS manager vector operations"))
     DuckDBCatalog = Any
 
 RefineSearchConfig = _RefineSearchConfig

@@ -11,11 +11,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
-
-import numpy as np
+from typing import TYPE_CHECKING, Literal, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+
+if TYPE_CHECKING:
+    import numpy as np  # type: ignore[reportMissingImports]
+else:
+    np = cast("np", LazyModule("numpy", "faiss builder operations"))
 from codeintel_rev.typing import FaissIndex, FaissModule, NDArrayF32, NDArrayI64, gate_import
 
 _faiss = LazyModule("faiss", "FAISS builder operations")

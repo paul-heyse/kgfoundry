@@ -39,6 +39,18 @@ from pathlib import Path
 
 
 def _read_jsonl(path: Path) -> list[dict]:
+    """Read JSONL file and return list of parsed JSON objects.
+
+    Parameters
+    ----------
+    path : Path
+        Path to JSONL file.
+
+    Returns
+    -------
+    list[dict]
+        List of parsed JSON dictionaries, one per line.
+    """
     out: list[dict] = []
     with path.open() as f:
         for line in f:
@@ -50,6 +62,18 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 
 def _read_qrels(path: Path) -> dict[str, set[int]]:
+    """Read TREC qrels TSV file and return relevance judgments.
+
+    Parameters
+    ----------
+    path : Path
+        Path to qrels TSV file (format: qid <tab> docid <tab> rel).
+
+    Returns
+    -------
+    dict[str, set[int]]
+        Mapping from query ID to set of relevant document IDs (rel > 0).
+    """
     gold: dict[str, set[int]] = {}
     with path.open() as f:
         for row in csv.reader(f, delimiter="\t"):
@@ -154,6 +178,22 @@ class RM3Heuristics:
 
 
 def _lucene_searcher(index_dir: Path, k1: float, b: float):
+    """Create and configure a Pyserini Lucene searcher with BM25 parameters.
+
+    Parameters
+    ----------
+    index_dir : Path
+        Path to BM25 index directory.
+    k1 : float
+        BM25 k1 parameter (term frequency saturation).
+    b : float
+        BM25 b parameter (length normalization).
+
+    Returns
+    -------
+    LuceneSearcher
+        Configured Pyserini searcher instance.
+    """
     from importlib import import_module
 
     lucene = import_module("pyserini.search.lucene")
@@ -166,6 +206,15 @@ def _lucene_searcher(index_dir: Path, k1: float, b: float):
 
 
 def _apply_rm3(searcher, p: RM3Params | None) -> None:
+    """Configure RM3 parameters on a searcher if provided.
+
+    Parameters
+    ----------
+    searcher
+        Pyserini Lucene searcher instance.
+    p : RM3Params | None
+        RM3 parameters to apply, or None to skip configuration.
+    """
     if p is None:
         return
     try:
@@ -177,6 +226,22 @@ def _apply_rm3(searcher, p: RM3Params | None) -> None:
 
 
 def _recall_at_k(run: Mapping[str, list[int]], qrels: Mapping[str, set[int]], k: int) -> float:
+    """Compute Recall@K metric over a run and relevance judgments.
+
+    Parameters
+    ----------
+    run : Mapping[str, list[int]]
+        Run results mapping query ID to ranked document ID list.
+    qrels : Mapping[str, set[int]]
+        Relevance judgments mapping query ID to set of relevant document IDs.
+    k : int
+        Cutoff rank for Recall@K evaluation.
+
+    Returns
+    -------
+    float
+        Recall@K score (fraction of queries with at least one relevant doc in top-k).
+    """
     num = 0
     den = 0
     for qid, gold in qrels.items():
@@ -188,6 +253,22 @@ def _recall_at_k(run: Mapping[str, list[int]], qrels: Mapping[str, set[int]], k:
 
 
 def _mrr_at_k(run: Mapping[str, list[int]], qrels: Mapping[str, set[int]], k: int) -> float:
+    """Compute Mean Reciprocal Rank@K metric over a run and relevance judgments.
+
+    Parameters
+    ----------
+    run : Mapping[str, list[int]]
+        Run results mapping query ID to ranked document ID list.
+    qrels : Mapping[str, set[int]]
+        Relevance judgments mapping query ID to set of relevant document IDs.
+    k : int
+        Cutoff rank for MRR@K evaluation.
+
+    Returns
+    -------
+    float
+        MRR@K score (average of 1/rank for first relevant doc, 0 if none found).
+    """
     import math
 
     total = 0.0
@@ -204,6 +285,18 @@ def _mrr_at_k(run: Mapping[str, list[int]], qrels: Mapping[str, set[int]], k: in
 
 
 def _parse_rm3_list(spec: str) -> list[RM3Params | None]:
+    """Parse comma-separated RM3 parameter specifications.
+
+    Parameters
+    ----------
+    spec : str
+        Comma-separated RM3 specs (e.g., "off,10-10-0.5,20-10-0.5").
+
+    Returns
+    -------
+    list[RM3Params | None]
+        List of RM3 parameter objects, None for "off" or "none" entries.
+    """
     out: list[RM3Params | None] = []
     for tok in spec.split(","):
         tok = tok.strip().lower()
@@ -216,6 +309,15 @@ def _parse_rm3_list(spec: str) -> list[RM3Params | None]:
 
 
 def _write_run(path: Path, run: Mapping[str, list[int]]) -> None:
+    """Write run results to TREC runfile TSV format.
+
+    Parameters
+    ----------
+    path : Path
+        Output file path.
+    run : Mapping[str, list[int]]
+        Run results mapping query ID to ranked document ID list.
+    """
     with path.open("w") as f:
         for q, docs in run.items():
             for rank, d in enumerate(docs, start=1):

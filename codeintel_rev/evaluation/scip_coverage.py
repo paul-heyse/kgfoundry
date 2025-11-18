@@ -162,6 +162,18 @@ class SCIPCoverageEvaluator:
         return summary
 
     def _lookup_chunk_ids(self, chunk_ids: Sequence[int]) -> set[int]:
+        """Query DuckDB to find which chunk IDs exist in the chunks table.
+
+        Parameters
+        ----------
+        chunk_ids : Sequence[int]
+            Chunk IDs to check for existence.
+
+        Returns
+        -------
+        set[int]
+            Set of chunk IDs that exist in the chunks table.
+        """
         if not chunk_ids:
             return set()
         with self._duckdb.connection() as conn:
@@ -177,11 +189,36 @@ class SCIPCoverageEvaluator:
         return {int(row[0]) for row in rows}
 
     def _embed(self, text: str) -> np.ndarray:
+        """Generate embedding vector for text using VLLM client.
+
+        Parameters
+        ----------
+        text : str
+            Text to embed.
+
+        Returns
+        -------
+        np.ndarray
+            Embedding vector as 2D array (1, embedding_dim) with float32 dtype.
+        """
         embedding = self._vllm.embed_single(text)
         return np.asarray(embedding, dtype=np.float32).reshape(1, -1)
 
     @staticmethod
     def _question_for(row: SymbolDefRow) -> str:
+        """Generate a natural language question for symbol retrieval.
+
+        Parameters
+        ----------
+        row : SymbolDefRow
+            Symbol definition row containing display name and language.
+
+        Returns
+        -------
+        str
+            Natural language question asking to find the symbol definition,
+            optionally including language context.
+        """
         language = (row.language or "").strip()
         base = f"Find the definition of {row.display_name}"
         if language:
@@ -194,6 +231,17 @@ class SCIPCoverageEvaluator:
         summary: CoverageSummary,
         output_dir: Path | str,
     ) -> None:
+        """Write coverage evaluation artifacts to output directory.
+
+        Parameters
+        ----------
+        per_symbol : Sequence[CoverageResult]
+            Per-symbol coverage results to write.
+        summary : CoverageSummary
+            Summary metrics to write.
+        output_dir : Path | str
+            Output directory path (relative to repo_root if not absolute).
+        """
         base = Path(output_dir)
         if not base.is_absolute():
             base = self._repo_root / base
@@ -221,6 +269,23 @@ class SCIPCoverageEvaluator:
         chunk_presence: set[int],
         k: int,
     ) -> CoverageResult:
+        """Evaluate coverage for a single symbol definition.
+
+        Parameters
+        ----------
+        row : SymbolDefRow
+            Symbol definition row to evaluate.
+        chunk_presence : set[int]
+            Set of chunk IDs that exist in the chunks table.
+        k : int
+            Top-k value for retrieval evaluation.
+
+        Returns
+        -------
+        CoverageResult
+            Coverage result indicating whether the symbol is chunk-covered,
+            index-covered, and retrieved in top-k search results.
+        """
         chunk_id = row.chunk_id
         chunk_covered = chunk_id is not None
         index_covered = chunk_id in chunk_presence if chunk_covered else False

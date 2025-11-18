@@ -10,9 +10,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import duckdb
-import numpy as np
 
 from codeintel_rev._lazy_imports import LazyModule
+
+if TYPE_CHECKING:
+    import numpy as np  # type: ignore[reportMissingImports]
+else:
+    np = cast("np", LazyModule("numpy", "faiss store operations"))
 from codeintel_rev.io.duckdb_catalog import IdMapMeta, refresh_faiss_idmap_materialized
 from codeintel_rev.typing import FaissIndex, NDArrayF32, NDArrayI64, gate_import
 

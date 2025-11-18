@@ -22,6 +22,21 @@ RANGE_TUPLE_LENGTH = 4
 
 
 def _range_from_list(rng: Sequence[object]) -> tuple[int, int, int, int] | None:
+    """Parse a range from a list of numbers.
+
+    Parameters
+    ----------
+    rng : Sequence[object]
+        List containing 3 or 4 numeric values representing a range.
+        Format: [start_line, start_char, end_line, end_char] or
+        [start_line, start_char, end_char] (end_line = start_line).
+
+    Returns
+    -------
+    tuple[int, int, int, int] | None
+        Parsed range tuple (start_line, start_char, end_line, end_char),
+        or None if parsing fails.
+    """
     if len(rng) not in {RANGE_TUPLE_LENGTH, 3}:
         return None
     normalized: list[int] = []
@@ -38,6 +53,19 @@ def _range_from_list(rng: Sequence[object]) -> tuple[int, int, int, int] | None:
 
 
 def _parse_occurrence(record: dict) -> tuple[str, tuple[int, int, int, int], int] | None:
+    """Parse a symbol occurrence from a SCIP JSON record.
+
+    Parameters
+    ----------
+    record : dict
+        Dictionary containing symbol, range, and roles fields.
+
+    Returns
+    -------
+    tuple[str, tuple[int, int, int, int], int] | None
+        Tuple of (symbol, range_tuple, roles) if parsing succeeds,
+        None if symbol is missing or range is invalid.
+    """
     symbol = record.get("symbol", "")
     if not symbol:
         return None

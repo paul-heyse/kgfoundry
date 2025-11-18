@@ -117,6 +117,18 @@ class IndexAssets:
 
 
 def _file_checksum(path: Path) -> str:
+    """Compute SHA256 checksum of a file.
+
+    Parameters
+    ----------
+    path : Path
+        File path to checksum.
+
+    Returns
+    -------
+    str
+        Hexadecimal SHA256 digest of the file contents.
+    """
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -127,6 +139,18 @@ def _file_checksum(path: Path) -> str:
 
 
 def _read_json(path: Path) -> dict[str, object]:
+    """Read and parse a JSON file, returning empty dict on error.
+
+    Parameters
+    ----------
+    path : Path
+        Path to JSON file to read.
+
+    Returns
+    -------
+    dict[str, object]
+        Parsed JSON object, or empty dict if file is missing or invalid.
+    """
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -172,6 +196,19 @@ def collect_asset_attrs(assets: IndexAssets) -> dict[str, object]:
 
 
 def _attrs_from_meta(meta_path: Path) -> dict[str, object]:
+    """Extract FAISS metadata attributes from .meta.json file.
+
+    Parameters
+    ----------
+    meta_path : Path
+        Path to FAISS .meta.json sidecar file.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary of FAISS metadata attributes (factory, parameters,
+        vector_count, etc.) extracted from the meta file.
+    """
     payload = _read_json(meta_path)
     if not payload:
         return {}
@@ -193,6 +230,19 @@ def _attrs_from_meta(meta_path: Path) -> dict[str, object]:
 
 
 def _attrs_from_idmap(idmap_path: Path | None) -> dict[str, object]:
+    """Extract attributes from FAISS ID map file.
+
+    Parameters
+    ----------
+    idmap_path : Path | None
+        Path to FAISS ID map Parquet file, or None if not present.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary containing ID map checksum and filename, or empty
+        dict if file is missing.
+    """
     if idmap_path is None or not idmap_path.exists():
         return {}
     return {
@@ -205,6 +255,21 @@ def _attrs_from_tuning(
     tuning_path: Path | None,
     existing: Mapping[str, object],
 ) -> dict[str, object]:
+    """Extract attributes from FAISS tuning profile JSON file.
+
+    Parameters
+    ----------
+    tuning_path : Path | None
+        Path to FAISS tuning profile JSON file, or None if not present.
+    existing : Mapping[str, object]
+        Existing attributes dictionary to check for factory override.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary containing tuning profile data, checksum, and extracted
+        parameters, or empty dict if file is missing.
+    """
     if tuning_path is None or not tuning_path.exists():
         return {}
     payload = _read_json(tuning_path)
@@ -666,6 +731,15 @@ class IndexLifecycleManager:
 
     # ------------------------------------------------------------------ internals
     def _write_current_pointer(self, version: str, target_dir: Path) -> None:
+        """Atomically update CURRENT pointer and symlink.
+
+        Parameters
+        ----------
+        version : str
+            Version identifier to write to CURRENT file.
+        target_dir : Path
+            Target directory for the symlink.
+        """
         tmp = self.current_file.with_suffix(".tmp")
         tmp.write_text(version, encoding="utf-8")
         Path(tmp).replace(self.current_file)
@@ -676,19 +750,61 @@ class IndexLifecycleManager:
 
     @staticmethod
     def _maybe_dir(path: Path) -> Path | None:
+        """Return path if it exists as a directory, None otherwise.
+
+        Parameters
+        ----------
+        path : Path
+            Path to check.
+
+        Returns
+        -------
+        Path | None
+            Path if directory exists, None otherwise.
+        """
         return path if path.exists() else None
 
     @staticmethod
     def _maybe_file(path: Path) -> Path | None:
+        """Return path if it exists as a file, None otherwise.
+
+        Parameters
+        ----------
+        path : Path
+            Path to check.
+
+        Returns
+        -------
+        Path | None
+            Path if file exists, None otherwise.
+        """
         return path if path.exists() else None
 
     @staticmethod
     def _copy_file(src: Path, dst: Path) -> None:
+        """Copy a file, creating parent directories if needed.
+
+        Parameters
+        ----------
+        src : Path
+            Source file path.
+        dst : Path
+            Destination file path.
+        """
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
     @staticmethod
     def _copy_tree(src: Path | None, dst: Path) -> None:
+        """Copy a directory tree if source exists.
+
+        Parameters
+        ----------
+        src : Path | None
+            Source directory path, or None to skip.
+        dst : Path
+            Destination directory path.
+        """
         if src is None:
             return
         if not src.exists():
@@ -697,6 +813,15 @@ class IndexLifecycleManager:
 
     @staticmethod
     def _copy_optional_file(src: Path | None, dst: Path) -> None:
+        """Copy a file if source exists and is not None.
+
+        Parameters
+        ----------
+        src : Path | None
+            Source file path, or None to skip.
+        dst : Path
+            Destination file path.
+        """
         if src is None:
             return
         if not src.exists():
@@ -706,6 +831,23 @@ class IndexLifecycleManager:
 
     @staticmethod
     def _resolve_manifest_path(version_dir: Path) -> Path:
+        """Resolve manifest file path, checking legacy names.
+
+        Parameters
+        ----------
+        version_dir : Path
+            Version directory containing the manifest.
+
+        Returns
+        -------
+        Path
+            Path to manifest file (manifest.json or legacy version.json).
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If no manifest file is found in the version directory.
+        """
         manifest_path = version_dir / MANIFEST_FILE
         if manifest_path.exists():
             return manifest_path
@@ -722,6 +864,22 @@ class IndexLifecycleManager:
         primary_name: str,
         legacy_names: tuple[str, ...],
     ) -> Path | None:
+        """Locate a sidecar file, checking legacy names.
+
+        Parameters
+        ----------
+        base_dir : Path
+            Base directory to search in.
+        primary_name : str
+            Primary filename to check first.
+        legacy_names : tuple[str, ...]
+            Legacy filenames to check if primary is not found.
+
+        Returns
+        -------
+        Path | None
+            Path to sidecar file if found, None otherwise.
+        """
         candidate = base_dir / primary_name
         if candidate.exists():
             return candidate

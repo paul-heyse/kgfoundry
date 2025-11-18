@@ -114,6 +114,19 @@ def is_reexport_hub(row: Mapping[str, Any]) -> bool:
 
 
 def _public_names(row: Mapping[str, Any]) -> list[str]:
+    """Extract public export names from a module row.
+
+    Parameters
+    ----------
+    row : Mapping[str, Any]
+        Module row containing exports or definitions.
+
+    Returns
+    -------
+    list[str]
+        List of public names (from exports if available, otherwise from
+        public function/class definitions).
+    """
     exports = row.get("exports") or []
     if isinstance(exports, list) and exports:
         return [name for name in exports if isinstance(name, str)]

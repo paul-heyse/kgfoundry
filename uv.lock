@@ -3362,6 +3362,9 @@ docs = [
 duckdb = [
     { name = "duckdb" },
 ]
+faiss = [
+    { name = "faiss-cpu" },
+]
 faiss-cpu = [
     { name = "faiss-cpu" },
 ]
@@ -3403,6 +3406,10 @@ minimal = [
     { name = "msgspec" },
     { name = "uvicorn" },
 ]
+pyarrow = [
+    { name = "pyarrow" },
+    { name = "pyarrow-stubs" },
+]
 scan-plus = [
     { name = "griffe" },
     { name = "libcst" },
@@ -3415,6 +3422,11 @@ tools = [
     { name = "build" },
     { name = "msgspec" },
     { name = "pyyaml" },
+]
+vector = [
+    { name = "faiss-cpu" },
+    { name = "pyarrow" },
+    { name = "pyarrow-stubs" },
 ]
 xtr = [
     { name = "sentencepiece" },
@@ -3457,7 +3469,9 @@ requires-dist = [
     { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=1.0.0" },
     { name = "easyocr", marker = "extra == 'gpu'" },
     { name = "faiss-cpu", specifier = ">=1.12" },
+    { name = "faiss-cpu", marker = "extra == 'faiss'", specifier = ">=1.12" },
     { name = "faiss-cpu", marker = "extra == 'faiss-cpu'", specifier = ">=1.8.0" },
+    { name = "faiss-cpu", marker = "extra == 'vector'", specifier = ">=1.12" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fastapi", marker = "extra == 'http-bridge'", specifier = ">=0.115.0" },
     { name = "fastapi", marker = "extra == 'minimal'", specifier = ">=0.115.0" },
@@ -3556,7 +3570,11 @@ requires-dist = [
     { name = "pyalex", specifier = ">=0.18" },
     { name = "pyan3", specifier = ">=1.2.0" },
     { name = "pyarrow", specifier = ">=21.0.0" },
+    { name = "pyarrow", marker = "extra == 'pyarrow'", specifier = ">=21.0.0" },
+    { name = "pyarrow", marker = "extra == 'vector'", specifier = ">=21.0.0" },
     { name = "pyarrow-stubs", specifier = ">=13.0.0" },
+    { name = "pyarrow-stubs", marker = "extra == 'pyarrow'", specifier = ">=13.0.0" },
+    { name = "pyarrow-stubs", marker = "extra == 'vector'", specifier = ">=13.0.0" },
     { name = "pybreaker" },
     { name = "pycg", specifier = ">=0.0.8" },
     { name = "pydantic", specifier = ">=2.0" },
@@ -3672,7 +3690,7 @@ requires-dist = [
     { name = "xdoctest", specifier = ">=1.1.4" },
     { name = "xgrammar", marker = "extra == 'gpu'" },
 ]
-provides-extras = ["docs", "codeintel", "http-bridge", "tools", "scan-plus", "gpu", "minimal", "faiss-cpu", "duckdb", "splade", "xtr", "dev", "all"]
+provides-extras = ["docs", "faiss", "pyarrow", "vector", "codeintel", "http-bridge", "tools", "scan-plus", "gpu", "minimal", "faiss-cpu", "duckdb", "splade", "xtr", "dev", "all"]
 
 [package.metadata.requires-dev]
 dev = []
@@ -4779,12 +4797,12 @@ name = "mlx-lm"
 version = "0.28.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "jinja2", marker = "python_full_version >= '3.14' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
+    { name = "jinja2", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
     { name = "mlx", marker = "sys_platform == 'darwin'" },
-    { name = "numpy", marker = "python_full_version >= '3.14' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
-    { name = "protobuf", marker = "python_full_version >= '3.14' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
-    { name = "pyyaml", marker = "python_full_version >= '3.14' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
-    { name = "transformers", marker = "python_full_version >= '3.14' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
+    { name = "numpy", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
+    { name = "protobuf", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
+    { name = "pyyaml", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
+    { name = "transformers", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/51/f6/15e002d52c28d8c544ec3aaf9053677468333e6ef0e76ea68579fd77b76d/mlx_lm-0.28.3.tar.gz", hash = "sha256:75df2b925d343ebaf50b63008dede4fe98cd3b02b1b24b7da71ebeb198d674f0", size = 214455, upload-time = "2025-10-17T21:44:33.921Z" }
 wheels = [
@@ -5341,7 +5359,7 @@ name = "nvidia-cudnn-cu12"
 version = "9.10.2.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ba/51/e123d997aa098c61d029f76663dedbfb9bc8dcf8c60cbd6adbe42f76d049/nvidia_cudnn_cu12-9.10.2.21-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:949452be657fa16687d0930933f032835951ef0892b37d2d53824d1a84dc97a8", size = 706758467, upload-time = "2025-06-06T21:54:08.597Z" },
@@ -5362,7 +5380,7 @@ name = "nvidia-cufft-cu12"
 version = "11.4.1.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-nvjitlink-cu12", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/95/f4/61e6996dd20481ee834f57a8e9dca28b1869366a135e0d42e2aa8493bdd4/nvidia_cufft_cu12-11.4.1.4-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c67884f2a7d276b4b80eb56a79322a95df592ae5e765cf1243693365ccab4e28", size = 200877592, upload-time = "2025-06-05T20:05:45.862Z" },
@@ -10561,8 +10579,8 @@ name = "xformers"
 version = "0.0.32.post1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy" },
-    { name = "torch" },
+    { name = "numpy", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
+    { name = "torch", marker = "python_full_version >= '3.15' or platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6f/33/3b9c4d3d5b2da453d27de891df4ad653ac5795324961aa3a5c15b0353fe6/xformers-0.0.32.post1.tar.gz", hash = "sha256:1de84a45c497c8d92326986508d81f4b0a8c6be4d3d62a29b8ad6048a6ab51e1", size = 12106196, upload-time = "2025-08-14T18:07:45.486Z" }
 wheels = [

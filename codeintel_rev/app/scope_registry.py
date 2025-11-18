@@ -114,6 +114,11 @@ class ScopeRegistry:
     """
 
     def __init__(self) -> None:
+        """Initialize an empty scope registry.
+
+        Creates a new registry with no scopes. Scopes are added via set_scope()
+        and can be pruned via prune_stale().
+        """
         self._scopes: dict[str, tuple[ScopeIn, float]] = {}
         self._lock = RLock()
 

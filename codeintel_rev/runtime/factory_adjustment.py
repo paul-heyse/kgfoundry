@@ -138,6 +138,13 @@ class DefaultFactoryAdjuster:
         """
 
         def _wrapped() -> T:
+            """Create FAISS object and apply nprobe tuning.
+
+            Returns
+            -------
+            T
+                FAISS object with nprobe applied if configured.
+            """
             obj: Any = base()
             if self.faiss_nprobe is not None:
                 setter = getattr(obj, "set_nprobe", None)
@@ -173,6 +180,14 @@ class DefaultFactoryAdjuster:
         """
 
         def _wrapped() -> T:
+            """Create hybrid search object and apply tuning parameters.
+
+            Returns
+            -------
+            T
+                Hybrid search object with RRF k and channel weights applied
+                if configured.
+            """
             obj: Any = base()
             if self.hybrid_rrf_k is not None:
                 rrk_setter = getattr(obj, "set_rrf_k", None)

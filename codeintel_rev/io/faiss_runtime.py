@@ -9,9 +9,12 @@ from numbers import Integral, Real
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
 
-import numpy as np
-
 from codeintel_rev._lazy_imports import LazyModule
+
+if TYPE_CHECKING:
+    import numpy as np  # type: ignore[reportMissingImports]
+else:
+    np = cast("np", LazyModule("numpy", "faiss runtime operations"))
 from codeintel_rev.typing import (
     FaissIndex,
     FaissModule,

@@ -42,10 +42,26 @@ except ImportError:  # pragma: no cover - optional dependency
 
 
 class _YamlDumpKwargs(TypedDict, total=False):
+    """Type definition for YAML dump keyword arguments.
+
+    Attributes
+    ----------
+    sort_keys : bool, optional
+        Whether to sort dictionary keys in output.
+    """
+
     sort_keys: bool
 
 
 class _YamlDumpFn(Protocol):
+    """Protocol for YAML dump functions (e.g., yaml.safe_dump).
+
+    Methods
+    -------
+    __call__(data, **kwargs)
+        Serialize data to YAML string.
+    """
+
     def __call__(
         self,
         data: Mapping[str, list[str]],

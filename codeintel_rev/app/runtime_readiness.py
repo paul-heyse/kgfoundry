@@ -146,6 +146,13 @@ class ReadinessProbe:
     """
 
     def __init__(self, context: ApplicationContext) -> None:
+        """Initialize readiness probe with application context.
+
+        Parameters
+        ----------
+        context : ApplicationContext
+            Application context containing configuration and paths for readiness checks.
+        """
         self._context = context
         self._lock = asyncio.Lock()
         self._last_checks: dict[str, CheckResult] = {}

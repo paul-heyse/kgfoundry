@@ -116,6 +116,19 @@ def write_import_graph(
 
 
 def _tarjan_scc(edges: dict[str, set[str]]) -> dict[str, int]:
+    """Find strongly connected components using Tarjan's algorithm.
+
+    Parameters
+    ----------
+    edges : dict[str, set[str]]
+        Directed graph edges mapping each node to its neighbors.
+
+    Returns
+    -------
+    dict[str, int]
+        Mapping from node to component ID. Nodes in the same cycle
+        share the same component ID.
+    """
     index = 0
     stack: list[str] = []
     on_stack: set[str] = set()

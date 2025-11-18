@@ -134,10 +134,31 @@ def _iter_entry_points() -> Iterable[EntryPoint]:
 
 
 def _entry_point_provider() -> Callable[[], Iterable[EntryPoint]]:
+    """Return the active entry point provider function.
+
+    Returns
+    -------
+    Callable[[], Iterable[EntryPoint]]
+        Provider function that returns entry points. If override stack is
+        non-empty, returns the top override. Otherwise returns default
+        provider that calls _iter_entry_points().
+
+    Notes
+    -----
+    Used by ChannelRegistry.discover() to get entry points. Supports
+    testing via override_channel_entry_points() context manager.
+    """
     if _ENTRY_POINT_PROVIDER_STACK:
         return _ENTRY_POINT_PROVIDER_STACK[-1]
 
     def _provider() -> Iterable[EntryPoint]:
+        """Return entry points via default discovery.
+
+        Returns
+        -------
+        Iterable[EntryPoint]
+            Entry points from _iter_entry_points().
+        """
         return _iter_entry_points()
 
     return _provider
@@ -183,13 +204,38 @@ def _load_factory(entry_point: EntryPoint) -> Callable[[ChannelContext], Channel
 def override_channel_entry_points(
     overrides: Iterable[EntryPoint] | Callable[[], Iterable[EntryPoint]],
 ) -> Iterator[None]:
-    """Temporarily override channel entry points for discovery."""
+    """Temporarily override channel entry points for discovery.
+
+    Parameters
+    ----------
+    overrides : Iterable[EntryPoint] | Callable[[], Iterable[EntryPoint]]
+        Entry points to use during override, either as an iterable or a
+        callable that returns an iterable. Pushed onto override stack.
+
+    Yields
+    ------
+    None
+        Context manager yields None. Entry points are overridden during
+        the context and restored on exit.
+
+    Notes
+    -----
+    Used for testing to inject mock entry points. Pushes override onto
+    stack on enter, pops on exit. Nested overrides are supported.
+    """
     if callable(overrides):
         _ENTRY_POINT_PROVIDER_STACK.append(overrides)
     else:
         entries = tuple(overrides)
 
         def _provider() -> Iterable[EntryPoint]:
+            """Return overridden entry points.
+
+            Returns
+            -------
+            Iterable[EntryPoint]
+                Entry points from the overrides tuple.
+            """
             return entries
 
         _ENTRY_POINT_PROVIDER_STACK.append(_provider)

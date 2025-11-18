@@ -14,6 +14,16 @@ class LazyModule:
     __slots__ = ("_module", "_module_name", "_purpose")
 
     def __init__(self, module_name: str, purpose: str) -> None:
+        """Initialize a lazy module proxy.
+
+        Parameters
+        ----------
+        module_name : str
+            Name of the module to import lazily (e.g., "numpy", "fastapi").
+        purpose : str
+            Human-readable description of why this module is needed, used in
+            error messages if import fails.
+        """
         self._module_name = module_name
         self._purpose = purpose
         self._module: ModuleType | None = None

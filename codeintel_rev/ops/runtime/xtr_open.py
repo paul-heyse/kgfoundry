@@ -81,6 +81,18 @@ _DEFAULT_CONTEXT = XtrOpenContext.production()
 
 
 def _cli_context(ctx: typer.Context | None = None) -> XtrOpenContext:
+    """Retrieve or create CLI context from Typer/Click context.
+
+    Parameters
+    ----------
+    ctx : typer.Context | None, optional
+        Typer context, or None to attempt Click context lookup.
+
+    Returns
+    -------
+    XtrOpenContext
+        CLI context from context state or default production context.
+    """
     active = ctx or click.get_current_context(silent=True)
     if active is None:
         return _DEFAULT_CONTEXT
@@ -219,6 +231,22 @@ def _exit_with_problem(
     detail: str | None = None,
     cause: Exception | None = None,
 ) -> None:
+    """Exit with RFC 9457 Problem Details payload.
+
+    Parameters
+    ----------
+    message : str
+        Problem title and message.
+    detail : str | None, optional
+        Detailed error description.
+    cause : Exception | None, optional
+        Underlying exception that caused the problem.
+
+    Raises
+    ------
+    typer.Exit
+        Always raises with exit code 1 after printing Problem Details to stderr.
+    """
     problem = RuntimeUnavailableError(
         message,
         runtime="xtr",

@@ -63,6 +63,22 @@ def discover_python_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
 
 
 def _matches_any(candidate: Path, root: Path, patterns: tuple[str, ...]) -> bool:
+    """Check if candidate path matches any of the glob patterns.
+
+    Parameters
+    ----------
+    candidate : Path
+        File path to check.
+    root : Path
+        Repository root for relative path computation.
+    patterns : tuple[str, ...]
+        Glob patterns to match against.
+
+    Returns
+    -------
+    bool
+        True if candidate matches any pattern, False otherwise.
+    """
     rel = normalized_rel_path(candidate, root)
     return any(fnmatch(rel, pattern) for pattern in patterns)
 
@@ -331,6 +347,20 @@ def _iter_source_files(
 
 
 def _py_module_name(repo_root: Path, file_path: Path) -> str:
+    """Compute Python module name from file path.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+    file_path : Path
+        Python file path.
+
+    Returns
+    -------
+    str
+        Dotted module name (e.g., "package.module").
+    """
     try:
         rel = file_path.relative_to(repo_root)
     except ValueError:

@@ -219,6 +219,13 @@ def _deterministic_uuid_factory(deterministic_uuid: UUID) -> Callable[[], UUID]:
     """
 
     def _factory() -> UUID:
+        """Return the deterministic UUID.
+
+        Returns
+        -------
+        UUID
+            Fixed UUID value from closure.
+        """
         return deterministic_uuid
 
     return _factory

@@ -45,6 +45,18 @@ def index_config_files(
 
 
 def _extract_keys(path: Path) -> list[str]:
+    """Extract keys or headings from a config file based on its format.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the config file.
+
+    Returns
+    -------
+    list[str]
+        List of extracted keys or headings, empty list if format is unsupported.
+    """
     suffix = path.suffix.lower()
     if suffix in {".yaml", ".yml"}:
         return _extract_yaml_keys(path)
@@ -58,6 +70,18 @@ def _extract_keys(path: Path) -> list[str]:
 
 
 def _extract_yaml_keys(path: Path) -> list[str]:
+    """Extract top-level keys from a YAML file using regex.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the YAML file.
+
+    Returns
+    -------
+    list[str]
+        List of top-level key names found in the file.
+    """
     keys: list[str] = []
     pattern = re.compile(r"^([A-Za-z0-9_.-]+):")
     for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -71,6 +95,18 @@ def _extract_yaml_keys(path: Path) -> list[str]:
 
 
 def _extract_toml_keys(path: Path) -> list[str]:
+    """Extract table names from a TOML file using regex.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the TOML file.
+
+    Returns
+    -------
+    list[str]
+        List of table names (section headers) found in the file.
+    """
     keys: list[str] = []
     pattern = re.compile(r"^\[([A-Za-z0-9_.-]+)\]")
     for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -84,6 +120,18 @@ def _extract_toml_keys(path: Path) -> list[str]:
 
 
 def _extract_json_keys(path: Path) -> list[str]:
+    """Extract all keys from a JSON file using recursive flattening.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the JSON file.
+
+    Returns
+    -------
+    list[str]
+        List of dot-notation key paths found in the JSON structure.
+    """
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
@@ -143,6 +191,18 @@ def _extract_json_keys(path: Path) -> list[str]:
 
 
 def _extract_markdown_headings(path: Path) -> list[str]:
+    """Extract markdown headings (lines starting with #) from a file.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the Markdown file.
+
+    Returns
+    -------
+    list[str]
+        List of heading text (with # prefix removed).
+    """
     return [
         raw_line.lstrip("#").strip()
         for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines()

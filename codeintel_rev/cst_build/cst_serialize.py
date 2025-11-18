@@ -22,6 +22,15 @@ class DatasetWriter:
     """Stream-oriented writer that materializes the dataset artifacts."""
 
     def __init__(self, out_dir: Path, *, sample_size: int = 10) -> None:
+        """Initialize dataset writer for CST collection output.
+
+        Parameters
+        ----------
+        out_dir : Path
+            Output directory for dataset artifacts.
+        sample_size : int, optional
+            Number of sample records to retain for debugging (default: 10).
+        """
         self._out_dir = out_dir
         self._sample_size = sample_size
         self._stack: ExitStack | None = None

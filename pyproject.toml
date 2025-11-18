@@ -278,6 +278,18 @@ docs = [
     "sphinx>=8.2.3,<9",
     "sphinx-autoapi>=3.2.0",
 ]
+faiss = [
+    "faiss-cpu>=1.12",
+]
+pyarrow = [
+    "pyarrow>=21.0.0",
+    "pyarrow-stubs>=13.0.0",
+]
+vector = [
+    "faiss-cpu>=1.12",
+    "pyarrow>=21.0.0",
+    "pyarrow-stubs>=13.0.0",
+]
 codeintel = [
     "anyio>=4.4.0",
     "orjson>=3.10.0",

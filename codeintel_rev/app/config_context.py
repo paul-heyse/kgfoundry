@@ -224,6 +224,12 @@ def set_paths(resolved: ResolvedPaths) -> None:
     _PATH_CACHE.set(resolved)
 
 
+def _ensure_filesystem_readiness(paths: ResolvedPaths) -> None:
+    """Validate filesystem readiness."""
+    readiness_results = fs_readiness.validate_paths(paths)
+    fs_readiness.raise_on_errors(readiness_results)
+
+
 def paths() -> ResolvedPaths:
     """Return the cached :class:`ResolvedPaths` for legacy callers.
 
@@ -886,6 +892,12 @@ class ApplicationContext:
             Initialized context with all clients and configuration ready. The context
             is frozen after creation and thread-safe for concurrent access.
 
+        Raises
+        ------
+        ConfigurationError
+            Raised when filesystem readiness checks fail (for example, when the
+            repository root does not exist).
+
         Examples
         --------
         >>> # In FastAPI lifespan() function
@@ -923,8 +935,11 @@ class ApplicationContext:
         settings = settings or load_settings()
         effective_overrides = overrides or ApplicationContextOverrides()
         paths = resolve_application_paths(settings)
-        readiness_results = fs_readiness.validate_paths(paths)
-        fs_readiness.raise_on_errors(readiness_results)
+        try:
+            _ensure_filesystem_readiness(paths)
+        except fs_readiness.ReadinessError as exc:
+            message = f"Repository root does not exist or failed readiness checks; details: {exc}"
+            raise ConfigurationError(message) from exc
         set_paths(paths)
 
         vllm_client = effective_overrides.vllm_client or build_vllm_client(settings.vllm)

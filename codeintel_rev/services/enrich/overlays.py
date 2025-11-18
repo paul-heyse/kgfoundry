@@ -111,6 +111,23 @@ def read_overlay_config(path: Path) -> Mapping[str, Any]:
 
 
 def _parse_bool(value: object) -> bool:
+    """Parse a boolean value from various input types.
+
+    Parameters
+    ----------
+    value : object
+        Value to parse (bool, str, or other).
+
+    Returns
+    -------
+    bool
+        Parsed boolean value.
+
+    Raises
+    ------
+    typer.BadParameter
+        If value cannot be interpreted as a boolean.
+    """
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -124,12 +141,43 @@ def _parse_bool(value: object) -> bool:
 
 
 def _resolve_path(path_value: Path | None) -> Path | None:
+    """Resolve a path with tilde expansion and absolute resolution.
+
+    Parameters
+    ----------
+    path_value : Path | None
+        Path to resolve, or None.
+
+    Returns
+    -------
+    Path | None
+        Resolved absolute path, or None if input is None.
+    """
     if path_value is None:
         return None
     return path_value.expanduser().resolve()
 
 
 def _parse_int_option(raw_value: object, *, option: str) -> int:
+    """Parse an integer value from various input types.
+
+    Parameters
+    ----------
+    raw_value : object
+        Value to parse (int, str, or other).
+    option : str
+        Option name for error messages.
+
+    Returns
+    -------
+    int
+        Parsed integer value.
+
+    Raises
+    ------
+    typer.BadParameter
+        If value cannot be interpreted as an integer.
+    """
     if isinstance(raw_value, int):
         return raw_value
     if isinstance(raw_value, str):
@@ -143,6 +191,25 @@ def _parse_int_option(raw_value: object, *, option: str) -> int:
 
 
 def _parse_path_option(raw_value: object, *, option: str) -> Path:
+    """Parse a filesystem path from various input types.
+
+    Parameters
+    ----------
+    raw_value : object
+        Value to parse (Path, str, or other).
+    option : str
+        Option name for error messages.
+
+    Returns
+    -------
+    Path
+        Parsed Path object.
+
+    Raises
+    ------
+    typer.BadParameter
+        If value cannot be interpreted as a path.
+    """
     if isinstance(raw_value, Path):
         return raw_value
     if isinstance(raw_value, str):

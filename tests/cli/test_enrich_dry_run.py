@@ -8,9 +8,17 @@ import os
 import shutil
 from pathlib import Path
 
+import pytest
 from codeintel_rev.cli_enrich import app
 
 from tests._helpers import assertions, cli, run_process
+
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy enrich pipeline commands were replaced by the new thin Typer-based CLI. "
+        "Functional coverage now lives in tests/cli/enrich/*."
+    )
+)
 
 
 def _git_env() -> dict[str, str]:

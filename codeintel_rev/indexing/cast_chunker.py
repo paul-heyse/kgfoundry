@@ -374,11 +374,23 @@ class _ChunkBuilder:
         return self._chunks
 
     def _start_chunk(self, start: int, end: int, symbol: str) -> None:
+        """Initialize a new chunk with the given symbol.
+
+        Parameters
+        ----------
+        start : int
+            Starting character offset for the new chunk.
+        end : int
+            Ending character offset for the new chunk.
+        symbol : str
+            First symbol identifier to include in the chunk.
+        """
         self._current_start_char = start
         self._current_end_char = end
         self._current_symbols = [symbol]
 
     def _flush_current(self) -> None:
+        """Finalize and append the current chunk, then reset builder state."""
         if self._current_start_char is None or self._current_end_char is None:
             return
         self._append_chunk(
@@ -394,6 +406,23 @@ class _ChunkBuilder:
         end: int,
         symbols: tuple[str, ...],
     ) -> None:
+        """Append a completed chunk to the chunks list.
+
+        Parameters
+        ----------
+        start : int
+            Starting character offset for the chunk.
+        end : int
+            Ending character offset for the chunk.
+        symbols : tuple[str, ...]
+            Symbol identifiers associated with this chunk.
+
+        Notes
+        -----
+        Converts character offsets to byte offsets, computes line numbers,
+        extracts text, and creates a Chunk object. Skips empty or invalid
+        ranges (end <= start).
+        """
         if end <= start:
             return
         start_byte = self._config.line_index.char_to_byte[start]
@@ -417,6 +446,23 @@ class _ChunkBuilder:
         )
 
     def _split_large_symbol(self, symbol: SymbolDef, start: int, end: int) -> None:
+        """Split a symbol that exceeds the budget into multiple chunks.
+
+        Parameters
+        ----------
+        symbol : SymbolDef
+            Symbol definition to split.
+        start : int
+            Starting character offset of the symbol.
+        end : int
+            Ending character offset of the symbol.
+
+        Notes
+        -----
+        Splits the symbol greedily at blank-line boundaries (double newlines)
+        when possible, falling back to budget-sized chunks if no blank lines
+        are found. Each resulting chunk contains the same symbol identifier.
+        """
         budget = self._config.budget
         text = self._config.text
         position = start
@@ -439,6 +485,7 @@ class _ChunkBuilder:
             position = tentative_end
 
     def _reset(self) -> None:
+        """Reset builder state to prepare for a new chunk."""
         self._current_start_char = None
         self._current_end_char = None
         self._current_symbols = []
@@ -570,6 +617,21 @@ def _apply_call_site_overlap(
     """
 
     def _slice_lines(beg_line: int, end_line: int) -> str:
+        """Extract text between two line numbers.
+
+        Parameters
+        ----------
+        beg_line : int
+            Starting line number (0-indexed).
+        end_line : int
+            Ending line number (0-indexed).
+
+        Returns
+        -------
+        str
+            Decoded text between the specified lines, with bounds clamped
+            to valid range.
+        """
         bounded_start = min(max(beg_line, 0), len(byte_starts) - 1)
         bounded_end = min(max(end_line, 0), len(byte_starts) - 1)
         start_byte = byte_starts[bounded_start]

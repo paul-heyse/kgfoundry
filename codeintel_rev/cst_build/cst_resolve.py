@@ -90,6 +90,14 @@ class SCIPResolver:
     _USE_KINDS: ClassVar[set[str]] = {"Call", "Attribute", "Name"}
 
     def __init__(self, documents: Mapping[str, Document]) -> None:
+        """Initialize SCIP resolver with document index.
+
+        Parameters
+        ----------
+        documents : Mapping[str, Document]
+            Mapping from file paths to SCIP Document objects containing symbol
+            definitions and occurrences.
+        """
         self._definition_index: dict[str, dict[int, list[_SymbolCandidate]]] = {}
         self._occurrence_index: dict[str, dict[int, list[_SymbolCandidate]]] = {}
         for path, document in documents.items():
