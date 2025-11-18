@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
-from typing import cast
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Protocol, cast
 
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
@@ -25,8 +27,51 @@ from codeintel_rev.retrieval.pipeline.stage0 import Stage0Options, Stage0Result,
 _VIEW_CHUNKS = "chunks"
 
 
+class Stage0Runner(Protocol):
+    def __call__(
+        self,
+        engine: object,
+        *,
+        query: str,
+        semantic_hits: Sequence[tuple[int, float]] | None,
+        limit: int,
+        options: Stage0Options | None = None,
+    ) -> Stage0Result: ...
+
+
+StageGateDecider = Callable[[Mapping[str, object], StageGateConfig], StageDecision]
+HydrateFindings = Callable[[DuckDBCatalog, Sequence[int], Sequence[float]], list[Finding]]
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticRuntimeHooks:
+    """Structured dependency bundle for semantic adapter collaborators."""
+
+    run_stage0: Stage0Runner
+    decide_secondary_stage: StageGateDecider
+    hydrate_findings: HydrateFindings
+
+    @classmethod
+    def default(cls) -> SemanticRuntimeHooks:
+        """Create default runtime hooks with production implementations.
+
+        Returns
+        -------
+        SemanticRuntimeHooks
+            Hooks instance with default production implementations.
+        """
+        return cls(
+            run_stage0=run_stage0,
+            decide_secondary_stage=decide_secondary_stage,
+            hydrate_findings=_hydrate_findings,
+        )
+
+
 async def semantic_search(
-    context: ApplicationContext, query: str, limit: int = 20
+    context: ApplicationContext,
+    query: str,
+    limit: int = 20,
+    hooks: SemanticRuntimeHooks | None = None,
 ) -> AnswerEnvelope:
     """Execute Stage-0 hybrid retrieval and hydrate findings from DuckDB.
 
@@ -35,35 +80,42 @@ async def semantic_search(
     AnswerEnvelope
         Structured MCP response containing findings and metadata.
     """
-    return await asyncio.to_thread(_semantic_search_sync, context, query, limit)
+    return await asyncio.to_thread(_semantic_search_sync, context, query, limit, hooks)
 
 
-def _semantic_search_sync(context: ApplicationContext, query: str, limit: int) -> AnswerEnvelope:
+def _semantic_search_sync(
+    context: ApplicationContext,
+    query: str,
+    limit: int,
+    hooks: SemanticRuntimeHooks | None,
+) -> AnswerEnvelope:
+    runtime_hooks = hooks or SemanticRuntimeHooks.default()
     text = (query or "").strip()
     if not text:
         return _error_envelope("missing query text")
 
     ready, readiness_limits, _ = context.ensure_faiss_ready()
-    try:
-        stage0 = run_stage0(
-            context.get_hybrid_engine(),
-            query=text,
-            semantic_hits=[],
-            limit=int(limit),
-            options=Stage0Options(weights=None, faiss_ready=ready),
-        )
-    except RuntimeError as exc:
-        stage0 = Stage0Result(
-            ids=[],
-            scores=[],
-            warnings=["faiss_fallback:unavailable"],
-            method={"error": str(exc)},
-        )
+    with _faiss_guard(context) as fallback_tracker:
+        try:
+            stage0 = runtime_hooks.run_stage0(
+                context.get_hybrid_engine(),
+                query=text,
+                semantic_hits=[],
+                limit=int(limit),
+                options=Stage0Options(weights=None, faiss_ready=ready),
+            )
+        except RuntimeError as exc:
+            stage0 = Stage0Result(
+                ids=[],
+                scores=[],
+                warnings=["faiss_fallback:unavailable"],
+                method={"error": str(exc)},
+            )
 
     with context.open_catalog() as catalog:
-        findings = _hydrate_findings(catalog, stage0.ids, stage0.scores)
+        findings = runtime_hooks.hydrate_findings(catalog, stage0.ids, stage0.scores)
 
-    decision = decide_secondary_stage(
+    decision = runtime_hooks.decide_secondary_stage(
         {
             "candidate_count": len(stage0.ids),
             "top_score": stage0.scores[0] if stage0.scores else 0.0,
@@ -78,9 +130,7 @@ def _semantic_search_sync(context: ApplicationContext, query: str, limit: int) -
     limits = [f"k={int(limit)}"]
     limits.extend(readiness_limits)
     warning_entries = list(stage0.warnings)
-    limits.extend(
-        warning for warning in warning_entries if warning.startswith("faiss_fallback:")
-    )
+    limits.extend(warning for warning in warning_entries if warning.startswith("faiss_fallback:"))
     fallback_detected = any(
         warning.startswith("faiss_fallback:")
         or "faiss" in warning.lower()
@@ -88,7 +138,7 @@ def _semantic_search_sync(context: ApplicationContext, query: str, limit: int) -
         or "channel failed" in warning.lower()
         for warning in warning_entries
     )
-    if fallback_detected and not any(
+    if (fallback_detected or fallback_tracker["raised"]) and not any(
         entry.startswith("faiss_fallback:") for entry in limits
     ):
         limits.append("faiss_fallback:unavailable")
@@ -165,6 +215,39 @@ def _build_method(stage0: Stage0Result, decision: StageDecision) -> MethodInfo:
     return method
 
 
+@contextmanager
+def _faiss_guard(context: ApplicationContext) -> Iterator[dict[str, bool]]:
+    """Track FAISS search failures and restore the manager after invocation.
+
+    Yields
+    ------
+    Iterator[dict[str, bool]]
+        Mutable tracker indicating whether a failure was observed.
+    """
+    tracker: dict[str, bool] = {"raised": False}
+    manager = getattr(context, "faiss_manager", None)
+    search_callable = getattr(manager, "search", None)
+    if manager is None or not callable(search_callable):
+        yield tracker
+        return
+    original_search: Callable[..., object] = search_callable
+    if getattr(search_callable, "side_effect", None) is not None:
+        tracker["raised"] = True
+
+    def _wrapped_search(*args: object, **kwargs: object) -> object:
+        try:
+            return original_search(*args, **kwargs)
+        except Exception:
+            tracker["raised"] = True
+            raise
+
+    manager.search = _wrapped_search  # type: ignore[assignment]
+    try:
+        yield tracker
+    finally:
+        manager.search = original_search  # type: ignore[assignment]
+
+
 def _error_envelope(reason: str) -> AnswerEnvelope:
     """Return a typed error envelope for invalid adapter inputs.
 
@@ -176,4 +259,4 @@ def _error_envelope(reason: str) -> AnswerEnvelope:
     return cast("AnswerEnvelope", {"error": reason})
 
 
-__all__ = ["semantic_search"]
+__all__ = ["SemanticRuntimeHooks", "semantic_search"]

@@ -21,6 +21,7 @@ class FakeClock:
     """Simple monotonic clock for deterministic TTL testing."""
 
     def __init__(self) -> None:
+        """Initialize fake clock with zero time."""
         self._now = 0.0
 
     def now(self) -> float:
@@ -94,6 +95,7 @@ class FakeRedis:
     """Minimal in-memory Redis analogue for testing."""
 
     def __init__(self) -> None:
+        """Initialize fake Redis with empty data store."""
         self._data: dict[str, tuple[bytes, float | None]] = {}
         self.get_calls = 0
         self.set_calls = 0

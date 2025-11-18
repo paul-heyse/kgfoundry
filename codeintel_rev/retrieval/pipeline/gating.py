@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from codeintel_rev.retrieval.gating import (
@@ -12,6 +13,11 @@ from codeintel_rev.retrieval.gating import (
     should_run_secondary_stage as _core,
 )
 from codeintel_rev.retrieval.types import StageSignals
+
+StageGateCore = Callable[[StageSignals, _CoreStageGateConfig], object]
+
+
+_STAGE_GATE_CORE_REF: list[StageGateCore] = [_core]
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,8 +61,19 @@ def decide_secondary_stage(
         min_candidates=config.min_candidates,
         margin_threshold=config.high_margin_threshold,
     )
-    out = _core(stage_signals, core_config)
+    out = _STAGE_GATE_CORE_REF[0](stage_signals, core_config)
     return StageDecision(should_run=bool(out.should_run), reason=str(out.reason))
+
+
+@contextmanager
+def override_stage_gate_core(core: StageGateCore) -> Iterator[None]:
+    """Temporarily override the Stage-1 gating core callable for tests."""
+    previous = _STAGE_GATE_CORE_REF[0]
+    _STAGE_GATE_CORE_REF[0] = core
+    try:
+        yield
+    finally:
+        _STAGE_GATE_CORE_REF[0] = previous
 
 
 def _normalize_signals(signals: Mapping[str, object]) -> StageSignals:
@@ -94,4 +111,9 @@ def _normalize_signals(signals: Mapping[str, object]) -> StageSignals:
     )
 
 
-__all__ = ["StageDecision", "StageGateConfig", "decide_secondary_stage"]
+__all__ = [
+    "StageDecision",
+    "StageGateConfig",
+    "decide_secondary_stage",
+    "override_stage_gate_core",
+]

@@ -77,6 +77,7 @@ class BlindExceptTransformer(ExceptHandlerTransformerMixin, cst.CSTTransformer):
     """
 
     def __init__(self) -> None:
+        """Initialize transformer with change tracking."""
         super().__init__()
         self.changes: list[str] = []
 

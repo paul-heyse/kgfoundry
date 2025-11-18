@@ -43,7 +43,13 @@ else:
 
 
 def _quote_literal(value: str) -> str:
-    """Return a DuckDB-safe string literal."""
+    """Return a DuckDB-safe string literal.
+
+    Returns
+    -------
+    str
+        Value quoted and escaped for safe SQL embedding.
+    """
     escaped = value.replace("'", "''")
     return f"'{escaped}'"
 

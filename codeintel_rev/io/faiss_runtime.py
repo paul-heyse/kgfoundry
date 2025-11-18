@@ -7,7 +7,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from numbers import Integral, Real
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 
@@ -35,6 +35,48 @@ except (ImportError, ModuleNotFoundError):  # pragma: no cover - rerank path opt
     exact_rerank = None
 
 _faiss = LazyModule("faiss", "FAISS runtime operations")
+
+
+class ExactRerank(Protocol):
+    """Protocol for exact reranking using DuckDB catalog.
+
+    This protocol defines the interface for reranking candidate documents
+    using exact similarity calculations from DuckDB embeddings.
+    """
+
+    def __call__(
+        self,
+        catalog: DuckDBCatalog,
+        queries: NDArrayF32,
+        candidate_ids: NDArrayI64,
+        *,
+        top_k: int,
+        metric: str,
+    ) -> tuple[NDArrayF32, NDArrayI64]:
+        """Rerank candidates using exact similarities from catalog.
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog
+            DuckDB catalog for querying exact embeddings.
+        queries : NDArrayF32
+            Query vectors to rerank against.
+        candidate_ids : NDArrayI64
+            Candidate document IDs to rerank.
+        top_k : int
+            Number of top results to return.
+        metric : str
+            Similarity metric ("ip" or "cosine").
+
+        Returns
+        -------
+        tuple[NDArrayF32, NDArrayI64]
+            Tuple of (scores, reranked_ids) arrays.
+        """
+        ...
+
+
+_EXACT_RERANK_REF: list[ExactRerank | None] = [exact_rerank]
 
 
 def _noop_parameter_space(_index: FaissIndex, _params: list[str]) -> bool:
@@ -297,6 +339,17 @@ def override_parameter_application(
         yield
     finally:
         _PARAMETER_SPACE_APPLIER_REF[0] = original
+
+
+@contextmanager
+def override_exact_rerank(reranker: ExactRerank | None) -> Iterator[None]:
+    """Temporarily replace the exact reranker used during dual searches."""
+    previous = _EXACT_RERANK_REF[0]
+    _EXACT_RERANK_REF[0] = reranker
+    try:
+        yield
+    finally:
+        _EXACT_RERANK_REF[0] = previous
 
 
 def _assign_attr(target: object, attr: str, value: int | None) -> bool:
@@ -701,8 +754,9 @@ def search_dual(  # noqa: PLR0913
     else:
         d_m, i_m = d1, i1
 
-    if exact_rerank is not None and catalog is not None and refine_k_factor > 1.0 and search_k > k:
-        reranked_d, reranked_i = exact_rerank(
+    reranker = _EXACT_RERANK_REF[0]
+    if reranker is not None and catalog is not None and refine_k_factor > 1.0 and search_k > k:
+        reranked_d, reranked_i = reranker(
             catalog,
             _as2d_f32(query),
             i_m,

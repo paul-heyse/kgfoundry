@@ -137,6 +137,15 @@ class TypeGateVisitor(ast.NodeVisitor):
     """
 
     def __init__(self, filepath: Path, heavy_modules: set[str]) -> None:
+        """Initialize type gate checker.
+
+        Parameters
+        ----------
+        filepath : Path
+            Path to the file being analyzed.
+        heavy_modules : set[str]
+            Set of module names considered "heavy" (e.g., numpy, fastapi, faiss).
+        """
         self.filepath = filepath
         self.violations: list[TypeGateViolation] = []
         self.in_type_checking_block = False

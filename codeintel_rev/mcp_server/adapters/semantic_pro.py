@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import Protocol, cast
 
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
@@ -24,8 +24,11 @@ from codeintel_rev.retrieval.pipeline.gating import (
     StageGateConfig,
     decide_secondary_stage,
 )
-from codeintel_rev.retrieval.pipeline.late_interaction import XTRLateInteraction
-from codeintel_rev.retrieval.pipeline.rerankers import NoopReranker
+from codeintel_rev.retrieval.pipeline.late_interaction import (
+    LateInteractionResult,
+    XTRLateInteraction,
+)
+from codeintel_rev.retrieval.pipeline.rerankers import NoopReranker, RerankResult
 from codeintel_rev.retrieval.pipeline.stage0 import Stage0Options, Stage0Result, run_stage0
 
 
@@ -43,11 +46,80 @@ class SemanticProOptions:
 ProOptions = SemanticProOptions
 
 
+class Stage0Runner(Protocol):
+    def __call__(
+        self,
+        engine: object,
+        *,
+        query: str,
+        semantic_hits: Sequence[tuple[int, float]] | None,
+        limit: int,
+        options: Stage0Options | None = None,
+    ) -> Stage0Result: ...
+
+
+class LateInteractionRunner(Protocol):
+    def rescore(
+        self,
+        query: str,
+        candidate_ids: Sequence[int],
+        *,
+        explain: bool = False,
+    ) -> LateInteractionResult: ...
+
+
+class Reranker(Protocol):
+    def rerank(
+        self,
+        query: str,
+        ids: Iterable[int],
+        scores: Iterable[float],
+    ) -> RerankResult: ...
+
+
+StageGateDecider = Callable[[Mapping[str, object], StageGateConfig], StageDecision]
+HydrateIds = Callable[[DuckDBCatalog, Sequence[int], Sequence[float]], list[Finding]]
+ResolveXtrIndex = Callable[[ApplicationContext], XTRIndex | None]
+LateInteractionFactory = Callable[[XTRIndex], LateInteractionRunner]
+RerankerFactory = Callable[[], Reranker]
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticProHooks:
+    """Configurable collaborators for the semantic pro adapter pipeline."""
+
+    run_stage0: Stage0Runner
+    decide_secondary_stage: StageGateDecider
+    hydrate_ids: HydrateIds
+    resolve_xtr_index: ResolveXtrIndex
+    late_interaction_factory: LateInteractionFactory
+    reranker_factory: RerankerFactory
+
+    @classmethod
+    def default(cls) -> SemanticProHooks:
+        """Return the production collaborators for semantic search pro.
+
+        Returns
+        -------
+        SemanticProHooks
+            Hook bundle referencing production implementations.
+        """
+        return cls(
+            run_stage0=run_stage0,
+            decide_secondary_stage=decide_secondary_stage,
+            hydrate_ids=_hydrate_ids,
+            resolve_xtr_index=_resolve_xtr_index,
+            late_interaction_factory=XTRLateInteraction,
+            reranker_factory=NoopReranker,
+        )
+
+
 async def semantic_search_pro(
     context: ApplicationContext,
     query: str,
     limit: int = 20,
     options: SemanticProOptions | None = None,
+    hooks: SemanticProHooks | None = None,
 ) -> AnswerEnvelope:
     """Execute Stage-0 → gating → optional late-interaction → optional rerank.
 
@@ -56,7 +128,7 @@ async def semantic_search_pro(
     AnswerEnvelope
         Structured MCP response capturing findings and metadata.
     """
-    return await asyncio.to_thread(_semantic_search_pro_sync, context, query, limit, options)
+    return await asyncio.to_thread(_semantic_search_pro_sync, context, query, limit, options, hooks)
 
 
 def _semantic_search_pro_sync(
@@ -64,13 +136,15 @@ def _semantic_search_pro_sync(
     query: str,
     limit: int,
     options: SemanticProOptions | None,
+    hooks: SemanticProHooks | None,
 ) -> AnswerEnvelope:
+    runtime_hooks = hooks or SemanticProHooks.default()
     opts = options or SemanticProOptions()
     query = (query or "").strip()
     if not query:
         return _error_envelope("missing query text")
 
-    stage0 = run_stage0(
+    stage0 = runtime_hooks.run_stage0(
         context.get_hybrid_engine(),
         query=query,
         semantic_hits=[],
@@ -79,7 +153,7 @@ def _semantic_search_pro_sync(
     )
     ids, scores = stage0.ids, stage0.scores
 
-    decision = decide_secondary_stage(
+    decision = runtime_hooks.decide_secondary_stage(
         {
             "candidate_count": len(ids),
             "top_score": scores[0] if scores else 0.0,
@@ -98,6 +172,7 @@ def _semantic_search_pro_sync(
         decision=decision,
         stage_records=stage_records,
         notes=notes,
+        hooks=runtime_hooks,
     )
 
     ids, scores = _run_late_interaction_stage(
@@ -115,7 +190,7 @@ def _semantic_search_pro_sync(
     )
 
     with context.open_catalog() as catalog:
-        findings = _hydrate_ids(catalog, ids, scores)
+        findings = runtime_hooks.hydrate_ids(catalog, ids, scores)
 
     method = _build_method(
         stage0=stage0,
@@ -199,6 +274,7 @@ class _StageContext:
     decision: StageDecision
     stage_records: list[StageInfo]
     notes: list[str]
+    hooks: SemanticProHooks
 
 
 def _run_late_interaction_stage(
@@ -231,14 +307,14 @@ def _run_late_interaction_stage(
         stage["reason"] = "no_candidates"
         stage_ctx.stage_records.append(stage)
         return ids, scores
-    xtr_index = _resolve_xtr_index(stage_ctx.context)
+    xtr_index = stage_ctx.hooks.resolve_xtr_index(stage_ctx.context)
     if xtr_index is None:
         stage["status"] = "skip"
         stage["reason"] = "xtr_unavailable"
         stage_ctx.stage_records.append(stage)
         stage_ctx.notes.append("late_interaction skipped: XTR unavailable")
         return ids, scores
-    li = XTRLateInteraction(xtr_index)
+    li = stage_ctx.hooks.late_interaction_factory(xtr_index)
     narrowed = li.rescore(
         query=query,
         candidate_ids=ids[: min(stage_ctx.options.xtr_k, len(ids))],
@@ -275,7 +351,7 @@ def _run_reranker_stage(
         stage["reason"] = "no_candidates"
         stage_ctx.stage_records.append(stage)
         return ids, scores, None
-    reranker = NoopReranker()
+    reranker = stage_ctx.hooks.reranker_factory()
     original = list(ids)
     reranked = reranker.rerank(query, ids, scores)
     reordered = sum(1 for idx, chunk_id in enumerate(reranked.ids) if chunk_id != original[idx])
@@ -331,4 +407,9 @@ def _error_envelope(reason: str) -> AnswerEnvelope:
     return cast("AnswerEnvelope", {"error": reason})
 
 
-__all__ = ["ProOptions", "SemanticProOptions", "semantic_search_pro"]
+__all__ = [
+    "ProOptions",
+    "SemanticProHooks",
+    "SemanticProOptions",
+    "semantic_search_pro",
+]

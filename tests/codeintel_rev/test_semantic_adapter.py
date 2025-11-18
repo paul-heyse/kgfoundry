@@ -23,29 +23,63 @@ class _StubContext:
     def open_catalog() -> contextlib.AbstractContextManager[object]:
         return contextlib.nullcontext(object())
 
+    @staticmethod
+    def ensure_faiss_ready() -> tuple[bool, list[str], str | None]:  # pragma: no cover
+        return True, [], None
+
     runtime_cells = type("_Cells", (), {"xtr_index": object()})()  # pragma: no cover
 
 
+def _build_runtime_hooks(
+    *,
+    stage0: Stage0Result,
+    findings: list[dict[str, float]],
+    decision: StageDecision,
+) -> semantic_adapter.SemanticRuntimeHooks:
+    def _run_stage0(
+        _engine: object,
+        *,
+        query: str,
+        semantic_hits: list[tuple[int, float]] | None,
+        limit: int,
+        options: object | None = None,
+    ) -> Stage0Result:
+        del _engine, query, semantic_hits, limit, options
+        return stage0
+
+    def _hydrate(
+        _catalog: object,
+        ids: list[int],
+        scores: list[float],
+    ) -> list[dict[str, float]]:
+        del _catalog, ids, scores
+        return findings
+
+    def _decide(_signals: object, _config: object) -> StageDecision:
+        del _signals, _config
+        return decision
+
+    return semantic_adapter.SemanticRuntimeHooks(
+        run_stage0=_run_stage0,
+        decide_secondary_stage=_decide,
+        hydrate_findings=_hydrate,
+    )
+
+
 @pytest.mark.asyncio
-async def test_semantic_search_returns_findings(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_semantic_search_returns_findings() -> None:
     """semantic_search hydrates catalog rows and surfaces method metadata."""
     stage0 = Stage0Result(
         ids=[1, 2], scores=[0.9, 0.8], warnings=["fanout"], method={"engine": "stub"}
     )
-    monkeypatch.setattr(semantic_adapter, "run_stage0", lambda *_args, **_kwargs: stage0)
-    monkeypatch.setattr(
-        semantic_adapter,
-        "_hydrate_findings",
-        lambda *_args, **_kwargs: [{"chunk_id": 1, "score": 0.9}],
-    )
-    monkeypatch.setattr(
-        semantic_adapter,
-        "decide_secondary_stage",
-        lambda *_args, **_kwargs: StageDecision(should_run=False, reason="tests"),
+    hooks = _build_runtime_hooks(
+        stage0=stage0,
+        findings=[{"chunk_id": 1, "score": 0.9}],
+        decision=StageDecision(should_run=False, reason="tests"),
     )
 
     context = cast("ApplicationContext", _StubContext())
-    envelope = await semantic_adapter.semantic_search(context, "vector", limit=5)
+    envelope = await semantic_adapter.semantic_search(context, "vector", limit=5, hooks=hooks)
 
     if "confidence" not in envelope:
         pytest.fail("expected confidence in envelope")

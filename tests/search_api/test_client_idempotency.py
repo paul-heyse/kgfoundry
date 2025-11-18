@@ -66,6 +66,15 @@ class StubHttpClient:
         get_responses: list[StubResponse] | None = None,
         post_responses: list[StubResponse] | None = None,
     ) -> None:
+        """Initialize stub HTTP adapter.
+
+        Parameters
+        ----------
+        get_responses : list[StubResponse] | None, optional
+            Queue of GET responses that will be returned in order.
+        post_responses : list[StubResponse] | None, optional
+            Queue of POST responses that will be returned in order.
+        """
         self._get_responses = list(get_responses or [])
         self._post_responses = list(post_responses or [])
         self.get_call_count = 0

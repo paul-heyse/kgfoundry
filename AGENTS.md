@@ -37,6 +37,7 @@
     ```bash
     scripts/bootstrap.sh
     ```
+    then run "uv sync && uv sync --extra gpu"
 
 2) **Implement**
    - Code to the typed API sketch.
@@ -62,7 +63,7 @@ For all code blocks that you make edits to, please check for pyright, pyrefly, a
 
 Strict Python Code Compliance Rules
 This contract defines every enforceable coding constraint from our Ruff linter, Pyrefly type checker, and Pyright (strict mode) configurations. All rules are mandatory and phrased as must or must not directives, grouped by theme for clarity. AI code generation must adhere to all of these rules.
-Part I: Imports and Module Structure
+##### Part I: Imports and Module Structure
     • Absolute Imports Only: Code must not use relative imports; all imports must be absolute with full module paths[1]. No from .module import X or import ..package – always use the complete package name.
     • Top-Level Import Placement: Imports must reside at the top of the file (module scope), not inside functions or blocks, except for type-only imports guarded by if typing.TYPE_CHECKING:[2][3]. Do not place regular imports inside functions or classes.
     • Type-Checking Imports: Any import used only for type annotations must be enclosed in an if TYPE_CHECKING: block (to avoid runtime overhead)[2]. This keeps type-only dependencies out of runtime execution.
@@ -75,7 +76,7 @@ Part I: Imports and Module Structure
     • No Useless Aliases: Avoid import aliases that do nothing. For example, must not do import numpy as numpy or import module as module (aliasing to the same name)[8].
     • Unused Imports: Every import in the code must be used. Remove any import that is not actually referenced in the module (the linter treats unused imports as errors[9]). No imported names should remain unused.
     • Executable Scripts: If a Python file is meant to be run as a script, it must include a proper shebang line (e.g., #!/usr/bin/env python3) and have executable permissions. Conversely, library modules must not contain shebang lines or executable file permissions unless they are truly intended as entry points (enforced by executable-check rules[10]).
-Part II: Code Style and Naming Conventions
+##### Part II: Code Style and Naming Conventions
     • Line Length Limit: All code must wrap or break lines to stay within 100 characters in length[11]. No line may exceed this limit, ensuring readability in diffs and standard terminals.
     • Indentation: Use 4 spaces per indentation level. Code must use spaces (not tabs) for indenting blocks[12]. Mixed tabs and spaces or incorrect indent multiples are disallowed[13].
     • Quotation Style: Use double quotes for all string literals, including docstrings[12]. Single quotes should be used only when a string contains double quotes and no easier escaping is possible. Consistent quoting is enforced – e.g., "example" rather than 'example' unless necessary.
@@ -94,7 +95,7 @@ Part II: Code Style and Naming Conventions
     • No Unnecessary Pass: Avoid using pass where it’s not needed. For instance, an empty class or function body can use ... (ellipsis) instead of pass in stub files, and in regular code an empty function should at least have a docstring or a comment. Unneeded pass statements are discouraged[30].
     • No Print Debugging: The code must not contain print statements or pretty-print (pprint) calls for debugging purposes. Printing to stdout/stderr for debugging (e.g., print("Debug")) is forbidden[31][32]. Use proper logging instead (and even then, only as needed).
     • Pathlib for Paths: When handling filesystem paths, the code must prefer pathlib.Path objects over direct string manipulation or os.path functions (enforced by use-pathlib rules). Build paths using Path operations instead of concatenating strings[33].
-Part III: Functions, Complexity, and Best Practices
+##### Part III: Functions, Complexity, and Best Practices
     • Function Length and Complexity: Functions and methods must remain reasonably simple. The cyclomatic complexity of a function must not exceed 10 branches[34]. In practice, this means avoiding overly complicated logic flows – refactor if a single function has too many if/elif branches or loop nesting. Additionally, a single function must not have more than 12 distinct branches (decision points) as measured by Pylint[35], and must not contain more than 6 return statements in total[35]. Keep functions focused and straightforward.
     • Parameter Count: While not explicitly configured, follow best practice by keeping the number of parameters manageable (Pylint’s default threshold is 5 arguments). Functions should not have an excessive number of parameters; break them into smaller functions or use objects to encapsulate if needed.
     • No Unused Function Arguments: Every function parameter defined must be used in the function’s body. Do not include parameters that serve no purpose (lint will flag unused function arguments[33]). If a function signature is constrained by an interface (thus unused parameters), explicitly prefix the name with an underscore to indicate it’s unused.
@@ -125,7 +126,7 @@ Part III: Functions, Complexity, and Best Practices
     • Use pivot_table instead of the older pivot or unstack when creating pivot tables[69].
     • Don’t use overly generic names like df for DataFrame variables in complex contexts[70]; while a short name is common for simple examples, in larger scopes use a descriptive name.
     • No Commented-Out Code: Do not leave commented-out code fragments in the codebase. Remove dead code entirely instead of commenting it out[71][72]. The presence of large commented code blocks is considered a violation (it’s flagged as “commented-out code” by the linter).
-Part IV: Error Handling and Logging
+##### Part IV: Error Handling and Logging
     • No Bare Exceptions: Every except clause must specify an exception type. Never use a bare except: with no exception class[73]. If you intend to catch all exceptions, at least use except Exception: (and even that should be used sparingly).
     • Avoid Broad Exception Catches: Catch the most specific exception that makes sense. Do not catch high-level exceptions like Exception or BaseException unless you genuinely need to handle all errors. In particular, do not silence system-exiting exceptions (like KeyboardInterrupt or SystemExit) unintentionally by catching BaseException.
     • No Silent Pass in Except: An exception handler must not be completely empty or just pass. Swallowing exceptions without at least logging or handling is not allowed[73]. If you truly want to ignore an exception, explicitly state it or use contextlib.suppress() with the specific exception.
@@ -153,7 +154,7 @@ Security and Dangerous Functions:
     • Cryptography: Use standard cryptographic libraries and avoid writing your own or using outdated algorithms. (E.g., do not use the random module for security-critical randomness – use secrets or os.urandom.)
     • Input Validation: Validate inputs from untrusted sources. This is a general guideline: ensure functions check and sanitize inputs if used in security contexts (though this may not be enforced by static analysis, it’s expected in secure code).
 (The security rules above align with common Bandit checks included via Ruff’s S (flake8-bandit) rules[85].)
-Part V: Typing and Static Type-Checking
+##### Part V: Typing and Static Type-Checking
     • All Functions Typed: Every function and method must have type annotations for all parameters and for the return type (except special cases like __init__ which implicitly returns None). The project enforces complete typing of function signatures[86]. No function should be left untyped in its definition.
     • Public Attributes Typed: All module-level variables, class attributes, and constants that are part of the public interface should be annotated with types, unless their value immediately makes the type obvious. In new code, aim to annotate any significant variable with an explicit type if the initializer expression is not clear or if it’s None initially.
     • No Any Types (Unless Explicitly Needed): Avoid the use of untyped Any types. All types should be as explicit and precise as possible. In strict mode, using Any (especially implicitly) can lead to type checker warnings. Thus, must not introduce Any types unless absolutely necessary (and if so, consider a comment or make it clear why).
@@ -191,7 +192,7 @@ Part V: Typing and Static Type-Checking
     • Self Use in Methods: Avoid using attributes named “self” outside of method definitions. Also, do not assign to self (the name) in a method – use it only as the instance reference. Flake8-self also flags instances of accessing private members of classes: do not access another class’s private variables (e.g., something that starts with _ClassName__), and do not use double prefix __var names in ways that rely on name-mangling inconsistently[99].
     • Typing Imports: Prefer modern typing syntax and imports. Use built-in generic types (like list[str] not typing.List[str]) on Python 3.13+ as appropriate (target version is py313[100]). Also prefer from collections.abc import Iterable instead of importing the old typing.Iterable if applicable. The code should be compatible with Python 3.13’s typing features.
 (Pyrefly and Pyright will enforce that any type errors are eliminated. In summary: the code must type-check cleanly with no errors or unresolved types[101], and must conform to the strictest interpretation of the type hints provided.)
-Part VI: Documentation and Comments
+##### Part VI: Documentation and Comments
     • Docstrings Required: Every public module, class, function, and method must include a docstring explaining its purpose. This project treats missing docstrings as violations (via Pydocstyle’s rules under the NumPy convention). All API elements should be documented.
     • Module docstring at the top of each file (if the file has code aside from perhaps imports).
     • Class docstring for each class or interface explaining what it represents.
@@ -364,6 +365,292 @@ Besides those formatting rules, all of your code designs and implementation work
 
 
 > If any step fails, **stop and fix** before continuing.
+
+## Testing Charter (for AI + Human Contributors)
+
+> **Intent:** All tests should behave as close to production as possible, even when targeting very small units of behavior. This charter defines hard rules and strong defaults for how to design and implement tests in this repo.
+
+---
+
+### 1. North Star & Scope
+
+* **North Star:**
+  Tests validate reality, not a lab simulation. Anything that passes our test suite should be extremely likely to work in production under realistic conditions.
+
+* **Scope:**
+  Applies to **all** pytest-based tests in this repo:
+
+  * Unit-ish tests
+  * Integration / “thin slice” tests
+  * End-to-end tests
+  * CLI, services, background jobs, data pipelines, code-intel components, etc.
+
+When in doubt, **choose the option that is closer to how the system runs in production.**
+
+---
+
+### 2. Global Rules
+
+1. **No monkeypatching at all.**
+
+   * You **MUST NOT** use `monkeypatch` fixture.
+   * You **MUST NOT** use `unittest.mock.patch`, `pytest-mock`, or any runtime-patching utilities on production code.
+   * All behavioral variation must be achieved via:
+
+     * configuration,
+     * dependency injection, or
+     * explicitly selectable implementations at composition time.
+
+2. **No test-only code paths.**
+
+   * Production code **MUST NOT** contain `if TESTING: ...` or branches that check `PYTEST_` env vars or “is pytest running?”.
+   * Configuration may differ (e.g. file paths, URLs, DB names), but logic may not.
+
+3. **Same stack, different instances.**
+
+   * Tests **MUST** use the same technologies as production:
+
+     * Same DB engine (e.g. DuckDB), same indexer (e.g. FAISS), same queues, same HTTP stack, etc.
+   * Tests may use **isolated instances** (temporary directories, in-memory DBs, local containers) but never replace a technology with a fake one (e.g. replacing DuckDB with a list).
+
+---
+
+### 3. Entry Points & Boundaries
+
+**Goal:** Exercise the system through the same seams that real users and systems use.
+
+* **Public entry points only**
+
+  * Tests **SHOULD** invoke:
+
+    * CLI commands via the real CLI app or `python -m` style entry points.
+    * Web/API operations via the real app factory / ASGI app.
+    * Library behavior via public functions/classes, not private helpers.
+  * Avoid reaching into internal helpers that production never calls directly.
+
+* **Compat shims**
+
+  * Where we maintain legacy shims (e.g. old CLI entry functions), tests **MAY** target them if they are real, deployed entry points.
+  * Test the **shim behavior + delegation**, not an alternative “test-only” path.
+
+---
+
+### 4. Imports & Dependency Wiring
+
+**Goal:** The dependency graph under test matches the production graph.
+
+* Tests **MUST** import modules using the same patterns as production (no special test-only import tricks).
+* Tests **MUST NOT** rely on manipulating `PYTHONPATH` or sys.path in ways not used in production.
+* If a dependency injection container or “composition root” exists:
+
+  * Tests **SHOULD** construct the app via that same composition root.
+  * Tests may override **configuration**, not the types bound to interfaces (except where explicitly supported by the production composition design).
+
+---
+
+### 5. Configuration & Environment
+
+**Goal:** Tests load configuration the same way production does.
+
+* Config **MUST** be loaded through the real config mechanism:
+
+  * e.g. `$ENV` + config files + CLI flags, etc.
+* Tests may:
+
+  * use a dedicated test config file (e.g. `.env.test`, `config.test.yaml`),
+  * or set environment variables that are **documented and meaningful** for real deployments.
+* Env vars:
+
+  * You **MAY** introduce test-specific values (e.g. `APP_ENV=test`, `TEST_DATA_DIR=...`),
+  * But they **MUST** map to behavior that could realistically occur in a non-test environment (e.g. “pointing to a different directory or DB”), not fundamentally different logic.
+
+---
+
+### 6. Data & Fixtures
+
+**Goal:** Test data looks and behaves like real data.
+
+* **Structural realism**
+
+  * Fixtures **SHOULD** use realistic shapes and values:
+
+    * Nested structures, multi-field records, non-ASCII text, reasonably long strings, realistic numerics, optional fields, etc.
+  * Avoid trivial “toy” fixtures like `{"id": 1, "name": "test"}` as the only coverage.
+
+* **Golden files**
+
+  * Golden reference files (JSON, Parquet, CSV, Markdown, HTML, etc.) **SHOULD** mirror real artifacts:
+
+    * Production column names, realistic row counts (not just a single row), plausible content and edge cases (nulls, weird spacing, etc.).
+  * Size may be small for performance, but complexity should reflect reality.
+
+---
+
+### 7. Dependencies & External Systems
+
+**Goal:** Same technology, smaller blast radius.
+
+* For each external system that production uses:
+
+  * Tests **MUST** use the **same kind of system**:
+
+    * DuckDB for DuckDB, FAISS for FAISS, Neo4j for Neo4j, etc.
+  * Tests **MAY** use:
+
+    * Temporary schemas / databases,
+    * Local containers / in-process mocks that are **drop-in compatible** and used in dev/staging,
+    * In-memory variants provided by the same engine (if realistic for production footprints).
+* No replacing a complex system with a toy in-memory structure that bypasses serialization, indexing, error handling, or the real API.
+
+---
+
+### 8. Time, Randomness & IDs
+
+**Goal:** Deterministic tests without cheating via monkeypatch.
+
+* Nondeterministic behavior **MUST** go through explicit abstractions:
+
+  * e.g. `Clock`, `NowProvider`, `RandomSource`, `IdGenerator`.
+* Production implementations call the real `time`/`datetime`/`random`/`uuid` APIs.
+* Test implementations:
+
+  * **SHOULD** be deterministic but realistic (monotonic time, realistic UUID shapes),
+  * **MUST NOT** be injected via monkeypatching;
+  * they are selected through configuration or DI.
+
+---
+
+### 9. Concurrency & Processes
+
+**Goal:** If production is concurrent, tests exercise that concurrency model.
+
+* Async code:
+
+  * Tests for async components **MUST** run them under the real event-loop / async stack used in production (e.g. `anyio`, `asyncio`) and not wrap them in artificial sync helpers that production never uses.
+* Multiprocessing / threading:
+
+  * Where production uses process pools or multiprocessing, tests **SHOULD** include at least some scenarios that use those same mechanisms.
+* Parallel test execution:
+
+  * All tests **MUST** be safe under parallel pytest execution (e.g. `pytest -n auto`):
+
+    * No shared fixed filenames,
+    * No shared mutable global state,
+    * Use unique temp directories or per-test resources.
+
+---
+
+### 10. Observability & Error Behavior
+
+**Goal:** Test not only outcomes, but also the signals we rely on in production.
+
+* Logging:
+
+  * For critical flows, tests **SHOULD** assert on log events and structure (log level, message, and key fields).
+* Metrics:
+
+  * When important behavior is tracked by metrics, tests **SHOULD** verify that the right counters/gauges/histograms are updated.
+* Errors:
+
+  * Prefer simulating real failure modes:
+
+    * e.g. corrupting a file, using a missing index path, closing a connection, making a dependency return a realistic error.
+  * Avoid artificial “magic” failures introduced via monkeypatch.
+
+---
+
+### 11. Use of Fakes & Test Doubles
+
+**Goal:** When you must use a stand-in, it behaves like a real component.
+
+* Test doubles **MUST**:
+
+  * Implement the same interface/protocol as the real dependency.
+  * Preserve key invariants (serialization, validation, error semantics).
+  * Be something you could plausibly use in a dev/staging environment (e.g. Minio for S3, local SMTP debug server, file-based cache).
+
+* Test doubles **MUST NOT**:
+
+  * Skip core behaviors (e.g. skip indexing, skip parsing, skip network boundaries) in ways that make bugs untestable.
+  * Be wired through runtime patching; they should be selected via configuration/DI.
+
+---
+
+### 12. Coverage & Test Types
+
+**Goal:** Every critical path has at least one realistic “thin slice” test.
+
+* For each critical user or system path:
+
+  * There **MUST** be at least one test that:
+
+    * Enters through the real entry point (CLI command, HTTP endpoint, worker main, etc.),
+    * Uses the real configuration mechanism,
+    * Hits real storage/indexing/cache layers (with isolated instances),
+    * Exercises typical and edge-case data.
+
+* Unit-level tests:
+
+  * Are allowed and encouraged for complex logic,
+  * **BUT** should target functions/classes that are **actually used** in production,
+  * And ideally are paired with a higher-level slice test for the same path, so they don’t drift from reality.
+
+---
+
+### 13. Anti-Patterns (Hard “NO”s)
+
+Agents and humans **MUST NOT**:
+
+1. Use `monkeypatch`, `unittest.mock`, or any runtime patching/mocking of production modules.
+2. Introduce `if TESTING` or equivalent branches in production code.
+3. Create alternate “test-only” code paths, containers, or composition roots that are not valid in real deployments.
+4. Rely on toy in-memory stand-ins for critical external systems (DBs, indexers, queues, etc.).
+5. Write tests that only validate internal helpers that are not used by any real code path.
+
+---
+
+### 14. Quick Checklist for New Tests (Agent-Friendly)
+
+Before finalizing a test, verify:
+
+1. **Entry point**
+
+   * Am I entering through the same public API/CLI/endpoint that production uses?
+
+2. **Config & env**
+
+   * Am I using the real configuration loading mechanism?
+   * Are any env vars I set consistent with plausible real deployments?
+
+3. **Dependencies**
+
+   * Am I using the same tech stack (DuckDB, FAISS, etc.) as production, just with isolated instances?
+
+4. **No patching**
+
+   * Did I avoid `monkeypatch`, `unittest.mock`, and other runtime patching tools?
+
+5. **Data realism**
+
+   * Does my test data look like real data, including some complexity and edge cases?
+
+6. **Nondeterminism**
+
+   * If time/randomness/UUIDs matter, am I using injected abstractions rather than patching built-ins?
+
+7. **Concurrency & isolation**
+
+   * Will this test still pass when tests run in parallel?
+
+8. **Observability (if applicable)**
+
+   * For critical flows, am I asserting on logs/metrics/errors in the way we depend on in production?
+
+If any answer is “no,” revise the test to move it closer to production reality.
+
+---
+
+
 
 ---
 

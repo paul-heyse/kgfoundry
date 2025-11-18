@@ -29,6 +29,19 @@ class RecordingFAISSManager:
         nlist: int,
         runtime: object | None = None,
     ) -> None:
+        """Initialize recording FAISS manager.
+
+        Parameters
+        ----------
+        index_path : Path
+            Path to FAISS index file.
+        vec_dim : int
+            Vector dimension.
+        nlist : int
+            Number of clusters for IVF index.
+        runtime : object | None, optional
+            Optional runtime object.
+        """
         self.index_path = index_path
         self.vec_dim = vec_dim
         self.nlist = nlist
@@ -57,6 +70,17 @@ class RecordingDuckDBCatalog:
     """Stub DuckDB catalog capturing constructor arguments."""
 
     def __init__(self, db_path: Path, vectors_dir: Path, **_: object) -> None:
+        """Initialize recording DuckDB catalog.
+
+        Parameters
+        ----------
+        db_path : Path
+            Path to DuckDB database file.
+        vectors_dir : Path
+            Directory containing vector files.
+        **_
+            Additional keyword arguments (ignored).
+        """
         self.db_path = db_path
         self.vectors_dir = vectors_dir
         self.open_called = False
@@ -80,6 +104,13 @@ class DummyVLLMClient:
     """Minimal vLLM client placeholder used for dependency injection."""
 
     def __init__(self, _config: object) -> None:  # pragma: no cover - trivial shim
+        """Initialize dummy vLLM client.
+
+        Parameters
+        ----------
+        _config : object
+            Configuration object (ignored).
+        """
         return
 
 

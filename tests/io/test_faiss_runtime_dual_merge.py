@@ -82,7 +82,7 @@ def test_dual_search_merge_no_refine() -> None:
     assertions.expect_equal(unique, _MERGE_K, reason="Merged results must dedupe IDs")
 
 
-def test_dual_search_merge_with_refine(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_dual_search_merge_with_refine() -> None:
     """Trigger refine path to ensure reranker output shapes are respected."""
 
     def fake_exact_rerank(
@@ -99,8 +99,6 @@ def test_dual_search_merge_with_refine(monkeypatch: pytest.MonkeyPatch) -> None:
         ids = candidate_ids[:, :top_k].astype(np.int64, copy=False)
         return distances, ids
 
-    monkeypatch.setattr(runtime_module, "exact_rerank", fake_exact_rerank, raising=True)
-
     d = 16
     primary, pvecs, _ = _mk_index(120, d, seed=3)
     query = pvecs[1].astype(np.float32)
@@ -109,14 +107,15 @@ def test_dual_search_merge_with_refine(monkeypatch: pytest.MonkeyPatch) -> None:
         """Catalog stub used to trigger refine path."""
 
     catalog = cast("DuckDBCatalog", FakeCatalog())
-    distances, ids = search_dual(
-        primary=primary,
-        secondary=None,
-        query=query,
-        k=_REFINE_K,
-        nprobe=None,
-        refine_k_factor=2.0,
-        catalog=catalog,
-    )
+    with runtime_module.override_exact_rerank(fake_exact_rerank):
+        distances, ids = search_dual(
+            primary=primary,
+            secondary=None,
+            query=query,
+            k=_REFINE_K,
+            nprobe=None,
+            refine_k_factor=2.0,
+            catalog=catalog,
+        )
     assertions.expect_equal(distances.shape, (1, _REFINE_K))
     assertions.expect_equal(ids.shape, (1, _REFINE_K))

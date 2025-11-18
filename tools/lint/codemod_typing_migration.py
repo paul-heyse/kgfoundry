@@ -32,6 +32,7 @@ class TypingFacadeMigrator(ImportFromTransformerMixin, CallTransformerMixin, cst
     """
 
     def __init__(self) -> None:
+        """Initialize transformer with modification tracking."""
         self.modified = False
 
     def _transform_import_from(self, node: cst.ImportFrom) -> cst.ImportFrom | cst.RemovalSentinel:

@@ -25,6 +25,7 @@ class RecordingObserver(RuntimeCellObserver):
     """Thread-safe observer that records cell events for assertions."""
 
     def __init__(self) -> None:
+        """Initialize recording observer with empty event lists."""
         self._lock = threading.Lock()
         self.init_started: list[str] = []
         self.init_events: list[dict[str, object]] = []

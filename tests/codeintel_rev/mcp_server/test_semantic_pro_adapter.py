@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from typing import cast
 
 import pytest
@@ -33,25 +34,62 @@ class _StubContext:
     def get_xtr_index() -> None:  # pragma: no cover - adapters patch resolver
         return None
 
+    @staticmethod
+    def ensure_faiss_ready() -> tuple[bool, list[str], str | None]:  # pragma: no cover
+        return True, [], None
+
+
+def _build_pro_hooks(
+    *,
+    stage0: Stage0Result,
+    decision: StageDecision,
+    findings: list[dict[str, float]],
+) -> semantic_pro.SemanticProHooks:
+    base = semantic_pro.SemanticProHooks.default()
+
+    def _run_stage0(
+        _engine: object,
+        *,
+        query: str,
+        semantic_hits: list[tuple[int, float]] | None,
+        limit: int,
+        options: object | None = None,
+    ) -> Stage0Result:
+        del _engine, query, semantic_hits, limit, options
+        return stage0
+
+    def _hydrate(
+        _catalog: object,
+        ids: list[int],
+        scores: list[float],
+    ) -> list[dict[str, float]]:
+        del _catalog, ids, scores
+        return findings
+
+    def _decide(_signals: object, _config: object) -> StageDecision:
+        del _signals, _config
+        return decision
+
+    return replace(
+        base,
+        run_stage0=_run_stage0,
+        decide_secondary_stage=_decide,
+        hydrate_ids=_hydrate,
+    )
+
 
 @pytest.mark.asyncio
-async def test_semantic_search_pro_returns_findings(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_semantic_search_pro_returns_findings() -> None:
     """semantic_search_pro orchestrates Stage-0 and returns hydrated findings."""
     stage0 = Stage0Result(ids=[1, 2], scores=[0.9, 0.8], warnings=[], method={})
-    monkeypatch.setattr(semantic_pro, "run_stage0", lambda *_args, **_kwargs: stage0)
-    monkeypatch.setattr(
-        semantic_pro,
-        "decide_secondary_stage",
-        lambda *_args, **_kwargs: StageDecision(should_run=False, reason="tests"),
-    )
-    monkeypatch.setattr(
-        semantic_pro,
-        "_hydrate_ids",
-        lambda *_args, **_kwargs: [{"chunk_id": 1, "score": 0.9}],
+    hooks = _build_pro_hooks(
+        stage0=stage0,
+        decision=StageDecision(should_run=False, reason="tests"),
+        findings=[{"chunk_id": 1, "score": 0.9}],
     )
 
     context = cast("ApplicationContext", _StubContext())
-    envelope = await semantic_pro.semantic_search_pro(context, "query", limit=3)
+    envelope = await semantic_pro.semantic_search_pro(context, "query", limit=3, hooks=hooks)
     if "findings" not in envelope:
         pytest.fail("expected findings in envelope")
     assertions.expect_equal(envelope["findings"], [{"chunk_id": 1, "score": 0.9}])
@@ -67,37 +105,41 @@ async def test_semantic_search_pro_returns_findings(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.asyncio
-async def test_semantic_search_pro_runs_late_interaction(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_semantic_search_pro_runs_late_interaction() -> None:
     """Late-interaction results replace Stage-0 ordering when gate allows."""
     stage0 = Stage0Result(ids=[1, 2], scores=[0.9, 0.8], warnings=[], method={})
-    monkeypatch.setattr(semantic_pro, "run_stage0", lambda *_args, **_kwargs: stage0)
-    monkeypatch.setattr(
-        semantic_pro,
-        "decide_secondary_stage",
-        lambda *_args, **_kwargs: StageDecision(should_run=True, reason="budget"),
+    hooks = _build_pro_hooks(
+        stage0=stage0,
+        decision=StageDecision(should_run=True, reason="budget"),
+        findings=[{"chunk_id": _SECOND_STAGE_CHUNK_ID, "score": 1.0}],
     )
 
-    def _fake_rescore(
-        _self: semantic_pro.XTRLateInteraction,
-        query: str,
-        candidate_ids: Sequence[int],
-        *,
-        explain: bool = False,
-    ) -> LateInteractionResult:
-        del explain, query, candidate_ids
-        return LateInteractionResult(ids=[_SECOND_STAGE_CHUNK_ID, 1], scores=[1.0, 0.7])
+    def _late_factory(_index: object) -> object:
+        class _StubLateInteraction:
+            @staticmethod
+            def rescore(
+                *,
+                query: str,
+                candidate_ids: Sequence[int],
+                explain: bool = False,
+            ) -> LateInteractionResult:
+                del query, candidate_ids, explain
+                return LateInteractionResult(ids=[_SECOND_STAGE_CHUNK_ID, 1], scores=[1.0, 0.7])
 
-    monkeypatch.setattr(semantic_pro.XTRLateInteraction, "rescore", _fake_rescore)
-    monkeypatch.setattr(
-        semantic_pro,
-        "_hydrate_ids",
-        lambda *_args, **_kwargs: [{"chunk_id": _SECOND_STAGE_CHUNK_ID, "score": 1.0}],
+        return _StubLateInteraction()
+
+    def _resolve_stub(_ctx: ApplicationContext) -> object:
+        del _ctx
+        return object()
+
+    hooks = replace(
+        hooks,
+        resolve_xtr_index=_resolve_stub,
+        late_interaction_factory=_late_factory,
     )
-
-    monkeypatch.setattr(semantic_pro, "_resolve_xtr_index", lambda *_args: object())
 
     context = cast("ApplicationContext", _StubContext())
-    envelope = await semantic_pro.semantic_search_pro(context, "query")
+    envelope = await semantic_pro.semantic_search_pro(context, "query", hooks=hooks)
     if "findings" not in envelope:
         pytest.fail("expected findings in envelope")
     first = envelope["findings"][0]
@@ -118,17 +160,16 @@ async def test_semantic_search_pro_runs_late_interaction(monkeypatch: pytest.Mon
 
 
 @pytest.mark.asyncio
-async def test_semantic_search_pro_runs_reranker(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_semantic_search_pro_runs_reranker() -> None:
     """Reranker output is honored when enabled in options."""
     stage0 = Stage0Result(ids=[3, 4], scores=[0.4, 0.3], warnings=[], method={})
-    monkeypatch.setattr(semantic_pro, "run_stage0", lambda *_args, **_kwargs: stage0)
-    monkeypatch.setattr(
-        semantic_pro,
-        "decide_secondary_stage",
-        lambda *_args, **_kwargs: StageDecision(should_run=False, reason="tests"),
+    hooks = _build_pro_hooks(
+        stage0=stage0,
+        decision=StageDecision(should_run=False, reason="tests"),
+        findings=[{"chunk_id": _RERANKED_CHUNK_ID, "score": 0.3}],
     )
 
-    class _StubReranker(semantic_pro.NoopReranker):
+    class _StubReranker:
         @staticmethod
         def rerank(
             _query: str,
@@ -139,16 +180,16 @@ async def test_semantic_search_pro_runs_reranker(monkeypatch: pytest.MonkeyPatch
             ordered_scores = list(scores)
             return RerankResult(ids=list(reversed(ordered_ids)), scores=ordered_scores)
 
-    monkeypatch.setattr(semantic_pro, "NoopReranker", _StubReranker)
-    monkeypatch.setattr(
-        semantic_pro,
-        "_hydrate_ids",
-        lambda *_args, **_kwargs: [{"chunk_id": _RERANKED_CHUNK_ID, "score": 0.3}],
-    )
+    def _build_reranker() -> _StubReranker:
+        return _StubReranker()
+
+    hooks = replace(hooks, reranker_factory=_build_reranker)
 
     options = semantic_pro.ProOptions(use_reranker=True, use_warp=False)
     context = cast("ApplicationContext", _StubContext())
-    envelope = await semantic_pro.semantic_search_pro(context, "query", options=options)
+    envelope = await semantic_pro.semantic_search_pro(
+        context, "query", options=options, hooks=hooks
+    )
     if "findings" not in envelope:
         pytest.fail("expected findings in envelope")
     reranked = envelope["findings"][0]
