@@ -82,6 +82,20 @@ class DuckDBManagerContext:
         """
 
         def _connector(database: str, *, read_only: bool) -> duckdb.DuckDBPyConnection:
+            """Create a DuckDB connection to the specified database.
+
+            Parameters
+            ----------
+            database : str
+                Path to DuckDB database file.
+            read_only : bool
+                Whether to open the database in read-only mode.
+
+            Returns
+            -------
+            duckdb.DuckDBPyConnection
+                New DuckDB connection instance.
+            """
             return duckdb.connect(database, read_only=read_only)
 
         return cls(connector=_connector)
@@ -272,6 +286,18 @@ class DuckDBManager:
             self.close()
 
     def _create_connection(self, *, read_only: bool = False) -> duckdb.DuckDBPyConnection:
+        """Create a new DuckDB connection with configured pragmas.
+
+        Parameters
+        ----------
+        read_only : bool, optional
+            Whether to open connection in read-only mode. Defaults to False.
+
+        Returns
+        -------
+        duckdb.DuckDBPyConnection
+            New connection configured with threading and object cache pragmas.
+        """
         connector = self._context.connector
         conn = connector(str(self._db_path), read_only=read_only)
         if self._config.enable_object_cache:
@@ -280,6 +306,14 @@ class DuckDBManager:
         return conn
 
     def _acquire_connection(self) -> duckdb.DuckDBPyConnection:
+        """Acquire a connection from pool or create a new one.
+
+        Returns
+        -------
+        duckdb.DuckDBPyConnection
+            Connection from pool if available, otherwise a newly created connection.
+            Blocks if pool is exhausted and pool_size > 0.
+        """
         if self._pool is None:
             return self._create_connection()
         try:
@@ -300,6 +334,13 @@ class DuckDBManager:
         return self._pool.get()
 
     def _release_connection(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Return a connection to the pool or close it.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            Connection to return to pool or close.
+        """
         if self._pool is None:
             conn.close()
             return

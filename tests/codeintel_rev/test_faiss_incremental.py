@@ -65,8 +65,7 @@ def test_update_index_creates_secondary(tmp_index_path: Path) -> None:
     """
     vec_dim = _UNIT_TEST_VEC_DIM
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
-
-    # Secondary index should not exist initially
+    _setup_primary_index(manager, vec_dim)
     assertions.expect_equal(manager.secondary_index, None)
     assertions.expect_equal(len(manager.incremental_ids), 0)
 
@@ -98,6 +97,7 @@ def test_update_index_skips_duplicates(tmp_index_path: Path) -> None:
     """
     vec_dim = _UNIT_TEST_VEC_DIM
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
+    _setup_primary_index(manager, vec_dim)
 
     # First batch
     vectors1 = _rng.normal(0.5, 0.15, (5, vec_dim)).astype(np.float32)

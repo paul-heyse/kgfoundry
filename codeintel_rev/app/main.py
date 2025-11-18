@@ -317,6 +317,29 @@ def _preload_hybrid_if_configured(context: ApplicationContext) -> None:
 def _create_application_context(
     overrides: ApplicationContextOverrides | None,
 ) -> ApplicationContext:
+    """Create application context with optional overrides.
+
+    Parameters
+    ----------
+    overrides : ApplicationContextOverrides | None
+        Optional dependency overrides for context creation.
+
+    Returns
+    -------
+    ApplicationContext
+        Created application context instance.
+
+    Notes
+    -----
+    Falls back to ApplicationContext.create() without overrides if the
+    overrides parameter is not supported (defensive compatibility).
+
+    Raises
+    ------
+    TypeError
+        Propagated when ApplicationContext.create raises an unexpected
+        TypeError unrelated to unsupported overrides.
+    """
     try:
         return ApplicationContext.create(overrides=overrides)
     except TypeError as exc:  # pragma: no cover - defensive compatibility
@@ -469,6 +492,20 @@ async def lifespan(
             def _handle_hup(
                 signum: int, frame: FrameType | None
             ) -> None:  # pragma: no cover - signal path
+                """Handle SIGHUP signal to reload indices.
+
+                Parameters
+                ----------
+                signum : int
+                    Signal number (should be SIGHUP).
+                frame : FrameType | None
+                    Current stack frame (unused).
+
+                Notes
+                -----
+                Silently ignores errors during index reload to prevent signal
+                handler from raising exceptions.
+                """
                 _ = (signum, frame)
                 try:
                     if context is None:

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import importlib
+
 import typer
 
 from codeintel_rev.cli.enrich import common
@@ -10,6 +12,9 @@ from codeintel_rev.cli.enrich import common
 app = typer.Typer(add_completion=True, help=common.GLOBAL_OPTIONS_HELP)
 common.attach_argv_normalizer(app, common.normalize_global_cli_args)
 app.callback()(common.shared_options)
+
+for module_name in ("analytics", "exports", "overlays", "scan", "to_duckdb"):
+    importlib.import_module(f"{__name__}.{module_name}")
 
 
 __all__ = ["app"]

@@ -371,11 +371,7 @@ class HybridPoolEvaluator:
         """
         if not cand_ids:
             return np.zeros((1, 0), dtype=np.float32), np.zeros((1, 0), dtype=np.int64)
-        vectors = store_reconstruct_batch(
-            self._manager.require_cpu_index(),
-            self._manager.vec_dim,
-            cand_ids,
-        )
+        vectors = self._reconstruct_candidates(cand_ids)
         faiss = __import__("faiss")  # lazy import
         faiss.normalize_L2(vectors)
         query = xq.copy()
@@ -386,6 +382,24 @@ class HybridPoolEvaluator:
         reranked_ids = np.take_along_axis(idx.reshape(1, -1), order, axis=1)
         reranked_scores = np.take_along_axis(scores, order, axis=1)
         return reranked_scores, reranked_ids
+
+    def _reconstruct_candidates(self, cand_ids: Sequence[int]) -> np.ndarray:
+        """Return candidate vectors using store helpers or manager fallbacks.
+
+        Returns
+        -------
+        np.ndarray
+            Float32 array containing reconstructed vectors for ``cand_ids``.
+        """
+        reconstruct = getattr(self._manager, "reconstruct_batch", None)
+        if callable(reconstruct):
+            batch = reconstruct(list(cand_ids))
+            return np.asarray(batch, dtype=np.float32)
+        return store_reconstruct_batch(
+            self._manager.require_cpu_index(),
+            self._manager.vec_dim,
+            cand_ids,
+        )
 
     def _extend_pool(
         self,

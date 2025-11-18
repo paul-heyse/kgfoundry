@@ -83,6 +83,23 @@ class CodeRankEmbedderContext:
         """
 
         def _provider(settings: SupportsCodeRankSettings) -> SentenceEncoderProtocol:
+            """Create a SentenceTransformer instance from settings.
+
+            Parameters
+            ----------
+            settings : SupportsCodeRankSettings
+                Settings containing model ID, device, and trust_remote_code flag.
+
+            Returns
+            -------
+            SentenceEncoderProtocol
+                SentenceTransformer instance cast to protocol.
+
+            Raises
+            ------
+            RuntimeError
+                If sentence_transformers module doesn't expose SentenceTransformer class.
+            """
             module = gate_import(
                 "sentence_transformers",
                 "CodeRank embeddings (install `sentence-transformers`)",

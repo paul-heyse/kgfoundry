@@ -302,6 +302,21 @@ class ReadinessProbe:
 
     @staticmethod
     def _record_check(span_name: str, fn: Callable[[], CheckResult]) -> CheckResult:
+        """Execute a readiness check function and return its result.
+
+        Parameters
+        ----------
+        span_name : str
+            Span name for tracing (currently unused but reserved for future
+            observability integration).
+        fn : Callable[[], CheckResult]
+            Check function to execute.
+
+        Returns
+        -------
+        CheckResult
+            Result from executing the check function.
+        """
         _ = span_name
         return fn()
 

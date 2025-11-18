@@ -103,7 +103,7 @@ def choose_family(n_vectors: int, cfg: IndexBuildConfig) -> IndexFamily:
         return cfg.family
     if n_vectors < _SMALL_CORPUS_THRESHOLD:
         return "flat"
-    if n_vectors <= _MEDIUM_CORPUS_THRESHOLD:
+    if n_vectors < _MEDIUM_CORPUS_THRESHOLD:
         return "ivfflat"
     return "ivfpq"
 
@@ -371,10 +371,20 @@ def extract_all_vectors(index: FaissIndex, vec_dim: int) -> tuple[NDArrayF32, ND
     for i in range(n_vectors):
         try:
             stored_id = int(at_callable(i))
+        except Exception as exc:  # pragma: no cover - defensive
+            msg = f"Failed to extract vector id at position {i}: {exc}"
+            raise RuntimeError(msg) from exc
+        try:
             reconstructed = base_index.reconstruct(i)
             vectors[i] = np.asarray(reconstructed, dtype=np.float32)
             ids[i] = stored_id
         except (AttributeError, RuntimeError) as exc:
+            if "DirectMap" in str(exc):
+                _configure_direct_map(index)
+                reconstructed = base_index.reconstruct(i)
+                vectors[i] = np.asarray(reconstructed, dtype=np.float32)
+                ids[i] = stored_id
+                continue
             msg = f"Failed to extract vector at index {i}: {exc}"
             raise RuntimeError(msg) from exc
 

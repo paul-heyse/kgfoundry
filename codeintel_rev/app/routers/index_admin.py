@@ -23,12 +23,36 @@ _ADMIN_FLAG = {"1", "true", "yes", "on"}
 
 
 def _require_admin() -> None:
+    """Check admin flag and raise HTTPException if admin access is disabled.
+
+    Raises
+    ------
+    HTTPException
+        If CODEINTEL_ADMIN environment variable is not set to an enabled value.
+    """
     flag = os.getenv("CODEINTEL_ADMIN", "")
     if flag.strip().lower() not in _ADMIN_FLAG:
         raise HTTPException(status_code=403, detail="admin-disabled")
 
 
 def _context(request: Request) -> ApplicationContext:
+    """Extract ApplicationContext from request app state.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request object containing application state.
+
+    Returns
+    -------
+    ApplicationContext
+        Application context from request.app.state.context.
+
+    Raises
+    ------
+    HTTPException
+        If context is not available in app state.
+    """
     context = getattr(request.app.state, "context", None)
     if context is None:
         raise HTTPException(status_code=503, detail="context-unavailable")
@@ -38,6 +62,22 @@ def _context(request: Request) -> ApplicationContext:
 async def _persist_session_tuning(
     ctx: ApplicationContext, session_id: str, overrides: dict[str, float | int]
 ) -> dict[str, float]:
+    """Persist FAISS tuning overrides to session scope store.
+
+    Parameters
+    ----------
+    ctx : ApplicationContext
+        Application context containing scope store.
+    session_id : str
+        Session identifier to store tuning for.
+    overrides : dict[str, float | int]
+        Tuning parameter overrides to merge with existing session tuning.
+
+    Returns
+    -------
+    dict[str, float]
+        Normalized tuning overrides that were persisted.
+    """
     scope = await ctx.scope_store.get(session_id)
     scope_dict = cast("ScopeIn", dict(scope or {}))
     existing_tuning = scope_dict.get("faiss_tuning")

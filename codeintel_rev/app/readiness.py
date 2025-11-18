@@ -44,14 +44,56 @@ class ReadinessError(ConfigurationError):
 
 
 def _ok(path: Path, message: str = "ok") -> ProbeResult:
+    """Create a ProbeResult with "ok" status.
+
+    Parameters
+    ----------
+    path : Path
+        Path that was probed successfully.
+    message : str, optional
+        Success message. Defaults to "ok".
+
+    Returns
+    -------
+    ProbeResult
+        Result with status "ok".
+    """
     return ProbeResult(subject=path, status="ok", message=message)
 
 
 def _warn(path: Path, message: str) -> ProbeResult:
+    """Create a ProbeResult with "warn" status.
+
+    Parameters
+    ----------
+    path : Path
+        Path that was probed with warnings.
+    message : str
+        Warning message describing the issue.
+
+    Returns
+    -------
+    ProbeResult
+        Result with status "warn".
+    """
     return ProbeResult(subject=path, status="warn", message=message)
 
 
 def _err(path: Path, message: str) -> ProbeResult:
+    """Create a ProbeResult with "error" status.
+
+    Parameters
+    ----------
+    path : Path
+        Path that failed the probe.
+    message : str
+        Error message describing the failure.
+
+    Returns
+    -------
+    ProbeResult
+        Result with status "error".
+    """
     return ProbeResult(subject=path, status="error", message=message)
 
 
@@ -119,6 +161,24 @@ def _probe_directory_permissions(
     writable: bool,
     executable_on_posix: bool,
 ) -> str | None:
+    """Check directory permissions and return error message if any check fails.
+
+    Parameters
+    ----------
+    path : Path
+        Directory path to check permissions for.
+    readable : bool
+        Whether read permission is required.
+    writable : bool
+        Whether write permission is required.
+    executable_on_posix : bool
+        Whether execute permission is required on POSIX systems.
+
+    Returns
+    -------
+    str | None
+        Error message string if permission check fails, None if all checks pass.
+    """
     if readable and not os.access(path, os.R_OK):
         return "directory not readable"
     if writable and not os.access(path, os.W_OK):
@@ -284,6 +344,18 @@ def _bootstrap_paths(paths: ResolvedPaths) -> None:
 
 
 def _ensure_directory_stub(path: Path) -> None:
+    """Create directory and stub marker file if directory doesn't exist.
+
+    Parameters
+    ----------
+    path : Path
+        Directory path to create with stub marker.
+
+    Raises
+    ------
+    ReadinessError
+        If directory creation or marker file writing fails.
+    """
     try:
         path.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
@@ -303,6 +375,20 @@ def _ensure_directory_stub(path: Path) -> None:
 
 
 def _ensure_text_stub(path: Path, payload: str) -> None:
+    """Create a text file stub if it doesn't exist.
+
+    Parameters
+    ----------
+    path : Path
+        File path to create with stub content.
+    payload : str
+        Text content to write to the stub file.
+
+    Raises
+    ------
+    ReadinessError
+        If file creation fails.
+    """
     if path.exists():
         return
     try:
@@ -314,6 +400,22 @@ def _ensure_text_stub(path: Path, payload: str) -> None:
 
 
 def _ensure_file_with_pivot(path: Path, *, env_var: str, stub_payload: bytes) -> None:
+    """Create a binary file stub, optionally pivoting from environment variable.
+
+    Parameters
+    ----------
+    path : Path
+        File path to create or pivot to.
+    env_var : str
+        Environment variable name to check for source path.
+    stub_payload : bytes
+        Binary content to write if creating a stub file.
+
+    Raises
+    ------
+    ReadinessError
+        If file creation fails.
+    """
     if _pivot_from_env(path, env_var):
         return
     if path.exists():
@@ -327,6 +429,21 @@ def _ensure_file_with_pivot(path: Path, *, env_var: str, stub_payload: bytes) ->
 
 
 def _pivot_from_env(target: Path, env_var: str) -> bool:
+    """Link or copy file/directory from environment variable source to target.
+
+    Parameters
+    ----------
+    target : Path
+        Target path to create link or copy at.
+    env_var : str
+        Environment variable containing source path.
+
+    Returns
+    -------
+    bool
+        True if pivot was performed (env var set and source exists),
+        False otherwise.
+    """
     source_value = os.getenv(env_var)
     if not source_value:
         return False

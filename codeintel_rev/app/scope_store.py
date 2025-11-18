@@ -207,10 +207,12 @@ class LRUCache[KeyT: Hashable, ValueT]:
             return OrderedDict((key, record.value) for key, record in self._store.items())
 
     def _enforce_size(self) -> None:
+        """Remove oldest entries until cache size is within maxsize limit."""
         while len(self._store) > self._maxsize:
             self._store.popitem(last=False)
 
     def _purge_expired_entries(self) -> None:
+        """Remove all expired entries from the cache."""
         if self._ttl_seconds is None:
             return
 
@@ -222,11 +224,37 @@ class LRUCache[KeyT: Hashable, ValueT]:
             self._store.pop(key, None)
 
     def _is_expired(self, record: _CacheRecord[ValueT]) -> bool:
+        """Check if a cache record has expired based on TTL.
+
+        Parameters
+        ----------
+        record : _CacheRecord[ValueT]
+            Cache record to check expiration for.
+
+        Returns
+        -------
+        bool
+            True if record has expired, False otherwise.
+        """
         if self._ttl_seconds is None:
             return False
         return self._has_expired(record.inserted_at, self._now())
 
     def _has_expired(self, inserted_at: float, now: float) -> bool:
+        """Check if an entry has expired based on insertion time and TTL.
+
+        Parameters
+        ----------
+        inserted_at : float
+            Timestamp when entry was inserted (monotonic time).
+        now : float
+            Current monotonic time.
+
+        Returns
+        -------
+        bool
+            True if elapsed time exceeds TTL, False otherwise.
+        """
         if self._ttl_seconds is None:
             return False
         return now - inserted_at >= self._ttl_seconds
@@ -264,6 +292,20 @@ class AsyncSingleFlight[KeyT: Hashable, ValueT]:
         return await asyncio.shield(inflight)
 
     async def _execute(self, key: KeyT, fn: Callable[[], Awaitable[ValueT]]) -> ValueT:
+        """Execute async function and remove key from inflight tracking.
+
+        Parameters
+        ----------
+        key : KeyT
+            Key to remove from inflight tracking after execution.
+        fn : Callable[[], Awaitable[ValueT]]
+            Async function to execute.
+
+        Returns
+        -------
+        ValueT
+            Result from executing the async function.
+        """
         try:
             return await fn()
         finally:
@@ -513,9 +555,33 @@ class ScopeStore:
         await self._redis.close()
 
     def _redis_key(self, session_id: str) -> str:
+        """Construct Redis key for a session ID.
+
+        Parameters
+        ----------
+        session_id : str
+            Session identifier.
+
+        Returns
+        -------
+        str
+            Redis key string with key prefix and session ID.
+        """
         return f"{self._key_prefix}:{session_id}"
 
     async def _fetch_from_l2(self, session_id: str) -> ScopeIn | None:
+        """Fetch scope data from Redis L2 cache.
+
+        Parameters
+        ----------
+        session_id : str
+            Session identifier to fetch scope for.
+
+        Returns
+        -------
+        ScopeIn | None
+            Scope data if found in Redis, None if missing or decode fails.
+        """
         key = self._redis_key(session_id)
         data = await self._redis.get(key)
 

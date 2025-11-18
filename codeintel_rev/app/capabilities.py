@@ -96,7 +96,33 @@ def override_capability_imports(
         mapping: Mapping[str, ModuleType | None],
         fallback: Callable[[str], ModuleType | None],
     ) -> Callable[[str], ModuleType | None]:
+        """Create a patched importer function from a mapping.
+
+        Parameters
+        ----------
+        mapping : Mapping[str, ModuleType | None]
+            Mapping of module names to modules (or None) to override imports.
+        fallback : Callable[[str], ModuleType | None]
+            Fallback importer function to use when module name is not in mapping.
+
+        Returns
+        -------
+        Callable[[str], ModuleType | None]
+            Patched importer function that checks mapping first, then falls back.
+        """
         def _patched(name: str) -> ModuleType | None:
+            """Return module from mapping if present, otherwise use fallback.
+
+            Parameters
+            ----------
+            name : str
+                Module name to import.
+
+            Returns
+            -------
+            ModuleType | None
+                Module from mapping if present, otherwise result from fallback.
+            """
             if name in mapping:
                 return mapping[name]
             return fallback(name)

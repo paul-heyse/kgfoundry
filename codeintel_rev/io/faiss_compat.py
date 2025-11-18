@@ -62,6 +62,13 @@ def sanitize_faiss_bindings(module: ModuleType) -> ModuleType:
 
 
 def _iter_faiss_modules() -> Iterator[tuple[str, ModuleType]]:
+    """Iterate over all FAISS-related modules in sys.modules.
+
+    Yields
+    ------
+    tuple[str, ModuleType]
+        Tuples of (module_name, module_object) for all modules starting with "faiss".
+    """
     for name, candidate in list(sys.modules.items()):
         if not name.startswith("faiss"):
             continue
@@ -70,6 +77,15 @@ def _iter_faiss_modules() -> Iterator[tuple[str, ModuleType]]:
 
 
 def _assign_missing_module_attr(target: ModuleType, module_name: str) -> None:
+    """Assign __module__ attribute to types missing it in target module.
+
+    Parameters
+    ----------
+    target : ModuleType
+        Module to scan for types missing __module__ attribute.
+    module_name : str
+        Module name to assign to types that lack __module__.
+    """
     for attr_name in dir(target):
         attr = getattr(target, attr_name, None)
         if isinstance(attr, type):

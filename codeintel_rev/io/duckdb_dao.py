@@ -416,6 +416,18 @@ class DuckDBQueryBuilder:
 
     @staticmethod
     def _build_join_clauses(opts: DuckDBQueryOptions) -> list[str]:
+        """Build SQL JOIN clauses from query options.
+
+        Parameters
+        ----------
+        opts : DuckDBQueryOptions
+            Query options specifying which tables to join.
+
+        Returns
+        -------
+        list[str]
+            List of JOIN clause strings (LEFT JOIN statements).
+        """
         joins: list[str] = []
         if opts.join_modules:
             joins.append("LEFT JOIN modules USING(uri)")
@@ -447,6 +459,24 @@ class DuckDBQueryBuilder:
         exclude_globs: Sequence[str],
         languages: Sequence[str],
     ) -> list[str]:
+        """Build SQL WHERE clause conditions from filter options.
+
+        Parameters
+        ----------
+        params : dict[str, list[int] | list[str] | str]
+            Parameter dictionary to populate with filter values.
+        include_globs : Sequence[str]
+            Glob patterns for URIs to include.
+        exclude_globs : Sequence[str]
+            Glob patterns for URIs to exclude.
+        languages : Sequence[str]
+            Language codes to filter by.
+
+        Returns
+        -------
+        list[str]
+            List of WHERE clause condition strings.
+        """
         clauses: list[str] = []
         if include_globs:
             include_clauses: list[str] = []
@@ -470,6 +500,18 @@ class DuckDBQueryBuilder:
 
     @classmethod
     def _glob_to_like(cls, pattern: str) -> str:
+        """Convert glob pattern to SQL LIKE pattern.
+
+        Parameters
+        ----------
+        pattern : str
+            Glob pattern to convert (supports **, *, ? wildcards).
+
+        Returns
+        -------
+        str
+            SQL LIKE pattern with wildcards converted and escaped.
+        """
         normalized = pattern.replace("\\", "/")
         starts_with_recursive = normalized.startswith("**/")
         escaped = cls._escape_like_wildcards(normalized)
@@ -489,4 +531,16 @@ class DuckDBQueryBuilder:
 
     @staticmethod
     def _escape_like_wildcards(pattern: str) -> str:
+        """Escape SQL LIKE wildcard characters in a pattern.
+
+        Parameters
+        ----------
+        pattern : str
+            Pattern string to escape.
+
+        Returns
+        -------
+        str
+            Pattern with backslashes, percent signs, and underscores escaped.
+        """
         return pattern.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

@@ -189,6 +189,21 @@ def override_gate_config(**kwargs: object) -> Iterator[None]:
 
 
 def _call_gate_import(module: str, purpose: str) -> object:
+    """Call gate_import with optional override from gate config stack.
+
+    Parameters
+    ----------
+    module : str
+        Module name to import via gate.
+    purpose : str
+        Purpose string describing why the module is needed.
+
+    Returns
+    -------
+    object
+        Imported module (or stub) from override if configured, otherwise
+        result from gate_import().
+    """
     override = _GATE_CONFIG_STACK[-1].gate_import
     if override is not None:
         return override(module, purpose)
@@ -354,6 +369,22 @@ def _default_duckdb_catalog_factory(
     settings: Settings,
     manager: DuckDBManager,
 ) -> DuckDBCatalog:
+    """Create a DuckDB catalog instance with default configuration.
+
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved application paths containing DuckDB and vectors directory paths.
+    settings : Settings
+        Application settings containing DuckDB and index configuration.
+    manager : DuckDBManager
+        DuckDB manager instance for catalog lifecycle management.
+
+    Returns
+    -------
+    DuckDBCatalog
+        Configured catalog instance with ID map path set from resolved paths.
+    """
     catalog = DuckDBCatalog(
         paths.duckdb_path,
         paths.vectors_dir,
@@ -1004,6 +1035,13 @@ class ApplicationContext:
         """
 
         def _factory() -> HybridSearchEngine:
+            """Build and return a new HybridSearchEngine instance.
+
+            Returns
+            -------
+            HybridSearchEngine
+                Newly constructed hybrid search engine.
+            """
             return self._build_hybrid_engine()
 
         engine = self._runtime.hybrid.get_or_initialize(_factory)
@@ -1077,6 +1115,13 @@ class ApplicationContext:
             return existing
 
         def _factory() -> FAISSManager:
+            """Build and return a new CodeRank FAISS manager instance.
+
+            Returns
+            -------
+            FAISSManager
+                Newly constructed FAISS manager for CodeRank index.
+            """
             return self._build_coderank_faiss_manager(vec_dim=vec_dim)
 
         manager = cell.get_or_initialize(_factory)
@@ -1112,6 +1157,13 @@ class ApplicationContext:
             cell.close()
 
         def _factory() -> XTRIndex:
+            """Build and return a new XTR index instance.
+
+            Returns
+            -------
+            XTRIndex
+                Newly constructed XTR token index.
+            """
             return self._build_xtr_index()
 
         try:
@@ -1428,6 +1480,20 @@ class ApplicationContext:
             raise ValueError(message)
 
         def _component_value[TOverride](name: str, default: TOverride) -> TOverride:
+            """Get component value from override dict or return default.
+
+            Parameters
+            ----------
+            name : str
+                Component name to look up in override dictionary.
+            default : TOverride
+                Default value to return if component not in override dict.
+
+            Returns
+            -------
+            TOverride
+                Override value if present, otherwise default value.
+            """
             return cast("TOverride", components.get(name, default))
 
         return ApplicationContext(

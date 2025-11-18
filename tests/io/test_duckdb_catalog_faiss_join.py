@@ -13,7 +13,7 @@ from codeintel_rev.io.duckdb_catalog import (
     ensure_faiss_idmap_view,
     refresh_faiss_idmap_materialized,
 )
-from codeintel_rev.io.duckdb_dao import ensure_v_faiss_join
+from codeintel_rev.io.duckdb_dao import ensure_chunks, ensure_v_faiss_join
 
 from tests._helpers import assertions
 
@@ -49,7 +49,14 @@ def test_ensure_faiss_idmap_view_registers_join(tmp_path: Path) -> None:
     _write_chunks(chunks)
     _write_idmap(idmap)
     conn = duckdb.connect(database=":memory:")
-    conn.execute("CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet(?)", [str(chunks)])
+    ensure_chunks(
+        conn,
+        parquet_glob=str(chunks),
+        materialize=False,
+        parquet_exists=True,
+    )
+    ensure_faiss_idmap_view(conn, idmap_parquet=idmap)
+    ensure_v_faiss_join(conn)
     ensure_faiss_idmap_view(conn, idmap_parquet=idmap)
     ensure_v_faiss_join(conn)
     count = conn.execute("SELECT COUNT(*) FROM v_faiss_join").fetchone()
@@ -66,6 +73,14 @@ def test_refresh_faiss_idmap_materialized_skips_when_unchanged(tmp_path: Path) -
     _write_chunks(chunks)
     _write_idmap(idmap)
     conn = duckdb.connect(database=str(tmp_path / "catalog.duckdb"))
+    ensure_chunks(
+        conn,
+        parquet_glob=str(chunks),
+        materialize=False,
+        parquet_exists=True,
+    )
+    ensure_faiss_idmap_view(conn, idmap_parquet=idmap)
+    ensure_v_faiss_join(conn)
     first: IdMapMeta = refresh_faiss_idmap_materialized(
         conn,
         idmap_parquet=str(idmap),

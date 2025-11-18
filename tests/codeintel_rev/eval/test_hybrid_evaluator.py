@@ -54,6 +54,7 @@ class _FakeManager:
             100: np.array([1.0, 0.0], dtype=np.float32),
             101: np.array([0.0, 1.0], dtype=np.float32),
         }
+        self.vec_dim = 2
 
     def search(
         self,

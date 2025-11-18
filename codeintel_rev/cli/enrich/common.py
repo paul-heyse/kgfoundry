@@ -132,7 +132,7 @@ EMIT_AST_OPTION = typer.Option(
 )
 DRY_RUN_OPTION = typer.Option(
     _DEFAULT_DRY_RUN,
-    "--dry-run",
+    "--dry-run/--no-dry-run",
     help="Run computations and log counts without writing artifacts.",
 )
 

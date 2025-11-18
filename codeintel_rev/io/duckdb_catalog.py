@@ -315,6 +315,20 @@ class _DuckDBQueryMixin:
         conn: duckdb.DuckDBPyConnection,
         unique_ids: Sequence[int],
     ) -> list[tuple[int, str, int | None, int | None, Sequence[str] | None]]:
+        """Fetch chunk annotation rows from the chunks table.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to execute query on.
+        unique_ids : Sequence[int]
+            Chunk IDs to fetch annotations for.
+
+        Returns
+        -------
+        list[tuple[int, str, int | None, int | None, Sequence[str] | None]]
+            Rows containing (id, uri, start_line, end_line, symbols) for each chunk.
+        """
         return conn.execute(
             """
             SELECT
@@ -333,6 +347,19 @@ class _DuckDBQueryMixin:
     def _initialize_annotation_maps(
         rows: Sequence[tuple[int, str, int | None, int | None, Sequence[str] | None]],
     ) -> tuple[dict[int, dict[str, object]], dict[int, tuple[int, int]]]:
+        """Initialize annotation maps from chunk rows.
+
+        Parameters
+        ----------
+        rows : Sequence[tuple[int, str, int | None, int | None, Sequence[str] | None]]
+            Chunk rows from _fetch_annotation_rows.
+
+        Returns
+        -------
+        tuple[dict[int, dict[str, object]], dict[int, tuple[int, int]]]
+            Tuple of (annotations dict, boundaries dict) initialized with URI,
+            symbol_hits, ast_node_kinds, cst_matches, and line boundaries.
+        """
         annotations: dict[int, dict[str, object]] = {}
         boundaries: dict[int, tuple[int, int]] = {}
         for chunk_id, uri, start_line, end_line, symbols in rows:
@@ -351,6 +378,17 @@ class _DuckDBQueryMixin:
         unique_ids: Sequence[int],
         annotations: dict[int, dict[str, object]],
     ) -> None:
+        """Attach symbol hits from chunk_symbols table to annotation maps.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to query chunk_symbols table.
+        unique_ids : Sequence[int]
+            Chunk IDs to fetch symbols for.
+        annotations : dict[int, dict[str, object]]
+            Annotation maps to update with symbol_hits.
+        """
         rows = conn.execute(
             """
             SELECT chunk_id, array_agg(DISTINCT symbol ORDER BY symbol) AS symbols
@@ -371,6 +409,17 @@ class _DuckDBQueryMixin:
         boundaries: Mapping[int, tuple[int, int]],
         annotations: dict[int, dict[str, object]],
     ) -> None:
+        """Attach AST node kinds from ast_nodes table to annotation maps.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to query ast_nodes table.
+        boundaries : Mapping[int, tuple[int, int]]
+            Mapping of chunk IDs to (start_line, end_line) boundaries.
+        annotations : dict[int, dict[str, object]]
+            Annotation maps to update with ast_node_kinds.
+        """
         for chunk_id, (start_line, end_line) in boundaries.items():
             payload = annotations.get(chunk_id)
             if payload is None:
@@ -390,6 +439,18 @@ class _DuckDBQueryMixin:
 
     @staticmethod
     def _resolve_cst_path_column(conn: duckdb.DuckDBPyConnection) -> str:
+        """Determine which column name is used for paths in cst_nodes table.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to probe cst_nodes schema.
+
+        Returns
+        -------
+        str
+            Column name ("uri" or "path") that exists in cst_nodes, defaults to "uri".
+        """
         for column, probe_sql in (
             ("uri", "SELECT uri FROM cst_nodes LIMIT 0"),
             ("path", "SELECT path FROM cst_nodes LIMIT 0"),
@@ -409,6 +470,19 @@ class _DuckDBQueryMixin:
         boundaries: Mapping[int, tuple[int, int]],
         annotations: dict[int, dict[str, object]],
     ) -> None:
+        """Attach CST node kinds from cst_nodes table to annotation maps.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to query cst_nodes table.
+        path_column : str
+            Column name to use for path matching ("uri" or "path").
+        boundaries : Mapping[int, tuple[int, int]]
+            Mapping of chunk IDs to (start_line, end_line) boundaries.
+        annotations : dict[int, dict[str, object]]
+            Annotation maps to update with cst_matches.
+        """
         sql = _CST_KIND_QUERIES.get(path_column)
         if sql is None:
             return
@@ -430,6 +504,20 @@ class _DuckDBQueryMixin:
         ordered_ids: Sequence[int],
         annotations: Mapping[int, dict[str, object]],
     ) -> dict[int, StructureAnnotations]:
+        """Convert annotation dictionaries to StructureAnnotations objects.
+
+        Parameters
+        ----------
+        ordered_ids : Sequence[int]
+            Chunk IDs in the order they should appear in the result.
+        annotations : Mapping[int, dict[str, object]]
+            Raw annotation dictionaries keyed by chunk ID.
+
+        Returns
+        -------
+        dict[int, StructureAnnotations]
+            StructureAnnotations objects keyed by chunk ID, preserving order.
+        """
         result: dict[int, StructureAnnotations] = {}
         for chunk_id in ordered_ids:
             payload = annotations.get(chunk_id)
@@ -448,6 +536,20 @@ class _DuckDBQueryMixin:
 
 
 class _LegacyOptions(TypedDict, total=False):
+    """Legacy options dictionary for backward compatibility.
+
+    Attributes
+    ----------
+    materialize : bool, optional
+        Whether to materialize views as tables.
+    manager : DuckDBManager | None, optional
+        DuckDB manager instance for connection pooling.
+    log_queries : bool, optional
+        Whether to log executed SQL queries.
+    repo_root : Path, optional
+        Repository root directory path.
+    """
+
     materialize: bool
     manager: DuckDBManager | None
     log_queries: bool
@@ -666,6 +768,13 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         self._ensure_faiss_join_view(conn)
 
     def _install_chunks_view(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Install the chunks view from Parquet files if it doesn't exist.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to create view on.
+        """
         if relation_exists(conn, "chunks"):
             return
         parquet_glob = str(self.vectors_dir / "**/*.parquet")
@@ -678,6 +787,13 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         )
 
     def _install_optional_views(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Install optional enrichment views (modules, SCIP, AST, CST, symbols).
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to create views on.
+        """
         modules_installed = self._install_parquet_view(
             conn, "modules", self._data_root / "modules/modules.parquet"
         )
@@ -699,6 +815,22 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         view_name: str,
         source: Path,
     ) -> bool:
+        """Install a view reading from a Parquet file.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to create view on.
+        view_name : str
+            Name for the created view.
+        source : Path
+            Path to the Parquet file to read from.
+
+        Returns
+        -------
+        bool
+            True if view was created, False if source file doesn't exist.
+        """
         if not source.exists():
             return False
         sql = "SELECT * FROM read_parquet(?)"
@@ -714,6 +846,22 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         view_name: str,
         source: Path,
     ) -> bool:
+        """Install a view reading from a JSON/JSONL file.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to create view on.
+        view_name : str
+            Name for the created view.
+        source : Path
+            Path to the JSON/JSONL file to read from.
+
+        Returns
+        -------
+        bool
+            True if view was created, False if source file doesn't exist.
+        """
         if not source.exists():
             return False
         sql = "SELECT * FROM read_json_auto(?)"
@@ -725,6 +873,13 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
 
     @staticmethod
     def _install_chunk_symbols_view(conn: duckdb.DuckDBPyConnection) -> None:
+        """Install view that unnests symbols from chunks into chunk_symbols format.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to create view on.
+        """
         try:
             conn.execute(
                 """
@@ -748,6 +903,17 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         view_name: str,
         source: Path | None,
     ) -> None:
+        """Install a structure view from Parquet if source file exists.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to create view on.
+        view_name : str
+            Name for the created view.
+        source : Path | None
+            Path to Parquet file, or None to skip installation.
+        """
         if source and source.exists():
             self._install_parquet_view(conn, view_name, source)
 
@@ -758,6 +924,17 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         plan_key: str,
         asset_path: Path | None,
     ) -> None:
+        """Materialize a structure table from Parquet if asset exists.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to create table on.
+        plan_key : str
+            Key to lookup materialization plan from _STRUCT_MATERIALIZATION_PLANS.
+        asset_path : Path | None
+            Path to Parquet asset, or None to skip materialization.
+        """
         if asset_path and asset_path.exists():
             plan = _STRUCT_MATERIALIZATION_PLANS[plan_key]
             self._materialize_struct_table(
@@ -797,6 +974,16 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         conn: duckdb.DuckDBPyConnection,
         override_path: Path | None,
     ) -> None:
+        """Ensure FAISS ID map view exists, using override path if provided.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to create view on.
+        override_path : Path | None
+            Optional override path for ID map Parquet file, otherwise uses catalog's
+            configured idmap path.
+        """
         target = override_path or self._idmap_path
         ensure_faiss_idmap_view(conn, idmap_parquet=target)
 
@@ -818,6 +1005,18 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         """Register structure-aware Parquet assets and optional materialized tables."""
 
         def _resolve(path: Path | None) -> Path | None:
+            """Resolve and expand user home directory in path.
+
+            Parameters
+            ----------
+            path : Path | None
+                Path to resolve, or None.
+
+            Returns
+            -------
+            Path | None
+                Resolved absolute path, or None if input was None.
+            """
             if path is None:
                 return None
             return path.expanduser().resolve()
@@ -1621,6 +1820,25 @@ def _parquet_hash(path: str | Path) -> str:
 
 
 def _compute_checksum_for_idmap(idmap_parquet: Path, vectors_dir: Path | None) -> str:
+    """Compute SHA256 checksum of ID map and associated Parquet files.
+
+    Parameters
+    ----------
+    idmap_parquet : Path
+        Path to the ID map Parquet file.
+    vectors_dir : Path | None
+        Directory containing Parquet files to include in checksum.
+
+    Returns
+    -------
+    str
+        Hexadecimal SHA256 checksum string.
+
+    Raises
+    ------
+    RuntimeError
+        If vectors_dir is None (required for materialization).
+    """
     if vectors_dir is None:
         message = "vectors_dir is required to materialize the ID map"
         raise RuntimeError(message)

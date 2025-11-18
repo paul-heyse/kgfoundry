@@ -36,9 +36,6 @@ from codeintel_rev.io.faiss_build import (
     load_index as builder_load_index,
 )
 from codeintel_rev.io.faiss_build import (
-    merge_indexes as builder_merge_indexes,
-)
-from codeintel_rev.io.faiss_build import (
     save_index as builder_save_index,
 )
 from codeintel_rev.io.faiss_runtime import (
@@ -59,12 +56,16 @@ from codeintel_rev.io.faiss_runtime import (
 from codeintel_rev.io.faiss_store import (
     IndexArtifactPaths,
     export_idmap_parquet,
+    get_idmap_array,
     load_tuned_profile,
     save_tuning_profile,
     write_meta_snapshot,
 )
 from codeintel_rev.io.faiss_store import (
     load_secondary_index as store_load_secondary,
+)
+from codeintel_rev.io.faiss_store import (
+    reconstruct_batch as store_reconstruct_batch,
 )
 from codeintel_rev.io.faiss_store import (
     save_secondary_index as store_save_secondary,
@@ -205,6 +206,7 @@ class FAISSManager:
         self.cpu_index: FaissIndex | None = None
         self.secondary_index: FaissIndex | None = None
         self.incremental_ids: set[int] = set()
+        self._primary_ids: set[int] = set()
 
         # Runtime state
         self._runtime_overrides: dict[str, float] = {}
@@ -246,6 +248,7 @@ class FAISSManager:
         self.cpu_index = index
         self.secondary_index = None
         self.incremental_ids.clear()
+        self._primary_ids.clear()
         self.faiss_family = resolved_family
         self._faiss_factory = factory
         self._vector_count = int(vectors.shape[0])
@@ -263,6 +266,7 @@ class FAISSManager:
             msg = "Primary index not initialized; call build_index() first."
             raise RuntimeError(msg)
         builder_add_vectors(self.cpu_index, vectors, ids)
+        self._primary_ids.update(int(cid) for cid in np.asarray(ids, dtype=np.int64).reshape(-1))
 
     def update_index(self, new_vectors: NDArrayF32, new_ids: NDArrayI64) -> int:
         """Add vectors to the secondary (incremental) index.
@@ -282,6 +286,7 @@ class FAISSManager:
             raise RuntimeError(msg)
 
         self._ensure_secondary()
+        self._ensure_primary_ids()
 
         ids_arr = np.asarray(new_ids, dtype=np.int64).reshape(-1)
         vectors_arr = np.asarray(new_vectors, dtype=np.float32)
@@ -289,7 +294,7 @@ class FAISSManager:
         seen = set()
 
         for pos, cid in enumerate(ids_arr.tolist()):
-            if cid in seen or cid in self.incremental_ids:
+            if cid in seen or cid in self.incremental_ids or cid in self._primary_ids:
                 keep_mask[pos] = False
             else:
                 seen.add(cid)
@@ -301,6 +306,7 @@ class FAISSManager:
                 raise RuntimeError(msg)
             builder_add_vectors(self.secondary_index, vectors_arr[keep_mask], ids_arr[keep_mask])
             self.incremental_ids.update(ids_arr[keep_mask].tolist())
+            self._persist_incremental_ids()
 
         return kept
 
@@ -332,6 +338,7 @@ class FAISSManager:
         self.cpu_index = builder_load_index(self.index_path)
         self.secondary_index = None
         self.incremental_ids.clear()
+        self._refresh_primary_ids()
         self.faiss_family = self.runtime_opts.faiss_family
         if export_idmap is not None:
             self.export_idmap(export_idmap)
@@ -354,13 +361,17 @@ class FAISSManager:
             msg = "Secondary index not created yet."
             raise RuntimeError(msg)
         store_save_secondary(self.secondary_index, self._paths)
+        self._persist_incremental_ids()
 
     def load_secondary_index(self) -> None:
         """Load the secondary index from disk (.secondary suffix)."""
         try:
             self.secondary_index = store_load_secondary(self._paths)
+            self._load_incremental_ids()
         except FileNotFoundError:
             self.secondary_index = None
+            self.incremental_ids.clear()
+            self._persist_incremental_ids()
 
     def export_idmap(self, out_path: Path) -> int:
         """Export {faiss_row -> external_id} mapping to Parquet.
@@ -378,7 +389,11 @@ class FAISSManager:
         if self.cpu_index is None:
             msg = "Primary index not initialized."
             raise RuntimeError(msg)
-        return export_idmap_parquet(self.cpu_index, out_path)
+        return export_idmap_parquet(
+            self.cpu_index,
+            out_path,
+            index_name=self.index_path.name,
+        )
 
     def search(
         self,
@@ -502,9 +517,33 @@ class FAISSManager:
         if self.secondary_index is None:
             return
 
-        self.cpu_index = builder_merge_indexes(self.cpu_index, self.secondary_index, self.vec_dim)
+        ids = get_idmap_array(self.secondary_index)
+        if ids.size == 0:
+            self.secondary_index = None
+            self.incremental_ids.clear()
+            self._persist_incremental_ids()
+            return
+
+        candidate_ids = np.asarray(ids, dtype=np.int64).reshape(-1)
+        self._ensure_primary_ids()
+        keep_mask = np.array([cid not in self._primary_ids for cid in candidate_ids], dtype=bool)
+        if not keep_mask.any():
+            self.secondary_index = None
+            self.incremental_ids.clear()
+            self._persist_incremental_ids()
+            return
+
+        vectors = store_reconstruct_batch(
+            self.secondary_index,
+            self.vec_dim,
+            candidate_ids.tolist(),
+        )
+        builder_add_vectors(self.cpu_index, vectors[keep_mask], candidate_ids[keep_mask])
+        self._primary_ids.update(int(cid) for cid in candidate_ids[keep_mask])
+
         self.secondary_index = None
         self.incremental_ids.clear()
+        self._persist_incremental_ids()
 
     def require_cpu_index(self) -> FaissIndex:
         """Get the primary CPU index or raise if not initialized.
@@ -558,7 +597,6 @@ class FAISSManager:
     def runtime_overrides(self) -> dict[str, float]:
         """Mutable runtime override dictionary."""
         return self._runtime_overrides
-
 
     def autotune(
         self,
@@ -638,7 +676,7 @@ class FAISSManager:
         cfg = IndexBuildConfig(
             vec_dim=self.vec_dim,
             default_nlist=self.nlist,
-            family=cast("IndexFamily", self.runtime_opts.faiss_family or "adaptive"),
+            family=self._resolve_family_hint(),
             pq_m=self.runtime_opts.pq_m,
             pq_bits=self.runtime_opts.pq_nbits,
             opq_m=self.runtime_opts.opq_m,
@@ -665,6 +703,21 @@ class FAISSManager:
             "total_bytes": int(cpu_bytes),
         }
 
+    def _resolve_family_hint(self) -> IndexFamily:
+        """Return the configured family hint, normalizing ``auto`` to adaptive.
+
+        Returns
+        -------
+        IndexFamily
+            Family literal representing the configured runtime hint.
+        """
+        hint = (self.runtime_opts.faiss_family or "adaptive").lower()
+        if hint in {"auto", "adaptive"}:
+            return "adaptive"
+        if hint in {"flat", "ivfflat", "ivfpq"}:
+            return cast("IndexFamily", hint)
+        return "adaptive"
+
     def _write_meta_snapshot(
         self,
         *,
@@ -672,6 +725,17 @@ class FAISSManager:
         factory: str | None = None,
         parameter_space: str | None = None,
     ) -> None:
+        """Write metadata snapshot file for the FAISS index.
+
+        Parameters
+        ----------
+        vector_count : int | None, optional
+            Override vector count, otherwise uses manager's count.
+        factory : str | None, optional
+            Override FAISS factory string, otherwise uses manager's factory.
+        parameter_space : str | None, optional
+            Override parameter space description, otherwise uses manager's space.
+        """
         write_meta_snapshot(
             index_path=self.index_path,
             vec_dim=self.vec_dim,
@@ -685,6 +749,49 @@ class FAISSManager:
             vector_count=vector_count or self._vector_count,
             parameter_space=parameter_space or self._parameter_space,
         )
+
+    def _secondary_ids_path(self) -> Path:
+        secondary_path = self._paths.secondary_index_path
+        return secondary_path.with_suffix(".ids.json")
+
+    def _persist_incremental_ids(self) -> None:
+        path = self._secondary_ids_path()
+        if not self.incremental_ids:
+            if path.exists():
+                path.unlink()
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(sorted(self.incremental_ids)), encoding="utf-8")
+
+    def _load_incremental_ids(self) -> None:
+        path = self._secondary_ids_path()
+        if not path.exists():
+            self.incremental_ids.clear()
+            return
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            self.incremental_ids.clear()
+            return
+        self.incremental_ids = {int(value) for value in payload}
+
+    def _ensure_primary_ids(self) -> None:
+        if self.cpu_index is None:
+            self._primary_ids.clear()
+            return
+        if not self._primary_ids and int(getattr(self.cpu_index, "ntotal", 0)) > 0:
+            self._refresh_primary_ids()
+
+    def _refresh_primary_ids(self) -> None:
+        if self.cpu_index is None:
+            self._primary_ids.clear()
+            return
+        try:
+            ids = get_idmap_array(self.cpu_index)
+        except (RuntimeError, TypeError):
+            self._primary_ids.clear()
+            return
+        self._primary_ids = {int(value) for value in ids.tolist()}
 
     def _resolve_profile_to_read(self) -> Path | None:
         for path in (self.autotune_profile_path, self._legacy_autotune_profile_path):
