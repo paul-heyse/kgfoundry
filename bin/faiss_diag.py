@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
+from codeintel_rev.io.faiss_store import get_compile_options
 
 
 def _build_argument_parser() -> argparse.ArgumentParser:
@@ -80,7 +81,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     manager = _build_manager(args)
     manager.load_cpu_index()
-    compile_opts = manager.get_compile_options()
+    compile_opts = get_compile_options()
     _emit(f"compile_options: {compile_opts}")
 
     if args.tune:

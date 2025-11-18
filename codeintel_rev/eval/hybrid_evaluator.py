@@ -13,6 +13,7 @@ import numpy as np
 from codeintel_rev.eval.pool_writer import Channel, write_pool
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, StructureAnnotations
 from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.faiss_store import reconstruct_batch as store_reconstruct_batch
 from codeintel_rev.retrieval.types import SearchPoolRow
 
 if TYPE_CHECKING:
@@ -229,7 +230,11 @@ class HybridPoolEvaluator:
     ) -> tuple[np.ndarray, np.ndarray]:
         if not cand_ids:
             return np.zeros((1, 0), dtype=np.float32), np.zeros((1, 0), dtype=np.int64)
-        vectors = self._manager.reconstruct_batch(cand_ids)
+        vectors = store_reconstruct_batch(
+            self._manager.require_cpu_index(),
+            self._manager.vec_dim,
+            cand_ids,
+        )
         faiss = __import__("faiss")  # lazy import
         faiss.normalize_L2(vectors)
         query = xq.copy()

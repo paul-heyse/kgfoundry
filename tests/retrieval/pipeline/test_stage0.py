@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from codeintel_rev.io.hybrid_search import HybridSearchResult
@@ -15,7 +16,13 @@ from tests._helpers import assertions
 class _StubHybridEngine:
     result: HybridSearchResult
 
-    def search(self, query: str, semantic_hits, limit: int, options):
+    def search(
+        self,
+        query: str,
+        semantic_hits: Sequence[tuple[int, float]],
+        limit: int,
+        options: Stage0Options | None,
+    ) -> HybridSearchResult:
         self.last_query = query
         self.last_semantic_hits = list(semantic_hits)
         self.last_limit = limit

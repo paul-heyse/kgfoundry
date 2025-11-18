@@ -12,11 +12,11 @@ This is a thin facade that delegates to specialized modules:
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.errors import VectorIndexStateError
@@ -59,19 +59,12 @@ from codeintel_rev.io.faiss_runtime import (
 from codeintel_rev.io.faiss_store import (
     IndexArtifactPaths,
     export_idmap_parquet,
-    get_idmap_array,
     load_tuned_profile,
     save_tuning_profile,
     write_meta_snapshot,
 )
 from codeintel_rev.io.faiss_store import (
-    get_compile_options as store_compile_options,
-)
-from codeintel_rev.io.faiss_store import (
     load_secondary_index as store_load_secondary,
-)
-from codeintel_rev.io.faiss_store import (
-    reconstruct_batch as store_reconstruct_batch,
 )
 from codeintel_rev.io.faiss_store import (
     save_secondary_index as store_save_secondary,
@@ -94,27 +87,34 @@ _faiss = LazyModule("faiss", "FAISS manager operations")
 faiss = cast("Any", _faiss)
 
 _DEFAULT_SWEEP = ("nprobe=16", "nprobe=32", "nprobe=64", "nprobe=96", "nprobe=128")
+_IVFFLAT_BALANCE_DIVISOR = 39
 
 
 class _RuntimeFacade:
-    """Helper exposing runtime tuning operations via :class:`FAISSManager`."""
+    """Runtime tuning adapter exposed via :class:`FAISSManager.runtime`."""
 
-    def __init__(self, manager: FAISSManager) -> None:
-        self._manager = manager
+    def __init__(
+        self,
+        *,
+        describe: Callable[[], dict[str, object]],
+        apply: Callable[[dict[str, object]], dict[str, object]],
+        reset: Callable[[], dict[str, object]],
+        set_params: Callable[[str], dict[str, object]],
+    ) -> None:
+        self._describe = describe
+        self._apply = apply
+        self._reset = reset
+        self._set_params = set_params
 
     def get_runtime_tuning(self) -> dict[str, object]:
-        """Return active runtime parameters, overrides, and profile metadata."""
-        profile = self._manager._load_profile_payload(self._manager._resolve_profile_to_read())
-        snapshot = self._manager._current_runtime_parameters()
-        payload: dict[str, object] = {
-            "active": snapshot,
-            "overrides": dict(self._manager._runtime_overrides),
-        }
-        if profile is not None:
-            payload["autotune_profile"] = profile
-        if self._manager._parameter_space is not None:
-            payload["parameter_space"] = self._manager._parameter_space
-        return payload
+        """Return active runtime parameters, overrides, and profile metadata.
+
+        Returns
+        -------
+        dict[str, object]
+            Runtime tuning snapshot including active values and overrides.
+        """
+        return self._describe()
 
     def apply_runtime_tuning(
         self,
@@ -124,35 +124,49 @@ class _RuntimeFacade:
         quantizer_ef_search: int | None = None,
         k_factor: float | None = None,
     ) -> dict[str, object]:
-        """Apply runtime overrides to the active FAISS index."""
-        overrides = self._manager._normalize_runtime_payload(
-            nprobe=nprobe,
-            ef_search=ef_search,
-            quantizer_ef_search=quantizer_ef_search,
-            k_factor=k_factor,
-        )
-        if not overrides:
-            msg = "No overrides provided"
-            raise ValueError(msg)
-        self._manager._apply_runtime_overrides(overrides)
-        return self.get_runtime_tuning()
+        """Apply runtime overrides to the active FAISS index.
+
+        Returns
+        -------
+        dict[str, object]
+            Updated runtime tuning snapshot after applying overrides.
+        """
+        overrides: dict[str, object] = {}
+        if nprobe is not None:
+            overrides["nprobe"] = nprobe
+        if ef_search is not None:
+            overrides["efSearch"] = ef_search
+        if quantizer_ef_search is not None:
+            overrides["quantizer_efSearch"] = quantizer_ef_search
+        if k_factor is not None:
+            overrides["k_factor"] = k_factor
+        return self._apply(overrides)
 
     def reset_runtime_tuning(self) -> dict[str, object]:
-        """Clear runtime overrides and revert to defaults."""
-        self._manager._reset_runtime_overrides()
-        return self.get_runtime_tuning()
+        """Clear runtime overrides and revert to defaults.
+
+        Returns
+        -------
+        dict[str, object]
+            Runtime tuning snapshot after reset.
+        """
+        return self._reset()
 
     def set_search_parameters(self, param_str: str) -> dict[str, object]:
-        """Apply FAISS ParameterSpace string (``nprobe=32,efSearch=64``)."""
-        overrides, normalized = self._manager._parse_parameter_string(param_str)
-        self._manager._apply_runtime_overrides(overrides, parameter_space=normalized)
-        return self.get_runtime_tuning()
+        """Apply FAISS ParameterSpace string (``nprobe=32,efSearch=64``).
+
+        Returns
+        -------
+        dict[str, object]
+            Runtime tuning snapshot after applying the parameter string.
+        """
+        return self._set_params(param_str)
 
 
 class FAISSManager:
     """FAISS index manager with adaptive indexing and incremental updates."""
 
-    _PARAMETER_ALIASES = {
+    _PARAMETER_ALIASES: ClassVar[dict[str, str]] = {
         "nprobe": "nprobe",
         "efsearch": "efSearch",
         "ef_search": "efSearch",
@@ -202,10 +216,21 @@ class FAISSManager:
         self._faiss_factory: str | None = None
         self._parameter_space: str | None = None
         self._default_refine_k_factor = self.refine_k_factor
-        self._runtime_facade = _RuntimeFacade(self)
+        self._runtime_facade = _RuntimeFacade(
+            describe=self._describe_runtime_state,
+            apply=self._apply_runtime_overrides_public,
+            reset=self._reset_runtime_overrides_public,
+            set_params=self._set_parameter_string_public,
+        )
 
     def build_index(self, vectors: NDArrayF32, *, family: str | None = None) -> None:
-        """Build and train FAISS index with adaptive type selection."""
+        """Build and train FAISS index with adaptive type selection.
+
+        Raises
+        ------
+        VectorIndexStateError
+            If vectors is None or empty.
+        """
         if vectors is None or vectors.size == 0:
             msg = "vectors must be a non-empty array"
             raise VectorIndexStateError(msg)
@@ -225,14 +250,31 @@ class FAISSManager:
         self._write_meta_snapshot(vector_count=self._vector_count, factory=factory)
 
     def add_vectors(self, vectors: NDArrayF32, ids: NDArrayI64) -> None:
-        """Add vectors to the primary index after build."""
+        """Add vectors to the primary index after build.
+
+        Raises
+        ------
+        RuntimeError
+            If primary index is not initialized.
+        """
         if self.cpu_index is None:
             msg = "Primary index not initialized; call build_index() first."
             raise RuntimeError(msg)
         builder_add_vectors(self.cpu_index, vectors, ids)
 
     def update_index(self, new_vectors: NDArrayF32, new_ids: NDArrayI64) -> int:
-        """Add vectors to the secondary (incremental) index."""
+        """Add vectors to the secondary (incremental) index.
+
+        Returns
+        -------
+        int
+            Number of vectors successfully added (after deduplication).
+
+        Raises
+        ------
+        RuntimeError
+            If primary index is not initialized or secondary index creation fails.
+        """
         if self.cpu_index is None:
             msg = "Primary index not initialized. Run build_index() or load_cpu_index() first."
             raise RuntimeError(msg)
@@ -266,7 +308,13 @@ class FAISSManager:
             self.secondary_index = builder_create_secondary(self.vec_dim)
 
     def save_cpu_index(self) -> None:
-        """Persist the primary CPU index to disk."""
+        """Persist the primary CPU index to disk.
+
+        Raises
+        ------
+        RuntimeError
+            If primary index is not initialized.
+        """
         if self.cpu_index is None:
             msg = "Primary index not initialized."
             raise RuntimeError(msg)
@@ -292,7 +340,13 @@ class FAISSManager:
             self._apply_runtime_overrides(self._runtime_overrides, persist=False)
 
     def save_secondary_index(self) -> None:
-        """Persist the secondary index to disk (.secondary suffix)."""
+        """Persist the secondary index to disk (.secondary suffix).
+
+        Raises
+        ------
+        RuntimeError
+            If secondary index is not created yet.
+        """
         if self.secondary_index is None:
             msg = "Secondary index not created yet."
             raise RuntimeError(msg)
@@ -306,18 +360,22 @@ class FAISSManager:
             self.secondary_index = None
 
     def export_idmap(self, out_path: Path) -> int:
-        """Export {faiss_row -> external_id} mapping to Parquet."""
+        """Export {faiss_row -> external_id} mapping to Parquet.
+
+        Returns
+        -------
+        int
+            Number of ID mappings exported.
+
+        Raises
+        ------
+        RuntimeError
+            If primary index is not initialized.
+        """
         if self.cpu_index is None:
             msg = "Primary index not initialized."
             raise RuntimeError(msg)
         return export_idmap_parquet(self.cpu_index, out_path)
-
-    def get_idmap_array(self) -> NDArrayI64:
-        """Get the ID map array from the primary index."""
-        if self.cpu_index is None:
-            msg = "Primary index not initialized."
-            raise RuntimeError(msg)
-        return get_idmap_array(self.cpu_index)
 
     def search(
         self,
@@ -328,7 +386,18 @@ class FAISSManager:
         runtime: SearchRuntimeOverrides | None = None,
         catalog: DuckDBCatalog | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
-        """Execute dual-index search with optional exact rerank."""
+        """Execute dual-index search with optional exact rerank.
+
+        Returns
+        -------
+        tuple[NDArrayF32, NDArrayI64]
+            Tuple of (distances, ids) arrays from the search.
+
+        Raises
+        ------
+        RuntimeError
+            If primary index is not initialized.
+        """
         if self.cpu_index is None:
             msg = "Primary index not initialized."
             raise RuntimeError(msg)
@@ -358,7 +427,13 @@ class FAISSManager:
         catalog: DuckDBCatalog,
         config: RefineSearchConfig | None = None,
     ) -> list[SearchHit]:
-        """Execute ANN search and return structured :class:`SearchHit` rows."""
+        """Execute ANN search and return structured :class:`SearchHit` rows.
+
+        Returns
+        -------
+        list[SearchHit]
+            List of search hits with scores, ranks, and explanation metadata.
+        """
         cfg = config or RefineSearchConfig()
         distances, ids = self.search(
             query=query,
@@ -399,19 +474,24 @@ class FAISSManager:
         """Apply runtime parameter overrides to the active index."""
         if self.cpu_index is None:
             return
+        nprobe_value = overrides.get("nprobe")
+        ef_search_value = overrides.get("efSearch")
+        quantizer_value = overrides.get("quantizer_efSearch")
         apply_runtime_parameters(
             self.cpu_index,
-            nprobe=int(overrides.get("nprobe")) if overrides.get("nprobe") is not None else None,
-            ef_search=int(overrides.get("efSearch")) if overrides.get("efSearch") is not None else None,
-            quantizer_ef_search=(
-                int(overrides.get("quantizer_efSearch"))
-                if overrides.get("quantizer_efSearch") is not None
-                else None
-            ),
+            nprobe=int(nprobe_value) if nprobe_value is not None else None,
+            ef_search=int(ef_search_value) if ef_search_value is not None else None,
+            quantizer_ef_search=int(quantizer_value) if quantizer_value is not None else None,
         )
 
     def merge_indexes(self) -> None:
-        """Merge secondary index into primary and rebuild."""
+        """Merge secondary index into primary and rebuild.
+
+        Raises
+        ------
+        RuntimeError
+            If primary index is not initialized.
+        """
         if self.cpu_index is None:
             msg = "Primary index not initialized."
             raise RuntimeError(msg)
@@ -423,14 +503,36 @@ class FAISSManager:
         self.incremental_ids.clear()
 
     def require_cpu_index(self) -> FaissIndex:
-        """Get the primary CPU index or raise if not initialized."""
+        """Get the primary CPU index or raise if not initialized.
+
+        Returns
+        -------
+        FaissIndex
+            The primary CPU index.
+
+        Raises
+        ------
+        RuntimeError
+            If primary index is not initialized.
+        """
         if self.cpu_index is None:
             msg = "Primary index not initialized."
             raise RuntimeError(msg)
         return self.cpu_index
 
     def active_index(self) -> FaissIndex:
-        """Get the currently active index (primary or secondary)."""
+        """Get the currently active index (primary or secondary).
+
+        Returns
+        -------
+        FaissIndex
+            The active index (primary preferred, falls back to secondary).
+
+        Raises
+        ------
+        RuntimeError
+            If no index is active.
+        """
         if self.cpu_index is not None:
             return self.cpu_index
         if self.secondary_index is not None:
@@ -461,7 +563,20 @@ class FAISSManager:
         k: int = 10,
         sweep: Sequence[str] | None = None,
     ) -> dict[str, object]:
-        """Sweep ParameterSpace strings and persist the best profile."""
+        """Sweep ParameterSpace strings and persist the best profile.
+
+        Returns
+        -------
+        dict[str, object]
+            Best autotune profile dictionary with parameters and metrics.
+
+        Raises
+        ------
+        RuntimeError
+            If primary index is not initialized or sweep evaluation fails.
+        ValueError
+            If sweep parameters are invalid.
+        """
         if self.cpu_index is None:
             msg = "Primary index not initialized."
             raise RuntimeError(msg)
@@ -496,7 +611,7 @@ class FAISSManager:
                     "timestamp": datetime.now(UTC).isoformat(),
                     "refine_k_factor": self.refine_k_factor,
                 }
-                profile.update({key: value for key, value in overrides.items()})
+                profile.update(dict(overrides))
                 best_profile = profile
                 best_recall = recall
                 best_latency = latency_ms
@@ -509,12 +624,14 @@ class FAISSManager:
         self._apply_profile_payload(best_profile)
         return best_profile
 
-    def reconstruct_batch(self, ids: Sequence[int]) -> NDArrayF32:
-        """Reconstruct vectors for a batch of chunk IDs."""
-        return store_reconstruct_batch(self.require_cpu_index(), self.vec_dim, ids)
-
     def estimate_memory_usage(self, n_vectors: int) -> dict[str, int]:
-        """Estimate memory usage in bytes for a given number of vectors."""
+        """Estimate memory usage in bytes for a given number of vectors.
+
+        Returns
+        -------
+        dict[str, int]
+            Dictionary with 'cpu_index_bytes' and 'total_bytes' estimates.
+        """
         if n_vectors <= 0:
             return {"cpu_index_bytes": 0, "total_bytes": 0}
         cfg = IndexBuildConfig(
@@ -531,7 +648,11 @@ class FAISSManager:
             cpu_bytes = n_vectors * self.vec_dim * 4
         elif family == "ivfflat":
             sqrt_n = int(np.sqrt(n_vectors))
-            alt = n_vectors // 39 if n_vectors >= 39 else sqrt_n
+            alt = (
+                n_vectors // _IVFFLAT_BALANCE_DIVISOR
+                if n_vectors >= _IVFFLAT_BALANCE_DIVISOR
+                else sqrt_n
+            )
             nlist = max(100, min(sqrt_n, alt))
             cpu_bytes = (nlist * self.vec_dim * 4) + (n_vectors * 8)
         else:
@@ -542,10 +663,6 @@ class FAISSManager:
             "cpu_index_bytes": int(cpu_bytes),
             "total_bytes": int(cpu_bytes),
         }
-
-    def get_compile_options(self) -> str:
-        """Return FAISS compile options string when available."""
-        return store_compile_options()
 
     def _write_meta_snapshot(
         self,
@@ -574,7 +691,8 @@ class FAISSManager:
                 return Path(path)
         return None
 
-    def _load_profile_payload(self, path: Path | None) -> dict[str, object] | None:
+    @staticmethod
+    def _load_profile_payload(path: Path | None) -> dict[str, object] | None:
         if path is None:
             return None
         return load_tuned_profile(Path(path))
@@ -619,6 +737,41 @@ class FAISSManager:
         parameter_space = meta.get("parameter_space")
         if isinstance(parameter_space, str):
             self._parameter_space = parameter_space
+
+    def _describe_runtime_state(self) -> dict[str, object]:
+        profile = self._load_profile_payload(self._resolve_profile_to_read())
+        snapshot = self._current_runtime_parameters()
+        payload: dict[str, object] = {
+            "active": snapshot,
+            "overrides": dict(self._runtime_overrides),
+        }
+        if profile is not None:
+            payload["autotune_profile"] = profile
+        if self._parameter_space is not None:
+            payload["parameter_space"] = self._parameter_space
+        return payload
+
+    def _apply_runtime_overrides_public(self, overrides: Mapping[str, object]) -> dict[str, object]:
+        normalized = self._normalize_runtime_payload(
+            nprobe=overrides.get("nprobe"),
+            ef_search=overrides.get("efSearch"),
+            quantizer_ef_search=overrides.get("quantizer_efSearch"),
+            k_factor=overrides.get("k_factor"),
+        )
+        if not normalized:
+            msg = "No overrides provided"
+            raise ValueError(msg)
+        self._apply_runtime_overrides(normalized)
+        return self._describe_runtime_state()
+
+    def _reset_runtime_overrides_public(self) -> dict[str, object]:
+        self._reset_runtime_overrides()
+        return self._describe_runtime_state()
+
+    def _set_parameter_string_public(self, param_str: str) -> dict[str, object]:
+        overrides, normalized = self._parse_parameter_string(param_str)
+        self._apply_runtime_overrides(overrides, parameter_space=normalized)
+        return self._describe_runtime_state()
 
     def _current_runtime_parameters(self) -> dict[str, object]:
         return {
@@ -705,33 +858,35 @@ class FAISSManager:
         )
         return overrides, normalized
 
-    def _coerce_positive_int(self, value: object, field: str) -> int:
+    @staticmethod
+    def _coerce_positive_int(value: object, field: str) -> int:
         if isinstance(value, bool):
             msg = f"Invalid integer override for {field}"
-            raise ValueError(msg)
+            raise TypeError(msg)
         if isinstance(value, (int, float)):
             result = int(value)
         elif isinstance(value, str):
             result = int(value.strip())
         else:
             msg = f"Invalid integer override for {field}"
-            raise ValueError(msg)
+            raise TypeError(msg)
         if result <= 0:
             msg = f"{field} must be positive"
             raise ValueError(msg)
         return result
 
-    def _coerce_positive_float(self, value: object, field: str, *, minimum: float = 0.0) -> float:
+    @staticmethod
+    def _coerce_positive_float(value: object, field: str, *, minimum: float = 0.0) -> float:
         if isinstance(value, bool):
             msg = f"Invalid float override for {field}"
-            raise ValueError(msg)
+            raise TypeError(msg)
         if isinstance(value, (int, float)):
             result = float(value)
         elif isinstance(value, str):
             result = float(value.strip())
         else:
             msg = f"Invalid float override for {field}"
-            raise ValueError(msg)
+            raise TypeError(msg)
         if result < minimum:
             msg = f"{field} must be >= {minimum}"
             raise ValueError(msg)

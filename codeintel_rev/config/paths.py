@@ -42,23 +42,106 @@ class ResolvedPaths:
 
 
 def _to_path(value: PathInput) -> Path:
+    """Convert path-like input to a Path object.
+
+    This helper function normalizes various path input types (strings, os.PathLike,
+    or Path objects) into a consistent Path instance. Used throughout the path
+    resolution system to ensure uniform path handling regardless of input format.
+
+    Parameters
+    ----------
+    value : PathInput
+        Path input that can be a string, os.PathLike, or Path object. The value
+        is converted to a Path instance for consistent processing.
+
+    Returns
+    -------
+    Path
+        Path object representing the input value. If already a Path, returns it
+        unchanged; otherwise constructs a new Path from the input.
+
+    Notes
+    -----
+    This function is a core utility in the path resolution system, enabling
+    flexible input handling while maintaining type safety. It ensures that all
+    downstream path operations work with Path objects, which provide better
+    cross-platform compatibility and path manipulation capabilities.
+    """
     if isinstance(value, Path):
         return value
     return Path(value)
 
 
 def _norm(path: Path) -> Path:
+    """Normalize a path by expanding user home directory and resolving to absolute form.
+
+    This function performs comprehensive path normalization including home directory
+    expansion, resolution to absolute paths, and platform-specific case normalization
+    on Windows. The normalization ensures paths are in a canonical form suitable for
+    comparison, storage, and cross-platform compatibility.
+
+    Parameters
+    ----------
+    path : Path
+        Input path to normalize. May be relative or absolute, and may contain
+        user home directory references (e.g., ~/data).
+
+    Returns
+    -------
+    Path
+        Normalized path with home directory expanded, resolved to absolute form
+        (when possible), and case-normalized on Windows. If resolution fails due
+        to missing filesystem entries, returns the expanded path without resolution.
+
+    Notes
+    -----
+    Path normalization is critical for ensuring consistent path handling across
+    different operating systems and user environments. The function handles edge
+    cases like missing filesystem entries gracefully by falling back to expanded
+    paths. Windows case normalization ensures case-insensitive path comparisons
+    work correctly.
+    """
     expanded = path.expanduser()
     try:
         resolved = expanded.resolve(strict=False)
     except (OSError, RuntimeError):
         resolved = expanded
     if sys.platform.startswith("win"):
-        return Path(os.path.normcase(str(resolved)))
+        return Path(os.normcase(str(resolved)))
     return resolved
 
 
 def _resolve_relative(base: Path, candidate: PathInput) -> Path:
+    """Resolve a candidate path relative to a base directory, handling both absolute and relative paths.
+
+    This function resolves paths that may be either absolute or relative to a base
+    directory. Absolute paths are normalized and returned as-is, while relative
+    paths are joined with the base directory and normalized. This enables flexible
+    path configuration where users can specify either absolute paths or paths
+    relative to the repository root.
+
+    Parameters
+    ----------
+    base : Path
+        Base directory used for resolving relative paths. Typically the repository
+        root directory. Must be an absolute, normalized path.
+    candidate : PathInput
+        Path candidate that may be absolute or relative. If absolute, used directly;
+        if relative, joined with the base directory.
+
+    Returns
+    -------
+    Path
+        Resolved and normalized path. Absolute candidates are normalized and returned;
+        relative candidates are joined with base and normalized.
+
+    Notes
+    -----
+    This function is essential for the path resolution system, allowing configuration
+    to specify paths either absolutely (for explicit control) or relatively (for
+    portability). The normalization step ensures all returned paths are in canonical
+    form suitable for filesystem operations and comparisons.
+    """
     raw = _to_path(candidate)
     if raw.is_absolute():
         return _norm(raw)
@@ -66,10 +149,69 @@ def _resolve_relative(base: Path, candidate: PathInput) -> Path:
 
 
 def _default_repo_root() -> Path:
+    """Determine the default repository root directory from the current module location.
+
+    This function computes the repository root by traversing up the directory tree
+    from the current module file location. It assumes a standard project layout
+    where the config module is located at `codeintel_rev/config/paths.py`, and
+    the repository root is two levels up. Used as a fallback when repository root
+    is not explicitly configured.
+
+    Returns
+    -------
+    Path
+        Normalized absolute path to the repository root directory. The path is
+        computed relative to this module's location and normalized for consistency.
+
+    Notes
+    -----
+    The default repository root detection enables the application to work without
+    explicit configuration in standard project layouts. This is particularly useful
+    for development environments and when running from the repository directory.
+    The function assumes a specific directory structure and may need adjustment
+    if the project layout changes.
+    """
     return _norm(Path(__file__).resolve().parents[2])
 
 
 def _build_from_mapping(settings: Mapping[str, Any]) -> ResolvedPaths:
+    """Build ResolvedPaths from a dictionary-like settings mapping.
+
+    This function constructs a ResolvedPaths instance from a mapping (typically
+    from environment variables or test fixtures) by extracting path configuration
+    values and resolving them relative to the repository root. The function handles
+    multiple repository root key names for compatibility and provides sensible
+    defaults for all path components. Used primarily for testing and environment-based
+    configuration.
+
+    Parameters
+    ----------
+    settings : Mapping[str, Any]
+        Dictionary-like object containing path configuration keys. Supports both
+        uppercase (e.g., "DATA_DIR") and lowercase (e.g., "data_dir") key variants.
+        Repository root can be specified via "BASE_DIR", "repo_root", or
+        "paths_repo_root" keys.
+
+    Returns
+    -------
+    ResolvedPaths
+        Fully resolved paths instance with all application paths computed from
+        the settings mapping. Paths are normalized and resolved relative to the
+        repository root, with defaults applied for any missing configuration.
+
+    Notes
+    -----
+    This function enables flexible configuration via environment variables or test
+    fixtures without requiring a full Settings object. The dual key format (uppercase
+    and lowercase) provides compatibility with different configuration styles. All
+    paths are normalized and resolved to ensure consistency across different
+    environments and operating systems.
+
+    See Also
+    --------
+    _build_from_settings : Build ResolvedPaths from a Settings object.
+    resolve_application_paths : Public API that delegates to this function.
+    """
     repo_value = (
         settings.get("BASE_DIR") or settings.get("repo_root") or settings.get("paths_repo_root")
     )
@@ -80,6 +222,30 @@ def _build_from_mapping(settings: Mapping[str, Any]) -> ResolvedPaths:
     )
 
     def _setting(key: str, default: Path) -> Path:
+        """Extract and resolve a path setting from the settings mapping.
+
+        This nested helper function extracts a path value from the settings mapping,
+        supporting both uppercase and lowercase key variants. If the key is found,
+        the value is resolved relative to the repository root; otherwise, the default
+        path is normalized and returned. This enables flexible configuration with
+        fallback defaults.
+
+        Parameters
+        ----------
+        key : str
+            Configuration key to look up (e.g., "DATA_DIR"). The function checks
+            both the exact key and its lowercase variant for compatibility.
+        default : Path
+            Default path to use if the key is not found in settings. The default
+            is normalized before being returned.
+
+        Returns
+        -------
+        Path
+            Resolved path from settings if found, or normalized default path if
+            the key is missing. All paths are normalized and resolved relative to
+            the repository root.
+        """
         raw = settings.get(key)
         if raw is None:
             raw = settings.get(key.lower())
@@ -127,10 +293,61 @@ def _build_from_mapping(settings: Mapping[str, Any]) -> ResolvedPaths:
 
 
 def _build_from_settings(settings: Settings) -> ResolvedPaths:
+    """Build ResolvedPaths from a fully constructed Settings object.
+
+    This function constructs a ResolvedPaths instance from a Settings object by
+    extracting path configuration from the PathsConfig component. All paths are
+    resolved relative to the configured repository root and normalized for consistency.
+    This is the primary path resolution method used in production code.
+
+    Parameters
+    ----------
+    settings : Settings
+        Fully constructed Settings object containing path configuration. The
+        settings.paths attribute must contain a PathsConfig with all required
+        path values.
+
+    Returns
+    -------
+    ResolvedPaths
+        Fully resolved paths instance with all application paths computed from
+        the Settings object. Paths are normalized and resolved relative to the
+        repository root specified in the settings.
+
+    Notes
+    -----
+    This function is the preferred method for path resolution in production code,
+    as it works with the fully typed Settings object and provides better type
+    safety. The function ensures all paths are normalized and resolved, providing
+    consistent path handling regardless of how paths are specified in configuration.
+
+    See Also
+    --------
+    _build_from_mapping : Build ResolvedPaths from a dictionary mapping.
+    resolve_application_paths : Public API that delegates to this function.
+    """
     cfg: PathsConfig = settings.paths
     repo_root = _norm(_to_path(cfg.repo_root))
 
     def _resolve(value: str) -> Path:
+        """Resolve a path string relative to the repository root.
+
+        This nested helper function resolves path strings from the PathsConfig
+        relative to the repository root. Used to convert relative path strings
+        from configuration into absolute, normalized Path objects.
+
+        Parameters
+        ----------
+        value : str
+            Path string from configuration. May be absolute or relative to the
+            repository root.
+
+        Returns
+        -------
+        Path
+            Resolved and normalized path relative to the repository root. The path
+            is normalized for consistency across platforms.
+        """
         return _resolve_relative(repo_root, value)
 
     config_dir = _norm(repo_root / "config")

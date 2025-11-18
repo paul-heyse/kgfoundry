@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from codeintel_rev.retrieval.pipeline.late_interaction import (
     LateInteractionResult,
     XTRLateInteraction,
@@ -11,10 +13,17 @@ from tests._helpers import assertions
 
 
 class _StubXTRIndex:
-    def __init__(self, triples):
+    def __init__(self, triples: list[tuple[int, float, dict[str, object] | None]]) -> None:
         self._triples = triples
 
-    def rescore(self, *, query: str, candidate_chunk_ids, explain: bool, topk_explanations: int):
+    def rescore(
+        self,
+        *,
+        query: str,
+        candidate_chunk_ids: Iterable[int],
+        explain: bool,
+        topk_explanations: int,
+    ) -> list[tuple[int, float, dict[str, object] | None]]:
         self.last_query = query
         self.last_candidates = list(candidate_chunk_ids)
         self.last_explain = explain

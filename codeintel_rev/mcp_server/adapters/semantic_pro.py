@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, StructureAnnotations, relation_exists
@@ -46,6 +46,16 @@ except ImportError:  # pragma: no cover - optional dependency
     CoderankLLMRerankerContext = None  # type: ignore[assignment]
 
 SNIPPET_PREVIEW_CHARS = 500
+
+
+class _CoderankLLMConfig(Protocol):
+    """Protocol for CodeRank LLM configuration object."""
+
+    model_id: str
+    device: str
+    max_new_tokens: int
+    temperature: float
+    top_p: float
 
 
 class RerankOptionPayload(dict):
@@ -394,7 +404,7 @@ def _maybe_apply_reranker(
     return new_ids, new_scores, metadata
 
 
-def _build_coderank_adapter(cfg: Any) -> CodeRankLLMAdapter | None:
+def _build_coderank_adapter(cfg: _CoderankLLMConfig) -> CodeRankLLMAdapter | None:
     if (
         CodeRankListwiseReranker is None
         or CodeRankGenerationSettings is None

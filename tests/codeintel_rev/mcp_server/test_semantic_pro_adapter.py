@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import pytest
 from codeintel_rev.mcp_server.adapters import semantic_pro
@@ -14,6 +15,34 @@ from codeintel_rev.retrieval.pipeline.stage0 import Stage0Metadata, Stage0Result
 
 from kgfoundry_common.errors import VectorSearchError
 from tests._helpers import assertions
+
+
+class _MockConnection(Protocol):
+    """Protocol for mock DuckDB connection in tests."""
+
+    def __enter__(self) -> _MockConnection:
+        """Enter context manager."""
+        ...
+
+    def __exit__(self, *exc: object) -> bool:
+        """Exit context manager."""
+        ...
+
+    def execute(self, _query: str, params: tuple[Sequence[int]]) -> _MockResult:
+        """Execute a query."""
+        ...
+
+
+class _MockResult(Protocol):
+    """Protocol for mock DuckDB query result in tests."""
+
+    def fetchone(self) -> tuple[int, str, str] | None:
+        """Fetch one row."""
+        ...
+
+    def fetchall(self) -> list[tuple[int, str, str]]:
+        """Fetch all rows."""
+        ...
 
 
 @dataclass
@@ -75,27 +104,27 @@ class _CatalogCtx:
     def get_structure_annotations(self, ids: list[int]) -> Mapping[int, Any]:
         return dict.fromkeys(ids)
 
-    def connection(self):
+    def connection(self) -> AbstractContextManager[_MockConnection]:
         class _Conn:
-            def __enter__(self):
+            def __enter__(self) -> _Conn:
                 return self
 
             def __exit__(self, *exc: object) -> bool:
                 return False
 
-            def execute(self, _query: str, params: tuple[Sequence[int]]):
+            def execute(self, _query: str, params: tuple[Sequence[int]]) -> _Result:
                 chunk_ids = params[0] if isinstance(params, (list, tuple)) else params
                 if isinstance(chunk_ids, int):
                     chunk_ids = [chunk_ids]
 
                 class _Result:
-                    def __init__(self, rows):
+                    def __init__(self, rows: list[tuple[int, str, str]]) -> None:
                         self._rows = rows
 
-                    def fetchone(self):
+                    def fetchone(self) -> tuple[int, str, str] | None:
                         return self._rows[0] if self._rows else None
 
-                    def fetchall(self):
+                    def fetchall(self) -> list[tuple[int, str, str]]:
                         return list(self._rows)
 
                 rows = [
@@ -104,7 +133,14 @@ class _CatalogCtx:
                 ]
                 return _Result(rows)
 
-        return _Conn()
+        class _ConnContextManager:
+            def __enter__(self) -> _Conn:
+                return _Conn()
+
+            def __exit__(self, *exc: object) -> bool:
+                return False
+
+        return _ConnContextManager()
 
 
 def _stage0_result() -> Stage0Result:
@@ -195,12 +231,14 @@ def test_semantic_search_pro_sync_orchestrates(monkeypatch: pytest.MonkeyPatch) 
 
 @pytest.mark.asyncio
 async def test_semantic_search_pro_validates_limit() -> None:
+    """Test that semantic_search_pro validates limit parameter."""
     context = _FakeContext()
     with pytest.raises(VectorSearchError):
         await semantic_pro.semantic_search_pro(context, query="q", limit=0)
 
 
 def test_merge_late_interaction_appends_unscored_candidates() -> None:
+    """Test that merge_late_interaction appends unscored candidates to results."""
     result_ids, result_scores = semantic_pro._merge_late_interaction(
         [1, 2, 3],
         [0.9, 0.8, 0.7],
@@ -211,6 +249,7 @@ def test_merge_late_interaction_appends_unscored_candidates() -> None:
 
 
 def test_maybe_run_late_interaction_returns_none_when_index_unavailable() -> None:
+    """Test that maybe_run_late_interaction returns None when index is unavailable."""
     context = _FakeContext()
 
     class _Index:
@@ -227,14 +266,20 @@ def test_maybe_run_late_interaction_returns_none_when_index_unavailable() -> Non
 
 
 def test_maybe_run_late_interaction_invokes_xtr_index() -> None:
+    """Test that maybe_run_late_interaction invokes XTR index when available."""
     context = _FakeContext()
 
     class _Index:
         ready = True
 
         def rescore(
-            self, _query: str, candidate_chunk_ids, *, _explain: bool, _topk_explanations: int
-        ):
+            self,
+            _query: str,
+            candidate_chunk_ids: Sequence[int],
+            *,
+            _explain: bool,
+            _topk_explanations: int,
+        ) -> list[tuple[int, float, dict[str, Any] | None]]:
             return [
                 (candidate_chunk_ids[0], 0.99, {"token_matches": []}),
                 (candidate_chunk_ids[1], 0.88, None),
@@ -250,6 +295,7 @@ def test_maybe_run_late_interaction_invokes_xtr_index() -> None:
 
 
 def test_maybe_apply_reranker_merges_scores(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that maybe_apply_reranker merges reranker scores correctly."""
     context = _FakeContext()
 
     class _StubAdapter:

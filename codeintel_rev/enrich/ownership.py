@@ -110,6 +110,32 @@ def compute_ownership(
 
 
 def _normalize_windows(values: Sequence[int]) -> tuple[int, ...]:
+    """Normalize churn time window values to valid positive integers.
+
+    This function sanitizes churn window values by ensuring they are positive
+    integers (minimum 1), removing invalid entries, and providing a default
+    window of 30 days if no valid windows are provided. The normalized windows
+    are sorted for consistent processing in downstream analysis.
+
+    Parameters
+    ----------
+    values : Sequence[int]
+        Sequence of time window values in days. Values are validated and
+        sanitized to ensure they are positive integers.
+
+    Returns
+    -------
+    tuple[int, ...]
+        Sorted tuple of normalized window values, each guaranteed to be at
+        least 1 day. Returns (30,) if no valid windows are provided.
+
+    Notes
+    -----
+    Window normalization ensures consistent churn metric computation by
+    validating input values and providing sensible defaults. The function
+    handles edge cases like empty sequences, zero or negative values, and
+    ensures all windows are positive integers suitable for time delta calculations.
+    """
     sanitized = {max(1, int(value)) for value in values if int(value) > 0}
     if not sanitized:
         sanitized = {30}
@@ -117,6 +143,33 @@ def _normalize_windows(values: Sequence[int]) -> tuple[int, ...]:
 
 
 def _try_open_repo(repo_root: Path) -> GitRepo | None:
+    """Attempt to open a Git repository at the specified root directory.
+
+    This function attempts to initialize a GitPython repository object for the
+    given root directory. It handles cases where GitPython is not installed or
+    where the directory is not a valid Git repository by returning None. Used
+    to safely access Git history for ownership and churn analysis.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Root directory path that should contain a .git directory. The path
+        is converted to a string for GitPython compatibility.
+
+    Returns
+    -------
+    GitRepo | None
+        GitPython Repo object if the repository is successfully opened, or None
+        if GitPython is unavailable, the directory is not a Git repository, or
+        repository access fails.
+
+    Notes
+    -----
+    This function provides graceful degradation when Git is unavailable, allowing
+    the ownership computation to proceed without Git history. The function is
+    designed to be safe to call even when GitPython is not installed, making it
+    suitable for environments where Git analysis is optional.
+    """
     if _RuntimeGitRepo is None:  # pragma: no cover - GitPython not installed
         return None
     try:
@@ -133,6 +186,51 @@ def _stats_via_gitpython(
     commits_window: int,
     windows: tuple[int, ...],
 ) -> dict[str, FileOwnership]:
+    """Compute ownership and churn statistics for files using GitPython.
+
+    This function analyzes Git commit history to compute ownership metrics including
+    primary authors, bus factor, and churn counts over specified time windows for
+    each file. The function iterates through recent commits for each file, extracts
+    author information, and computes aggregated statistics. Ownership is determined
+    by CODEOWNERS file lookup or by identifying the most frequent committer.
+
+    Parameters
+    ----------
+    repo : GitRepo
+        GitPython repository object providing access to commit history. Must be
+        a valid, initialized repository.
+    repo_root : Path
+        Root directory of the repository, used for CODEOWNERS file lookup and
+        path resolution.
+    rel_paths : Sequence[str]
+        Sequence of repository-relative file paths to analyze. Each path is
+        processed independently to compute its ownership metrics.
+    commits_window : int
+        Maximum number of recent commits to analyze per file. Limits history
+        traversal for performance while providing sufficient data for ownership
+        analysis.
+    windows : tuple[int, ...]
+        Time windows in days for churn metric computation. Each window specifies
+        a period over which to count commits, enabling analysis of change frequency
+        over different time scales.
+
+    Returns
+    -------
+    dict[str, FileOwnership]
+        Dictionary mapping repository-relative file paths to their FileOwnership
+        records. Each record contains ownership information, primary authors,
+        bus factor, and churn counts per window. Files with no commit history or
+        access errors are excluded from the result.
+
+    Notes
+    -----
+    This function performs the core ownership analysis by leveraging Git history.
+    It handles errors gracefully by skipping files that cannot be analyzed, ensuring
+    partial results are returned even if some files fail. The bus factor calculation
+    measures code concentration (higher values indicate more concentrated ownership),
+    while churn windows help identify frequently changing files that may need
+    attention.
+    """
     commit_limit = max(1, commits_window)
     now = datetime.now(tz=UTC)
     cutoffs = {window: now - timedelta(days=window) for window in windows}
@@ -165,6 +263,34 @@ def _stats_via_gitpython(
 
 
 def _author_name(commit: object) -> str | None:
+    """Extract author name from a Git commit object.
+
+    This function safely extracts the author name from a Git commit object by
+    accessing the author attribute and its name property. The function handles
+    cases where the commit object structure may vary or where author information
+    is missing, returning None in such cases.
+
+    Parameters
+    ----------
+    commit : object
+        Git commit object (typically a GitPython Commit object) containing author
+        information. The object should have an 'author' attribute with a 'name'
+        property.
+
+    Returns
+    -------
+    str | None
+        Author name string if successfully extracted and non-empty, or None if
+        the author information is missing, invalid, or empty. The returned name
+        is stripped of leading/trailing whitespace.
+
+    Notes
+    -----
+    This helper function provides safe access to commit author information,
+    handling variations in GitPython object structure and missing data gracefully.
+    It ensures that only valid, non-empty author names are returned for use in
+    ownership analysis.
+    """
     author = getattr(commit, "author", None)
     name = getattr(author, "name", None)
     if isinstance(name, str) and name.strip():
@@ -173,6 +299,33 @@ def _author_name(commit: object) -> str | None:
 
 
 def _top_k(items: Sequence[str], k: int) -> list[str]:
+    """Extract the top K most frequent items from a sequence.
+
+    This function counts item frequencies and returns the K most common items
+    in descending order of frequency. Used to identify primary authors or most
+    frequent contributors for ownership analysis.
+
+    Parameters
+    ----------
+    items : Sequence[str]
+        Sequence of items (typically author names) to count and rank. Duplicate
+        items are counted, and the most frequent items are selected.
+    k : int
+        Number of top items to return. The function returns at most K items,
+        fewer if the sequence contains fewer than K unique items.
+
+    Returns
+    -------
+    list[str]
+        List of the K most frequent items, ordered by frequency (most frequent
+        first). The list length is min(k, len(unique_items)).
+
+    Notes
+    -----
+    This function uses Counter for efficient frequency counting and provides
+    a simple interface for extracting top contributors. It's used to identify
+    primary authors for files, helping understand code ownership patterns.
+    """
     counter = Counter(items)
     return [name for name, _count in counter.most_common(k)]
 
