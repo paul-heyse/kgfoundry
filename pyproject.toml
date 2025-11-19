@@ -697,9 +697,11 @@ exclude = "codeintel_rev/patches|codeintel_rev/cli/telemetry.py|codeintel_rev/di
 # The type annotation matches the signature, but pydoclint cannot parse underscore-prefixed kwargs
 # DOC105: Typer CLI commands use Annotated types for argument parsing, but docstrings document underlying types
 # This is correct - docstrings should document the actual types users interact with, not Annotated wrappers
+# DOC301: __init__ methods should have docstrings per PEP 257. We document constructor parameters in __init__
+# docstrings rather than class docstrings for clarity and consistency with Python conventions.
 # DOC503: RuntimeCell.get_or_initialize raises exceptions via variable (cooldown_error), not directly
 # Pydoclint doesn't recognize that cooldown_error is a variable containing an exception, not an exception type
-skipCheckingCode = ["DOC503"]
+skipCheckingCode = ["DOC301", "DOC503"]
 
 [tool.pydocstyle]
 convention = "numpy"

@@ -15,7 +15,21 @@ from codeintel_rev.typing import PolarsModule
 
 @dataclass(slots=True, frozen=True)
 class UseGraph:
-    """Definition-to-use relationships summarised by file."""
+    """Definition-to-use relationships summarised by file.
+
+    Attributes
+    ----------
+    uses_by_file : dict[str, set[str]]
+        Dictionary mapping file paths to sets of symbol identifiers used in
+        that file. Represents symbol usage grouped by file.
+    symbol_usage : dict[str, int]
+        Dictionary mapping symbol identifiers to their usage count across all
+        files. Represents how many times each symbol is referenced.
+    edges : list[tuple[str, str, str]]
+        List of (def_path, use_path, symbol) tuples representing definition-to-use
+        edges. def_path is where the symbol is defined, use_path is where it's
+        used, and symbol is the symbol identifier.
+    """
 
     uses_by_file: dict[str, set[str]]
     symbol_usage: dict[str, int]

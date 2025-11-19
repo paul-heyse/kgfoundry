@@ -131,14 +131,32 @@ class _DuckDBModule(Protocol):
 
 @dataclass(slots=True, frozen=True)
 class DuckConn:
-    """Connection metadata for enrichment DuckDB ingestion."""
+    """Connection metadata for enrichment DuckDB ingestion.
+
+    Attributes
+    ----------
+    db_path : Path
+        Path to the DuckDB database file used for enrichment data ingestion.
+    """
 
     db_path: Path
 
 
 @dataclass(slots=True, frozen=True)
 class DuckDBIngestContext:
-    """Dependency providers and options for DuckDB ingestion routines."""
+    """Dependency providers and options for DuckDB ingestion routines.
+
+    Attributes
+    ----------
+    duckdb_module : _DuckDBModule
+        DuckDB module instance for database operations.
+    use_native_json : bool, optional
+        Whether to use DuckDB's native JSON functions. If False, uses
+        string-based JSON handling. Defaults to True.
+    pragmas : tuple[tuple[str, str], ...], optional
+        Tuple of (pragma_name, value) pairs to set on DuckDB connections.
+        Empty tuple means no pragmas are set. Defaults to empty tuple.
+    """
 
     duckdb_module: _DuckDBModule
     use_native_json: bool = True

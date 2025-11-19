@@ -14,6 +14,13 @@ from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRec
 def load_modules_jsonl(modules_jsonl: Path, db_path: Path) -> int:
     """Load ``modules.jsonl`` rows into DuckDB.
 
+    Parameters
+    ----------
+    modules_jsonl : Path
+        Path to the JSONL file containing module records to ingest.
+    db_path : Path
+        Path to the DuckDB database file where records will be loaded.
+
     Returns
     -------
     int
@@ -47,6 +54,18 @@ def write_to_duckdb(
     replace: bool = True,
 ) -> None:
     """Write service module records into DuckDB using the context connection.
+
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context containing DuckDB connection. Must have been created
+        with ``enable_db=True``.
+    records : list[SimpleModuleRecord]
+        List of module records to write to the database.
+    table : str, optional
+        Table name to write records to. Defaults to "modules".
+    replace : bool, optional
+        Whether to drop and recreate the table if it exists. Defaults to True.
 
     Raises
     ------

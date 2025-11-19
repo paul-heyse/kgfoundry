@@ -6,14 +6,50 @@ from msgspec import structs
 
 from codeintel_rev.config.api import AppConfig
 from codeintel_rev.config.settings import (
+    BM25Config as LegacyBM25Config,
+)
+from codeintel_rev.config.settings import (
+    EmbeddingsConfig as LegacyEmbeddingsConfig,
+)
+from codeintel_rev.config.settings import (
     Settings,
-    SpladeConfig as LegacySpladeConfig,
-    SpladeOnnxQueryConfig as LegacySpladeOnnxQueryConfig,
     load_settings,
+)
+from codeintel_rev.config.settings import (
+    SpladeConfig as LegacySpladeConfig,
+)
+from codeintel_rev.config.settings import (
+    SpladeOnnxQueryConfig as LegacySpladeOnnxQueryConfig,
+)
+from codeintel_rev.config.settings import (
+    VLLMConfig as LegacyVLLMConfig,
+)
+from codeintel_rev.config.settings import (
+    VLLMEmbeddingMode as LegacyVLLMEmbeddingMode,
+)
+from codeintel_rev.config.settings import (
+    VLLMRunMode as LegacyVLLMRunMode,
+)
+from codeintel_rev.config.settings import (
+    XTRConfig as LegacyXTRConfig,
 )
 
 
 def _convert_splade_config(app_config: AppConfig) -> LegacySpladeConfig:
+    """Convert AppConfig SPLADE settings to legacy SpladeConfig format.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing SPLADE settings to convert.
+
+    Returns
+    -------
+    LegacySpladeConfig
+        Legacy msgspec-based SPLADE configuration struct with all fields
+        populated from app_config.splade, including optional ONNX query
+        encoder configuration if present.
+    """
     splade = app_config.splade
     onnx_query_cfg = splade.onnx_query
     legacy_onnx = None
@@ -53,6 +89,130 @@ def _convert_splade_config(app_config: AppConfig) -> LegacySpladeConfig:
     )
 
 
+def _convert_embeddings_config(app_config: AppConfig) -> LegacyEmbeddingsConfig:
+    """Convert Embeddings settings to legacy struct.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing EmbeddingsSettings to convert.
+
+    Returns
+    -------
+    LegacyEmbeddingsConfig
+        Legacy msgspec-based embeddings configuration struct with all fields
+        populated from app_config.embeddings.
+    """
+    embeddings = app_config.embeddings
+    return LegacyEmbeddingsConfig(
+        provider=embeddings.provider,
+        model_name=embeddings.model_name,
+        device=embeddings.device,
+        batch_size=embeddings.batch_size,
+        micro_batch_size=embeddings.micro_batch_size,
+        normalize=embeddings.normalize,
+        max_tokens=embeddings.max_tokens,
+        max_sequence_chars=embeddings.max_sequence_chars,
+        retry_max_attempts=embeddings.retry_max_attempts,
+        retry_backoff_ms=embeddings.retry_backoff_ms,
+        max_pending_batches=embeddings.max_pending_batches,
+        max_wait_ms=embeddings.max_wait_ms,
+        allow_hf_fallback=embeddings.allow_hf_fallback,
+    )
+
+
+def _convert_vllm_config(app_config: AppConfig) -> LegacyVLLMConfig:
+    """Convert vLLM settings to legacy struct.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing VLLMSettings to convert.
+
+    Returns
+    -------
+    LegacyVLLMConfig
+        Legacy msgspec-based vLLM configuration struct with all fields
+        populated from app_config.vllm, including converted run mode and
+        embedding mode enums.
+    """
+    vllm = app_config.vllm
+    run_mode = LegacyVLLMRunMode(mode=vllm.run_mode)
+    embedding_mode = LegacyVLLMEmbeddingMode.from_value(vllm.embedding_mode)
+    return LegacyVLLMConfig(
+        base_url=vllm.base_url,
+        model=vllm.model,
+        batch_size=vllm.batch_size,
+        embedding_dim=vllm.embedding_dim,
+        timeout_s=vllm.timeout_s,
+        run=run_mode,
+        memory_utilization=vllm.memory_utilization,
+        max_num_batched_tokens=vllm.max_num_batched_tokens,
+        normalize=vllm.normalize,
+        embedding_mode=embedding_mode,
+        max_concurrent_requests=vllm.max_concurrent_requests,
+        task=vllm.task,
+    )
+
+
+def _convert_bm25_config(app_config: AppConfig) -> LegacyBM25Config:
+    """Convert AppConfig BM25 settings to legacy BM25Config format.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing BM25 settings to convert.
+
+    Returns
+    -------
+    LegacyBM25Config
+        Legacy msgspec-based BM25 configuration struct with all fields
+        populated from app_config.bm25, including corpus directory, index
+        directory, ranking parameters, RM3 settings, and analyzer configuration.
+    """
+    bm25 = app_config.bm25
+    return LegacyBM25Config(
+        corpus_json_dir=str(bm25.corpus_json_dir),
+        index_dir=str(bm25.index_dir),
+        threads=bm25.threads,
+        enabled=bm25.enabled,
+        k1=bm25.k1,
+        b=bm25.b,
+        rm3_enabled=bm25.rm3_enabled,
+        rm3_fb_docs=bm25.rm3_fb_docs,
+        rm3_fb_terms=bm25.rm3_fb_terms,
+        rm3_original_query_weight=bm25.rm3_original_query_weight,
+        analyzer=bm25.analyzer,
+        stopwords=tuple(bm25.stopwords),
+    )
+
+
+def _convert_xtr_config(app_config: AppConfig) -> LegacyXTRConfig:
+    """Convert AppConfig XTR settings to legacy XTRConfig format.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing XTR settings to convert.
+
+    Returns
+    -------
+    LegacyXTRConfig
+        Legacy msgspec-based XTR configuration struct populated from AppConfig.
+    """
+    xtr = app_config.xtr
+    return LegacyXTRConfig(
+        model_id=xtr.model_id,
+        device=xtr.device,
+        max_query_tokens=xtr.max_query_tokens,
+        candidate_k=xtr.candidate_k,
+        dim=xtr.dim,
+        dtype=xtr.dtype,
+        enable=xtr.enable,
+        mode=xtr.mode,
+    )
+
+
 def settings_from_app_config(app_config: AppConfig, *, base: Settings | None = None) -> Settings:
     """Return msgspec Settings with AppConfig overrides applied.
 
@@ -77,11 +237,27 @@ def settings_from_app_config(app_config: AppConfig, *, base: Settings | None = N
         faiss_index=str(app_config.faiss.index_path),
     )
     splade_cfg = _convert_splade_config(app_config)
+    bm25_cfg = _convert_bm25_config(app_config)
+    embeddings_cfg = _convert_embeddings_config(app_config)
+    vllm_cfg = _convert_vllm_config(app_config)
+    xtr_cfg = _convert_xtr_config(app_config)
     patched_index = structs.replace(
         base_settings.index,
+        enable_bm25_channel=app_config.bm25.enabled,
+        bm25_k1=app_config.bm25.k1,
+        bm25_b=app_config.bm25.b,
         enable_splade_channel=app_config.splade.enabled,
     )
-    return structs.replace(base_settings, paths=patched_paths, splade=splade_cfg, index=patched_index)
+    return structs.replace(
+        base_settings,
+        paths=patched_paths,
+        bm25=bm25_cfg,
+        splade=splade_cfg,
+        embeddings=embeddings_cfg,
+        vllm=vllm_cfg,
+        xtr=xtr_cfg,
+        index=patched_index,
+    )
 
 
 __all__ = ["settings_from_app_config"]

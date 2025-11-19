@@ -17,7 +17,35 @@ DEFAULT_EXPORT_HUB_THRESHOLD = 10
 
 @dataclass(frozen=True, slots=True)
 class OverlayPolicy:
-    """Controls when an overlay is generated and how it is written."""
+    """Controls when an overlay is generated and how it is written.
+
+    Attributes
+    ----------
+    overlays_root : Path, optional
+        Root directory where overlay stub files will be written. Defaults to
+        Path("stubs/overlays").
+    include_public_defs : bool, optional
+        Whether to include public definition stubs in overlays. Defaults to True.
+    inject_module_getattr_any : bool, optional
+        Whether to inject `__getattr__` returning Any for star imports.
+        Defaults to True.
+    when_star_imports : bool, optional
+        Whether to generate overlays for modules with star imports. Defaults
+        to True.
+    when_type_errors : bool, optional
+        Whether to generate overlays based on type error counts. Defaults to False.
+    min_type_errors : int, optional
+        Minimum number of type errors required to trigger overlay generation
+        when when_type_errors is True. Must be positive. Defaults to 25.
+    max_overlays : int, optional
+        Maximum number of overlays to generate. Must be positive. Defaults to 200.
+    export_hub_threshold : int, optional
+        Minimum number of exports required to consider a module an export hub.
+        Must be positive. Defaults to DEFAULT_EXPORT_HUB_THRESHOLD.
+    overlay_tag : str, optional
+        Tag name used to mark modules needing overlays. Defaults to
+        "overlay-needed".
+    """
 
     overlays_root: Path = Path("stubs/overlays")
     include_public_defs: bool = True
@@ -32,7 +60,21 @@ class OverlayPolicy:
 
 @dataclass(frozen=True, slots=True)
 class OverlayResult:
-    """Summary of overlay creation for a single module."""
+    """Summary of overlay creation for a single module.
+
+    Attributes
+    ----------
+    pyi_path : Path | None
+        Path to the generated overlay stub file (.pyi). None if no overlay
+        was created.
+    created : bool
+        Whether an overlay file was actually created.
+    reason : str
+        Reason string explaining why the overlay was or was not created.
+    exports_resolved : Mapping[str, set[str]]
+        Dictionary mapping export names to sets of resolved qualified names.
+        Used for tracking symbol resolution in overlays.
+    """
 
     pyi_path: Path | None
     created: bool
@@ -42,7 +84,23 @@ class OverlayResult:
 
 @dataclass(frozen=True, slots=True)
 class OverlayInputs:
-    """Runtime inputs influencing overlay generation."""
+    """Runtime inputs influencing overlay generation.
+
+    Attributes
+    ----------
+    scip : SCIPIndex | None, optional
+        SCIP symbol index for symbol resolution. None if SCIP is not available.
+        Defaults to None.
+    type_error_counts : Mapping[str, int] | None, optional
+        Dictionary mapping file paths to type error counts. None if type
+        error data is not available. Defaults to None.
+    force : bool, optional
+        Whether to force overlay generation regardless of heuristics.
+        Defaults to False.
+    overlay_tagged_paths : frozenset[str], optional
+        Set of file paths previously tagged as needing overlays. Empty set
+        if no tagged paths. Defaults to empty frozenset.
+    """
 
     scip: SCIPIndex | None = None
     type_error_counts: Mapping[str, int] | None = None
@@ -52,7 +110,24 @@ class OverlayInputs:
 
 @dataclass(frozen=True, slots=True)
 class OverlayRenderContext:
-    """Bundle of values required to render overlay text."""
+    """Bundle of values required to render overlay text.
+
+    Attributes
+    ----------
+    module_name : str
+        Python module name for the overlay (e.g., "module.submodule").
+    module : ModuleIndex
+        Module index containing imports, definitions, and exports.
+    star_targets : Mapping[str, list[str]]
+        Dictionary mapping star import module names to lists of resolved
+        symbol names.
+    import_reexports : list[str]
+        List of symbol names that are re-exported via imports.
+    include_public_defs : bool
+        Whether to include public definition stubs in the overlay.
+    inject_getattr_any : bool
+        Whether to inject `__getattr__` returning Any for star imports.
+    """
 
     module_name: str
     module: ModuleIndex
@@ -64,7 +139,19 @@ class OverlayRenderContext:
 
 @dataclass(frozen=True)
 class OverlayDecisionInputs:
-    """Data needed to decide whether an overlay should be generated."""
+    """Data needed to decide whether an overlay should be generated.
+
+    Attributes
+    ----------
+    module : ModuleIndex
+        Module index containing imports, definitions, and exports.
+    rel_key : str
+        Relative file path key used for lookup and tagging.
+    has_star : bool
+        Whether the module contains star imports (from module import *).
+    error_count : int
+        Number of type errors reported for this module. Must be non-negative.
+    """
 
     module: ModuleIndex
     rel_key: str

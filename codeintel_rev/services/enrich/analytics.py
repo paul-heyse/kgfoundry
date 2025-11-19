@@ -38,10 +38,20 @@ def compute_pipeline_analytics(
 ) -> AnalyticsArtifacts:
     """Compute analytics artifacts for module rows.
 
+    Parameters
+    ----------
+    ctx : LegacyPipelineContext
+        Pipeline context containing SCIP index, config records, tagging rules,
+        and package prefix.
+    module_rows : list[ModuleRecord]
+        List of module records to compute analytics for. Modified in place
+        with additional metadata fields.
+
     Returns
     -------
     AnalyticsArtifacts
-        Aggregated graphs and tabular analytics.
+        Aggregated graphs and tabular analytics including import graph, use
+        graph, config index, coverage rows, hotspot rows, and tag index.
     """
     with _stage(StageMeta("analytics", {"modules": len(module_rows)})) as meta:
         import_graph, use_graph, config_index = augment_module_rows(
@@ -72,10 +82,16 @@ def prepare_config_state(
 ) -> ConfigReferenceState:
     """Materialize config reference tracking state.
 
+    Parameters
+    ----------
+    records : list[dict[str, Any]] | None, optional
+        Optional list of config record dictionaries. If None, uses empty list.
+
     Returns
     -------
     ConfigReferenceState
-        Populated record/index mapping with empty references.
+        Populated record/index mapping with empty references. Records are
+        grouped by directory for efficient lookup.
     """
     materialized = records or []
     return ConfigReferenceState(
@@ -94,10 +110,25 @@ def augment_module_rows(
 ) -> tuple[ImportGraph, UseGraph, list[dict[str, Any]]]:
     """Attach graph/usage/export metadata and emit module artifacts.
 
+    Parameters
+    ----------
+    module_rows : list[ModuleRecord]
+        List of module records to augment. Modified in place with graph metrics,
+        export resolution, usage counts, config references, overlay flags,
+        and hotspot scores.
+    scip_index : SCIPIndex
+        SCIP index for building use graphs and symbol usage analysis.
+    package_prefix : str | None, optional
+        Optional package prefix for module name resolution and import graph
+        building.
+    config_records : list[dict[str, Any]] | None, optional
+        Optional list of config record dictionaries for reference tracking.
+        If None, uses empty list.
+
     Returns
     -------
     tuple[ImportGraph, UseGraph, list[dict[str, Any]]]
-        Import graph, use graph, and config records with references.
+        Import graph, use graph, and config records with populated references.
     """
     module_name_map = build_module_name_map(module_rows, package_prefix)
     import_graph = build_import_graph(module_rows, package_prefix)
@@ -147,10 +178,17 @@ def augment_module_rows(
 def build_tag_index(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
     """Return tag -> path mapping.
 
+    Parameters
+    ----------
+    rows : Sequence[Mapping[str, Any]]
+        Sequence of module record dictionaries containing "tags" and "path"
+        fields.
+
     Returns
     -------
     dict[str, list[str]]
-        Mapping of tag to associated module paths.
+        Mapping of tag to associated module paths. Rows with invalid or
+        missing tags/paths are skipped.
     """
     tag_index: dict[str, list[str]] = {}
     for row in rows:
@@ -166,7 +204,15 @@ def build_tag_index(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
 
 
 def infer_tags(rows: list[ModuleRecord], rules: Mapping[str, Any]) -> None:
-    """Apply tagging rules with logging/telemetry."""
+    """Apply tagging rules with logging/telemetry.
+
+    Parameters
+    ----------
+    rows : list[ModuleRecord]
+        List of module records to tag. Modified in place with inferred tags.
+    rules : Mapping[str, Any]
+        Tagging rules dictionary mapping rule names to rule configurations.
+    """
     with _stage(StageMeta("tagging", {"rules": len(rules)})) as meta:
         _apply_tagging(rows, rules)
         meta["tagged"] = sum(1 for row in rows if row.get("tags"))
@@ -175,10 +221,17 @@ def infer_tags(rows: list[ModuleRecord], rules: Mapping[str, Any]) -> None:
 def build_coverage_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Build structured coverage rows from module metadata.
 
+    Parameters
+    ----------
+    rows : Sequence[Mapping[str, Any]]
+        Sequence of module record dictionaries containing coverage metadata
+        fields like "covered_lines_ratio" and "covered_defs_ratio".
+
     Returns
     -------
     list[dict[str, Any]]
-        Coverage summary rows keyed by path.
+        Coverage summary rows keyed by path, with default values of 0.0
+        for missing coverage ratios.
     """
     return [
         {
@@ -193,10 +246,16 @@ def build_coverage_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
 def build_hotspot_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Build hotspot summary rows.
 
+    Parameters
+    ----------
+    rows : Sequence[Mapping[str, Any]]
+        Sequence of module record dictionaries containing hotspot score
+        and path information.
+
     Returns
     -------
     list[dict[str, Any]]
-        Lightweight hotspot records.
+        Lightweight hotspot records containing path and hotspot_score fields.
     """
     return [
         {
@@ -217,10 +276,18 @@ def basic_stats(
 ) -> Mapping[str, Any]:
     """Return simple analytics for the refactored CLI commands.
 
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context containing logger for analytics logging.
+    records : list[SimpleModuleRecord]
+        List of module records to compute statistics for.
+
     Returns
     -------
     Mapping[str, Any]
-        Summary containing ``files``, ``loc_total``, and tag counts.
+        Summary containing ``files`` (file count), ``loc_total`` (total lines
+        of code), and ``tags`` (tag frequency dictionary).
     """
     file_count = len(records)
     loc_total = sum(record.loc for record in records)
@@ -237,10 +304,16 @@ def basic_stats(
 def group_configs_by_dir(records: list[dict[str, Any]]) -> dict[str, tuple[str, ...]]:
     """Group config records by containing directory.
 
+    Parameters
+    ----------
+    records : list[dict[str, Any]]
+        List of config record dictionaries containing "path" fields.
+
     Returns
     -------
     dict[str, tuple[str, ...]]
-        Directory key to config path mapping.
+        Directory key to config path mapping. Records with invalid or missing
+        paths are skipped.
     """
     grouped: dict[str, list[str]] = {}
     for record in records:
@@ -258,10 +331,18 @@ def config_refs_for_row(
 ) -> list[str]:
     """Return config references scoped to ancestor directories.
 
+    Parameters
+    ----------
+    module_path : str
+        Module file path to find config references for.
+    config_by_dir : Mapping[str, Sequence[str]]
+        Dictionary mapping directory keys to lists of config file paths.
+
     Returns
     -------
     list[str]
-        Config file paths referenced by the module path.
+        Config file paths referenced by the module path. Returns empty list
+        if no matching configs are found.
     """
     dirs = ancestor_dirs(module_path)
     seen: set[str] = set()
@@ -277,6 +358,11 @@ def config_refs_for_row(
 
 def ancestor_dirs(path: str) -> list[str]:
     """Return normalized ancestor directory keys for ``path``.
+
+    Parameters
+    ----------
+    path : str
+        File path to compute ancestor directories for.
 
     Returns
     -------
@@ -300,10 +386,16 @@ def ancestor_dirs(path: str) -> list[str]:
 def dir_key_from_path(path: Path) -> str:
     """Return normalized directory path key.
 
+    Parameters
+    ----------
+    path : Path
+        Directory path to normalize.
+
     Returns
     -------
     str
         Forward-slash-separated directory representation (may be empty).
+        Normalized string suitable for use as a dictionary key.
     """
     rendered = str(path)
     if rendered in {"", "."}:
@@ -314,10 +406,19 @@ def dir_key_from_path(path: Path) -> str:
 def should_mark_overlay(row: Mapping[str, Any]) -> bool:
     """Return True if row should be marked overlay-needed.
 
+    Parameters
+    ----------
+    row : Mapping[str, Any]
+        Module record dictionary containing type error counts, fan-in metrics,
+        and parameter counts.
+
     Returns
     -------
     bool
-        ``True`` when overlay heuristics deem the module a candidate.
+        ``True`` when overlay heuristics deem the module a candidate based on
+        type error count, fan-in, or parameter thresholds (as defined by
+        OVERLAY_ERROR_THRESHOLD, OVERLAY_FAN_IN_THRESHOLD, and
+        OVERLAY_PARAM_THRESHOLD constants).
     """
     type_errors = int(row.get("type_errors") or row.get("type_error_count") or 0)
     if type_errors == 0:

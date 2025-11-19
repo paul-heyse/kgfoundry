@@ -42,7 +42,17 @@ _LEGACY_PROFILE_FILES = ("tuning.json",)
 
 @dataclass(slots=True, frozen=True)
 class LuceneAssets:
-    """Lucene index directories that should flip atomically."""
+    """Lucene index directories that should flip atomically.
+
+    Attributes
+    ----------
+    bm25_dir : Path | None, optional
+        Directory path containing the BM25 Lucene index. None if BM25
+        assets are not included. Defaults to None.
+    splade_dir : Path | None, optional
+        Directory path containing the SPLADE Lucene impact index. None if
+        SPLADE assets are not included. Defaults to None.
+    """
 
     bm25_dir: Path | None = None
     splade_dir: Path | None = None
@@ -75,7 +85,31 @@ def link_current_lucene(base_dir: Path, version: str, assets: LuceneAssets) -> N
 
 @dataclass(slots=True, frozen=True)
 class IndexAssets:
-    """File-system assets that must advance together for one index version."""
+    """File-system assets that must advance together for one index version.
+
+    Attributes
+    ----------
+    faiss_index : Path
+        Path to the FAISS vector index file. Required asset.
+    duckdb_path : Path
+        Path to the DuckDB catalog database file. Required asset.
+    scip_index : Path
+        Path to the SCIP symbol index file. Required asset.
+    bm25_dir : Path | None, optional
+        Directory path containing the BM25 Lucene index. Optional asset.
+        Defaults to None.
+    splade_dir : Path | None, optional
+        Directory path containing the SPLADE Lucene impact index. Optional
+        asset. Defaults to None.
+    xtr_dir : Path | None, optional
+        Directory path containing the XTR token-level index. Optional asset.
+        Defaults to None.
+    faiss_idmap : Path | None, optional
+        Path to the FAISS ID map Parquet file. Optional asset. Defaults to None.
+    tuning_profile : Path | None, optional
+        Path to the FAISS tuning profile JSON file. Optional asset.
+        Defaults to None.
+    """
 
     faiss_index: Path
     duckdb_path: Path
@@ -292,7 +326,19 @@ def _attrs_from_tuning(
 
 @dataclass(slots=True, frozen=True)
 class VersionMeta:
-    """Metadata recorded for each version directory."""
+    """Metadata recorded for each version directory.
+
+    Attributes
+    ----------
+    version : str
+        Version identifier string (e.g., "v1", "2024-01-01").
+    created_ts : float
+        Timestamp when the version was created (from time.time()).
+    attrs : Mapping[str, Any], optional
+        Additional metadata attributes including checksums, file paths,
+        FAISS configuration, and other version-specific information.
+        Defaults to empty dictionary.
+    """
 
     version: str
     created_ts: float

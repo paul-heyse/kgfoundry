@@ -69,7 +69,14 @@ class SentenceEncoderProtocol(Protocol):
 
 @dataclass(slots=True, frozen=True)
 class CodeRankEmbedderContext:
-    """Dependency providers for the CodeRank embedder."""
+    """Dependency providers for the CodeRank embedder.
+
+    Attributes
+    ----------
+    model_provider : Callable[[SupportsCodeRankSettings], SentenceEncoderProtocol]
+        Factory function that creates a SentenceEncoderProtocol instance from
+        CodeRank settings. Used for dependency injection in tests.
+    """
 
     model_provider: Callable[[SupportsCodeRankSettings], SentenceEncoderProtocol]
 

@@ -11,14 +11,29 @@ from codeintel_rev.enrich.type_integration import TypeSummary, collect_pyrefly, 
 
 @dataclass(slots=True, frozen=True)
 class FileTypeSignals:
-    """Joined Pyrefly/Pyright error counts for a single file."""
+    """Joined Pyrefly/Pyright error counts for a single file.
+
+    Attributes
+    ----------
+    pyrefly_errors : int, optional
+        Number of type errors reported by Pyrefly for this file. Defaults to 0.
+    pyright_errors : int, optional
+        Number of type errors reported by Pyright for this file. Defaults to 0.
+    """
 
     pyrefly_errors: int = 0
     pyright_errors: int = 0
 
     @property
     def total(self) -> int:
-        """Return the max error count across all sources."""
+        """Return the max error count across all sources.
+
+        Returns
+        -------
+        int
+            Maximum of pyrefly_errors and pyright_errors, representing the
+            worst-case type error count for the file.
+        """
         return max(self.pyrefly_errors, self.pyright_errors)
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from dataclasses import replace as dc_replace
 from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -13,6 +14,7 @@ import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import readyz
 from codeintel_rev.app.runtime_readiness import CheckResult, ReadinessProbe
+from codeintel_rev.config.api import AppConfig
 from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, VLLMRunMode
 from codeintel_rev.config.utils import replace_settings, replace_struct
 from fastapi import FastAPI
@@ -50,8 +52,21 @@ def _reset_duckdb_catalog(db_path: Path) -> None:
 def _context_with_settings(
     context: ApplicationContext,
     settings: Settings,
+    app_config: AppConfig | None = None,
 ) -> ApplicationContext:
-    return context.with_overrides(settings=settings)
+    return context.with_overrides(settings=settings, app_config=app_config)
+
+
+def _http_vllm_app_config(context: ApplicationContext, base_url: str) -> AppConfig:
+    """Return AppConfig copy with vLLM HTTP settings.
+
+    Returns
+    -------
+    AppConfig
+        Copy of the active config with HTTP vLLM overrides applied.
+    """
+    vllm_cfg = dc_replace(context.app_config.vllm, base_url=base_url, run_mode="http")
+    return dc_replace(context.app_config, vllm=vllm_cfg)
 
 
 @pytest.mark.asyncio
@@ -247,6 +262,7 @@ async def test_readiness_probe_vllm_unreachable(
     context = _context_with_settings(
         mock_application_context,
         replace_settings(mock_application_context.settings, vllm=http_vllm),
+        app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
     )
     probe = ReadinessProbe(context)
 
@@ -392,7 +408,11 @@ def test_readiness_probe_check_vllm_invalid_url(
     # Arrange - create new settings with invalid URL
     invalid_vllm = VLLMConfig(base_url="not-a-valid-url", run=VLLMRunMode(mode="http"))
     new_settings = replace_settings(mock_application_context.settings, vllm=invalid_vllm)
-    context = _context_with_settings(mock_application_context, new_settings)
+    context = _context_with_settings(
+        mock_application_context,
+        new_settings,
+        app_config=_http_vllm_app_config(mock_application_context, "not-a-valid-url"),
+    )
     probe = ReadinessProbe(context)
 
     # Act
@@ -410,7 +430,11 @@ def test_readiness_probe_check_vllm_success(mock_application_context: Applicatio
     # Arrange - create new settings with valid URL
     valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1", run=VLLMRunMode(mode="http"))
     new_settings = replace_settings(mock_application_context.settings, vllm=valid_vllm)
-    context = _context_with_settings(mock_application_context, new_settings)
+    context = _context_with_settings(
+        mock_application_context,
+        new_settings,
+        app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
+    )
     probe = ReadinessProbe(context)
 
     # Act - mock successful HTTP response
@@ -434,7 +458,11 @@ def test_readiness_probe_check_vllm_http_error(
     # Arrange - create new settings with valid URL
     valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1", run=VLLMRunMode(mode="http"))
     new_settings = replace_settings(mock_application_context.settings, vllm=valid_vllm)
-    context = _context_with_settings(mock_application_context, new_settings)
+    context = _context_with_settings(
+        mock_application_context,
+        new_settings,
+        app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
+    )
     probe = ReadinessProbe(context)
 
     # Act - mock HTTP error

@@ -1,863 +1,167 @@
 #!/usr/bin/env python3
-"""One-shot indexing: SCIP → chunk → embed → Parquet → FAISS.
-
-This script orchestrates the full indexing pipeline:
-1. Parse SCIP index for symbol definitions
-2. Chunk files using cAST (SCIP-based)
-3. Embed chunks with vLLM
-4. Write to Parquet with embeddings
-5. Build FAISS index with adaptive type selection
-
-The FAISS index type is automatically selected based on corpus size:
-- Small (<5K vectors): Flat index (exact search, fast training)
-- Medium (5K-50K vectors): IVFFlat (balanced training/recall)
-- Large (>50K vectors): IVF-PQ (memory efficient, fast search)
-"""
+"""Typer CLI for orchestrating the index build pipeline."""
 
 from __future__ import annotations
 
-import argparse
-import logging
-import os
-from collections import defaultdict
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Annotated
 
-from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.config import AppConfig, load_app_config
-from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
-from codeintel_rev.embeddings import get_embedding_provider
-from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
-from codeintel_rev.indexing.cast_chunker import Chunk, ChunkOptions, chunk_file
-from codeintel_rev.indexing.scip_reader import (
-    SCIPIndex,
-    SymbolDef,
-    extract_definitions,
-    get_top_level_definitions,
-    parse_scip_json,
+import typer
+
+from codeintel_rev.services.index import IndexBuildConfig, IndexPaths, run_index_build
+
+VectorsDirOption = Annotated[
+    Path,
+    typer.Option(
+        "--vectors-parquet-dir",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=True,
+        help="Directory containing *.parquet shards with embeddings.",
+    ),
+]
+PrimaryIndexOption = Annotated[
+    Path,
+    typer.Option(
+        "--primary-index-path",
+        resolve_path=True,
+        help="Destination path for the primary FAISS index.",
+    ),
+]
+IdmapPathOption = Annotated[
+    Path,
+    typer.Option(
+        "--idmap-parquet-path",
+        resolve_path=True,
+        help="Destination for the {faiss_row -> external_id} Parquet sidecar.",
+    ),
+]
+DuckDBPathOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--duckdb-path",
+        resolve_path=True,
+        help="Optional DuckDB catalog file used for registration/materialization.",
+    ),
+]
+VecDimOption = Annotated[
+    int,
+    typer.Option("--vec-dim", min=1, help="Embedding dimensionality for the shards."),
+]
+IdColumnOption = Annotated[
+    str,
+    typer.Option("--id-col", help="Chunk identifier column name."),
+]
+VecColumnOption = Annotated[
+    str,
+    typer.Option("--vec-col", help="Embedding column name."),
+]
+SampleSizeOption = Annotated[
+    int,
+    typer.Option(
+        "--sample-size",
+        min=1,
+        help="Maximum number of rows to sample for index training.",
+    ),
+]
+BatchRowsOption = Annotated[
+    int,
+    typer.Option(
+        "--batch-rows",
+        min=1,
+        help="Rows to load per batch when adding vectors to the index.",
+    ),
+]
+MaterializeFlag = Annotated[
+    bool,
+    typer.Option(
+        "--materialize/--no-materialize",
+        help="Materialize the FAISS join inside DuckDB after registration.",
+        show_default=True,
+    ),
+]
+
+app = typer.Typer(
+    add_completion=False,
+    help="Build FAISS indexes and DuckDB metadata from Parquet shards.",
 )
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
-from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
-from codeintel_rev.io.parquet_store import (
-    ParquetWriteOptions,
-    extract_embeddings,
-    read_chunks_parquet,
-    write_chunks_parquet,
-)
-from codeintel_rev.io.symbol_catalog import (  # new
-    SymbolCatalog,
-    SymbolDefRow,
-    SymbolOccurrenceRow,
-)
-from codeintel_rev.io.vllm_client import build_vllm_client
-from codeintel_rev.typing import NDArrayF32
-
-if TYPE_CHECKING:
-    import numpy as np
-else:
-    np = cast("np", LazyModule("numpy", "codeintel indexing pipeline"))
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-EMBED_PREVIEW_CHARS = 1000
-TRAINING_LIMIT = 10_000
 
 
-@dataclass(frozen=True)
-class PipelinePaths:
-    """Resolved filesystem paths for the indexing pipeline."""
-
-    repo_root: Path
-    scip_index: Path
-    vectors_dir: Path
-    faiss_index: Path
-    duckdb_path: Path
-
-
-def main() -> None:
-    """Run the end-to-end indexing pipeline.
-
-    Supports both full rebuild (default) and incremental update modes.
-    Use --incremental to add new chunks to an existing index instead of rebuilding.
-    """
-    parser = argparse.ArgumentParser(
-        description="Index repository: SCIP → chunk → embed → Parquet → FAISS",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "--incremental",
-        action="store_true",
-        help="Add new chunks to existing index instead of rebuilding (fast incremental updates)",
-    )
-    parser.add_argument(
-        "--eval-after-index",
-        action="store_true",
-        help="Run offline recall evaluation after indexing completes.",
-    )
-    parser.add_argument(
-        "--eval-queries",
-        type=Path,
-        default=None,
-        help="Optional JSONL payload for offline evaluation queries.",
-    )
-    parser.add_argument(
-        "--phase",
-        choices=("full", "embeddings", "faiss"),
-        default="full",
-        help=(
-            "full: perform chunk→embed→FAISS (default); "
-            "embeddings: stop after writing Parquet/DuckDB; "
-            "faiss: reuse existing Parquet/DuckDB artifacts to rebuild FAISS only."
-        ),
-    )
-    args = parser.parse_args()
-
-    settings = load_settings()
-    app_config = load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
-    paths = resolve_pipeline_paths(settings, app_config)
-    phase = args.phase
-    if args.incremental and phase != "full":
-        parser.error("--incremental is only supported with --phase=full")
-    if args.eval_after_index and phase != "full":
-        parser.error("--eval-after-index is only supported with --phase=full")
-
-    logger.info("Starting indexing for repo root %s", paths.repo_root)
-
-    if phase == "faiss":
-        embeddings = _load_embeddings_from_artifacts(paths)
-        _build_faiss_index(embeddings, paths, settings.index)
-        catalog_count = _initialize_duckdb(
-            paths,
-            materialize=settings.index.duckdb_materialize,
-        )
-        logger.info(
-            "FAISS rebuild complete (phase=faiss); vectors=%s faiss_index=%s duckdb_rows=%s",
-            len(embeddings),
-            paths.faiss_index,
-            catalog_count,
-        )
-        return
-
-    scip_index = _load_scip_index(paths)
-    grouped_defs = _group_definitions_by_file(scip_index)
-    chunks = _chunk_repository(paths, grouped_defs, settings.index.chunk_budget)
-
-    if not chunks:
-        logger.error("No chunks were produced; aborting pipeline")
-        return
-
-    embeddings = _embed_chunks(chunks, settings)
-    parquet_path = _write_parquet(
-        chunks,
-        embeddings,
-        paths,
-        settings.index.vec_dim,
-        settings.index.preview_max_chars,
-    )
-
-    catalog_count = _initialize_duckdb(
-        paths,
-        materialize=settings.index.duckdb_materialize,
-    )
-    if phase == "full":
-        _write_symbols(paths, scip_index, chunks)
-
-    if phase == "embeddings":
-        logger.info(
-            "Embedding phase complete; chunks=%s embeddings=%s parquet=%s duckdb_rows=%s "
-            "(skipped FAISS by request)",
-            len(chunks),
-            len(embeddings),
-            parquet_path,
-            catalog_count,
-        )
-        return
-
-    if args.incremental:
-        _update_faiss_index_incremental(chunks, embeddings, paths, settings.index)
-    else:
-        _build_faiss_index(embeddings, paths, settings.index)
-
-    mode_str = "incremental" if args.incremental else "full rebuild"
-    logger.info(
-        "Indexing pipeline complete (%s); chunks=%s embeddings=%s parquet=%s "
-        "faiss_index=%s duckdb_rows=%s",
-        mode_str,
-        len(chunks),
-        len(embeddings),
-        parquet_path,
-        paths.faiss_index,
-        catalog_count,
-    )
-    if args.eval_after_index:
-        _run_offline_evaluation(settings, paths, args.eval_queries)
-
-
-def resolve_pipeline_paths(
-    settings: Settings,
-    app_config: AppConfig | None = None,
-) -> PipelinePaths:
-    """Resolve and normalize key filesystem paths.
-
-    Parameters
-    ----------
-    settings : Settings
-        Application settings containing path configuration.
-    app_config : AppConfig | None, optional
-        Immutable configuration providing overrides for critical paths.
-
-    Returns
-    -------
-    PipelinePaths
-        Absolute paths for all filesystem locations used by the pipeline.
-    """
-    repo_root = (
-        app_config.paths.repo_root
-        if app_config is not None
-        else Path(settings.paths.repo_root).expanduser().resolve()
-    )
-
-    def _resolve(path_str: str, override: Path | None = None) -> Path:
-        """Resolve a path string relative to repo_root or as absolute.
-
-        Parameters
-        ----------
-        path_str : str
-            Path string to resolve.
-        override : Path | None
-            Optional AppConfig-provided absolute path taking precedence.
-
-        Returns
-        -------
-        Path
-            Resolved absolute path.
-        """
-        if override is not None:
-            return override
-        path = Path(path_str)
-        if path.is_absolute():
-            return path.expanduser().resolve()
-        return (repo_root / path).resolve()
-
-    return PipelinePaths(
-        repo_root=repo_root,
-        scip_index=_resolve(settings.paths.scip_index),
-        vectors_dir=_resolve(settings.paths.vectors_dir),
-        faiss_index=_resolve(
-            settings.paths.faiss_index,
-            override=app_config.faiss.index_path if app_config is not None else None,
-        ),
-        duckdb_path=_resolve(
-            settings.paths.duckdb_path,
-            override=app_config.duckdb.database if app_config is not None else None,
-        ),
-    )
-
-
-def _load_scip_index(paths: PipelinePaths) -> SCIPIndex:
-    """Load and parse the SCIP index from disk.
-
-    Parameters
-    ----------
-    paths : PipelinePaths
-        Pipeline paths configuration containing SCIP index location.
-
-    Returns
-    -------
-    SCIPIndex
-        Parsed SCIP index containing all documents and occurrences.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the configured SCIP index file does not exist.
-    """
-    if not paths.scip_index.exists():
-        msg = f"SCIP index not found at {paths.scip_index}"
-        raise FileNotFoundError(msg)
-
-    index = parse_scip_json(paths.scip_index)
-    logger.info("Parsed %s documents from SCIP index", len(index.documents))
-    return index
-
-
-def _group_definitions_by_file(index: SCIPIndex) -> Mapping[str, list[SymbolDef]]:
-    """Group symbol definitions by their relative file path.
-
-    Parameters
-    ----------
-    index : SCIPIndex
-        SCIP index containing symbol definitions.
-
-    Returns
-    -------
-    Mapping[str, list[SymbolDef]]
-        Definitions grouped by file path for downstream chunking.
-    """
-    grouped: dict[str, list[SymbolDef]] = defaultdict(list)
-    for definition in extract_definitions(index):
-        grouped[definition.path].append(definition)
-
-    logger.info("Found definitions in %s files", len(grouped))
-    return grouped
-
-
-def _chunk_repository(
-    paths: PipelinePaths,
-    definitions_by_file: Mapping[str, Sequence[SymbolDef]],
-    budget: int,
-) -> list[Chunk]:
-    """Chunk all files referenced by the SCIP index.
-
-    Parameters
-    ----------
-    paths : PipelinePaths
-        Pipeline paths configuration.
-    definitions_by_file : Mapping[str, Sequence[SymbolDef]]
-        Symbol definitions grouped by file path.
-    budget : int
-        Character budget per chunk.
-
-    Returns
-    -------
-    list[Chunk]
-        Collection of generated chunks across the repository.
-    """
-    chunks: list[Chunk] = []
-    for relative_path, defs in definitions_by_file.items():
-        full_path = paths.repo_root / relative_path
-        if not full_path.exists():
-            logger.warning("Skipping missing file %s", full_path)
-            continue
-
-        try:
-            text = full_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
-            logger.warning("Unable to read %s: %s", full_path, exc)
-            continue
-
-        def_list = list(defs)
-        top_level_defs = get_top_level_definitions(def_list)
-        if not top_level_defs:
-            continue
-
-        file_language = top_level_defs[0].language if top_level_defs else ""
-        file_chunks = chunk_file(
-            full_path,
-            text,
-            top_level_defs,
-            options=ChunkOptions(budget=budget, language=file_language),
-        )
-        chunks.extend(file_chunks)
-
-    logger.info("Chunked %s files into %s chunks", len(definitions_by_file), len(chunks))
-    return chunks
-
-
-def _embed_chunks(chunks: Sequence[Chunk], settings: Settings) -> NDArrayF32:
-    """Generate embeddings for the supplied chunks using vLLM.
-
-    Parameters
-    ----------
-    chunks : Sequence[Chunk]
-        Chunks to embed.
-    settings : Settings
-        Application settings (provider + embedding config).
-
-    Returns
-    -------
-    NDArrayF32
-        Embedding matrix aligned with the chunk order.
-    """
-    provider = get_embedding_provider(settings)
-    try:
-        texts = [chunk.text[:EMBED_PREVIEW_CHARS] for chunk in chunks]
-        vectors = provider.embed_texts(texts)
-    finally:
-        provider.close()
-    logger.info(
-        "Generated %s embeddings via %s (%s)",
-        len(vectors),
-        provider.metadata.provider,
-        provider.metadata.model_name,
-    )
-    return vectors
-
-
-def _write_parquet(
-    chunks: Sequence[Chunk],
-    embeddings: NDArrayF32,
-    paths: PipelinePaths,
-    vec_dim: int,
-    preview_max_chars: int,
-) -> Path:
-    """Persist chunk metadata and embeddings to Parquet.
-
-    Parameters
-    ----------
-    chunks : Sequence[Chunk]
-        Chunks to persist.
-    embeddings : NDArrayF32
-        Embedding vectors aligned with chunks.
-    paths : PipelinePaths
-        Pipeline paths configuration.
-    vec_dim : int
-        Embedding vector dimension.
-    preview_max_chars : int
-        Maximum number of characters to persist in chunk previews.
-
-    Returns
-    -------
-    Path
-        Path to the written Parquet file containing chunk data.
-    """
-    output_path = paths.vectors_dir / "part-000.parquet"
-    write_chunks_parquet(
-        output_path=output_path,
-        chunks=chunks,
-        embeddings=embeddings,
-        options=ParquetWriteOptions(
-            start_id=0,
-            vec_dim=vec_dim,
-            preview_max_chars=preview_max_chars,
-            id_strategy="stable_hash",
-        ),
-    )
-    logger.info("Wrote Parquet dataset to %s", output_path)
-    return output_path
-
-
-def _build_faiss_index(
-    embeddings: NDArrayF32,
-    paths: PipelinePaths,
-    index_config: IndexConfig,
+@app.command("all")
+def cmd_all(  # noqa: PLR0913
+    *,
+    vectors_parquet_dir: VectorsDirOption,
+    primary_index_path: PrimaryIndexOption,
+    idmap_parquet_path: IdmapPathOption,
+    duckdb_path: DuckDBPathOption = None,
+    vec_dim: VecDimOption,
+    id_col: IdColumnOption = "chunk_id",
+    vec_col: VecColumnOption = "embedding",
+    sample_size: SampleSizeOption = 50_000,
+    batch_rows: BatchRowsOption = 50_000,
+    materialize: MaterializeFlag = True,
 ) -> None:
-    """Train and persist the FAISS index with adaptive type selection.
-
-    The index type is automatically selected based on corpus size for optimal
-    performance. Small corpora use flat indexes (fast training), medium corpora
-    use IVFFlat (balanced), and large corpora use IVF-PQ (memory efficient).
+    """Run the full index build pipeline.
 
     Parameters
     ----------
-    embeddings : NDArrayF32
-        Embedding vectors to index.
-    paths : PipelinePaths
-        Pipeline paths configuration.
-    index_config : IndexConfig
-        FAISS index configuration.
-
-    Raises
-    ------
-    RuntimeError
-        If embeddings are empty and the index cannot be trained.
+    vectors_parquet_dir : VectorsDirOption
+        Directory containing Parquet shard files with embeddings. Must exist
+        and contain *.parquet files.
+    primary_index_path : PrimaryIndexOption
+        Destination path for the primary FAISS index file. Parent directory
+        will be created if needed.
+    idmap_parquet_path : IdmapPathOption
+        Destination path for the Parquet sidecar file mapping FAISS row indices
+        to external chunk IDs.
+    duckdb_path : DuckDBPathOption, optional
+        Optional DuckDB catalog file path for index registration and view
+        materialization. If None, DuckDB operations are skipped.
+    vec_dim : VecDimOption
+        Embedding dimensionality for the vectors. Must match the dimension
+        of vectors in the Parquet files. Must be at least 1.
+    id_col : IdColumnOption, optional
+        Column name containing chunk identifiers in Parquet files. Defaults
+        to "chunk_id".
+    vec_col : VecColumnOption, optional
+        Column name containing embedding vectors in Parquet files. Defaults
+        to "embedding".
+    sample_size : SampleSizeOption, optional
+        Maximum number of rows to sample for index training. Defaults to 50_000.
+        Must be at least 1.
+    batch_rows : BatchRowsOption, optional
+        Number of rows to load per batch when adding vectors to the index.
+        Defaults to 50_000. Must be at least 1.
+    materialize : MaterializeFlag, optional
+        Whether to materialize the FAISS join view inside DuckDB after
+        registration. Defaults to True.
     """
-    if embeddings.size == 0:
-        msg = "No embeddings available to build FAISS index"
-        raise RuntimeError(msg)
-
-    n_vectors = len(embeddings)
-    logger.info("Building FAISS index for %s vectors (adaptive type selection)", n_vectors)
-
-    runtime_opts = _runtime_options_from_index(index_config)
-    faiss_mgr = FAISSManager(
-        index_path=paths.faiss_index,
-        vec_dim=index_config.vec_dim,
-        nlist=_resolve_nlist(index_config),
-        runtime=runtime_opts,
+    paths = IndexPaths(
+        vectors_parquet_dir=vectors_parquet_dir,
+        primary_index_path=primary_index_path,
+        idmap_parquet_path=idmap_parquet_path,
+        duckdb_path=duckdb_path,
     )
-
-    # Log memory estimate before building
-    mem_est = faiss_mgr.estimate_memory_usage(n_vectors)
-    logger.info(
-        "Estimated memory usage (CPU): %.2f GB (total %.2f GB)",
-        mem_est["cpu_index_bytes"] / 1e9,
-        mem_est["total_bytes"] / 1e9,
-    )
-
-    train_limit = min(len(embeddings), TRAINING_LIMIT)
-    training_vectors = embeddings[:train_limit]
-    faiss_mgr.build_index(training_vectors)
-    # Index type and memory estimate are logged by FAISSManager.build_index()
-
-    ids = np.arange(len(embeddings), dtype=np.int64)
-    faiss_mgr.add_vectors(embeddings, ids)
-    faiss_mgr.save_cpu_index()
-    logger.info("Persisted FAISS index to %s", paths.faiss_index)
-
-
-def _load_embeddings_from_artifacts(paths: PipelinePaths) -> NDArrayF32:
-    """Load stored embeddings from Parquet artifacts for FAISS-only runs.
-
-    Parameters
-    ----------
-    paths : PipelinePaths
-        Pipeline paths object containing vectors_dir path where Parquet shards
-        are expected to be located.
-
-    Returns
-    -------
-    NDArrayF32
-        Concatenated array of all embeddings loaded from Parquet shards. The
-        array shape is (num_vectors, embedding_dim) with float32 dtype.
-
-    Raises
-    ------
-    FileNotFoundError
-        Raised when no Parquet shards are found in the vectors directory.
-        Indicates that the embeddings phase must be run first.
-    RuntimeError
-        Raised when Parquet reading or embedding extraction fails during
-        the loading process.
-    """
-    parquet_files = sorted(paths.vectors_dir.glob("*.parquet"))
-    if not parquet_files:
-        msg = f"No Parquet shards found under {paths.vectors_dir}; run --phase=embeddings first."
-        raise FileNotFoundError(msg)
-
-    tensors: list[NDArrayF32] = []
-    for shard in parquet_files:
-        table = read_chunks_parquet(shard)
-        vectors = extract_embeddings(table)
-        if vectors.size:
-            tensors.append(vectors)
-
-    if not tensors:
-        msg = f"Could not load embeddings from {paths.vectors_dir}"
-        raise RuntimeError(msg)
-
-    if len(tensors) == 1:
-        return tensors[0]
-
-    return np.vstack(tensors)
-
-
-def _update_faiss_index_incremental(
-    chunks: Sequence[Chunk],
-    embeddings: NDArrayF32,
-    paths: PipelinePaths,
-    index_config: IndexConfig,
-) -> None:
-    """Update FAISS index incrementally by adding new chunks to secondary index.
-
-    Loads existing primary index and identifies new chunks that aren't already
-    indexed. Adds new chunks to the secondary flat index for fast incremental
-    updates without rebuilding the primary index.
-
-    Parameters
-    ----------
-    chunks : Sequence[Chunk]
-        All chunks from the current indexing run.
-    embeddings : NDArrayF32
-        Embedding vectors aligned with chunks.
-    paths : PipelinePaths
-        Pipeline paths configuration.
-    index_config : IndexConfig
-        FAISS index configuration.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the primary index does not exist. Use full rebuild mode first.
-    RuntimeError
-        If embeddings are empty or index loading fails.
-    """
-    if embeddings.size == 0:
-        msg = "No embeddings available for incremental update"
-        raise RuntimeError(msg)
-
-    logger.info("Incremental indexing mode: adding new chunks to existing index")
-
-    runtime_opts = _runtime_options_from_index(index_config)
-    faiss_mgr = FAISSManager(
-        index_path=paths.faiss_index,
-        vec_dim=index_config.vec_dim,
-        nlist=_resolve_nlist(index_config),
-        runtime=runtime_opts,
-    )
-
-    # Load existing primary index
-    try:
-        faiss_mgr.load_cpu_index()
-        logger.info("Loaded existing primary index from %s", paths.faiss_index)
-    except FileNotFoundError as exc:
-        msg = (
-            f"Primary index not found at {paths.faiss_index}. "
-            "Run without --incremental flag first to create the initial index."
-        )
-        raise FileNotFoundError(msg) from exc
-
-    # Try to load existing secondary index (if any)
-    try:
-        faiss_mgr.load_secondary_index()
-        logger.info(
-            "Loaded existing secondary index with %s vectors",
-            len(faiss_mgr.incremental_ids),
-        )
-    except FileNotFoundError:
-        logger.info("No existing secondary index found; will create new one")
-
-    # Identify new chunks (not already in primary or secondary index)
-    # For simplicity, we'll use chunk indices as IDs (matching the full rebuild logic)
-    chunk_ids = np.arange(len(chunks), dtype=np.int64)
-    existing_ids = set(faiss_mgr.incremental_ids)
-
-    # Get IDs from primary index if possible
-    cpu_index = cast("Any", faiss_mgr.cpu_index)
-    if cpu_index is not None:
-        try:
-            primary_n = int(getattr(cpu_index, "ntotal", 0))
-            id_map = getattr(cpu_index, "id_map", None)
-            if id_map is not None:
-                primary_ids = {int(id_map.at(i)) for i in range(primary_n)}
-                existing_ids.update(primary_ids)
-        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
-            logger.warning("Could not extract IDs from primary index: %s", exc)
-
-    # Filter to new chunks only
-    new_mask = np.array([chunk_id not in existing_ids for chunk_id in chunk_ids])
-    new_indices = np.where(new_mask)[0]
-
-    if len(new_indices) == 0:
-        logger.info("All %s chunks already indexed; no incremental update needed", len(chunks))
-        return
-
-    new_chunks = [chunks[i] for i in new_indices]
-    new_embeddings = embeddings[new_indices]
-    new_ids = chunk_ids[new_indices]
-
-    logger.info(
-        "Adding %s new chunks to secondary index (%s already indexed)",
-        len(new_chunks),
-        len(chunks) - len(new_chunks),
-    )
-    faiss_mgr.update_index(new_embeddings, new_ids)
-    faiss_mgr.save_cpu_index()
-    faiss_mgr.save_secondary_index()
-    logger.info(
-        "Incremental update complete: %s new vectors added to secondary index",
-        len(new_ids),
-    )
-
-
-def _runtime_options_from_index(index_config: IndexConfig) -> FAISSRuntimeOptions:
-    """Return FAISS runtime options derived from the active index configuration.
-
-    Extended Summary
-    ----------------
-    This helper converts structured IndexConfig (from index manifest or settings)
-    into FAISS-specific runtime options. It maps configuration parameters (family,
-    PQ settings and HNSW parameters) to FAISSRuntimeOptions fields.
-    Used during index building to configure FAISS manager with index-specific
-    runtime behavior.
-
-    Parameters
-    ----------
-    index_config : IndexConfig
-        Structured index configuration containing FAISS parameters: family type,
-        quantization settings (pq_m, pq_nbits, opq_m), HNSW parameters (m,
-        ef_construction, ef_search), and search tuning defaults.
-
-    Returns
-    -------
-    FAISSRuntimeOptions
-        Runtime options instance populated from index_config parameters. The
-        returned object is used to initialize FAISS manager with index-appropriate
-        runtime configuration.
-
-    Notes
-    -----
-    This helper ensures runtime options match the index structure (e.g., HNSW
-    parameters only apply to HNSW indexes). Used during index building and
-    manager initialization to maintain consistency between index type and runtime
-    behavior. Time complexity: O(1) for option construction.
-    """
-    return FAISSRuntimeOptions(
-        faiss_family=index_config.faiss_family,
-        pq_m=index_config.pq_m,
-        pq_nbits=index_config.pq_nbits,
-        opq_m=index_config.opq_m,
-        default_nprobe=index_config.default_nprobe,
-        default_k=index_config.default_k,
-        hnsw_m=index_config.hnsw_m,
-        hnsw_ef_construction=index_config.hnsw_ef_construction,
-        hnsw_ef_search=index_config.hnsw_ef_search,
-        refine_k_factor=index_config.refine_k_factor,
-        autotune_on_start=index_config.autotune_on_start,
-        enable_range_search=index_config.enable_range_search,
-        semantic_min_score=index_config.semantic_min_score,
-    )
-
-
-def _resolve_nlist(index_config: IndexConfig) -> int:
-    """Return an integer ``nlist`` value with legacy fallback.
-
-    Parameters
-    ----------
-    index_config : IndexConfig
-        Index configuration possibly containing explicit ``nlist``.
-
-    Returns
-    -------
-    int
-        ``nlist`` resolved from configuration, falling back to legacy field.
-    """
-    if index_config.nlist is not None:
-        return index_config.nlist
-    return index_config.faiss_nlist
-
-
-def _run_offline_evaluation(
-    settings: Settings,
-    paths: PipelinePaths,
-    queries_path: Path | None,
-) -> None:
-    """Execute the offline recall evaluator if enabled."""
-    if not settings.eval.enabled and queries_path is None:
-        logger.info("Offline evaluation disabled; skipping.")
-        return
-    duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
-    vllm_client = build_vllm_client(settings.vllm)
-    runtime_opts = _runtime_options_from_index(settings.index)
-    faiss_mgr = FAISSManager(
-        index_path=paths.faiss_index,
-        vec_dim=settings.index.vec_dim,
-        nlist=_resolve_nlist(settings.index),
-        runtime=runtime_opts,
-    )
-    faiss_mgr.load_cpu_index()
-    evaluator = OfflineRecallEvaluator(
-        settings=settings,
-        paths=settings.paths,
-        faiss_manager=faiss_mgr,
-        vllm_client=vllm_client,
-        duckdb_manager=duckdb_manager,
-    )
-    output_dir = (
-        Path(settings.eval.output_dir)
-        if settings.eval.output_dir and settings.eval.output_dir.strip()
-        else None
-    )
-    evaluator.run(queries_path=queries_path, output_dir=output_dir)
-
-
-def _initialize_duckdb(paths: PipelinePaths, *, materialize: bool) -> int:
-    """Create or refresh the DuckDB catalog and return the chunk count.
-
-    Parameters
-    ----------
-    paths : PipelinePaths
-        Pipeline paths configuration.
-    materialize : bool
-        Whether to materialize Parquet data into a DuckDB table with indexes.
-
-    Returns
-    -------
-    int
-        Number of chunk records registered in the catalog.
-    """
-    with DuckDBCatalog(
-        db_path=paths.duckdb_path,
-        vectors_dir=paths.vectors_dir,
+    cfg = IndexBuildConfig(
+        vec_dim=vec_dim,
+        id_col=id_col,
+        vec_col=vec_col,
+        sample_size=sample_size,
+        batch_rows=batch_rows,
         materialize=materialize,
-        repo_root=paths.repo_root,
-    ) as catalog:
-        count = catalog.count_chunks()
-    logger.info(
-        "DuckDB catalog initialized at %s (rows=%s, materialize=%s)",
-        paths.duckdb_path,
-        count,
-        materialize,
     )
-    return count
-
-
-def _write_symbols(paths: PipelinePaths, index: SCIPIndex, chunks: Sequence[Chunk]) -> None:
-    """Derive symbol tables and persist them into DuckDB."""
-    manager = DuckDBManager(paths.duckdb_path)
-    sym = SymbolCatalog(manager)
-    sym.ensure_schema()
-
-    by_file: dict[str, list[tuple[int, int, int]]] = {}
-    for chunk_id, chunk in enumerate(chunks):
-        by_file.setdefault(chunk.uri, []).append((chunk_id, chunk.start_line, chunk.end_line))
-
-    def _chunk_for(uri: str, line: int) -> int:
-        """Find chunk ID containing the given line number.
-
-        Parameters
-        ----------
-        uri : str
-            File URI to search.
-        line : int
-            Line number to locate.
-
-        Returns
-        -------
-        int
-            Chunk ID if found, -1 otherwise.
-        """
-        for cid, start, end in by_file.get(uri, []):
-            if start <= line <= end:
-                return cid
-        return -1
-
-    occ_rows: list[SymbolOccurrenceRow] = []
-    def_rows: dict[str, SymbolDefRow] = {}
-    chunk_pairs: list[tuple[int, str]] = []
-
-    for doc in index.documents:
-        uri = str((paths.repo_root / doc.relative_path).resolve())
-        lang = doc.language or ""
-        for occ in doc.occurrences:
-            sl, sc, el, ec = occ.range
-            chunk_id = _chunk_for(uri, sl)
-            roles = int(occ.roles or 0)
-            occ_rows.append(
-                SymbolOccurrenceRow(
-                    symbol=occ.symbol,
-                    uri=uri,
-                    start_line=sl,
-                    start_col=sc,
-                    end_line=el,
-                    end_col=ec,
-                    roles=roles,
-                    kind=None,
-                    language=lang,
-                    chunk_id=chunk_id,
-                )
-            )
-            if roles & 1:
-                display_name = occ.symbol.split("#")[-1].split(".")[-1]
-                def_rows.setdefault(
-                    occ.symbol,
-                    SymbolDefRow(
-                        symbol=occ.symbol,
-                        display_name=display_name,
-                        kind="symbol",
-                        language=lang,
-                        uri=uri,
-                        start_line=sl,
-                        start_col=sc,
-                        end_line=el,
-                        end_col=ec,
-                        chunk_id=chunk_id,
-                        docstring=None,
-                        signature=None,
-                    ),
-                )
-
-    for chunk_id, chunk in enumerate(chunks):
-        chunk_pairs.extend((chunk_id, symbol) for symbol in chunk.symbols)
-
-    sym.bulk_insert_occurrences(occ_rows)
-    sym.upsert_symbol_defs(list(def_rows.values()))
-    sym.bulk_insert_chunk_symbols(chunk_pairs)
+    state = run_index_build(paths, cfg)
+    summary = [
+        "index-all completed",
+        f"  shards: {len(state.shards)}",
+        f"  added_rows: {state.added_rows}",
+        f"  idmap_rows: {state.idmap_rows}",
+        f"  primary_index: {primary_index_path}",
+        f"  idmap: {idmap_parquet_path}",
+    ]
+    typer.echo("\n".join(summary))
 
 
 if __name__ == "__main__":
-    main()
+    app()

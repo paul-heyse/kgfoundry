@@ -1,0 +1,13 @@
+Usage: all [OPTIONS]
+Run the full index build pipeline.
+--vectors-parqu
+--primary-index
+--idmap-parquet
+--duckdb-path
+--vec-dim
+--id-col
+--vec-col
+--sample-size
+--batch-rows
+--materialize
+--help

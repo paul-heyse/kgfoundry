@@ -20,7 +20,8 @@ import numpy as np
 import typer
 
 from codeintel_rev.config import AppConfig, load_app_config
-from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.embeddings import EmbeddingProvider, get_embedding_provider
 from codeintel_rev.errors import RuntimeLifecycleError
 from codeintel_rev.eval.hybrid_evaluator import EvalConfig, HybridPoolEvaluator
@@ -59,27 +60,14 @@ app.add_typer(embeddings_app, name="embeddings")
 
 @lru_cache(maxsize=1)
 def _cached_settings() -> Settings:
-    """Load and cache application settings.
-
-    This function loads application settings using load_settings() and caches
-    the result using lru_cache to avoid repeated file I/O and parsing. The
-    cache has maxsize=1, ensuring only one settings instance is cached.
+    """Load and cache msgspec Settings derived from AppConfig.
 
     Returns
     -------
     Settings
-        Loaded application settings object containing configuration for paths,
-        index parameters, and embedding providers. The settings are cached
-        after first load for subsequent calls.
-
-    Notes
-    -----
-    Settings caching improves performance by avoiding repeated configuration
-    file reads and parsing. The lru_cache decorator ensures settings are
-    loaded once and reused across CLI command invocations, reducing overhead
-    for commands that access settings multiple times.
+        Legacy settings struct populated from :func:`load_app_config`.
     """
-    return load_settings()
+    return settings_from_app_config(_cached_app_config())
 
 
 @lru_cache(maxsize=1)
@@ -274,38 +262,52 @@ def _default_count_idmap_rows(path: Path) -> int:
 
 
 def _default_embedding_provider_factory(settings: Settings) -> EmbeddingProvider:
-    """Create an embedding provider instance from settings.
-
-    This function creates an EmbeddingProvider instance using settings configuration,
-    delegating to get_embedding_provider to instantiate the appropriate provider
-    based on settings (e.g., OpenAI, VLLM, local models).
+    """Create an embedding provider instance from the active configuration.
 
     Parameters
     ----------
     settings : Settings
-        Application settings containing embedding provider configuration (provider
-        type, model name, API keys, etc.). Used to instantiate the appropriate
-        embedding provider.
+        Legacy settings struct that supplies index configuration (vector
+        dimensionality). Embedding/vLLM parameters are sourced from AppConfig.
 
     Returns
     -------
     EmbeddingProvider
         Configured embedding provider instance ready for generating embeddings.
-        The provider type and configuration are determined from settings.
-
-    Notes
-    -----
-    Embedding provider creation enables embedding generation for CLI commands that
-    need to create embeddings from text. The function delegates to get_embedding_provider
-    which handles provider selection and instantiation based on settings, supporting
-    multiple provider backends (OpenAI, VLLM, local models).
     """
-    return get_embedding_provider(settings)
+    app_config = _cached_app_config()
+    return get_embedding_provider(
+        embeddings=app_config.embeddings,
+        index=settings.index,
+        vllm=app_config.vllm,
+    )
 
 
 @dataclass(slots=True, frozen=True)
 class IndexctlCliContext:
-    """Dependency injection context for the indexctl CLI."""
+    """Dependency injection context for the indexctl CLI.
+
+    Attributes
+    ----------
+    settings_factory : Callable[[], Settings]
+        Factory function that returns application settings. Typically uses
+        caching to avoid repeated file I/O.
+    faiss_manager_factory : Callable[[Settings, Path | None], FAISSManager]
+        Factory function that creates FAISS manager instances from settings
+        and optional index path override.
+    duckdb_catalog_factory : Callable[[Settings, Path | None], DuckDBCatalog]
+        Factory function that creates DuckDB catalog instances from settings
+        and optional path override.
+    duckdb_dim_resolver : Callable[[DuckDBCatalog], int]
+        Function that determines embedding dimension from a DuckDB catalog
+        by querying sample embeddings.
+    idmap_row_counter : Callable[[Path], int]
+        Function that counts rows in a FAISS ID map Parquet file without
+        loading the entire file.
+    embedding_provider_factory : Callable[[Settings], EmbeddingProvider]
+        Factory function that creates embedding provider instances from
+        application settings.
+    """
 
     settings_factory: Callable[[], Settings]
     faiss_manager_factory: Callable[[Settings, Path | None], FAISSManager]
@@ -515,7 +517,17 @@ EvalXtrOracleOption = Annotated[
 
 @app.callback()
 def global_options(ctx: click.Context, root: RootOption = None) -> None:
-    """Configure shared CLI options."""
+    """Configure shared CLI options.
+
+    Parameters
+    ----------
+    ctx : click.Context
+        Click context object to store shared state in. The context's obj dict
+        is used to store root directory and CLI context.
+    root : RootOption, optional
+        Optional root directory path to store in context state. If provided,
+        overrides default root resolution for subsequent commands.
+    """
     state = ctx.ensure_object(dict)
     if root is not None:
         state["root"] = root
@@ -1178,7 +1190,7 @@ def _build_embedding_manifest(
     checksum: str,
     vector_count: int,
     output_path: Path,
-    settings: Settings,
+    app_config: AppConfig,
 ) -> dict[str, object]:
     """Build embedding manifest dictionary with generation metadata.
 
@@ -1201,9 +1213,8 @@ def _build_embedding_manifest(
     output_path : Path
         Path where embeddings Parquet file was written. Included in manifest
         for reference and validation.
-    settings : Settings
-        Application settings containing batch size parameters. Batch sizes are
-        included in manifest to document generation parameters.
+    app_config : AppConfig
+        Immutable application configuration providing embedding batch parameters.
 
     Returns
     -------
@@ -1222,6 +1233,7 @@ def _build_embedding_manifest(
     tracking of when embeddings were generated.
     """
     meta = provider.metadata
+    embeddings_cfg = app_config.embeddings
     return {
         "provider": meta.provider,
         "model_name": meta.model_name,
@@ -1232,8 +1244,8 @@ def _build_embedding_manifest(
         "fingerprint": provider.fingerprint(),
         "checksum": checksum,
         "vectors": vector_count,
-        "batch_size": settings.embeddings.batch_size,
-        "micro_batch_size": settings.embeddings.micro_batch_size,
+        "batch_size": embeddings_cfg.batch_size,
+        "micro_batch_size": embeddings_cfg.micro_batch_size,
         "output_path": str(output_path),
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
@@ -1551,7 +1563,7 @@ def _execute_embeddings_build(
             checksum=checksum,
             vector_count=len(chunks),
             output_path=context.output_path,
-            settings=settings,
+            app_config=_cached_app_config(),
         )
         manifest_payload["row_count"] = row_count
         _write_manifest(context.manifest_path, manifest_payload)
@@ -1691,7 +1703,24 @@ def embeddings_build_command(
     output: OutputOption = None,
     chunk_size: ChunkBatchOption = 512,
 ) -> None:
-    """Embed chunks from DuckDB and write Parquet + manifest artifacts."""
+    """Embed chunks from DuckDB and write Parquet + manifest artifacts.
+
+    Parameters
+    ----------
+    force : bool, optional
+        Whether to rebuild embeddings even when checksum and fingerprint match
+        existing artifacts. Defaults to False.
+    version : VersionOption, optional
+        Optional version identifier for embedding artifacts. If provided, artifacts
+        are written to the versioned directory. Defaults to None.
+    duckdb_path : DuckOption, optional
+        Optional DuckDB catalog path. If None, uses configured default path.
+    output : OutputOption, optional
+        Optional output directory for Parquet artifacts. If None, uses configured
+        default output directory.
+    chunk_size : ChunkBatchOption, optional
+        Batch size for embedding generation. Defaults to 512.
+    """
     settings = _get_settings()
     manager = _manager()
     context = _build_context(
@@ -2124,7 +2153,15 @@ def stage_command(
 def publish_command(
     version: VersionArg,
 ) -> None:
-    """Publish a previously staged version."""
+    """Publish a previously staged version.
+
+    Parameters
+    ----------
+    version : VersionArg
+        Version identifier of the staged version to publish. The version must
+        have been previously staged using the stage command. Publishing makes
+        the version the active version and updates the CURRENT symlink.
+    """
     mgr = _manager()
     final_dir = mgr.publish(version)
     typer.echo(f"Published version {version} -> {final_dir}")
@@ -2134,7 +2171,15 @@ def publish_command(
 def rollback_command(
     version: VersionArg,
 ) -> None:
-    """Rollback to a previously published version."""
+    """Rollback to a previously published version.
+
+    Parameters
+    ----------
+    version : VersionArg
+        Version identifier to rollback to. The version must have been previously
+        published. Rolling back makes the specified version the active version
+        and updates the CURRENT symlink.
+    """
     mgr = _manager()
     mgr.rollback(version)
     typer.echo(f"Rolled back to {version}")
@@ -2158,7 +2203,25 @@ def health_command(
     duckdb: DuckOption = None,
     idmap: IdMapOption | None = None,
 ) -> None:
-    """Validate FAISS, DuckDB, and ID map invariants."""
+    """Validate FAISS, DuckDB, and ID map invariants.
+
+    Parameters
+    ----------
+    index : IndexOption, optional
+        Path to FAISS index file to validate. If None, uses configured default
+        index path.
+    duckdb : DuckOption, optional
+        Path to DuckDB catalog file to validate. If None, uses configured default
+        DuckDB path.
+    idmap : IdMapOption | None, optional
+        Path to FAISS ID map Parquet file to validate. If None, uses configured
+        default ID map path.
+
+    Notes
+    -----
+    Prints JSON health check results to stdout including dimension matches,
+    row count matches, and view validation status.
+    """
     settings = _get_settings()
     manager = _faiss_manager(index)
     catalog = _duckdb_catalog(duckdb)
@@ -2217,7 +2280,21 @@ def export_idmap_command(
     out: OutOption = None,
     duckdb: DuckOption = None,
 ) -> None:
-    """Export FAISS ID map to Parquet and optionally refresh DuckDB materialization."""
+    """Export FAISS ID map to Parquet and optionally refresh DuckDB materialization.
+
+    Parameters
+    ----------
+    index : IndexOption, optional
+        Path to FAISS index file to export ID map from. If None, uses configured
+        default index path.
+    out : OutOption, optional
+        Output path for the exported ID map Parquet file. If None, uses configured
+        default ID map path.
+    duckdb : DuckOption, optional
+        Optional DuckDB catalog path. If provided, refreshes the materialized
+        FAISS join view after exporting the ID map. If None, only exports the
+        ID map without updating DuckDB.
+    """
     settings = _get_settings()
     manager = _faiss_manager(index)
     destination = (out or Path(settings.paths.faiss_idmap_path)).expanduser().resolve()
@@ -2237,7 +2314,16 @@ def materialize_join_command(
     idmap: IdMapOption,
     duckdb: DuckOption = None,
 ) -> None:
-    """Refresh DuckDB's materialized FAISS join if the ID map sidecar changed."""
+    """Refresh DuckDB's materialized FAISS join if the ID map sidecar changed.
+
+    Parameters
+    ----------
+    idmap : IdMapOption
+        Path to FAISS ID map Parquet file. The file is checked for changes, and
+        if modified, the materialized join view is refreshed.
+    duckdb : DuckOption, optional
+        Path to DuckDB catalog file. If None, uses configured default DuckDB path.
+    """
     catalog = _duckdb_catalog(duckdb)
     stats = catalog.refresh_faiss_idmap_mat_if_changed(idmap.expanduser().resolve())
     catalog.ensure_faiss_idmap_views(idmap)

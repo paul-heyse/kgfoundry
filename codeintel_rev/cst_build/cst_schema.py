@@ -36,7 +36,19 @@ class StitchCandidate(TypedDict, total=False):
 
 @dataclass(slots=True, frozen=True)
 class Span:
-    """Source span tracked for each node."""
+    """Source span tracked for each node.
+
+    Attributes
+    ----------
+    start_line : int
+        Starting line number of the span (1-based).
+    start_col : int
+        Starting column number of the span (0-based).
+    end_line : int
+        Ending line number of the span (1-based).
+    end_col : int
+        Ending column number of the span (0-based, exclusive).
+    """
 
     start_line: int
     start_col: int
@@ -59,7 +71,29 @@ class Span:
 
 @dataclass(slots=True, frozen=True)
 class StitchInfo:
-    """Join metadata linking nodes to module records and SCIP symbols."""
+    """Join metadata linking nodes to module records and SCIP symbols.
+
+    Attributes
+    ----------
+    module_id : str | None, optional
+        Module identifier from the module records that this node is linked to.
+        None if no module match was found. Defaults to None.
+    scip_symbol : str | None, optional
+        SCIP symbol identifier that this node is linked to. None if no SCIP
+        symbol match was found. Defaults to None.
+    evidence : list[str], optional
+        List of evidence strings explaining why this node was linked to the
+        module or SCIP symbol. Empty list if no evidence is available.
+        Defaults to empty list.
+    confidence : float | None, optional
+        Confidence score for the stitching match (0.0 to 1.0). Higher values
+        indicate stronger matches. None if confidence is not computed.
+        Defaults to None.
+    candidates : list[StitchCandidate] | None, optional
+        List of candidate matches considered during stitching. Used for debugging
+        and match quality analysis. None if candidates are not tracked.
+        Defaults to None.
+    """
 
     module_id: str | None = None
     scip_symbol: str | None = None
@@ -90,7 +124,58 @@ class StitchInfo:
 
 @dataclass(slots=True, frozen=True)
 class NodeRecord:
-    """Single CST node row ready for serialization."""
+    """Single CST node row ready for serialization.
+
+    Attributes
+    ----------
+    path : str
+        File path relative to the repository root where this node occurs.
+    node_id : str
+        Unique identifier for this node within the file (e.g., "node_123").
+    kind : str
+        AST node kind (e.g., "FunctionDef", "ClassDef", "Call", "Name").
+    name : str | None
+        Name of the node if it has one (e.g., function name, class name).
+        None for nodes without names.
+    span : Span
+        Source code span (line/column range) where this node occurs.
+    text_preview : str | None
+        Preview of the source code text for this node. None if preview is
+        unavailable or too large.
+    parents : list[str]
+        List of parent node IDs representing the AST hierarchy. Empty list
+        for root nodes.
+    scope : str | None
+        Qualified name of the scope containing this node (e.g., "module.Class.method").
+        None if scope resolution failed.
+    qnames : list[str]
+        List of qualified names this node resolves to (e.g., ["builtins.str",
+        "typing.Union"]). Empty list if resolution failed.
+    doc : DocSnippet | None, optional
+        Docstring snippet containing module and function/class docstrings.
+        None if no docstring is available. Defaults to None.
+    is_public : bool | None, optional
+        Whether this node is part of the public API (not prefixed with _).
+        None if public/private status is not determined. Defaults to None.
+    decorators : list[str] | None, optional
+        List of decorator names applied to this node. None if decorators are
+        not tracked. Defaults to None.
+    call_target_qnames : list[str] | None, optional
+        List of qualified names of functions/methods called by this node.
+        None if call targets are not tracked. Defaults to None.
+    ann : str | None, optional
+        Type annotation string for this node. None if no annotation is present.
+        Defaults to None.
+    imports : ImportMetadata | None, optional
+        Import metadata for Import/ImportFrom nodes. None for non-import nodes.
+        Defaults to None.
+    stitch : StitchInfo | None, optional
+        Stitching metadata linking this node to module records and SCIP symbols.
+        None if stitching was not performed or no match was found. Defaults to None.
+    errors : list[str] | None, optional
+        List of error messages encountered during node processing. None if no
+        errors occurred. Defaults to None.
+    """
 
     path: str
     node_id: str
@@ -145,7 +230,21 @@ class NodeRecord:
 
 @dataclass(slots=True, frozen=True)
 class CollectorStats:
-    """Aggregated counters for provider usage."""
+    """Aggregated counters for provider usage.
+
+    Attributes
+    ----------
+    files_indexed : int, optional
+        Number of files successfully indexed. Defaults to 0.
+    node_rows : int, optional
+        Total number of node rows collected across all files. Defaults to 0.
+    parse_errors : int, optional
+        Number of files that failed to parse. Defaults to 0.
+    qname_hits : int, optional
+        Number of qualified name resolutions that succeeded. Defaults to 0.
+    scope_resolved : int, optional
+        Number of scope resolutions that succeeded. Defaults to 0.
+    """
 
     files_indexed: int = 0
     node_rows: int = 0

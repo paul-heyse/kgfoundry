@@ -125,6 +125,12 @@ def get_capability_stamp() -> str | None:
     str | None
         Stable capability hash when initialized, otherwise ``None`` if the
         stamp has not been stored in the current context.
+
+    Notes
+    -----
+    The capability stamp is set by SessionScopeMiddleware during request
+    processing and stored in a ContextVar for thread-local access. This
+    function should only be called within request handlers.
     """
     return capability_stamp_var.get()
 

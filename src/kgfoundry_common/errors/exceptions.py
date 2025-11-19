@@ -174,22 +174,6 @@ class KgFoundryError(Exception):
     Problem Details mapping. All kgfoundry exceptions inherit from this
     base class and can be converted to Problem Details JSON for HTTP responses.
 
-    Creates a new KgFoundryError instance with the provided message
-    and configuration. Resolves configuration from either the config
-    parameter or legacy keyword arguments.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message.
-    config : KgFoundryErrorConfig | None, optional
-        Structured configuration for the error including code, http_status,
-        log_level, cause and context. When omitted, these fields fall back
-        to sensible defaults. Defaults to None.
-    **legacy_kwargs : object
-        Backwards-compatible keyword arguments mirroring the fields of
-        KgFoundryErrorConfig. Cannot be combined with config.
-
     Examples
     --------
     >>> from kgfoundry_common.errors import KgFoundryError, ErrorCode
@@ -208,14 +192,21 @@ class KgFoundryError(Exception):
     ) -> None:
         """Initialize kgfoundry error.
 
+        Creates a new KgFoundryError instance with the provided message
+        and configuration. Resolves configuration from either the config
+        parameter or legacy keyword arguments.
+
         Parameters
         ----------
         message : str
             Human-readable error message.
         config : KgFoundryErrorConfig | None, optional
-            Error configuration dataclass. If None, uses defaults.
+            Structured configuration for the error including code, http_status,
+            log_level, cause and context. When omitted, these fields fall back
+            to sensible defaults. Defaults to None.
         **legacy_kwargs : object
-            Legacy keyword arguments for backward compatibility.
+            Backwards-compatible keyword arguments mirroring the fields of
+            KgFoundryErrorConfig. Cannot be combined with config.
         """
         resolved_config = _coerce_error_config(config, dict(legacy_kwargs))
         self.message = message
@@ -299,17 +290,6 @@ class DownloadError(KgFoundryError):
     Raised when download or resource fetch operations fail. Uses error code
     DOWNLOAD_FAILED and HTTP status 503 (Service Unavailable).
 
-    Creates a DownloadError with DOWNLOAD_FAILED error code and HTTP status 503.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the download failure.
-    cause : Exception | None, optional
-        Underlying exception that caused the download failure. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details. Defaults to None.
-
     Examples
     --------
     >>> raise DownloadError("Failed to download PDF", cause=IOError("Connection refused"))
@@ -323,14 +303,16 @@ class DownloadError(KgFoundryError):
     ) -> None:
         """Initialize download error.
 
+        Creates a DownloadError with DOWNLOAD_FAILED error code and HTTP status 503.
+
         Parameters
         ----------
         message : str
-            Human-readable error message.
+            Human-readable error message describing the download failure.
         cause : Exception | None, optional
-            Underlying exception that caused this error.
+            Underlying exception that caused the download failure. Defaults to None.
         context : Mapping[str, object] | None, optional
-            Additional context dictionary for error details.
+            Additional context dictionary for error details. Defaults to None.
         """
         super().__init__(
             message,

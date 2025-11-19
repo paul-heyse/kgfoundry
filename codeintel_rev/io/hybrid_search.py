@@ -98,10 +98,7 @@ class HybridSearchEngine:
             rrf_base=int(opts.rrf_base),
         )
         fused_pairs = self.fusion.fuse(
-            [
-                FusionInput(channel=name, candidates=pairs)
-                for name, pairs in channel_pairs.items()
-            ],
+            [FusionInput(channel=name, candidates=pairs) for name, pairs in channel_pairs.items()],
             options=FusionOptions(weights=weights, k=fusion_limit, base=int(opts.rrf_base)),
         )
         docs = [
@@ -127,6 +124,23 @@ class HybridSearchEngine:
         query: str,
         per_channel_k: int,
     ) -> tuple[dict[str, list[tuple[int, float]]], list[str]]:
+        """Collect search results from BM25 and SPLADE sparse channels.
+
+        Parameters
+        ----------
+        query : str
+            Query text to search for across sparse channels.
+        per_channel_k : int
+            Maximum number of results to retrieve from each channel.
+
+        Returns
+        -------
+        tuple[dict[str, list[tuple[int, float]]], list[str]]
+            A tuple containing:
+            - Dictionary mapping channel names ("bm25", "splade") to lists
+              of (doc_id, score) pairs
+            - List of warning messages from channel execution
+        """
         warnings: list[str] = []
         channel_pairs: dict[str, list[tuple[int, float]]] = {}
         for label, engine in (("bm25", self.bm25), ("splade", self.splade)):
@@ -144,6 +158,26 @@ def _run_sparse_channel(
     query: str,
     limit: int,
 ) -> tuple[list[tuple[int, float]], str | None]:
+    """Execute search on a single sparse channel (BM25 or SPLADE).
+
+    Parameters
+    ----------
+    label : str
+        Channel label for error reporting (e.g., "bm25", "splade").
+    engine : BM25Engine | SPLADEEngine
+        Search engine instance to execute the query on.
+    query : str
+        Query text to search for.
+    limit : int
+        Maximum number of results to return.
+
+    Returns
+    -------
+    tuple[list[tuple[int, float]], str | None]
+        A tuple containing:
+        - List of (doc_id, score) pairs from the search
+        - Warning message string if an error occurred, None otherwise
+    """
     try:
         hits = engine.search(query, k=limit)
     except (RuntimeError, ValueError, OSError) as exc:  # pragma: no cover - defensive
@@ -156,6 +190,22 @@ def _normalize_inputs(
     hits: Sequence[tuple[int, float]] | None,
     limit: int,
 ) -> list[tuple[int, float]]:
+    """Normalize semantic search hits to a list of (doc_id, score) pairs.
+
+    Parameters
+    ----------
+    hits : Sequence[tuple[int, float]] | None
+        Optional sequence of (doc_id, score) pairs from semantic search.
+        Can be None or empty.
+    limit : int
+        Maximum number of hits to include in the normalized result.
+
+    Returns
+    -------
+    list[tuple[int, float]]
+        Normalized list of (doc_id, score) pairs. Returns empty list if
+        hits is None or empty. Invalid entries are skipped silently.
+    """
     if not hits:
         return []
     normalized: list[tuple[int, float]] = []
@@ -166,8 +216,21 @@ def _normalize_inputs(
             continue
     return normalized
 
+
 @dataclass(frozen=True, slots=True)
 class _FusionConfig:
+    """Configuration parameters for hybrid search fusion.
+
+    Attributes
+    ----------
+    fusion_k : int
+        Maximum number of results to return after fusion.
+    per_channel_k : int
+        Maximum number of results to retrieve from each channel before fusion.
+    rrf_base : int
+        Base value for Reciprocal Rank Fusion (RRF) scoring.
+    """
+
     fusion_k: int
     per_channel_k: int
     rrf_base: int
@@ -180,6 +243,29 @@ def _build_method_payload(
     normalized_weights: Mapping[str, float],
     fusion_config: _FusionConfig,
 ) -> tuple[dict[str, object], dict[str, dict[str, object]], list[str]]:
+    """Build method metadata payload and contribution tracking for hybrid search.
+
+    Parameters
+    ----------
+    channel_pairs : dict[str, list[tuple[int, float]]]
+        Dictionary mapping channel names to their (doc_id, score) result pairs.
+    warnings : list[str]
+        List of warning messages from channel execution.
+    normalized_weights : Mapping[str, float]
+        Normalized fusion weights for each channel.
+    fusion_config : _FusionConfig
+        Fusion configuration containing k values and RRF base.
+
+    Returns
+    -------
+    tuple[dict[str, object], dict[str, dict[str, object]], list[str]]
+        A tuple containing:
+        - Method metadata dictionary with retrieval channels, fusion details,
+          budget information, and explainability data
+        - Contributions dictionary mapping channel names to their candidate
+          counts and weights
+        - List of retrieval channel names
+    """
     fusion_limit = fusion_config.fusion_k
     per_channel_k = fusion_config.per_channel_k
     rrf_base = fusion_config.rrf_base

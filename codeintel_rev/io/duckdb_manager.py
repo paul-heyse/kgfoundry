@@ -107,6 +107,16 @@ class _InstrumentedDuckDBConnection:
     __slots__ = ("_config", "_conn")
 
     def __init__(self, conn: duckdb.DuckDBPyConnection, config: DuckDBConfig) -> None:
+        """Initialize instrumented DuckDB connection wrapper.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            Underlying DuckDB connection to wrap and instrument.
+        config : DuckDBConfig
+            Configuration for instrumentation behavior, including logging
+            and query tracking settings.
+        """
         self._conn = conn
         self._config = config
 

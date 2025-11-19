@@ -18,7 +18,21 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(slots=True, frozen=True)
 class DefInfo:
-    """Intermediate representation for definition nodes with qualnames."""
+    """Intermediate representation for definition nodes with qualnames.
+
+    Attributes
+    ----------
+    node : ast.AST
+        AST node representing the definition (FunctionDef, ClassDef, etc.).
+    name : str | None
+        Name of the definition if it has one. None for anonymous definitions.
+    qualname : str | None
+        Qualified name of the definition (e.g., "module.Class.method").
+        None if qualname resolution failed.
+    parent_qualname : str | None
+        Qualified name of the parent scope containing this definition.
+        None for top-level definitions.
+    """
 
     node: ast.AST
     name: str | None
@@ -28,7 +42,43 @@ class DefInfo:
 
 @dataclass(slots=True, frozen=True)
 class AstNodeRow:
-    """Row emitted to ast_nodes.parquet."""
+    """Row emitted to ast_nodes.parquet.
+
+    Attributes
+    ----------
+    path : str
+        File path relative to repository root where this node occurs.
+    module : str
+        Module name containing this node.
+    qualname : str | None
+        Qualified name of the node (e.g., "module.Class.method"). None for
+        nodes without qualnames.
+    name : str | None
+        Name of the node if it has one. None for anonymous nodes.
+    node_type : str
+        AST node type (e.g., "FunctionDef", "ClassDef", "Assign").
+    lineno : int | None
+        Starting line number (1-based). None if line number is unavailable.
+    col : int | None
+        Starting column number (0-based). None if column number is unavailable.
+    end_lineno : int | None
+        Ending line number (1-based). None if end line is unavailable.
+    end_col : int | None
+        Ending column number (0-based, exclusive). None if end column is
+        unavailable.
+    parent_qualname : str | None
+        Qualified name of the parent scope. None for top-level nodes.
+    decorators : tuple[str, ...]
+        Tuple of decorator names applied to this node. Empty tuple if no
+        decorators.
+    bases : tuple[str, ...]
+        Tuple of base class names for ClassDef nodes. Empty tuple for
+        non-class nodes.
+    docstring : str | None
+        Docstring text if present. None if no docstring.
+    is_public : bool
+        Whether the node is part of the public API (not prefixed with _).
+    """
 
     path: str
     module: str
@@ -61,7 +111,33 @@ class AstNodeRow:
 
 @dataclass(slots=True, frozen=True)
 class AstMetricsRow:
-    """Row emitted to ast_metrics.parquet."""
+    """Row emitted to ast_metrics.parquet.
+
+    Attributes
+    ----------
+    path : str
+        File path relative to repository root.
+    module : str
+        Module name for this file.
+    func_count : int
+        Number of function definitions in the file.
+    class_count : int
+        Number of class definitions in the file.
+    assign_count : int
+        Number of assignment statements in the file.
+    import_count : int
+        Number of import statements in the file.
+    branch_nodes : int
+        Number of branching nodes (if, for, while, etc.) in the file.
+    cyclomatic : int
+        Cyclomatic complexity score for the file.
+    cognitive : int
+        Cognitive complexity score for the file.
+    max_nesting : int
+        Maximum nesting depth of control structures in the file.
+    statements : int
+        Total number of statements in the file.
+    """
 
     path: str
     module: str

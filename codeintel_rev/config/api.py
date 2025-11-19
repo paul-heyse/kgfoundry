@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +13,20 @@ CONFIG_API_VERSION: Final[str] = "1.0"
 
 @dataclass(frozen=True, slots=True)
 class PathsConfig:
-    """Filesystem paths used by the application."""
+    """Filesystem paths used by the application.
+
+    Attributes
+    ----------
+    repo_root : Path
+        Repository root directory path. All other paths are typically resolved
+        relative to this root.
+    data_dir : Path
+        Directory path for application data files (indexes, catalogs, etc.).
+    cache_dir : Path
+        Directory path for cached artifacts and temporary data.
+    logs_dir : Path
+        Directory path for application log files.
+    """
 
     repo_root: Path
     data_dir: Path
@@ -22,7 +36,24 @@ class PathsConfig:
 
 @dataclass(frozen=True, slots=True)
 class DuckDBSettings:
-    """Settings for the DuckDB subsystem."""
+    """Settings for the DuckDB subsystem.
+
+    Attributes
+    ----------
+    database : Path
+        Path to the DuckDB database file. Used for catalog storage and queries.
+    threads : int | None, optional
+        Number of threads for DuckDB operations. If None, uses DuckDB's default
+        thread count. Defaults to None.
+    object_cache : bool, optional
+        Whether to enable DuckDB's object cache for improved performance.
+        Defaults to True.
+    temp_directory : Path | None, optional
+        Optional temporary directory for DuckDB operations. If None, uses DuckDB's
+        default temporary directory. Defaults to None.
+    pool_size : int, optional
+        Connection pool size for concurrent DuckDB operations. Defaults to 4.
+    """
 
     database: Path
     threads: int | None = None
@@ -33,7 +64,23 @@ class DuckDBSettings:
 
 @dataclass(frozen=True, slots=True)
 class FAISSSettings:
-    """Settings for the FAISS subsystem."""
+    """Settings for the FAISS subsystem.
+
+    Attributes
+    ----------
+    index_path : Path
+        Path to the FAISS index file. The index must exist and be compatible
+        with the configured vector dimension.
+    default_k : int, optional
+        Default number of nearest neighbors to retrieve in FAISS searches.
+        Defaults to 50.
+    default_nprobe : int, optional
+        Default number of clusters to probe in IVF indexes. Higher values
+        improve recall but increase search time. Defaults to 64.
+    refine_k_factor : float, optional
+        Multiplier for refinement during FAISS search. Values > 1.0 retrieve
+        more candidates before refinement. Defaults to 1.0.
+    """
 
     index_path: Path
     default_k: int = 50
@@ -43,7 +90,31 @@ class FAISSSettings:
 
 @dataclass(frozen=True, slots=True)
 class SearchSettings:
-    """Settings for hybrid search weighting and Stage-0 tuning."""
+    """Settings for hybrid search weighting and Stage-0 tuning.
+
+    Attributes
+    ----------
+    bm25_weight : float, optional
+        Weight for BM25 sparse retrieval channel in hybrid fusion. Must be
+        non-negative. Defaults to 0.2.
+    splade_weight : float, optional
+        Weight for SPLADE sparse retrieval channel in hybrid fusion. Must be
+        non-negative. Defaults to 0.3.
+    faiss_weight : float, optional
+        Weight for FAISS dense retrieval channel in hybrid fusion. Must be
+        non-negative. Defaults to 0.5.
+    per_channel_k : int, optional
+        Number of results to retrieve from each channel before fusion. Larger
+        values improve recall but increase computation. Defaults to 100.
+    fusion_k : int, optional
+        Number of results to return after fusion. Must be positive. Defaults to 50.
+    rrf_base : int, optional
+        Base value for Reciprocal Rank Fusion (RRF) scoring. Must be positive.
+        Higher values reduce the impact of rank differences. Defaults to 60.
+    max_results : int, optional
+        Maximum number of results to return from search operations. Must be
+        positive. Defaults to 50.
+    """
 
     bm25_weight: float = 0.2
     splade_weight: float = 0.3
@@ -56,7 +127,17 @@ class SearchSettings:
 
 @dataclass(frozen=True, slots=True)
 class LoggingSettings:
-    """Settings for log output."""
+    """Settings for log output.
+
+    Attributes
+    ----------
+    level : str, optional
+        Logging level (e.g., "DEBUG", "INFO", "WARNING", "ERROR"). Must be
+        a valid Python logging level name. Defaults to "INFO".
+    json : bool, optional
+        Whether to output logs in JSON format for structured logging. If False,
+        logs are output in human-readable format. Defaults to False.
+    """
 
     level: str = "INFO"
     json: bool = False
@@ -64,7 +145,41 @@ class LoggingSettings:
 
 @dataclass(frozen=True, slots=True)
 class SpladeOnnxQueryConfig:
-    """Optional SPLADE ONNX query encoder configuration."""
+    """Optional SPLADE ONNX query encoder configuration.
+
+    Attributes
+    ----------
+    enabled : bool, optional
+        Whether to enable ONNX-based query encoding. If False, SPLADE query
+        encoding uses the default PyTorch model. Defaults to False.
+    model_path : Path | None, optional
+        Path to the ONNX model file for query encoding. Required if enabled=True.
+        Defaults to None.
+    tokenizer_name : str | None, optional
+        HuggingFace tokenizer name for the ONNX model. If None, inferred from
+        model_path. Defaults to None.
+    output_name : str, optional
+        Name of the ONNX model output tensor containing logits. Defaults to "logits".
+    input_ids_name : str, optional
+        Name of the ONNX model input tensor for token IDs. Defaults to "input_ids".
+    attention_mask_name : str, optional
+        Name of the ONNX model input tensor for attention masks. Defaults to
+        "attention_mask".
+    providers : tuple[str, ...], optional
+        ONNX Runtime execution providers (e.g., "CPUExecutionProvider",
+        "CUDAExecutionProvider"). Defaults to ("CPUExecutionProvider",).
+    topn : int, optional
+        Number of top tokens to extract from SPLADE logits. Must be positive.
+        Defaults to 64.
+    min_weight : float, optional
+        Minimum token weight threshold for filtering SPLADE tokens. Tokens
+        below this threshold are discarded. Defaults to 1e-6.
+    normalize : bool, optional
+        Whether to normalize SPLADE token weights. Defaults to False.
+    format : Literal["string", "map"], optional
+        Output format for SPLADE queries. "string" produces a query string,
+        "map" produces a token-to-weight mapping. Defaults to "string".
+    """
 
     enabled: bool = False
     model_path: Path | None = None
@@ -81,7 +196,53 @@ class SpladeOnnxQueryConfig:
 
 @dataclass(frozen=True, slots=True)
 class SpladeSettings:
-    """SPLADE runtime configuration for artifacts, encoding, and indexing."""
+    """SPLADE runtime configuration for artifacts, encoding, and indexing.
+
+    Attributes
+    ----------
+    model_id : str
+        HuggingFace model identifier for the SPLADE model (e.g.,
+        "naver/splade-cocondenser-ensembledistil").
+    model_dir : Path
+        Directory path containing the SPLADE PyTorch model files.
+    onnx_dir : Path
+        Directory path containing ONNX model files for SPLADE encoding.
+    onnx_file : str
+        Filename of the ONNX model file within onnx_dir.
+    vectors_dir : Path
+        Directory path for storing SPLADE vector embeddings (JsonVectorCollection
+        shards).
+    index_dir : Path
+        Directory path for the SPLADE Lucene impact index.
+    provider : str
+        Device provider for SPLADE encoding (e.g., "cpu", "cuda").
+    quantization : int
+        Quantization level for model weights (typically 100 for int8 quantization).
+    max_terms : int
+        Maximum number of terms in SPLADE representations. Must be positive.
+    max_clause_count : int
+        Maximum number of clauses in Lucene boolean queries. Must be at least 1024.
+    batch_size : int
+        Batch size for SPLADE encoding operations. Must be positive.
+    threads : int
+        Number of threads for parallel SPLADE processing. Must be positive.
+    enabled : bool
+        Whether SPLADE retrieval is enabled. If False, SPLADE operations are skipped.
+    max_query_terms : int
+        Maximum number of terms to extract from queries. Must be non-negative.
+    prune_below : float
+        Minimum token weight threshold for pruning SPLADE tokens. Tokens below
+        this threshold are discarded. Must be non-negative.
+    analyzer : Literal["wordpiece", "code"]
+        Tokenizer analyzer type. "wordpiece" uses standard WordPiece tokenization,
+        "code" uses code-specific tokenization.
+    static_prune_pct : float
+        Static pruning percentage for SPLADE tokens (0.0 to 1.0). Tokens are
+        pruned based on this percentage before max_query_terms filtering.
+    onnx_query : SpladeOnnxQueryConfig | None, optional
+        Optional ONNX query encoder configuration. If None, uses PyTorch model
+        for query encoding. Defaults to None.
+    """
 
     model_id: str
     model_dir: Path
@@ -104,14 +265,308 @@ class SpladeSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class XTRSettings:
+    """XTR token-level index configuration.
+
+    Attributes
+    ----------
+    model_id : str, optional
+        HuggingFace model identifier for the XTR model. Defaults to
+        "nomic-ai/CodeRankEmbed".
+    device : str, optional
+        Device for XTR model execution (e.g., "cuda", "cpu", "mps"). Defaults
+        to "cuda".
+    max_query_tokens : int, optional
+        Maximum number of tokens in query text. Longer queries are truncated.
+        Must be positive. Defaults to 256.
+    candidate_k : int, optional
+        Number of candidate documents to retrieve before XTR rescoring. Must
+        be positive. Defaults to 200.
+    dim : int, optional
+        Embedding dimension for XTR token vectors. Must be positive. Defaults
+        to 768.
+    dtype : Literal["float16", "float32"], optional
+        Data type for XTR token embeddings. "float16" reduces memory usage but
+        may have lower precision. Defaults to "float16".
+    enable : bool, optional
+        Whether XTR retrieval is enabled. If False, XTR operations are skipped.
+        Defaults to False.
+    mode : Literal["narrow", "wide"], optional
+        XTR search mode. "narrow" uses token-level matching, "wide" uses
+        document-level matching. Defaults to "narrow".
+    """
+
+    model_id: str = "nomic-ai/CodeRankEmbed"
+    device: str = "cuda"
+    max_query_tokens: int = 256
+    candidate_k: int = 200
+    dim: int = 768
+    dtype: Literal["float16", "float32"] = "float16"
+    enable: bool = False
+    mode: Literal["narrow", "wide"] = "narrow"
+
+
+@dataclass(frozen=True, slots=True)
+class BM25Settings:
+    """BM25 configuration for corpus preparation and Lucene index tuning.
+
+    Attributes
+    ----------
+    corpus_json_dir : Path
+        Directory path containing JSONL corpus files for BM25 indexing. Each
+        file should contain documents with "id", "title", "section", and "body"
+        fields.
+    index_dir : Path
+        Directory path where the BM25 Lucene index will be built or loaded from.
+    threads : int, optional
+        Number of threads for BM25 index building and search operations. Must
+        be positive. Defaults to 8.
+    enabled : bool, optional
+        Whether BM25 retrieval is enabled. If False, BM25 operations are skipped.
+        Defaults to True.
+    k1 : float, optional
+        BM25 term frequency saturation parameter. Controls how quickly term
+        frequency saturates. Must be positive. Defaults to 0.9.
+    b : float, optional
+        BM25 length normalization parameter. Controls the impact of document
+        length on scoring. Must be non-negative. Defaults to 0.4.
+    rm3_enabled : bool, optional
+        Whether to enable RM3 (Relevance Model 3) query expansion. RM3 expands
+        queries with relevant terms from top-ranked documents. Defaults to False.
+    rm3_fb_docs : int, optional
+        Number of feedback documents to use for RM3 expansion. Must be positive.
+        Defaults to 10.
+    rm3_fb_terms : int, optional
+        Number of feedback terms to add to the query in RM3 expansion. Must be
+        positive. Defaults to 10.
+    rm3_original_query_weight : float, optional
+        Weight for the original query terms in RM3 expansion (0.0 to 1.0).
+        Higher values preserve more of the original query. Defaults to 0.5.
+    analyzer : Literal["code", "standard"], optional
+        Tokenizer analyzer type. "code" uses code-specific tokenization,
+        "standard" uses standard text tokenization. Defaults to "code".
+    stopwords : tuple[str, ...], optional
+        Tuple of stopwords to filter during indexing and search. Empty tuple
+        means no stopword filtering. Defaults to empty tuple.
+    """
+
+    corpus_json_dir: Path
+    index_dir: Path
+    threads: int = 8
+    enabled: bool = True
+    k1: float = 0.9
+    b: float = 0.4
+    rm3_enabled: bool = False
+    rm3_fb_docs: int = 10
+    rm3_fb_terms: int = 10
+    rm3_original_query_weight: float = 0.5
+    analyzer: Literal["code", "standard"] = "code"
+    stopwords: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingsSettings:
+    """Embedding provider configuration shared by CLIs and services.
+
+    Attributes
+    ----------
+    provider : Literal["vllm", "hf"], optional
+        Embedding provider backend. "vllm" uses vLLM for in-process or HTTP
+        embedding generation. "hf" uses HuggingFace transformers directly.
+        Defaults to "vllm".
+    model_name : str, optional
+        Model identifier for embedding generation (e.g., "nomic-ai/nomic-embed-code").
+        Must be compatible with the selected provider. Defaults to
+        "nomic-ai/nomic-embed-code".
+    device : str, optional
+        Device for embedding computation (e.g., "auto", "cuda", "cpu", "mps").
+        "auto" selects the best available device. Defaults to "auto".
+    batch_size : int, optional
+        Batch size for embedding generation. Larger batches improve throughput
+        but require more memory. Must be positive. Defaults to 64.
+    micro_batch_size : int, optional
+        Micro-batch size for batching multiple requests. Used for request
+        coalescing in async scenarios. Must be positive. Defaults to 32.
+    normalize : bool, optional
+        Whether to L2-normalize embeddings to unit length. Normalized embeddings
+        enable cosine similarity via dot product. Defaults to True.
+    max_tokens : int, optional
+        Maximum number of tokens per input text. Longer texts are truncated.
+        Must be positive. Defaults to 4096.
+    max_sequence_chars : int, optional
+        Maximum number of characters per input sequence. Used for input validation
+        and truncation. Must be positive. Defaults to 8192.
+    retry_max_attempts : int, optional
+        Maximum number of retry attempts for failed embedding requests. Must be
+        non-negative. Defaults to 3.
+    retry_backoff_ms : int, optional
+        Backoff delay in milliseconds between retry attempts. Must be non-negative.
+        Defaults to 250.
+    max_pending_batches : int, optional
+        Maximum number of pending batches in the embedding queue. Used for
+        backpressure control. Must be non-negative. Defaults to 8.
+    max_wait_ms : int, optional
+        Maximum wait time in milliseconds before emitting a partial batch.
+        Used for latency control in batching systems. Must be non-negative.
+        Defaults to 8.
+    allow_hf_fallback : bool, optional
+        Whether to allow fallback to HuggingFace transformers when vLLM is
+        unavailable. Defaults to True.
+    """
+
+    provider: Literal["vllm", "hf"] = "vllm"
+    model_name: str = "nomic-ai/nomic-embed-code"
+    device: str = "auto"
+    batch_size: int = 64
+    micro_batch_size: int = 32
+    normalize: bool = True
+    max_tokens: int = 4096
+    max_sequence_chars: int = 8192
+    retry_max_attempts: int = 3
+    retry_backoff_ms: int = 250
+    max_pending_batches: int = 8
+    max_wait_ms: int = 8
+    allow_hf_fallback: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class VLLMSettings:
+    """Configuration for the vLLM embedding service.
+
+    Attributes
+    ----------
+    base_url : str, optional
+        Base URL for vLLM HTTP API when run_mode is "http". Format:
+        "http://host:port/v1". Defaults to "http://127.0.0.1:8001/v1".
+    model : str, optional
+        Model identifier for vLLM (e.g., "nomic-ai/nomic-embed-code"). Must be
+        compatible with vLLM's embedding API. Defaults to "nomic-ai/nomic-embed-code".
+    batch_size : int, optional
+        Batch size for vLLM embedding requests. Larger batches improve throughput
+        but require more memory. Must be positive. Defaults to 64.
+    embedding_dim : int, optional
+        Expected embedding dimension from the model. Used for validation and
+        array allocation. Must be positive. Defaults to 3584.
+    timeout_s : float, optional
+        Request timeout in seconds for vLLM HTTP requests. Must be positive.
+        Defaults to 120.0.
+    run_mode : Literal["inprocess", "http"], optional
+        vLLM execution mode. "inprocess" runs vLLM in the same process,
+        "http" uses a separate HTTP server. Defaults to "inprocess".
+    memory_utilization : float, optional
+        Memory utilization target for vLLM (0.0 to 1.0). Higher values use more
+        GPU memory but may cause OOM errors. Defaults to 0.92.
+    max_num_batched_tokens : int, optional
+        Maximum number of tokens in a single batch. Used for memory management.
+        Must be positive. Defaults to 65_536.
+    normalize : bool, optional
+        Whether to L2-normalize embeddings to unit length. Defaults to True.
+    embedding_mode : Literal["LAST", "CLS", "MEAN"], optional
+        Pooling strategy for generating embeddings from token vectors. "LAST"
+        uses the last token, "CLS" uses the [CLS] token, "MEAN" averages all
+        tokens. Defaults to "LAST".
+    max_concurrent_requests : int, optional
+        Maximum number of concurrent requests to vLLM HTTP API. Used for
+        connection pooling. Must be positive. Defaults to 4.
+    task : Literal["embed"] | None, optional
+        Deprecated: Use embedding_mode instead. Task type for vLLM. Defaults to None.
+    """
+
+    base_url: str = "http://127.0.0.1:8001/v1"
+    model: str = "nomic-ai/nomic-embed-code"
+    batch_size: int = 64
+    embedding_dim: int = 3584
+    timeout_s: float = 120.0
+    run_mode: Literal["inprocess", "http"] = "inprocess"
+    memory_utilization: float = 0.92
+    max_num_batched_tokens: int = 65_536
+    normalize: bool = True
+    embedding_mode: Literal["LAST", "CLS", "MEAN"] = "LAST"
+    max_concurrent_requests: int = 4
+    task: Literal["embed"] | None = None
+
+    def resolved_embedding_mode(self) -> Literal["LAST", "CLS", "MEAN"]:
+        """Return embedding mode while handling deprecated ``task`` flag.
+
+        Returns
+        -------
+        Literal["LAST", "CLS", "MEAN"]
+            The embedding mode to use. Emits a deprecation warning if the
+            deprecated task field is set, then returns the embedding_mode value.
+        """
+        if self.task:
+            warnings.warn(
+                "VLLMSettings.task is deprecated; use embedding_mode instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        return self.embedding_mode
+
+    @property
+    def pooling_type(self) -> Literal["LAST", "CLS", "MEAN"]:
+        """Return literal pooling type for compatibility helpers."""
+        return self.resolved_embedding_mode()
+
+    def pooler_kwargs(self) -> dict[str, object]:
+        """Return keyword arguments for vLLM PoolerConfig construction.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary containing pooling_type and normalize keys suitable
+            for passing to vLLM PoolerConfig constructor.
+        """
+        return {
+            "pooling_type": self.pooling_type,
+            "normalize": self.normalize,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
-    """Top-level immutable configuration."""
+    """Top-level immutable configuration.
+
+    Attributes
+    ----------
+    version : str
+        Configuration API version string (e.g., "1.0"). Used for version
+        compatibility checking.
+    paths : PathsConfig
+        Filesystem paths configuration for all application directories.
+    duckdb : DuckDBSettings
+        DuckDB database configuration and connection settings.
+    faiss : FAISSSettings
+        FAISS vector index configuration and search parameters.
+    bm25 : BM25Settings
+        BM25 sparse retrieval configuration and index settings.
+    splade : SpladeSettings
+        SPLADE sparse retrieval configuration and model settings.
+    xtr : XTRSettings
+        XTR token-level retrieval configuration and model settings.
+    embeddings : EmbeddingsSettings
+        Embedding provider configuration shared across CLIs and services.
+    vllm : VLLMSettings
+        vLLM embedding service configuration and runtime settings.
+    search : SearchSettings, optional
+        Hybrid search weighting and Stage-0 tuning configuration. Defaults to
+        SearchSettings() with default values.
+    logging : LoggingSettings, optional
+        Logging output configuration. Defaults to LoggingSettings() with default
+        values.
+    extras : Mapping[str, object], optional
+        Additional configuration key-value pairs for extensibility. Defaults to
+        empty dictionary.
+    """
 
     version: str
     paths: PathsConfig
     duckdb: DuckDBSettings
     faiss: FAISSSettings
+    bm25: BM25Settings
     splade: SpladeSettings
+    xtr: XTRSettings
+    embeddings: EmbeddingsSettings
+    vllm: VLLMSettings
     search: SearchSettings = field(default_factory=SearchSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
     extras: Mapping[str, object] = field(default_factory=dict)
@@ -146,27 +601,67 @@ def validate_config(cfg: AppConfig) -> None:
     ValueError
         If any invariants fail validation.
     """
+
+    def _require(message: str, *, condition: bool) -> None:
+        if not condition:
+            raise ValueError(message)
+
     if not is_compatible_version(cfg.version):
-        message = f"Incompatible config version {cfg.version!r}; expected {CONFIG_API_VERSION}"
-        raise ValueError(message)
-    if cfg.faiss.default_k <= 0:
-        message = "faiss.default_k must be positive"
-        raise ValueError(message)
-    if cfg.faiss.default_nprobe <= 0:
-        message = "faiss.default_nprobe must be positive"
-        raise ValueError(message)
-    if cfg.faiss.refine_k_factor <= 0:
-        message = "faiss.refine_k_factor must be positive"
-        raise ValueError(message)
-    if cfg.search.max_results <= 0:
-        message = "search.max_results must be positive"
-        raise ValueError(message)
-    if cfg.search.per_channel_k <= 0:
-        message = "search.per_channel_k must be positive"
-        raise ValueError(message)
-    if cfg.search.fusion_k <= 0:
-        message = "search.fusion_k must be positive"
-        raise ValueError(message)
-    if cfg.search.rrf_base <= 0:
-        message = "search.rrf_base must be positive"
-        raise ValueError(message)
+        msg = f"Incompatible config version {cfg.version!r}; expected {CONFIG_API_VERSION}"
+        raise ValueError(msg)
+
+    _require("faiss.default_k must be positive", condition=cfg.faiss.default_k > 0)
+    _require("faiss.default_nprobe must be positive", condition=cfg.faiss.default_nprobe > 0)
+    _require(
+        "faiss.refine_k_factor must be positive",
+        condition=cfg.faiss.refine_k_factor > 0,
+    )
+    _require("search.max_results must be positive", condition=cfg.search.max_results > 0)
+    _require("search.per_channel_k must be positive", condition=cfg.search.per_channel_k > 0)
+    _require("search.fusion_k must be positive", condition=cfg.search.fusion_k > 0)
+    _require("search.rrf_base must be positive", condition=cfg.search.rrf_base > 0)
+    _require("bm25.threads must be positive", condition=cfg.bm25.threads > 0)
+    _require("bm25.k1 must be positive", condition=cfg.bm25.k1 > 0)
+    _require("bm25.b must be non-negative", condition=cfg.bm25.b >= 0)
+    _require("bm25.rm3_fb_docs must be positive", condition=cfg.bm25.rm3_fb_docs > 0)
+    _require("bm25.rm3_fb_terms must be positive", condition=cfg.bm25.rm3_fb_terms > 0)
+    _require("embeddings.batch_size must be positive", condition=cfg.embeddings.batch_size > 0)
+    _require(
+        "embeddings.micro_batch_size must be positive",
+        condition=cfg.embeddings.micro_batch_size > 0,
+    )
+    _require("embeddings.max_tokens must be positive", condition=cfg.embeddings.max_tokens > 0)
+    _require(
+        "embeddings.max_sequence_chars must be positive",
+        condition=cfg.embeddings.max_sequence_chars > 0,
+    )
+    _require(
+        "embeddings.retry_max_attempts must be non-negative",
+        condition=cfg.embeddings.retry_max_attempts >= 0,
+    )
+    _require(
+        "embeddings.retry_backoff_ms must be non-negative",
+        condition=cfg.embeddings.retry_backoff_ms >= 0,
+    )
+    _require(
+        "embeddings.max_pending_batches must be non-negative",
+        condition=cfg.embeddings.max_pending_batches >= 0,
+    )
+    _require(
+        "embeddings.max_wait_ms must be non-negative",
+        condition=cfg.embeddings.max_wait_ms >= 0,
+    )
+    _require("vllm.batch_size must be positive", condition=cfg.vllm.batch_size > 0)
+    _require("vllm.embedding_dim must be positive", condition=cfg.vllm.embedding_dim > 0)
+    _require("vllm.timeout_s must be positive", condition=cfg.vllm.timeout_s > 0)
+    _require(
+        "vllm.max_num_batched_tokens must be positive",
+        condition=cfg.vllm.max_num_batched_tokens > 0,
+    )
+    _require(
+        "vllm.max_concurrent_requests must be positive",
+        condition=cfg.vllm.max_concurrent_requests > 0,
+    )
+    _require("xtr.dim must be positive", condition=cfg.xtr.dim > 0)
+    _require("xtr.max_query_tokens must be positive", condition=cfg.xtr.max_query_tokens > 0)
+    _require("xtr.candidate_k must be positive", condition=cfg.xtr.candidate_k > 0)

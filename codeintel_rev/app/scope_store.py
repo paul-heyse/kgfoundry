@@ -41,7 +41,16 @@ class SupportsAsyncRedis(Protocol):
 
 @dataclass(slots=True, frozen=True)
 class _CacheRecord[ValueT]:
-    """Internal cache record containing a value and its insertion timestamp."""
+    """Internal cache record containing a value and its insertion timestamp.
+
+    Attributes
+    ----------
+    value : ValueT
+        Cached value of generic type ValueT.
+    inserted_at : float
+        Timestamp when the value was inserted into the cache (from
+        time.monotonic()).
+    """
 
     value: ValueT
     inserted_at: float
@@ -336,7 +345,21 @@ class AsyncSingleFlight[KeyT: Hashable, ValueT]:
 
 @dataclass(slots=True, frozen=True)
 class ScopeStoreMetrics:
-    """Runtime counters describing scope store cache performance."""
+    """Runtime counters describing scope store cache performance.
+
+    Attributes
+    ----------
+    l1_hits : int, optional
+        Number of successful lookups in the L1 (in-memory) cache. Defaults to 0.
+    l1_misses : int, optional
+        Number of failed lookups in the L1 cache (requiring L2 lookup).
+        Defaults to 0.
+    l2_hits : int, optional
+        Number of successful lookups in the L2 (persistent) cache. Defaults to 0.
+    l2_misses : int, optional
+        Number of failed lookups in both L1 and L2 caches (cache miss).
+        Defaults to 0.
+    """
 
     l1_hits: int = 0
     l1_misses: int = 0

@@ -9,7 +9,19 @@ from pathlib import Path
 
 import msgspec
 import pytest
-from codeintel_rev.config.settings import Settings
+from codeintel_rev.config.api import (
+    AppConfig,
+    BM25Settings,
+    DuckDBSettings,
+    EmbeddingsSettings,
+    FAISSSettings,
+    LoggingSettings,
+    PathsConfig,
+    SearchSettings,
+    SpladeSettings,
+    VLLMSettings,
+    XTRSettings,
+)
 from codeintel_rev.io.bm25_manager import (
     BM25BuildContext,
     BM25CorpusMetadata,
@@ -17,19 +29,84 @@ from codeintel_rev.io.bm25_manager import (
     BM25IndexMetadata,
 )
 
+from kgfoundry_common.subprocess_utils import SubprocessError
 from tests._helpers import assertions, constants
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import DEFAULT_XTR_SETTINGS
 
 DOC_COUNT = constants.BATCH_SIZES.minimal
 
 
-def _bootstrap_repo(tmp_path: Path, *, bm25_threads: int | None = None) -> tuple[Path, Settings]:
-    """Initialize a fake repository layout and return configured settings.
+def _make_app_config(repo_root: Path, bm25_threads: int | None = None) -> AppConfig:
+    """Return AppConfig for the synthetic repository.
 
     Returns
     -------
-    tuple[Path, Settings]
-        Tuple containing the repo root path and tailored Settings instance.
+    AppConfig
+        Immutable configuration anchored at ``repo_root``.
+    """
+    data_dir = repo_root / "data"
+    paths = PathsConfig(
+        repo_root=repo_root,
+        data_dir=data_dir,
+        cache_dir=repo_root / ".cache",
+        logs_dir=repo_root / "logs",
+    )
+    duck_cfg = DuckDBSettings(database=data_dir / "catalog.duckdb")
+    faiss_cfg = FAISSSettings(index_path=data_dir / "faiss" / "code.ivfpq.faiss")
+    bm25_cfg = BM25Settings(
+        corpus_json_dir=data_dir / "bm25_json",
+        index_dir=repo_root / "indexes" / "bm25",
+        threads=bm25_threads if bm25_threads is not None else 8,
+        enabled=True,
+        k1=0.9,
+        b=0.4,
+        rm3_enabled=False,
+        rm3_fb_docs=10,
+        rm3_fb_terms=10,
+        rm3_original_query_weight=0.5,
+        analyzer="code",
+    )
+    splade_cfg = SpladeSettings(
+        model_id="naver/splade-v3",
+        model_dir=repo_root / "models" / "splade-v3",
+        onnx_dir=repo_root / "models" / "splade-v3" / "onnx",
+        onnx_file="model_qint8.onnx",
+        vectors_dir=data_dir / "splade_vectors",
+        index_dir=repo_root / "indexes" / "splade_v3_impact",
+        provider="CPUExecutionProvider",
+        quantization=100,
+        max_terms=3000,
+        max_clause_count=4096,
+        batch_size=32,
+        threads=8,
+        enabled=True,
+        max_query_terms=64,
+        prune_below=0.0,
+        analyzer="wordpiece",
+        static_prune_pct=0.0,
+    )
+    return AppConfig(
+        version="1.0",
+        paths=paths,
+        duckdb=duck_cfg,
+        faiss=faiss_cfg,
+        bm25=bm25_cfg,
+        splade=splade_cfg,
+        xtr=DEFAULT_XTR_SETTINGS,
+        embeddings=EmbeddingsSettings(),
+        vllm=VLLMSettings(),
+        search=SearchSettings(),
+        logging=LoggingSettings(),
+    )
+
+
+def _bootstrap_repo(tmp_path: Path, *, bm25_threads: int | None = None) -> tuple[Path, AppConfig]:
+    """Initialize a fake repository layout and return configured AppConfig.
+
+    Returns
+    -------
+    tuple[Path, AppConfig]
+        Tuple containing the repo root path and tailored AppConfig instance.
     """
     repo_root = tmp_path / "repo"
     data_dir = repo_root / "data"
@@ -44,9 +121,8 @@ def _bootstrap_repo(tmp_path: Path, *, bm25_threads: int | None = None) -> tuple
     (repo_root / "data" / "catalog.duckdb").touch()
     (repo_root / "index.scip").write_text("{}", encoding="utf-8")
 
-    bm25_overrides = {"threads": bm25_threads} if bm25_threads is not None else None
-    settings = build_settings_for_repo(repo_root, bm25_overrides=bm25_overrides)
-    return repo_root, settings
+    app_config = _make_app_config(repo_root, bm25_threads=bm25_threads)
+    return repo_root, app_config
 
 
 def _write_corpus(source_path: Path) -> None:
@@ -63,11 +139,11 @@ def _write_corpus(source_path: Path) -> None:
 
 def test_prepare_corpus_creates_json_collection(tmp_path: Path) -> None:
     """Preparing a corpus should emit per-document JSON and metadata."""
-    repo_root, settings = _bootstrap_repo(tmp_path)
+    repo_root, app_config = _bootstrap_repo(tmp_path)
     source_path = repo_root / "datasets" / "corpus.jsonl"
     _write_corpus(source_path)
 
-    manager = BM25IndexManager(settings)
+    manager = BM25IndexManager(app_config)
 
     summary = manager.prepare_corpus(source_path)
 
@@ -86,7 +162,7 @@ def test_prepare_corpus_creates_json_collection(tmp_path: Path) -> None:
 
 def test_prepare_corpus_detects_duplicate_ids(tmp_path: Path) -> None:
     """Duplicate document identifiers should cause preparation to fail."""
-    repo_root, settings = _bootstrap_repo(tmp_path)
+    repo_root, app_config = _bootstrap_repo(tmp_path)
     source_path = repo_root / "datasets" / "corpus.jsonl"
     rows = [
         {"id": "dup", "contents": "first"},
@@ -97,7 +173,7 @@ def test_prepare_corpus_detects_duplicate_ids(tmp_path: Path) -> None:
         for row in rows:
             handle.write(json.dumps(row) + "\n")
 
-    manager = BM25IndexManager(settings)
+    manager = BM25IndexManager(app_config)
 
     with pytest.raises(ValueError, match="Duplicate document id"):
         manager.prepare_corpus(source_path)
@@ -105,12 +181,12 @@ def test_prepare_corpus_detects_duplicate_ids(tmp_path: Path) -> None:
 
 def test_build_index_writes_metadata(tmp_path: Path) -> None:
     """Index builds should invoke Pyserini and persist index metadata."""
-    repo_root, settings = _bootstrap_repo(tmp_path, bm25_threads=2)
+    repo_root, app_config = _bootstrap_repo(tmp_path, bm25_threads=2)
     source_path = repo_root / "datasets" / "corpus.jsonl"
     _write_corpus(source_path)
 
     commands: list[list[str]] = []
-    index_dir = Path(settings.bm25.index_dir)
+    index_dir = Path(app_config.bm25.index_dir)
 
     def fake_runner(cmd: list[str]) -> None:
         commands.append(list(cmd))
@@ -123,7 +199,7 @@ def test_build_index_writes_metadata(tmp_path: Path) -> None:
         clock=lambda: datetime(2024, 1, 1, tzinfo=UTC),
     )
 
-    manager = BM25IndexManager(settings, build_context=context)
+    manager = BM25IndexManager(app_config, build_context=context)
     summary = manager.prepare_corpus(source_path)
 
     metadata = manager.build_index()
@@ -145,3 +221,22 @@ def test_build_index_writes_metadata(tmp_path: Path) -> None:
         type=BM25IndexMetadata,
     )
     assertions.expect_equal(disk_metadata, metadata)
+
+
+def test_build_index_raises_when_subprocess_fails(tmp_path: Path) -> None:
+    """Pyserini failures should surface as SubprocessError."""
+    _, app_config = _bootstrap_repo(tmp_path)
+
+    def fake_run(cmd: list[str]) -> None:
+        _ = cmd
+        message = "fail"
+        raise SubprocessError(message, returncode=1)
+
+    context = replace(
+        BM25BuildContext.production(),
+        pyserini_runner=fake_run,
+    )
+    manager = BM25IndexManager(app_config, build_context=context)
+
+    with pytest.raises(SubprocessError):
+        manager.build_index()

@@ -23,13 +23,37 @@ from sentence_transformers import SentenceTransformer
 
 from codeintel_rev.config import load_app_config
 from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.settings import Settings
-from codeintel_rev.config.shim import settings_from_app_config
 
 
 @dataclass(slots=True)
 class EmbedJob:
-    """Configuration bundle for an embedding run."""
+    """Configuration bundle for an embedding run.
+
+    Attributes
+    ----------
+    input_path : Path
+        Path to input text file. Each line is treated as a separate text
+        sample to embed. Empty lines are skipped.
+    output_path : Path
+        Destination for the NumPy .npy embeddings array. The parent directory
+        is created if it doesn't exist.
+    model_name : str | None
+        Optional SentenceTransformer identifier. If None, resolved from
+        application configuration (embeddings.model_name or vllm.model).
+    batch_size : int
+        Batch size for encode() calls. Larger batches improve throughput but
+        require more memory.
+    device_name : str | None
+        Optional device override ("cpu", "cuda", "mps"). If None, auto-detected
+        based on available hardware.
+    normalize : bool
+        Whether to L2-normalize embeddings. Normalized embeddings have unit
+        length, enabling cosine similarity via dot product.
+    jsonl_path : Path | None
+        Optional JSONL preview file path. If provided, writes text and embedding
+        pairs for inspection. Each line contains a JSON object with "text" and
+        "embedding" keys.
+    """
 
     input_path: Path
     output_path: Path
@@ -54,12 +78,12 @@ def _resolve_model_name(cli_value: str | None) -> str:
         Model name resolved in priority order: CLI value, embeddings.model_name
         from settings, or vllm.model from settings as fallback.
     """
-    settings = _cached_settings()
+    app_config = _cached_app_config()
     if cli_value:
         return cli_value
-    if settings.embeddings.model_name:
-        return settings.embeddings.model_name
-    return settings.vllm.model
+    if app_config.embeddings.model_name:
+        return app_config.embeddings.model_name
+    return app_config.vllm.model
 
 
 def _resolve_device(cli_value: str | None) -> str:
@@ -266,6 +290,8 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
+
+
 @lru_cache(maxsize=1)
 def _cached_app_config() -> AppConfig:
     """Load and cache AppConfig for CLI invocations.
@@ -276,14 +302,3 @@ def _cached_app_config() -> AppConfig:
         Cached immutable configuration derived from env/file sources.
     """
     return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
-
-
-def _cached_settings() -> Settings:
-    """Return legacy Settings derived from AppConfig.
-
-    Returns
-    -------
-    Settings
-        Legacy msgspec settings populated from AppConfig values.
-    """
-    return settings_from_app_config(_cached_app_config())

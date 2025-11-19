@@ -12,7 +12,17 @@ from codeintel_rev.module_utils import normalize_module_name
 
 @dataclass(slots=True, frozen=True)
 class OverlayPlan:
-    """Plan describing overlays to generate."""
+    """Plan describing overlays to generate.
+
+    Attributes
+    ----------
+    module_path : str
+        File path relative to the repository root for the module that needs
+        overlays (e.g., "src/module.py").
+    exports : dict[str, dict[str, str]]
+        Dictionary mapping symbol names to export metadata. Each export entry
+        contains type information and other metadata needed for overlay generation.
+    """
 
     module_path: str
     exports: dict[str, dict[str, str]]

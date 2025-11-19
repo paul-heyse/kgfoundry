@@ -1,3 +1,9 @@
+"""Test helpers for manipulating Python module import behavior.
+
+This module provides utilities for temporarily overriding module discovery
+during testing, enabling tests to simulate missing or custom module implementations.
+"""
+
 from __future__ import annotations
 
 import importlib.util
@@ -19,6 +25,21 @@ def with_module_presence(overrides: Mapping[str, ModuleSpec | None]) -> Iterator
     original_find_spec = importlib.util.find_spec
 
     def fake_find_spec(name: str, package: str | None = None) -> ModuleSpec | None:
+        """Fake find_spec implementation that checks overrides before delegating.
+
+        Parameters
+        ----------
+        name : str
+            Module name to look up.
+        package : str | None, optional
+            Package context for relative imports. Defaults to None.
+
+        Returns
+        -------
+        ModuleSpec | None
+            Overridden ModuleSpec if the module name is in overrides, otherwise
+            delegates to the original find_spec implementation.
+        """
         if name in overrides:
             return overrides[name]
         return original_find_spec(name, package)

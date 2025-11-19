@@ -7,7 +7,7 @@ SMOKE_HOST ?= https://localhost
 APP_SERVICE ?= hypercorn.service
 NGINX_SERVICE ?= nginx.service
 
-.PHONY: format lint types test run-hypercorn reload-hypercorn install-systemd smoke-h3 ci dev-up dev-down reload-nginx logs-app logs-nginx verify-h3
+.PHONY: format lint types test run-hypercorn reload-hypercorn install-systemd smoke-h3 ci dev-up dev-down reload-nginx logs-app logs-nginx verify-h3 index-all
 
 format:
 	$(UV) run ruff format
@@ -61,3 +61,19 @@ verify-h3:
 smoke-h3: verify-h3
 
 ci: format lint types test
+
+index-all:
+	@test -n "$(VECTORS_DIR)" || (echo "VECTORS_DIR is required" && exit 1)
+	@test -n "$(INDEX_OUT)" || (echo "INDEX_OUT is required" && exit 1)
+	@test -n "$(IDMAP_OUT)" || (echo "IDMAP_OUT is required" && exit 1)
+	$(UV) run python codeintel_rev/bin/index_all.py all \
+		--vectors-parquet-dir "$(VECTORS_DIR)" \
+		--primary-index-path "$(INDEX_OUT)" \
+		--idmap-parquet-path "$(IDMAP_OUT)" \
+		$(if $(DUCKDB_PATH),--duckdb-path "$(DUCKDB_PATH)",) \
+		$(if $(VEC_DIM),--vec-dim $(VEC_DIM),) \
+		$(if $(ID_COL),--id-col "$(ID_COL)",) \
+		$(if $(VEC_COL),--vec-col "$(VEC_COL)",) \
+		$(if $(SAMPLE_SIZE),--sample-size $(SAMPLE_SIZE),) \
+		$(if $(BATCH_ROWS),--batch-rows $(BATCH_ROWS),) \
+		$(if $(filter false,$(MATERIALIZE)),--no-materialize,)

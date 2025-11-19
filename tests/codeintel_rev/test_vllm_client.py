@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from codeintel_rev.config.settings import VLLMConfig, VLLMRunMode
+from codeintel_rev.config.api import VLLMSettings
 from codeintel_rev.io.vllm_client import VLLMClient, VLLMTransportContext
 
 if TYPE_CHECKING:
@@ -62,18 +62,18 @@ def _build_transport_context(
     *,
     http_client: httpx.Client | None = None,
     async_client: httpx.AsyncClient | None = None,
-    inprocess_engine_factory: Callable[[VLLMConfig], _StubInprocessEngine] | None = None,
+    inprocess_engine_factory: Callable[[VLLMSettings], _StubInprocessEngine] | None = None,
 ) -> VLLMTransportContext:
     http_instance = cast("httpx.Client", http_client or _FailingHTTPClient())
     async_instance = cast("httpx.AsyncClient", async_client or _FailingAsyncClient())
 
-    def _http_factory(_: VLLMConfig) -> httpx.Client:
+    def _http_factory(_: VLLMSettings) -> httpx.Client:
         return http_instance
 
-    def _async_factory(_: VLLMConfig) -> httpx.AsyncClient:
+    def _async_factory(_: VLLMSettings) -> httpx.AsyncClient:
         return async_instance
 
-    def _inprocess_factory(config: VLLMConfig) -> _StubInprocessEngine:
+    def _inprocess_factory(config: VLLMSettings) -> _StubInprocessEngine:
         if inprocess_engine_factory is not None:
             return inprocess_engine_factory(config)
         message = "Inprocess engine should not be used in this test"
@@ -83,7 +83,7 @@ def _build_transport_context(
         http_client_factory=_http_factory,
         async_client_factory=_async_factory,
         inprocess_embedder_factory=cast(
-            "Callable[[VLLMConfig], InprocessVLLMEmbedder]",
+            "Callable[[VLLMSettings], InprocessVLLMEmbedder]",
             _inprocess_factory,
         ),
     )
@@ -91,11 +91,11 @@ def _build_transport_context(
 
 def test_embed_batch_empty_uses_configured_dimension() -> None:
     """Empty batches should produce arrays with the configured embedding width."""
-    config = VLLMConfig(
+    config = VLLMSettings(
         base_url="http://127.0.0.1:9000/v1",
         model="unit-test",
         embedding_dim=384,
-        run=VLLMRunMode(mode="http"),
+        run_mode="http",
     )
     transport_context = _build_transport_context()
     client = VLLMClient(config, transport_context=transport_context)
@@ -109,11 +109,11 @@ def test_embed_batch_empty_uses_configured_dimension() -> None:
 
 def test_embed_chunks_empty_uses_configured_dimension() -> None:
     """Chunk embedding should bypass network calls when no data is supplied."""
-    config = VLLMConfig(
+    config = VLLMSettings(
         base_url="http://127.0.0.1:9000/v1",
         model="unit-test",
         embedding_dim=128,
-        run=VLLMRunMode(mode="http"),
+        run_mode="http",
     )
     transport_context = _build_transport_context()
     client = VLLMClient(config, transport_context=transport_context)
@@ -132,11 +132,11 @@ def test_embed_chunks_empty_uses_configured_dimension() -> None:
 @pytest.mark.asyncio
 async def test_embed_batch_async_empty_uses_configured_dimension() -> None:
     """Async embedding should return appropriately shaped arrays for empty input."""
-    config = VLLMConfig(
+    config = VLLMSettings(
         base_url="http://127.0.0.1:9000/v1",
         model="unit-test",
         embedding_dim=1024,
-        run=VLLMRunMode(mode="http"),
+        run_mode="http",
     )
     async_client = _FailingAsyncClient()
     transport_context = _build_transport_context(
@@ -154,14 +154,14 @@ async def test_embed_batch_async_empty_uses_configured_dimension() -> None:
 
 def test_vllm_client_inprocess_uses_local_engine() -> None:
     """Local transport should delegate to the in-process embedder."""
-    config = VLLMConfig(
+    config = VLLMSettings(
         model="unit-test",
         embedding_dim=16,
-        run=VLLMRunMode(mode="inprocess"),
+        run_mode="inprocess",
     )
     stub_engine = _StubInprocessEngine(config.embedding_dim)
 
-    def _engine_factory(_: VLLMConfig) -> _StubInprocessEngine:
+    def _engine_factory(_: VLLMSettings) -> _StubInprocessEngine:
         return stub_engine
 
     transport_context = _build_transport_context(inprocess_engine_factory=_engine_factory)

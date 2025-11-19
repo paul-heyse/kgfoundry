@@ -1,3 +1,10 @@
+"""Factory functions for creating test ApplicationContext instances.
+
+This module provides utilities for constructing ApplicationContext instances
+configured for testing, supporting both real repository data and synthetic
+test fixtures based on environment configuration.
+"""
+
 from __future__ import annotations
 
 import os
@@ -24,6 +31,26 @@ _REPO_ROOT_OVERRIDE = os.getenv("KGFOUNDRY_TEST_REPO_ROOT")
 
 
 def _real_paths(repo_root: Path) -> ResolvedPaths:
+    """Resolve application paths using real repository data artifacts.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory containing real data artifacts (FAISS indexes,
+        DuckDB catalogs, SCIP indexes, etc.).
+
+    Returns
+    -------
+    ResolvedPaths
+        Resolved paths pointing to real data artifacts in the repository.
+
+    Raises
+    ------
+    FileNotFoundError
+        If required data artifacts are missing from the repository. The error
+        message lists all missing paths and suggests running the indexing
+        pipeline or disabling real-data mode.
+    """
     data_dir = repo_root / "data"
     vectors_dir = data_dir / "vectors"
     faiss_dir = data_dir / "faiss"
@@ -68,6 +95,21 @@ def _real_paths(repo_root: Path) -> ResolvedPaths:
 
 
 def _synthetic_paths(tmp_path: Path) -> ResolvedPaths:
+    """Create synthetic test paths and directory structure.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory path where synthetic repository structure should
+        be created.
+
+    Returns
+    -------
+    ResolvedPaths
+        Resolved paths pointing to synthetic test fixtures including empty
+        FAISS index files, DuckDB catalog, SCIP index, and configuration
+        directories.
+    """
     repo_root = tmp_path / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
     data_dir = repo_root / "data"

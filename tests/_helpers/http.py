@@ -75,6 +75,20 @@ def build_test_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """FastAPI lifespan context manager for test applications.
+
+        Parameters
+        ----------
+        app : FastAPI
+            FastAPI application instance to configure with context and capabilities.
+
+        Yields
+        ------
+        AsyncIterator[None]
+            Async context manager that sets up the MCP context variable and
+            app state, then yields control. Cleans up the context variable
+            on exit.
+        """
         token = mcp_context.set(context)
         try:
             app.state.context = context
@@ -102,6 +116,13 @@ def build_test_app(
 
     @app.get("/healthz")
     async def healthz() -> JSONResponse:
+        """Health check endpoint for test applications.
+
+        Returns
+        -------
+        JSONResponse
+            JSON response with status "ok" indicating the application is healthy.
+        """
         return JSONResponse({"status": "ok"})
 
     app.mount("/mcp", mcp_app)

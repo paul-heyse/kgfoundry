@@ -17,9 +17,14 @@ from codeintel_rev.cli.indexctl import app as indexctl_app
 from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
     AppConfig,
+    BM25Settings,
+    EmbeddingsSettings,
     FAISSSettings,
     LoggingSettings,
     SearchSettings,
+    SpladeSettings,
+    VLLMSettings,
+    XTRSettings,
 )
 from codeintel_rev.config.api import (
     DuckDBSettings as ApiDuckDBSettings,
@@ -32,7 +37,7 @@ from codeintel_rev.embeddings import EmbeddingProvider
 from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
 from tests._helpers import assertions, cli, constants
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import DEFAULT_XTR_SETTINGS, build_settings_for_repo
 
 
 class _StubProvider:
@@ -198,11 +203,37 @@ def _app_config_with_duckdb(repo_root: Path, duckdb_path: Path) -> AppConfig:
         cache_dir=repo_root / ".cache",
         logs_dir=repo_root / "logs",
     )
+    data_dir = paths_cfg.data_dir
     return AppConfig(
         version=CONFIG_API_VERSION,
         paths=paths_cfg,
         duckdb=ApiDuckDBSettings(database=duckdb_path),
         faiss=FAISSSettings(index_path=repo_root / "faiss.index"),
+        bm25=BM25Settings(
+            corpus_json_dir=data_dir / "bm25_json",
+            index_dir=repo_root / "indexes" / "bm25",
+        ),
+        splade=SpladeSettings(
+            model_dir=repo_root / "models" / "splade",
+            onnx_dir=repo_root / "models" / "splade" / "onnx",
+            onnx_file="model.onnx",
+            vectors_dir=data_dir / "splade_vectors",
+            index_dir=repo_root / "indexes" / "splade",
+            provider="CPUExecutionProvider",
+            quantization=100,
+            max_terms=1000,
+            max_clause_count=2048,
+            batch_size=16,
+            threads=4,
+            enabled=False,
+            max_query_terms=32,
+            prune_below=0.0,
+            analyzer="wordpiece",
+            static_prune_pct=0.0,
+        ),
+        xtr=DEFAULT_XTR_SETTINGS,
+        embeddings=EmbeddingsSettings(),
+        vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
     )

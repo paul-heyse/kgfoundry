@@ -17,11 +17,33 @@ from codeintel_rev.retrieval.types import StageSignals
 
 
 class StageGateCoreResult(Protocol):
-    @property
-    def should_run(self) -> bool: ...
+    """Protocol describing the result of core stage gating logic.
+
+    This protocol defines the interface for gating decisions returned by the
+    core gating function, enabling type-safe interaction with gating results
+    while maintaining compatibility across different gating implementations.
+
+    Attributes
+    ----------
+    should_run : bool
+        Whether the secondary stage should be executed based on the gating
+        decision. True indicates the stage should run, False indicates it
+        should be skipped.
+    reason : object
+        Explanation for the gating decision. Typically a string describing
+        why the stage should or should not run, but can be any object for
+        flexibility in different gating implementations.
+    """
 
     @property
-    def reason(self) -> object: ...
+    def should_run(self) -> bool:
+        """Return whether the secondary stage should run."""
+        ...
+
+    @property
+    def reason(self) -> object:
+        """Return the reason for the gating decision."""
+        ...
 
 
 StageGateCore = Callable[[StageSignals, _CoreStageGateConfig], StageGateCoreResult]
@@ -96,6 +118,19 @@ def _normalize_signals(signals: Mapping[str, object]) -> StageSignals:
     """
 
     def _maybe_float(value: object | None) -> float | None:
+        """Convert a value to float if possible, returning None otherwise.
+
+        Parameters
+        ----------
+        value : object | None
+            Value to convert to float. Can be None, int, float, or other types.
+
+        Returns
+        -------
+        float | None
+            The float representation of the value if it's numeric (int or float),
+            or None if the value is None or cannot be converted to float.
+        """
         if value is None:
             return None
         if isinstance(value, (int, float)):

@@ -102,6 +102,19 @@ class _RuntimeFacade:
         reset: Callable[[], dict[str, object]],
         set_params: Callable[[str], dict[str, object]],
     ) -> None:
+        """Initialize runtime facade with dependency injection callables.
+
+        Parameters
+        ----------
+        describe : Callable[[], dict[str, object]]
+            Function that returns current runtime tuning state and metadata.
+        apply : Callable[[dict[str, object]], dict[str, object]]
+            Function that applies runtime tuning parameters and returns updated state.
+        reset : Callable[[], dict[str, object]]
+            Function that resets runtime tuning to defaults and returns state.
+        set_params : Callable[[str], dict[str, object]]
+            Function that sets runtime parameters from a JSON string and returns state.
+        """
         self._describe = describe
         self._apply = apply
         self._reset = reset

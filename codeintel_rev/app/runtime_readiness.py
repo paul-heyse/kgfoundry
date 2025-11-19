@@ -470,7 +470,7 @@ class ReadinessProbe:
         CheckResult
             Healthy status describing artifact availability.
         """
-        cfg = self._context.settings.xtr
+        cfg = self._context.app_config.xtr
         xtr_dir = self._context.paths.xtr_dir
         token_name = "tokens.f32" if cfg.dtype == "float32" else "tokens.f16"
         token_path = xtr_dir / token_name
@@ -563,9 +563,10 @@ class ReadinessProbe:
         CheckResult
             Result of the probe indicating health and optional detail.
         """
-        mode = getattr(self._context.settings.vllm.run, "mode", "inprocess")
+        vllm_cfg = self._context.app_config.vllm
+        mode = vllm_cfg.run_mode
         if mode == "http":
-            return self._check_vllm_http(self._context.settings.vllm.base_url)
+            return self._check_vllm_http(vllm_cfg.base_url)
         return self._check_vllm_inprocess()
 
     def _check_vllm_inprocess(self) -> CheckResult:

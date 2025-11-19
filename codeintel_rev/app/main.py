@@ -50,7 +50,31 @@ except PackageNotFoundError:
 
 @dataclass(slots=True, frozen=True)
 class AppLifecycleHooks:
-    """Override hooks for application startup/shutdown behavior."""
+    """Override hooks for application startup/shutdown behavior.
+
+    Attributes
+    ----------
+    context_factory : Callable[[ApplicationContextOverrides | None], ApplicationContext] | None, optional
+        Optional factory function for creating ApplicationContext instances.
+        If provided, replaces the default context creation. Used primarily
+        for testing. Defaults to None.
+    faiss_health_check : Callable[[], object] | None, optional
+        Optional function for performing FAISS health checks. If provided,
+        replaces the default health check. Used primarily for testing.
+        Defaults to None.
+    readiness_probe_factory : Callable[[ApplicationContext], ReadinessProbe] | None, optional
+        Optional factory function for creating ReadinessProbe instances. If
+        provided, replaces the default probe creation. Used primarily for testing.
+        Defaults to None.
+    env_flag_resolver : Callable[[str], bool] | None, optional
+        Optional function for resolving environment flag values. If provided,
+        replaces the default environment variable lookup. Used primarily for
+        testing. Defaults to None.
+    shutdown_observer : Callable[[ApplicationContext], None] | None, optional
+        Optional callback function invoked during application shutdown. If
+        provided, called with the ApplicationContext before shutdown. Used
+        for cleanup and resource management. Defaults to None.
+    """
 
     context_factory: Callable[[ApplicationContextOverrides | None], ApplicationContext] | None = (
         None
@@ -66,7 +90,22 @@ _APP_HOOKS_STACK: list[AppLifecycleHooks] = [AppLifecycleHooks()]
 
 @contextmanager
 def override_app_hooks(**kwargs: object) -> Iterator[None]:
-    """Temporarily override application lifecycle hooks (tests only)."""
+    """Temporarily override application lifecycle hooks (tests only).
+
+    Parameters
+    ----------
+    **kwargs : object
+        Keyword arguments matching fields of AppLifecycleHooks to override.
+        Supported fields include context_factory, faiss_health_check,
+        readiness_probe_factory, env_flag_resolver, and shutdown_observer.
+
+    Yields
+    ------
+    Iterator[None]
+        Context manager that temporarily overrides hooks. The override is
+        pushed onto a stack and popped when the context exits, restoring
+        the previous hooks configuration.
+    """
     hooks = replace(_APP_HOOKS_STACK[-1], **kwargs)
     _APP_HOOKS_STACK.append(hooks)
     try:
@@ -183,7 +222,17 @@ def _client_address(request: Request) -> str:
 
 
 def _log_request_summary(request: Request, *, status_code: int, duration_ms: int) -> None:
-    """Emit a structured log describing a completed HTTP request."""
+    """Emit a structured log describing a completed HTTP request.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request object containing request metadata and state.
+    status_code : int
+        HTTP status code returned for the request.
+    duration_ms : int
+        Request duration in milliseconds, measured from request start to completion.
+    """
 
 
 def _stream_log_extra(
@@ -198,19 +247,20 @@ def _stream_log_extra(
     Parameters
     ----------
     request : Request
-        FastAPI request object containing request state and URL path.
+        FastAPI request object containing request metadata and state.
     stream_name : str
-        Name identifier for the stream being logged.
+        Name identifier for the stream (e.g., "sse", "chunked").
     stage : str
-        Lifecycle stage identifier (e.g., "open", "flush", "closed").
-    chunk_bytes : int | None
-        Optional byte count for the chunk being processed. Defaults to None.
+        Lifecycle stage identifier (e.g., "start", "chunk", "end").
+    chunk_bytes : int | None, optional
+        Optional size of the current chunk in bytes. If None, chunk size
+        is not included in the metadata. Defaults to None.
 
     Returns
     -------
     dict[str, object]
-        Dictionary containing request_id, path, stream name, stage, and optional
-        chunk_bytes for structured logging.
+        Dictionary containing structured logging metadata including request
+        identity, stream name, stage, and optional chunk size.
     """
     metadata: dict[str, object] = {
         "request_id": getattr(request.state, "request_id", None),
@@ -284,7 +334,14 @@ def _resolve_proxy_trusted_hops() -> int:
 
 
 async def _preload_faiss_if_configured(context: ApplicationContext) -> None:
-    """Preload FAISS indexes when configured to do so."""
+    """Preload FAISS indexes when configured to do so.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing FAISS manager and settings. The function
+        checks settings.index.faiss_preload to determine if preloading should occur.
+    """
     if not context.settings.index.faiss_preload:
         return
     preload_success = await asyncio.to_thread(_preload_faiss_index, context)
@@ -293,7 +350,14 @@ async def _preload_faiss_if_configured(context: ApplicationContext) -> None:
 
 
 def _preload_xtr_if_configured(context: ApplicationContext) -> None:
-    """Preload XTR runtime when toggle is enabled."""
+    """Preload XTR runtime when toggle is enabled.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing XTR manager. The function checks the
+        XTR_PRELOAD environment flag to determine if preloading should occur.
+    """
     if not _env_flag("XTR_PRELOAD"):
         return
     try:
@@ -305,7 +369,14 @@ def _preload_xtr_if_configured(context: ApplicationContext) -> None:
 
 
 def _preload_hybrid_if_configured(context: ApplicationContext) -> None:
-    """Preload HybridSearchEngine when toggle is enabled."""
+    """Preload HybridSearchEngine when toggle is enabled.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing hybrid search engine. The function checks
+        the HYBRID_PRELOAD environment flag to determine if preloading should occur.
+    """
     if not _env_flag("HYBRID_PRELOAD"):
         return
     try:
@@ -423,7 +494,16 @@ async def _shutdown_context(
     context: ApplicationContext | None,
     readiness: ReadinessProbe | None,
 ) -> None:
-    """Shut down mutable runtimes and readiness probes."""
+    """Shut down mutable runtimes and readiness probes.
+
+    Parameters
+    ----------
+    context : ApplicationContext | None
+        Application context to shut down. If None, no context shutdown is performed.
+        The function closes all runtimes and scope store if present.
+    readiness : ReadinessProbe | None
+        Readiness probe to shut down. If None, no readiness shutdown is performed.
+    """
     hooks = _APP_HOOKS_STACK[-1]
     if context is not None:
         if hooks.shutdown_observer is not None:

@@ -40,7 +40,14 @@ _OUTLINE_QUERY_CACHE: dict[str, QueryProtocol | None] = {}
 
 @dataclass(slots=True, frozen=True)
 class OutlineConfig:
-    """Configuration toggles for outline generation."""
+    """Configuration toggles for outline generation.
+
+    Attributes
+    ----------
+    use_ts_query : bool, optional
+        Whether to use Tree-sitter queries for outline extraction. If False,
+        uses AST traversal. Defaults to _USE_TS_QUERY constant value.
+    """
 
     use_ts_query: bool = _USE_TS_QUERY
 
@@ -141,7 +148,19 @@ def _lang_for_ext(ext: str) -> tuple[str, Language] | None:
 
 @dataclass(slots=True, frozen=True)
 class OutlineNode:
-    """Serializable view of a function/class definition."""
+    """Serializable view of a function/class definition.
+
+    Attributes
+    ----------
+    kind : str
+        Node kind identifier (e.g., "function", "class", "method").
+    name : str
+        Name of the function, class, or method.
+    start_byte : int
+        Starting byte offset of the node in the source file.
+    end_byte : int
+        Ending byte offset of the node in the source file (exclusive).
+    """
 
     kind: str
     name: str
@@ -151,7 +170,16 @@ class OutlineNode:
 
 @dataclass(slots=True, frozen=True)
 class TSOutline:
-    """Bundle of outline nodes plus the originating Tree-sitter language."""
+    """Bundle of outline nodes plus the originating Tree-sitter language.
+
+    Attributes
+    ----------
+    language : str
+        Tree-sitter language identifier (e.g., "python", "json", "yaml").
+    nodes : list[OutlineNode], optional
+        List of outline nodes extracted from the source file. Empty list if
+        no nodes were found. Defaults to empty list.
+    """
 
     language: str
     nodes: list[OutlineNode] = field(default_factory=list)

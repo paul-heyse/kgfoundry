@@ -12,7 +12,17 @@ from pathlib import Path
 
 @dataclass(slots=True, frozen=True)
 class TypeFileSummary:
-    """Aggregated type-checker results for a single file."""
+    """Aggregated type-checker results for a single file.
+
+    Attributes
+    ----------
+    file : str
+        File path relative to repository root.
+    error_count : int, optional
+        Number of type errors reported for this file. Defaults to 0.
+    notes : list[str], optional
+        List of note messages from the type checker. Defaults to empty list.
+    """
 
     file: str
     error_count: int = 0
@@ -21,7 +31,14 @@ class TypeFileSummary:
 
 @dataclass(slots=True, frozen=True)
 class TypeSummary:
-    """Mapping of file path → :class:`TypeFileSummary`."""
+    """Mapping of file path → :class:`TypeFileSummary`.
+
+    Attributes
+    ----------
+    by_file : dict[str, TypeFileSummary], optional
+        Dictionary mapping file paths to their type summary. Empty dictionary
+        if no type summaries are available. Defaults to empty dictionary.
+    """
 
     by_file: dict[str, TypeFileSummary] = field(default_factory=dict)
 

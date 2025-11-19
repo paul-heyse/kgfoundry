@@ -35,7 +35,23 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True, frozen=True)
 class CollectorConfig:
-    """Configurable knobs for CST extraction."""
+    """Configurable knobs for CST extraction.
+
+    Attributes
+    ----------
+    max_preview_chars : int, optional
+        Maximum number of characters to include in text previews. Longer
+        previews are truncated. Defaults to 120.
+    max_doc_chars : int, optional
+        Maximum number of characters to include in docstring snippets. Longer
+        docstrings are truncated. Defaults to 240.
+    max_parent_depth : int, optional
+        Maximum depth of parent node hierarchy to track. Deeper hierarchies
+        are truncated. Must be positive. Defaults to 8.
+    text_preview_skip_bytes : int, optional
+        Skip text preview generation for nodes larger than this size (in bytes).
+        Used to avoid memory issues with very large nodes. Defaults to 2_000_000.
+    """
 
     max_preview_chars: int = 120
     max_doc_chars: int = 240

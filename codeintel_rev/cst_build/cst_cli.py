@@ -23,7 +23,30 @@ from codeintel_rev.cst_build.cst_serialize import DatasetWriter, write_index, wr
 
 @dataclass(slots=True, frozen=True)
 class CLIOptions:
-    """Normalized command-line options."""
+    """Normalized command-line options.
+
+    Attributes
+    ----------
+    root : Path
+        Repository root directory to scan for Python files.
+    scip : Path
+        Path to the SCIP index file for symbol resolution and stitching.
+    modules : Path
+        Path to the modules.jsonl file containing module metadata for stitching.
+    out : Path
+        Output directory path where CST dataset files will be written.
+    include : tuple[str, ...]
+        Glob patterns for files to include. Empty tuple means include all files.
+    exclude : tuple[str, ...]
+        Glob patterns for files to exclude. Files matching any pattern are skipped.
+    limit : int | None
+        Maximum number of files to process. None means no limit.
+    fail_on_parse_error : bool
+        Whether to raise an exception when a file fails to parse. If False,
+        parse errors are logged but processing continues.
+    debug_joins : bool
+        Whether to enable debug logging for stitching/join operations.
+    """
 
     root: Path
     scip: Path

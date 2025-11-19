@@ -4,12 +4,27 @@ from __future__ import annotations
 
 from typing import Final
 
-from codeintel_rev.config.api import AppConfig, DuckDBSettings, FAISSSettings, SearchSettings
+from codeintel_rev.config.api import (
+    AppConfig,
+    BM25Settings,
+    DuckDBSettings,
+    EmbeddingsSettings,
+    FAISSSettings,
+    SearchSettings,
+    SpladeSettings,
+    VLLMSettings,
+    XTRSettings,
+)
 
 __all__: Final = [
+    "bm25_settings",
     "duckdb_settings",
+    "embeddings_settings",
     "faiss_settings",
     "search_settings",
+    "splade_settings",
+    "vllm_settings",
+    "xtr_settings",
 ]
 
 
@@ -59,3 +74,83 @@ def search_settings(cfg: AppConfig) -> SearchSettings:
         Hybrid retrieval weighting parameters.
     """
     return cfg.search
+
+
+def splade_settings(cfg: AppConfig) -> SpladeSettings:
+    """Return SPLADE settings from the supplied config.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
+
+    Returns
+    -------
+    SpladeSettings
+        SPLADE-specific configuration block.
+    """
+    return cfg.splade
+
+
+def bm25_settings(cfg: AppConfig) -> BM25Settings:
+    """Return BM25 settings from the supplied config.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
+
+    Returns
+    -------
+    BM25Settings
+        BM25-specific configuration segment.
+    """
+    return cfg.bm25
+
+
+def embeddings_settings(cfg: AppConfig) -> EmbeddingsSettings:
+    """Return embedding provider settings from the supplied config.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
+
+    Returns
+    -------
+    EmbeddingsSettings
+        Embedding provider configuration segment.
+    """
+    return cfg.embeddings
+
+
+def vllm_settings(cfg: AppConfig) -> VLLMSettings:
+    """Return vLLM settings from the supplied config.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
+
+    Returns
+    -------
+    VLLMSettings
+        vLLM-specific configuration segment.
+    """
+    return cfg.vllm
+
+
+def xtr_settings(cfg: AppConfig) -> XTRSettings:
+    """Return XTR settings from the supplied config.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
+
+    Returns
+    -------
+    XTRSettings
+        XTR-specific configuration segment.
+    """
+    return cfg.xtr

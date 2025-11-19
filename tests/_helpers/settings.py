@@ -10,9 +10,14 @@ import msgspec
 from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
     AppConfig,
+    BM25Settings,
+    EmbeddingsSettings,
     FAISSSettings,
     LoggingSettings,
     SearchSettings,
+    SpladeSettings,
+    VLLMSettings,
+    XTRSettings,
 )
 from codeintel_rev.config.api import (
     DuckDBSettings as ApiDuckDBSettings,
@@ -22,6 +27,18 @@ from codeintel_rev.config.api import (
 )
 from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings, load_settings
+
+
+DEFAULT_XTR_SETTINGS = XTRSettings(
+    model_id="nomic-ai/CodeRankEmbed",
+    device="cuda",
+    max_query_tokens=256,
+    candidate_k=200,
+    dim=768,
+    dtype="float16",
+    enable=False,
+    mode="narrow",
+)
 
 
 def build_settings_for_repo(
@@ -122,11 +139,42 @@ def build_app_config_from_paths(paths: ResolvedPaths) -> AppConfig:
     )
     duck_cfg = ApiDuckDBSettings(database=paths.duckdb_path)
     faiss_cfg = FAISSSettings(index_path=paths.faiss_index)
+    bm25_cfg = BM25Settings(
+        corpus_json_dir=paths.data_dir / "bm25_json",
+        index_dir=paths.lucene_dir / "bm25",
+    )
+    embeddings_cfg = EmbeddingsSettings()
+    vllm_cfg = VLLMSettings()
+    xtr_cfg = DEFAULT_XTR_SETTINGS
+    splade_cfg = SpladeSettings(
+        model_id="naver/splade-v3",
+        model_dir=paths.repo_root / "models" / "splade-v3",
+        onnx_dir=paths.repo_root / "models" / "splade-v3" / "onnx",
+        onnx_file="model_qint8.onnx",
+        vectors_dir=paths.data_dir / "splade_vectors",
+        index_dir=paths.repo_root / "indexes" / "splade_v3_impact",
+        provider="CPUExecutionProvider",
+        quantization=100,
+        max_terms=3000,
+        max_clause_count=4096,
+        batch_size=32,
+        threads=8,
+        enabled=True,
+        max_query_terms=64,
+        prune_below=0.0,
+        analyzer="wordpiece",
+        static_prune_pct=0.0,
+    )
     return AppConfig(
         version=CONFIG_API_VERSION,
         paths=paths_cfg,
         duckdb=duck_cfg,
         faiss=faiss_cfg,
+        bm25=bm25_cfg,
+        splade=splade_cfg,
+        xtr=xtr_cfg,
+        embeddings=embeddings_cfg,
+        vllm=vllm_cfg,
         search=SearchSettings(),
         logging=LoggingSettings(),
     )
@@ -156,4 +204,9 @@ def scaffold_repo_root(repo_root: Path) -> None:
         config_file.write_text("tests: true", encoding="utf-8")
 
 
-__all__ = ["build_app_config_from_paths", "build_settings_for_repo", "scaffold_repo_root"]
+__all__ = [
+    "build_app_config_from_paths",
+    "build_settings_for_repo",
+    "DEFAULT_XTR_SETTINGS",
+    "scaffold_repo_root",
+]

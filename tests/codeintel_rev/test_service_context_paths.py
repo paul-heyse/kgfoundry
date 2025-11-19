@@ -13,9 +13,14 @@ from codeintel_rev.app.config_context import (
 from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
     AppConfig,
+    BM25Settings,
+    EmbeddingsSettings,
     FAISSSettings,
     LoggingSettings,
     SearchSettings,
+    SpladeSettings,
+    VLLMSettings,
+    XTRSettings,
 )
 from codeintel_rev.config.api import (
     DuckDBSettings as ApiDuckDBSettings,
@@ -32,7 +37,7 @@ from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server import service_context
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import DEFAULT_XTR_SETTINGS, build_settings_for_repo
 
 
 class RecordingFAISSManager:
@@ -173,6 +178,31 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
         ),
         duckdb=ApiDuckDBSettings(database=expected_duckdb_path),
         faiss=FAISSSettings(index_path=expected_faiss_path),
+        bm25=BM25Settings(
+            corpus_json_dir=repo_root / "data" / "bm25_json",
+            index_dir=repo_root / "indexes" / "bm25",
+        ),
+        splade=SpladeSettings(
+            model_dir=repo_root / "models" / "splade",
+            onnx_dir=repo_root / "models" / "splade" / "onnx",
+            onnx_file="model.onnx",
+            vectors_dir=repo_root / "vectors",
+            index_dir=repo_root / "indexes" / "splade",
+            provider="CPUExecutionProvider",
+            quantization=100,
+            max_terms=1000,
+            max_clause_count=4096,
+            batch_size=16,
+            threads=4,
+            enabled=False,
+            max_query_terms=32,
+            prune_below=0.0,
+            analyzer="wordpiece",
+            static_prune_pct=0.0,
+        ),
+        xtr=DEFAULT_XTR_SETTINGS,
+        embeddings=EmbeddingsSettings(),
+        vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
     )
@@ -243,6 +273,31 @@ def test_merge_paths_with_app_config_overrides_duckdb_and_faiss(tmp_path: Path) 
         ),
         duckdb=ApiDuckDBSettings(database=custom_duckdb),
         faiss=FAISSSettings(index_path=custom_faiss),
+        bm25=BM25Settings(
+            corpus_json_dir=repo_root / "data" / "bm25_json",
+            index_dir=repo_root / "indexes" / "bm25",
+        ),
+        splade=SpladeSettings(
+            model_dir=repo_root / "models" / "splade",
+            onnx_dir=repo_root / "models" / "splade" / "onnx",
+            onnx_file="model.onnx",
+            vectors_dir=repo_root / "vectors",
+            index_dir=repo_root / "indexes" / "splade",
+            provider="CPUExecutionProvider",
+            quantization=100,
+            max_terms=1000,
+            max_clause_count=4096,
+            batch_size=16,
+            threads=4,
+            enabled=False,
+            max_query_terms=32,
+            prune_below=0.0,
+            analyzer="wordpiece",
+            static_prune_pct=0.0,
+        ),
+        xtr=DEFAULT_XTR_SETTINGS,
+        embeddings=EmbeddingsSettings(),
+        vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
     )

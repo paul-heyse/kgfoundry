@@ -53,20 +53,23 @@ def load_overlay_options(config_path: Path | None, overrides: list[str]) -> Over
 
     Parameters
     ----------
-    config_path :
-        Optional path to a JSON/YAML config file.
-    overrides :
-        CLI ``KEY=VALUE`` overrides.
+    config_path : Path | None, optional
+        Optional path to a JSON/YAML config file containing overlay options.
+        If None, only CLI overrides are applied.
+    overrides : list[str]
+        CLI ``KEY=VALUE`` overrides that take precedence over config file
+        values. Each override must be in the format "KEY=VALUE".
 
     Returns
     -------
     OverlayCLIOptions
-        Fully resolved overlay options.
+        Fully resolved overlay options with config file values merged with
+        CLI overrides.
 
     Raises
     ------
     typer.BadParameter
-        Raised when overrides cannot be parsed.
+        Raised when overrides cannot be parsed or are in invalid format.
     """
     options = OverlayCLIOptions()
     if config_path is not None:
@@ -85,6 +88,12 @@ def load_overlay_options(config_path: Path | None, overrides: list[str]) -> Over
 def read_overlay_config(path: Path) -> Mapping[str, Any]:
     """Parse overlay config supporting YAML or JSON.
 
+    Parameters
+    ----------
+    path : Path
+        Path to the configuration file. Supports .yaml, .yml, and .json
+        extensions.
+
     Returns
     -------
     Mapping[str, Any]
@@ -93,7 +102,8 @@ def read_overlay_config(path: Path) -> Mapping[str, Any]:
     Raises
     ------
     typer.BadParameter
-        Raised when parsing fails or payload is invalid.
+        Raised when parsing fails, payload is invalid, PyYAML is required
+        but missing for YAML files, or the config is not a mapping.
     """
     payload = path.read_text(encoding="utf-8")
     suffix = path.suffix.lower()
@@ -221,10 +231,24 @@ def _parse_path_option(raw_value: object, *, option: str) -> Path:
 def set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: object) -> None:
     """Update overlay CLI options with validated values.
 
+    Parameters
+    ----------
+    options : OverlayCLIOptions
+        Overlay options object to update in place.
+    key : str
+        Option name to set. Case-insensitive, supports options like
+        "stubs_root", "overlays_root", "min_errors", "max_overlays",
+        "include_public_defs", "inject_getattr_any", "dry_run", "activate",
+        "deactivate_all_first", "type_error_overlays".
+    raw_value : object
+        Raw value to parse and set. Type depends on the option (Path for
+        path options, int for integer options, bool for boolean options).
+
     Raises
     ------
     typer.BadParameter
-        Raised when the override cannot be parsed.
+        Raised when the override cannot be parsed, the option name is unknown,
+        or the value type is incompatible with the option.
     """
     attr = key.strip().lower()
     if attr in {"stubs_root", "overlays_root"}:
@@ -253,10 +277,19 @@ def set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: object) 
 def load_overlay_tagged_paths(out_dir: Path, overlay_tag: str) -> frozenset[str]:
     """Return cached overlay-needed paths from ``tags_index.yaml``.
 
+    Parameters
+    ----------
+    out_dir : Path
+        Output directory containing the tags subdirectory with tags_index.yaml.
+    overlay_tag : str
+        Tag name to look up in the tags index. If empty, returns empty set.
+
     Returns
     -------
     frozenset[str]
-        Paths previously marked with ``overlay_tag``.
+        Paths previously marked with ``overlay_tag``. Returns empty set if
+        the tag is empty, tags file doesn't exist, YAML module is unavailable,
+        or parsing fails.
     """
     if not overlay_tag:
         return frozenset()
@@ -281,15 +314,24 @@ def build_overlay_context(
 ) -> OverlayContext:
     """Construct overlay context using pipeline inputs.
 
+    Parameters
+    ----------
+    pipeline : PipelineOptions
+        Pipeline configuration options including SCIP index path, repository
+        root, and other pipeline settings.
+    options : OverlayCLIOptions
+        Overlay-specific CLI options including paths, thresholds, and flags.
+
     Returns
     -------
     OverlayContext
-        Aggregated context objects for overlay generation.
+        Aggregated context objects for overlay generation including SCIP index,
+        type signals, module records, and overlay configuration.
 
     Raises
     ------
     typer.BadParameter
-        Raised when the ``--scip`` path is missing.
+        Raised when the ``--scip`` path is missing from pipeline options.
     """
     if pipeline.scip is None:
         message = "The --scip option is required for overlay generation."
@@ -350,10 +392,35 @@ def ensure_package_overlays(  # noqa: PLR0913
 ) -> bool:
     """Ensure package ``__init__`` overlays exist for ancestors of ``rel_path``.
 
+    Parameters
+    ----------
+    rel_path : Path
+        Relative path to the file requiring overlays. Ancestor package
+        directories are traversed upward from this path.
+    generated : list[str]
+        Mutable list accumulating generated overlay file paths (modified in place).
+    generated_set : set[str]
+        Set tracking already generated overlay paths for deduplication.
+    manifest_entries : list[str]
+        Mutable list accumulating manifest entries for generated overlays.
+    package_name : str
+        Package name used for overlay generation.
+    package_overlays : set[str]
+        Mutable set tracking package-level overlay paths that have been created.
+    root : Path
+        Repository root directory for absolute path resolution.
+    scip_index : SCIPIndex
+        SCIP index for symbol lookup during overlay generation.
+    policy : OverlayPolicy
+        Overlay generation policy including thresholds and configuration.
+    type_error_counts : Mapping[str, int]
+        Mapping of file paths to type error counts used for overlay decisions.
+
     Returns
     -------
     bool
-        ``True`` when the overlay budget is exhausted.
+        ``True`` when the overlay budget is exhausted (max_overlays limit reached),
+        ``False`` otherwise.
     """
     current = rel_path.parent
     root_marker = Path()

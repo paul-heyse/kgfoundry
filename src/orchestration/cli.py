@@ -127,7 +127,17 @@ class ArtifactFS(Protocol):
 
 @dataclass(frozen=True)
 class BM25BuildConfig:
-    """Configuration for BM25 index builds."""
+    """Configuration for BM25 index builds.
+
+    Attributes
+    ----------
+    chunks_path : str
+        Path to the chunks JSONL file containing documents to index.
+    backend : str
+        Backend identifier for BM25 implementation (e.g., "lucene", "pure").
+    index_dir : str
+        Output directory path where the BM25 index will be built.
+    """
 
     chunks_path: str
     backend: str
@@ -136,7 +146,23 @@ class BM25BuildConfig:
 
 @dataclass(slots=True, frozen=True)
 class _CommandContext:
-    """Structured context shared across a single command invocation."""
+    """Structured context shared across a single command invocation.
+
+    Attributes
+    ----------
+    subcommand : str
+        Name of the CLI subcommand being executed (e.g., "e2e", "build").
+    operation_id : str
+        Unique identifier for this command execution. Used for tracking
+        and correlation in logs and envelopes.
+    correlation_id : str
+        Correlation identifier for grouping related operations across
+        multiple commands or services.
+    start : float
+        Timestamp when the command started (from time.time()).
+    envelope_dir : Path
+        Directory path where CLI envelopes will be written for this command.
+    """
 
     subcommand: str
     operation_id: str
@@ -169,7 +195,23 @@ class _CommandContext:
 
 @dataclass(slots=True, frozen=True)
 class OrchestrationCliContext:
-    """Dependency injection context for orchestration CLI commands."""
+    """Dependency injection context for orchestration CLI commands.
+
+    Attributes
+    ----------
+    uuid_factory : Callable[[], str]
+        Factory function that generates unique identifiers. Returns a string
+        UUID suitable for operation and correlation IDs.
+    bm25_builder : Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]]
+        Factory function that builds BM25 indexes. Takes configuration and
+        logger, returns tuple of (index_path, doc_count).
+    faiss_runner : Callable[[IndexCliConfig], dict[str, object]]
+        Factory function that runs FAISS index builds. Takes index configuration,
+        returns dictionary with build metadata.
+    artifact_fs : ArtifactFS
+        Filesystem abstraction for reading and writing CLI artifacts.
+        Used for envelope persistence and artifact management.
+    """
 
     uuid_factory: Callable[[], str]
     bm25_builder: Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]]
@@ -2022,12 +2064,51 @@ def _run_e2e_flow() -> list[str]:
 def e2e(ctx: typer.Context) -> None:
     """Execute the Prefect-powered end-to-end orchestration pipeline.
 
+    Extended Summary
+    ----------------
+    This command orchestrates the complete knowledge graph construction pipeline
+    using Prefect workflows, enabling comprehensive testing and production
+    deployment. It integrates with the shared CLI envelope system to emit
+    structured metadata for downstream tooling and monitoring. The function
+    delegates to the conditionally imported e2e_flow function, which executes
+    all pipeline stages sequentially and reports progress through stage names.
+
+    Parameters
+    ----------
+    ctx : typer.Context
+        Typer context containing shared CLI state, configuration, and
+        command-line arguments. Used to initialize the CLI envelope builder
+        and correlation context for observability.
+
+
     Raises
     ------
     typer.Exit
-        Raised with a non-zero exit code when the pipeline cannot be executed
-        (for example, Prefect is not installed). The envelope captures the
-        associated Problem Details payload.
+        Raised with exit code 1 when the pipeline cannot be executed (for
+        example, Prefect is not installed or a RuntimeError occurs during
+        flow execution). The CLI envelope captures the associated Problem
+        Details payload for downstream tooling.
+
+    Notes
+    -----
+    • Side effects: Writes CLI envelopes to stdout via render_cli_envelope,
+      emits stage progress messages via typer.echo, and may raise typer.Exit
+      to terminate the process with a non-zero exit code.
+    • Dependencies: Requires Prefect to be installed (via `pip install -e '.[gpu]'`
+      or manual installation). The e2e_flow function is conditionally imported
+      and will be None if Prefect is unavailable.
+    • Error handling: RuntimeError exceptions from _run_e2e_flow are caught,
+      converted to Problem Details format, and emitted via CLI envelope before
+      raising typer.Exit(code=1).
+    • Observability: Each execution generates a correlation context via
+      _start_command and records stage progress in the CLI envelope builder.
+
+    Examples
+    --------
+    >>> # This function is a Typer CLI command and cannot be called directly
+    >>> # It is invoked via: orchestration e2e
+    >>> # Successful execution emits stage names and a success envelope
+    >>> # Failed execution emits an error envelope and exits with code 1
     """
     context, builder = _start_command(ctx, SUBCOMMAND_E2E)
     try:

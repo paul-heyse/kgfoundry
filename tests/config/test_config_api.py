@@ -8,14 +8,18 @@ from pathlib import Path
 import pytest
 from codeintel_rev.config.api import (
     AppConfig,
+    BM25Settings,
     DuckDBSettings,
+    EmbeddingsSettings,
     FAISSSettings,
     LoggingSettings,
     PathsConfig,
     SearchSettings,
     SpladeSettings,
+    VLLMSettings,
     validate_config,
 )
+from tests._helpers.settings import DEFAULT_XTR_SETTINGS
 
 
 def _make_config(tmp_path: Path) -> AppConfig:
@@ -31,6 +35,19 @@ def _make_config(tmp_path: Path) -> AppConfig:
     faiss = FAISSSettings(index_path=repo_root / "index.faiss")
     search = SearchSettings()
     logging_cfg = LoggingSettings()
+    bm25 = BM25Settings(
+        corpus_json_dir=repo_root / "bm25_json",
+        index_dir=repo_root / "bm25_index",
+        threads=4,
+        enabled=True,
+        k1=0.9,
+        b=0.4,
+        rm3_enabled=False,
+        rm3_fb_docs=10,
+        rm3_fb_terms=10,
+        rm3_original_query_weight=0.5,
+        analyzer="code",
+    )
     splade = SpladeSettings(
         model_id="splade-model",
         model_dir=repo_root / "models",
@@ -50,12 +67,46 @@ def _make_config(tmp_path: Path) -> AppConfig:
         analyzer="wordpiece",
         static_prune_pct=0.0,
     )
+    xtr = DEFAULT_XTR_SETTINGS
+    embeddings = EmbeddingsSettings(
+        provider="hf",
+        model_name="hf/model",
+        device="cpu",
+        batch_size=32,
+        micro_batch_size=16,
+        normalize=False,
+        max_tokens=2048,
+        max_sequence_chars=4096,
+        retry_max_attempts=2,
+        retry_backoff_ms=100,
+        max_pending_batches=4,
+        max_wait_ms=5,
+        allow_hf_fallback=False,
+    )
+    vllm = VLLMSettings(
+        base_url="http://localhost:9000/v1",
+        model="nomic-ai/nomic-embed-code",
+        batch_size=32,
+        embedding_dim=1024,
+        timeout_s=30.0,
+        run_mode="http",
+        memory_utilization=0.8,
+        max_num_batched_tokens=40000,
+        normalize=True,
+        embedding_mode="MEAN",
+        max_concurrent_requests=2,
+        task="embed",
+    )
     return AppConfig(
         version="1.0",
         paths=paths,
         duckdb=duckdb,
         faiss=faiss,
+        bm25=bm25,
         splade=splade,
+        xtr=xtr,
+        embeddings=embeddings,
+        vllm=vllm,
         search=search,
         logging=logging_cfg,
     )
@@ -83,3 +134,15 @@ def test_validate_config_rejects_invalid_values(tmp_path: Path) -> None:
     bad_search = replace(cfg, search=replace(cfg.search, max_results=0))
     with pytest.raises(ValueError, match="search\\.max_results"):
         validate_config(bad_search)
+    bad_embed = replace(cfg, embeddings=replace(cfg.embeddings, batch_size=0))
+    with pytest.raises(ValueError, match="embeddings\\.batch_size"):
+        validate_config(bad_embed)
+    bad_vllm = replace(cfg, vllm=replace(cfg.vllm, batch_size=0))
+    with pytest.raises(ValueError, match="vllm\\.batch_size"):
+        validate_config(bad_vllm)
+    bad_bm25 = replace(cfg, bm25=replace(cfg.bm25, threads=0))
+    with pytest.raises(ValueError, match="bm25\\.threads"):
+        validate_config(bad_bm25)
+    bad_xtr = replace(cfg, xtr=replace(cfg.xtr, dim=0))
+    with pytest.raises(ValueError, match="xtr\\.dim"):
+        validate_config(bad_xtr)

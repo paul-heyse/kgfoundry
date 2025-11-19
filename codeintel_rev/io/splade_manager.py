@@ -15,22 +15,44 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, TextIO, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Protocol, TextIO, TypedDict, Unpack, cast
 
 import msgspec
 import numpy as np
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.config.api import AppConfig, SpladeSettings
 from codeintel_rev.io.path_utils import resolve_within_repo
 from codeintel_rev.io.splade_engine import SPLADEEngine
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.subprocess_utils import run_subprocess
 
+class _ImpactHit(Protocol):
+    """Protocol describing SPLADE search hits."""
+
+    docid: str | int
+    score: float
+
+
+class _EncoderProtocol(Protocol):
+    """Protocol describing the encoder exposed by the searcher."""
+
+    def encode(self, text: str) -> Sequence[float] | NDArrayF32:
+        """Encode text into sparse vector representation."""
+        ...
+
+
+class _LuceneImpactSearcherProtocol(Protocol):
+    """Protocol describing the Pyserini Lucene impact searcher surface we use."""
+
+    encoder: _EncoderProtocol | None
+
+    def search(self, query: str, k: int) -> Sequence[_ImpactHit]:
+        """Return top-k SPLADE hits for the supplied query."""
+        ...
+
+
 if TYPE_CHECKING:
-    from typing import Protocol
-
-    from codeintel_rev.config.settings import Settings
-
     class _SparseEncoderProtocol(Protocol):
         """Protocol defining the interface for SPLADE sparse encoders.
 
@@ -322,14 +344,29 @@ _lucene_search = LazyModule("pyserini.search.lucene", "splade impact runtime")
 
 @dataclass(frozen=True, slots=True)
 class SpladeQueryOptions:
-    """Runtime knobs for SPLADE impact search."""
+    """Runtime knobs for SPLADE impact search.
+
+    Attributes
+    ----------
+    top_k : int, optional
+        Maximum number of results to return from SPLADE search. Must be
+        positive. Defaults to 50.
+    """
 
     top_k: int = 50
 
 
 @dataclass(frozen=True, slots=True)
 class SpladeHit:
-    """Typed SPLADE hit row."""
+    """Typed SPLADE hit row.
+
+    Attributes
+    ----------
+    doc_id : int
+        Document/chunk identifier returned by the search.
+    score : float
+        Relevance score for this hit. Higher scores indicate better matches.
+    """
 
     doc_id: int
     score: float
@@ -359,7 +396,7 @@ class SpladeQueryEngine:
         self._index_dir = Path(index_dir).resolve()
         self._encoder = encoder
         self._device = device
-        self._searcher: Any | None = None
+        self._searcher: _LuceneImpactSearcherProtocol | None = None
 
     def search(self, query: str, *, options: SpladeQueryOptions | None = None) -> list[SpladeHit]:
         """Execute SPLADE search and return typed hits.
@@ -433,18 +470,45 @@ class SpladeQueryEngine:
             arr = arr.reshape(1, -1)
         return cast("NDArrayF32", arr)
 
-    def _ensure_searcher(self) -> Any:
+    def _ensure_searcher(self) -> _LuceneImpactSearcherProtocol:
+        """Create or return a cached Lucene impact searcher instance.
+
+        Returns
+        -------
+        object
+            A Pyserini LuceneImpactSearcher instance bound to the index directory
+            and encoder. The searcher is cached after first creation and the encoder
+            device is moved if specified.
+        """
         searcher = self._searcher
         if searcher is not None:
             return searcher
         module = _lucene_search.module()
-        searcher = module.LuceneImpactSearcher(str(self._index_dir), self._encoder)
+        searcher = cast(
+            "_LuceneImpactSearcherProtocol",
+            module.LuceneImpactSearcher(str(self._index_dir), self._encoder),
+        )
         _maybe_move_encoder_device(searcher, self._device)
         self._searcher = searcher
         return searcher
 
 
 def _docid_to_int(docid: str | int) -> int:
+    """Convert a document ID to integer, handling various formats.
+
+    Parameters
+    ----------
+    docid : str | int
+        Document identifier. Can be an integer, a string integer, or a string
+        with "chunk:" prefix. May also contain non-numeric suffixes.
+
+    Returns
+    -------
+    int
+        Integer representation of the document ID. Extracts numeric portion
+        from strings with non-numeric suffixes. Returns -1 if no valid
+        integer can be extracted.
+    """
     text = str(docid).strip()
     if text.startswith("chunk:"):
         text = text.split(":", 1)[1]
@@ -463,7 +527,25 @@ def _docid_to_int(docid: str | int) -> int:
             return -1
 
 
-def _maybe_move_encoder_device(searcher: object, device: str | None) -> None:
+def _maybe_move_encoder_device(
+    searcher: _LuceneImpactSearcherProtocol, device: str | None
+) -> None:
+    """Move encoder to specified device if supported.
+
+    Parameters
+    ----------
+    searcher : object
+        Pyserini searcher instance that may have an encoder attribute.
+    device : str | None
+        Target device name (e.g., "cuda", "cpu"). If None, no operation
+        is performed.
+
+    Notes
+    -----
+    This function attempts to move the encoder to the specified device by
+    calling encoder.to(device). If the encoder doesn't support device
+    movement or an error occurs, the operation is silently ignored.
+    """
     if device is None:
         return
     encoder = getattr(searcher, "encoder", None)
@@ -604,7 +686,26 @@ class SpladeIndexMetadata(msgspec.Struct, frozen=True):
 
 @dataclass(frozen=True)
 class _ShardState:
-    """Mutable encoding state for shard rotation."""
+    """Mutable encoding state for shard rotation.
+
+    Attributes
+    ----------
+    vectors_dir : Path
+        Directory path where vector shard files are written.
+    quantization : int
+        Quantization level for model weights (typically 100 for int8).
+    shard_size : int
+        Maximum number of documents per shard. Must be positive.
+    doc_count : int, optional
+        Current number of documents written to the current shard. Defaults to 0.
+    shard_index : int, optional
+        Current shard index (0-based). Defaults to 0.
+    shard_handle : TextIO | None, optional
+        File handle for the current shard being written. None if no shard is
+        currently open. Defaults to None.
+    shard_count : int, optional
+        Total number of shards created so far. Defaults to 0.
+    """
 
     vectors_dir: Path
     quantization: int
@@ -620,7 +721,23 @@ _SET_SHARD_STATE_ATTR = object.__setattr__
 
 @dataclass(frozen=True)
 class _ExportContext:
-    """Context for SPLADE export operations."""
+    """Context for SPLADE export operations.
+
+    Attributes
+    ----------
+    model_id : str
+        HuggingFace model identifier for the SPLADE model.
+    model_dir : Path
+        Directory path containing the SPLADE PyTorch model files.
+    onnx_dir : Path
+        Directory path where ONNX model files will be written.
+    provider : str
+        Device provider for ONNX execution (e.g., "CPUExecutionProvider").
+    target_path : Path
+        Target file path for the exported ONNX model.
+    options : SpladeExportOptions
+        Export options controlling optimization, quantization, and file naming.
+    """
 
     model_id: str
     model_dir: Path
@@ -740,7 +857,14 @@ def _detect_pyserini_version() -> str:
 
 @dataclass(frozen=True)
 class SpladeEncoderContext:
-    """Dependency provider for acquiring SPLADE encoder classes."""
+    """Dependency provider for acquiring SPLADE encoder classes.
+
+    Attributes
+    ----------
+    encoder_factory : Callable[[], _SparseEncoderFactory]
+        Factory function that returns a SparseEncoder factory. Used for
+        dependency injection in tests.
+    """
 
     encoder_factory: Callable[[], _SparseEncoderFactory]
 
@@ -758,7 +882,19 @@ class SpladeEncoderContext:
 
 @dataclass(frozen=True)
 class SpladeArtifactsContext:
-    """Dependencies for artifact export operations."""
+    """Dependencies for artifact export operations.
+
+    Attributes
+    ----------
+    encoder_context : SpladeEncoderContext
+        Encoder context providing SPLADE encoder factory.
+    export_helpers_factory : Callable[[], tuple[_OptimizerFunction, _QuantizerFunction]]
+        Factory function that returns (optimizer, quantizer) helper functions
+        for ONNX export. Used for dependency injection in tests.
+    clock : Callable[[], datetime]
+        Clock function returning current UTC datetime. Used for timestamping
+        exported artifacts. Used for dependency injection in tests.
+    """
 
     encoder_context: SpladeEncoderContext
     export_helpers_factory: Callable[[], tuple[_OptimizerFunction, _QuantizerFunction]]
@@ -782,7 +918,23 @@ class SpladeArtifactsContext:
 
 @dataclass(frozen=True)
 class SpladeIndexContext:
-    """Dependencies for SPLADE Lucene index builds."""
+    """Dependencies for SPLADE Lucene index builds.
+
+    Attributes
+    ----------
+    subprocess_runner : Callable[[list[str], Mapping[str, str] | None], str]
+        Function that runs subprocess commands and returns stdout. Used for
+        dependency injection in tests.
+    version_provider : Callable[[], str]
+        Function that returns the pyserini version string. Used for dependency
+        injection in tests.
+    directory_size : Callable[[Path], int]
+        Function that computes total size of all files in a directory. Used
+        for dependency injection in tests.
+    clock : Callable[[], datetime]
+        Clock function returning current UTC datetime. Used for timestamping
+        index builds. Used for dependency injection in tests.
+    """
 
     subprocess_runner: Callable[[list[str], Mapping[str, str] | None], str]
     version_provider: Callable[[], str]
@@ -1331,7 +1483,7 @@ class SpladeArtifactsManager:
 
     def __init__(
         self,
-        settings: Settings,
+        app_config: AppConfig,
         *,
         logger_: logging.Logger | None = None,
         artifacts_context: SpladeArtifactsContext | None = None,
@@ -1340,17 +1492,16 @@ class SpladeArtifactsManager:
 
         Parameters
         ----------
-        settings : Settings
-            Application settings containing SPLADE configuration.
+        app_config : AppConfig
+            Application configuration containing SPLADE settings and paths.
         logger_ : logging.Logger | None, optional
             Custom logger instance. If None, uses module logger.
         artifacts_context : SpladeArtifactsContext | None, optional
             Context for artifact management. If None, uses production context.
         """
-        self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
-        self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
-        self._config = settings.splade
+        self._repo_root = Path(app_config.paths.repo_root).expanduser().resolve()
+        self._config: SpladeSettings = app_config.splade
         self._artifacts_context = artifacts_context or SpladeArtifactsContext.production()
 
     @property
@@ -1445,18 +1596,32 @@ class SpladeEncoderService:
 
     def __init__(
         self,
-        settings: Settings,
+        app_config: AppConfig,
         *,
         logger_: logging.Logger | None = None,
         encoder_context: SpladeEncoderContext | None = None,
         timer: Callable[[], float] | None = None,
     ) -> None:
-        self._settings = settings
+        """Initialize SPLADE encoder service.
+
+        Parameters
+        ----------
+        app_config : AppConfig
+            Application configuration containing SPLADE settings and paths.
+        logger_ : logging.Logger | None, optional
+            Custom logger instance. If None, uses module logger.
+        encoder_context : SpladeEncoderContext | None, optional
+            Encoder context for dependency injection. If None, uses production
+            context.
+        timer : Callable[[], float] | None, optional
+            Timer function for performance measurement. If None, uses
+            time.perf_counter.
+        """
         self._logger = logger_ or logging.getLogger(__name__)
         self._encoder_context = encoder_context or SpladeEncoderContext.production()
         self._timer = timer or perf_counter
-        self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
-        self._config = settings.splade
+        self._repo_root = Path(app_config.paths.repo_root).expanduser().resolve()
+        self._config: SpladeSettings = app_config.splade
 
     @property
     def vectors_dir(self) -> Path:
@@ -1749,7 +1914,7 @@ class SpladeIndexManager:
 
     def __init__(
         self,
-        settings: Settings,
+        app_config: AppConfig,
         *,
         logger_: logging.Logger | None = None,
         index_context: SpladeIndexContext | None = None,
@@ -1758,17 +1923,16 @@ class SpladeIndexManager:
 
         Parameters
         ----------
-        settings : Settings
-            Application settings containing SPLADE configuration.
+        app_config : AppConfig
+            Application configuration containing SPLADE settings.
         logger_ : logging.Logger | None, optional
             Custom logger instance. If None, uses module logger.
         index_context : SpladeIndexContext | None, optional
             Context for index management. If None, uses production context.
         """
-        self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
-        self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
-        self._config = settings.splade
+        self._repo_root = Path(app_config.paths.repo_root).expanduser().resolve()
+        self._config: SpladeSettings = app_config.splade
         self._index_context = index_context or SpladeIndexContext.production()
 
     @property

@@ -31,7 +31,13 @@ class SpladeBackend(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class SPLADEEngine:
-    """Narrow SPLADE engine that handles encode/search orchestration only."""
+    """Narrow SPLADE engine that handles encode/search orchestration only.
+
+    Attributes
+    ----------
+    backend : SpladeBackend
+        SPLADE backend implementation providing encoding and search capabilities.
+    """
 
     backend: SpladeBackend
 
@@ -84,7 +90,15 @@ class SPLADEEngine:
 
 @dataclass(frozen=True, slots=True)
 class SpladeImpactBackendConfig:
-    """Configuration bundle for :class:`SpladeImpactBackend`."""
+    """Configuration bundle for :class:`SpladeImpactBackend`.
+
+    Attributes
+    ----------
+    model_dir : Path
+        Directory path containing SPLADE PyTorch model files.
+    onnx_dir : Path
+        Directory path containing ONNX model files for SPLADE encoding.
+    """
 
     model_dir: Path
     onnx_dir: Path
@@ -218,6 +232,22 @@ class SpladeImpactBackend(SpladeBackend):
         return results
 
     def _filter_pairs(self, pairs: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
+        """Filter and prune SPLADE token-weight pairs based on configuration thresholds.
+
+        Parameters
+        ----------
+        pairs : Sequence[tuple[str, float]]
+            Sequence of (token, weight) pairs from SPLADE encoding.
+
+        Returns
+        -------
+        list[tuple[str, float]]
+            Filtered list of (token, weight) pairs after applying pruning thresholds:
+            - Removes pairs with weight <= 0
+            - Removes pairs below prune_below threshold (if configured)
+            - Applies static pruning percentage (if configured)
+            - Limits to max_query_terms (if configured)
+        """
         filtered = [(token, weight) for token, weight in pairs if weight > 0]
         if self._prune_below > 0.0:
             filtered = [
@@ -231,6 +261,20 @@ class SpladeImpactBackend(SpladeBackend):
         return filtered
 
     def _build_bow(self, pairs: Sequence[tuple[str, float]]) -> str:
+        """Build bag-of-words query string from filtered token-weight pairs.
+
+        Parameters
+        ----------
+        pairs : Sequence[tuple[str, float]]
+            Sequence of (token, weight) pairs, typically already filtered.
+
+        Returns
+        -------
+        str
+            Space-separated bag-of-words query string where each token appears
+            a number of times proportional to its quantized weight. The number
+            of repetitions is limited by quantization level and remaining term budget.
+        """
         tokens: list[str] = []
         query_cap = self._max_query_terms or self._max_terms
         remaining = min(self._max_terms, query_cap) if query_cap else self._max_terms
@@ -248,6 +292,22 @@ class SpladeImpactBackend(SpladeBackend):
         return " ".join(tokens)
 
     def _coerce_weighted_input(self, value: SpladeQueryRepresentation) -> str:
+        """Convert SPLADE query representation to weighted query string.
+
+        Parameters
+        ----------
+        value : SpladeQueryRepresentation
+            Query representation in one of three formats:
+            - str: Already a weighted query string (returned as-is)
+            - Mapping[str, float]: Token-weight mapping (converted to weighted string)
+            - NDArrayF32: SPLADE vector (decoded and converted to weighted string)
+
+        Returns
+        -------
+        str
+            Weighted query string suitable for Pyserini impact search. Returns
+            empty string if value cannot be converted or encoder is unavailable.
+        """
         if isinstance(value, str):
             return value
         if isinstance(value, Mapping):
@@ -264,6 +324,19 @@ class SpladeImpactBackend(SpladeBackend):
 
     @staticmethod
     def _mapping_to_weighted(values: Mapping[str, float]) -> str:
+        """Convert token-weight mapping to Pyserini weighted query format.
+
+        Parameters
+        ----------
+        values : Mapping[str, float]
+            Dictionary mapping tokens to their weights.
+
+        Returns
+        -------
+        str
+            Space-separated weighted query string in format "token^weight",
+            where tokens with weight <= 0 are excluded.
+        """
         parts: list[str] = []
         for token, weight in values.items():
             impact = float(weight)
@@ -274,6 +347,20 @@ class SpladeImpactBackend(SpladeBackend):
 
 
 def _safe_int(value: object) -> int | None:
+    """Convert a value to an integer, returning None on failure.
+
+    Parameters
+    ----------
+    value : object
+        Value to convert to integer. Can be any type that can be converted
+        via str() and then int().
+
+    Returns
+    -------
+    int | None
+        The integer representation of the value, or None if conversion fails
+        due to TypeError or ValueError.
+    """
     try:
         return int(str(value))
     except (TypeError, ValueError):  # pragma: no cover - defensive

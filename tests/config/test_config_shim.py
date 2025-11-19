@@ -6,13 +6,17 @@ from pathlib import Path
 
 from codeintel_rev.config.api import (
     AppConfig,
+    BM25Settings,
     DuckDBSettings,
+    EmbeddingsSettings,
     FAISSSettings,
     LoggingSettings,
     PathsConfig,
     SearchSettings,
     SpladeOnnxQueryConfig,
     SpladeSettings,
+    VLLMSettings,
+    XTRSettings,
 )
 from codeintel_rev.config.shim import settings_from_app_config
 
@@ -30,6 +34,20 @@ def _make_app_config(tmp_path: Path) -> AppConfig:
     )
     duckdb = DuckDBSettings(database=repo_root / "catalog.duckdb")
     faiss = FAISSSettings(index_path=repo_root / "index.faiss")
+    bm25 = BM25Settings(
+        corpus_json_dir=repo_root / "bm25_json",
+        index_dir=repo_root / "indexes" / "bm25",
+        threads=6,
+        enabled=False,
+        k1=1.1,
+        b=0.7,
+        rm3_enabled=True,
+        rm3_fb_docs=12,
+        rm3_fb_terms=18,
+        rm3_original_query_weight=0.45,
+        analyzer="standard",
+        stopwords=("a", "b"),
+    )
     splade = SpladeSettings(
         model_id="splade-model",
         model_dir=repo_root / "models" / "splade",
@@ -62,12 +80,19 @@ def _make_app_config(tmp_path: Path) -> AppConfig:
             format="map",
         ),
     )
+    xtr = XTRSettings(enable=True, dim=512, dtype="float32", mode="wide")
+    embeddings = EmbeddingsSettings()
+    vllm = VLLMSettings()
     return AppConfig(
         version="1.0",
         paths=paths,
         duckdb=duckdb,
         faiss=faiss,
+        bm25=bm25,
         splade=splade,
+        xtr=xtr,
+        embeddings=embeddings,
+        vllm=vllm,
         search=SearchSettings(),
         logging=LoggingSettings(),
     )
@@ -79,12 +104,25 @@ def test_settings_from_app_config_updates_paths_and_splade(tmp_path: Path) -> No
     settings = settings_from_app_config(cfg)
     assertions.expect_equal(settings.paths.repo_root, str(cfg.paths.repo_root))
     assertions.expect_equal(settings.paths.faiss_index, str(cfg.faiss.index_path))
+    assertions.expect_equal(settings.bm25.corpus_json_dir, str(cfg.bm25.corpus_json_dir))
+    assertions.expect_equal(settings.bm25.index_dir, str(cfg.bm25.index_dir))
+    assertions.expect_equal(settings.bm25.threads, cfg.bm25.threads)
+    assertions.expect_equal(settings.bm25.analyzer, cfg.bm25.analyzer)
+    assertions.expect_sequence_equal(list(settings.bm25.stopwords), list(cfg.bm25.stopwords))
     assertions.expect_equal(settings.splade.model_dir, str(cfg.splade.model_dir))
     assertions.expect_equal(settings.splade.index_dir, str(cfg.splade.index_dir))
     assertions.expect_equal(settings.splade.enabled, cfg.splade.enabled)
-    assert settings.splade.onnx_query is not None
-    assertions.expect_equal(
-        settings.splade.onnx_query.model_path,
-        str(cfg.splade.onnx_query.model_path),
-    )
+    onnx_cfg = settings.splade.onnx_query
+    assertions.expect_true(onnx_cfg is not None, reason="Expected ONNX query config")
+    if onnx_cfg is not None and cfg.splade.onnx_query is not None:
+        assertions.expect_equal(
+            onnx_cfg.model_path,
+            str(cfg.splade.onnx_query.model_path),
+        )
     assertions.expect_equal(settings.index.enable_splade_channel, cfg.splade.enabled)
+    assertions.expect_equal(settings.index.enable_bm25_channel, cfg.bm25.enabled)
+    assertions.expect_equal(settings.index.bm25_k1, cfg.bm25.k1)
+    assertions.expect_equal(settings.index.bm25_b, cfg.bm25.b)
+    assertions.expect_equal(settings.xtr.enable, cfg.xtr.enable)
+    assertions.expect_equal(settings.xtr.dim, cfg.xtr.dim)
+    assertions.expect_equal(settings.xtr.mode, cfg.xtr.mode)

@@ -10,7 +10,36 @@ from codeintel_rev.io.duckdb_manager import DuckDBManager
 
 @dataclass(frozen=True)
 class SymbolDefRow:
-    """Immutable row describing a symbol definition."""
+    """Immutable row describing a symbol definition.
+
+    Attributes
+    ----------
+    symbol : str
+        SCIP symbol identifier string (e.g., "scip-python python ...").
+    display_name : str
+        Human-readable display name for the symbol (e.g., "function_name").
+    kind : str
+        Symbol kind identifier (e.g., "FUNCTION", "CLASS", "VARIABLE").
+    language : str
+        Programming language identifier (e.g., "python", "typescript").
+    uri : str
+        File URI where the symbol is defined (e.g., "file:///path/to/file.py").
+    start_line : int
+        Starting line number where the symbol is defined (1-based).
+    start_col : int
+        Starting column number where the symbol is defined (0-based).
+    end_line : int
+        Ending line number where the symbol is defined (1-based).
+    end_col : int
+        Ending column number where the symbol is defined (0-based, exclusive).
+    chunk_id : int
+        Chunk identifier linking this symbol to a chunk in the vector index.
+    docstring : str | None, optional
+        Docstring text for the symbol. None if no docstring. Defaults to None.
+    signature : str | None, optional
+        Function or method signature string. None if not applicable or unavailable.
+        Defaults to None.
+    """
 
     symbol: str
     display_name: str
@@ -28,7 +57,25 @@ class SymbolDefRow:
 
 @dataclass(frozen=True)
 class SymbolOccurrenceRow:
-    """Service row for individual symbol occurrences."""
+    """Service row for individual symbol occurrences.
+
+    Attributes
+    ----------
+    symbol : str
+        SCIP symbol identifier string for the occurrence.
+    uri : str
+        File URI where the occurrence is located.
+    start_line : int
+        Starting line number of the occurrence (1-based).
+    start_col : int
+        Starting column number of the occurrence (0-based).
+    end_line : int
+        Ending line number of the occurrence (1-based).
+    end_col : int
+        Ending column number of the occurrence (0-based, exclusive).
+    roles : int
+        Bitmask of occurrence roles (e.g., DEFINITION, REFERENCE, CALL).
+    """
 
     symbol: str
     uri: str

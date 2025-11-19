@@ -105,7 +105,48 @@ _SEARCH_RESULT_DIM = 2
 
 @dataclass(frozen=True, slots=True)
 class FAISSRuntimeOptions:
-    """Runtime tuning knobs exposed by :class:`FAISSManager`."""
+    """Runtime tuning knobs exposed by :class:`FAISSManager`.
+
+    Attributes
+    ----------
+    faiss_family : str | None, optional
+        FAISS index family identifier ("ivf", "hnsw", etc.). "auto" selects
+        based on index type. None means use index defaults. Defaults to "auto".
+    pq_m : int, optional
+        Number of subquantizers for Product Quantization (PQ). Must be positive.
+        Defaults to 64.
+    pq_nbits : int, optional
+        Number of bits per PQ code. Must be positive. Defaults to 8.
+    opq_m : int, optional
+        Number of subquantizers for Optimized Product Quantization (OPQ). 0
+        disables OPQ. Must be non-negative. Defaults to 0.
+    default_nprobe : int | None, optional
+        Default number of clusters to probe in IVF indexes. None means use
+        index defaults. Must be positive if specified. Defaults to None.
+    default_k : int, optional
+        Default number of nearest neighbors to retrieve. Must be positive.
+        Defaults to 50.
+    hnsw_m : int, optional
+        HNSW parameter M (number of bi-directional links per node). Must be
+        positive. Defaults to 32.
+    hnsw_ef_construction : int, optional
+        HNSW ef_construction parameter (size of candidate list during
+        construction). Must be positive. Defaults to 200.
+    hnsw_ef_search : int, optional
+        HNSW ef_search parameter (size of candidate list during search).
+        Must be positive. Defaults to 128.
+    refine_k_factor : float, optional
+        Multiplier for refinement during search. Values > 1.0 retrieve more
+        candidates before refinement. Must be positive. Defaults to 2.0.
+    autotune_on_start : bool, optional
+        Whether to run autotuning when the index is loaded. Defaults to False.
+    enable_range_search : bool, optional
+        Whether to enable range search (distance threshold) in addition to
+        k-NN search. Defaults to False.
+    semantic_min_score : float, optional
+        Minimum similarity score threshold for semantic search results.
+        Results below this threshold are filtered. Defaults to 0.0.
+    """
 
     faiss_family: str | None = "auto"
     pq_m: int = 64
@@ -124,7 +165,20 @@ class FAISSRuntimeOptions:
 
 @dataclass(frozen=True, slots=True)
 class SearchRuntimeOverrides:
-    """Per-search overrides for HNSW/quantizer parameters."""
+    """Per-search overrides for HNSW/quantizer parameters.
+
+    Attributes
+    ----------
+    ef_search : int | None, optional
+        Override for HNSW ef_search parameter. None means use default from
+        runtime options. Must be positive if specified. Defaults to None.
+    quantizer_ef_search : int | None, optional
+        Override for quantizer ef_search parameter. None means use default.
+        Must be positive if specified. Defaults to None.
+    k_factor : float | None, optional
+        Override for refine_k_factor multiplier. None means use default from
+        runtime options. Must be positive if specified. Defaults to None.
+    """
 
     ef_search: int | None = None
     quantizer_ef_search: int | None = None
@@ -133,7 +187,20 @@ class SearchRuntimeOverrides:
 
 @dataclass(frozen=True, slots=True)
 class RefineSearchConfig:
-    """Configuration bundle for refine searches."""
+    """Configuration bundle for refine searches.
+
+    Attributes
+    ----------
+    nprobe : int | None, optional
+        Number of clusters to probe in IVF indexes. None means use default
+        from runtime options. Must be positive if specified. Defaults to None.
+    runtime : SearchRuntimeOverrides | None, optional
+        Per-search runtime parameter overrides. None means use defaults from
+        runtime options. Defaults to None.
+    source : str, optional
+        Source identifier for the search operation (e.g., "faiss", "refine").
+        Used for observability and logging. Defaults to "faiss".
+    """
 
     nprobe: int | None = None
     runtime: SearchRuntimeOverrides | None = None

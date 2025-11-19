@@ -51,6 +51,20 @@ def git_executable() -> str:
 
 
 def init_git_repo(root: Path) -> None:
+    """Initialize a new git repository with deterministic user configuration.
+
+    Parameters
+    ----------
+    root : Path
+        Directory path where the git repository should be initialized.
+        The directory must exist or be creatable.
+
+    Notes
+    -----
+    This function calls git subprocess commands via run_process, which may
+    raise subprocess.CalledProcessError if git commands fail. The exception
+    is propagated to the caller.
+    """
     env = git_env()
     git_bin = git_executable()
     run_process([git_bin, "init"], cwd=root, env=env)
@@ -59,6 +73,17 @@ def init_git_repo(root: Path) -> None:
 
 
 def write_sample_modules(repo_root: Path) -> None:
+    """Write sample Python modules and CODEOWNERS file for testing.
+
+    Creates a package structure with alpha.py and beta.py modules that
+    reference each other, plus a CODEOWNERS file for ownership testing.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory where the sample modules should be created.
+        Creates a "pkg" subdirectory with __init__.py, alpha.py, and beta.py.
+    """
     pkg = repo_root / "pkg"
     pkg.mkdir(parents=True, exist_ok=True)
     (pkg / "__init__.py").write_text(
@@ -82,6 +107,20 @@ def write_sample_modules(repo_root: Path) -> None:
 
 
 def seed_initial_commit(repo_root: Path) -> None:
+    """Create an initial git commit with all files in the repository.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory containing files to commit. Must be a valid
+        git repository initialized with init_git_repo.
+
+    Notes
+    -----
+    This function calls git subprocess commands via run_process, which may
+    raise subprocess.CalledProcessError if git commands fail. The exception
+    is propagated to the caller.
+    """
     env = git_env()
     git_bin = git_executable()
     run_process([git_bin, "add", "."], cwd=repo_root, env=env)

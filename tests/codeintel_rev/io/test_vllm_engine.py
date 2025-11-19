@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import cast
 
 import numpy as np
-from codeintel_rev.config.settings import VLLMConfig, VLLMRunMode
+from codeintel_rev.config.api import VLLMSettings
 from codeintel_rev.io.vllm_engine import (
     LLM,
     InprocessVLLMContext,
@@ -67,7 +67,7 @@ def _build_context() -> InprocessVLLMContext:
     def _tokenizer_factory(_model_id: str) -> TokenizerProtocol:
         return cast("TokenizerProtocol", _StubTokenizer())
 
-    def _llm_factory(_config: VLLMConfig) -> LLM:
+    def _llm_factory(_config: VLLMSettings) -> LLM:
         return cast("LLM", _StubLLM())
 
     def _tokens_prompt_factory(token_ids: Sequence[int]) -> TokensPrompt:
@@ -82,10 +82,10 @@ def _build_context() -> InprocessVLLMContext:
 
 def test_embed_batch_returns_expected_shape() -> None:
     """Batch embedding produces the configured dimensionality."""
-    config = VLLMConfig(
+    config = VLLMSettings(
         model="nomic-ai/nomic-embed-code",
         embedding_dim=2,
-        run=VLLMRunMode(mode="inprocess"),
+        run_mode="inprocess",
     )
 
     embedder = InprocessVLLMEmbedder(config, context=_build_context())
@@ -96,10 +96,10 @@ def test_embed_batch_returns_expected_shape() -> None:
 
 def test_embed_batch_handles_empty_input() -> None:
     """Empty inputs produce zero-row embeddings."""
-    config = VLLMConfig(
+    config = VLLMSettings(
         model="nomic-ai/nomic-embed-code",
         embedding_dim=3,
-        run=VLLMRunMode(mode="inprocess"),
+        run_mode="inprocess",
     )
 
     embedder = InprocessVLLMEmbedder(config, context=_build_context())

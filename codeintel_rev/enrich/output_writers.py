@@ -138,7 +138,15 @@ def write_json(path: str | Path, obj: object) -> None:
 
 @dataclass(slots=True)
 class WriterEnvConfig:
-    """Configuration for resolving writer environment variables."""
+    """Configuration for resolving writer environment variables.
+
+    Attributes
+    ----------
+    env_resolver : Callable[[str, str | None], str | None] | None, optional
+        Optional function for resolving environment variable values. Takes
+        variable name and default value, returns resolved value or None.
+        If None, uses default environment variable lookup. Defaults to None.
+    """
 
     env_resolver: Callable[[str, str | None], str | None] | None = None
 

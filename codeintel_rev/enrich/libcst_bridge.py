@@ -32,7 +32,21 @@ class NodeHandler(Protocol):
 
 @dataclass(slots=True, frozen=True)
 class ImportEntry:
-    """Normalized metadata for a single import statement."""
+    """Normalized metadata for a single import statement.
+
+    Attributes
+    ----------
+    module : str | None
+        Module name being imported. None for relative imports without module name.
+    names : list[str]
+        List of symbol names imported from the module.
+    aliases : dict[str, str]
+        Dictionary mapping original names to their aliases (e.g., {"np": "numpy"}).
+    is_star : bool
+        Whether this is a star import (from module import *).
+    level : int
+        Relative import level (0 for absolute imports, 1+ for relative).
+    """
 
     module: str | None
     names: list[str]
@@ -43,7 +57,18 @@ class ImportEntry:
 
 @dataclass(slots=True, frozen=True)
 class DefEntry:
-    """Top-level function/class definition summary."""
+    """Top-level function/class definition summary.
+
+    Attributes
+    ----------
+    kind : str
+        Definition kind identifier. Must be one of "class", "function", or
+        "variable".
+    name : str
+        Name of the definition.
+    lineno : int
+        Line number where the definition occurs (1-based).
+    """
 
     kind: str  # "class" | "function" | "variable"
     name: str
@@ -52,7 +77,23 @@ class DefEntry:
 
 @dataclass(slots=True, frozen=True)
 class ModuleIndex:
-    """Aggregate module metadata returned by :func:`index_module`."""
+    """Aggregate module metadata returned by :func:`index_module`.
+
+    Attributes
+    ----------
+    path : str
+        File path relative to repository root.
+    imports : list[ImportEntry], optional
+        List of normalized import entries found in the module. Defaults to
+        empty list.
+    defs : list[DefEntry], optional
+        List of top-level definition entries. Defaults to empty list.
+    exports : set[str], optional
+        Set of symbol names exported by this module (from __all__ or public
+        names). Defaults to empty set.
+    docstring : str | None, optional
+        Module-level docstring text. None if no docstring. Defaults to None.
+    """
 
     path: str
     imports: list[ImportEntry] = field(default_factory=list)

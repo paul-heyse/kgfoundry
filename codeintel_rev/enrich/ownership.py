@@ -33,7 +33,25 @@ __all__ = ["FileOwnership", "OwnershipIndex", "compute_ownership"]
 
 @dataclass(slots=True, frozen=True)
 class FileOwnership:
-    """Aggregated ownership metadata for a single file."""
+    """Aggregated ownership metadata for a single file.
+
+    Attributes
+    ----------
+    path : str
+        File path relative to repository root.
+    owner : str | None, optional
+        Primary owner identifier (e.g., from CODEOWNERS). None if no owner
+        is determined. Defaults to None.
+    primary_authors : tuple[str, ...], optional
+        Tuple of primary author identifiers based on commit history. Empty
+        tuple if no authors are identified. Defaults to empty tuple.
+    bus_factor : float, optional
+        Bus factor score indicating how many authors are needed to maintain
+        the file. Lower values indicate higher risk. Defaults to 0.0.
+    churn_by_window : dict[int, int], optional
+        Dictionary mapping time window days to churn count (number of changes
+        in that window). Defaults to empty dictionary.
+    """
 
     path: str
     owner: str | None = None
@@ -44,7 +62,17 @@ class FileOwnership:
 
 @dataclass(slots=True, frozen=True)
 class OwnershipIndex:
-    """Collection of :class:`FileOwnership` entries keyed by relative path."""
+    """Collection of :class:`FileOwnership` entries keyed by relative path.
+
+    Attributes
+    ----------
+    by_file : dict[str, FileOwnership], optional
+        Dictionary mapping file paths to their ownership metadata. Empty
+        dictionary if no ownership data is available. Defaults to empty dictionary.
+    churn_windows : tuple[int, ...], optional
+        Tuple of time window sizes in days used for churn analysis (e.g., 30,
+        90 days). Defaults to (30, 90).
+    """
 
     by_file: dict[str, FileOwnership] = field(default_factory=dict)
     churn_windows: tuple[int, ...] = field(default_factory=lambda: (30, 90))

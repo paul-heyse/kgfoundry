@@ -24,7 +24,23 @@ else:
 
 @dataclass(slots=True, frozen=True)
 class XTRBuildSummary:
-    """Metadata describing a freshly built XTR token index."""
+    """Metadata describing a freshly built XTR token index.
+
+    Attributes
+    ----------
+    chunk_count : int
+        Number of chunks indexed in the XTR index.
+    token_count : int
+        Total number of tokens across all chunks in the index.
+    dim : int
+        Embedding dimension for token vectors. Must be positive.
+    dtype : str
+        Data type string for token embeddings (e.g., "float16", "float32").
+    token_path : str
+        File path to the token embeddings memory-mapped file.
+    meta_path : str
+        File path to the XTR metadata JSON file.
+    """
 
     chunk_count: int
     token_count: int

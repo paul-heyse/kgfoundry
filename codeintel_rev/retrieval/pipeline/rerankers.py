@@ -30,10 +30,20 @@ class NoopReranker:
     def rerank(_query: str, ids: Iterable[int], scores: Iterable[float]) -> RerankResult:
         """Return the provided identifiers and scores unchanged.
 
+        Parameters
+        ----------
+        _query : str
+            Query text (unused by no-op reranker).
+        ids : Iterable[int]
+            Document/chunk IDs to rerank.
+        scores : Iterable[float]
+            Initial relevance scores.
+
         Returns
         -------
         RerankResult
-            Result with original ordering preserved.
+            Result with original ordering preserved, containing the same IDs
+            and scores in the same order as the input.
         """
         ids_list = [int(i) for i in ids]
         scores_list = [float(s) for s in scores]

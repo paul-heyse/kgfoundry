@@ -51,6 +51,18 @@ class XTRLateInteraction:
     ) -> LateInteractionResult:
         """Rescore candidate IDs using the XTR narrow-mode API.
 
+        Parameters
+        ----------
+        query : str
+            Query text to use for rescoring.
+        candidate_ids : Iterable[int]
+            Iterable of document/chunk IDs to rescore.
+        explain : bool, optional
+            Whether to include explanation metadata in the result. Defaults to False.
+        topk_explanations : int, optional
+            Maximum number of explanations to include per result when explain=True.
+            Defaults to 5.
+
         Returns
         -------
         LateInteractionResult

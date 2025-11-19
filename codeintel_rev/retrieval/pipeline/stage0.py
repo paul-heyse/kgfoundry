@@ -39,6 +39,21 @@ def run_stage0(
 ) -> Stage0Result:
     """Execute Stage-0 fusion via the provided hybrid search engine.
 
+    Parameters
+    ----------
+    engine : HybridSearchEngine
+        Hybrid search engine instance to use for Stage-0 retrieval.
+    query : str
+        Query text to search for.
+    semantic_hits : Sequence[tuple[int, float]] | None, optional
+        Optional pre-computed semantic search hits to include in fusion.
+        If None, semantic search is performed as part of Stage-0.
+    limit : int
+        Maximum number of results to return. Clamped to at least 1.
+    options : Stage0Options | None, optional
+        Optional configuration for fusion weights, per-channel k values,
+        fusion k, and RRF base. If None, uses default options.
+
     Returns
     -------
     Stage0Result

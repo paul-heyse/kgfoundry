@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, cast
 import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.config.settings import VLLMConfig
+from codeintel_rev.config.api import VLLMSettings
 from codeintel_rev.runtime.imports import gate_import
 from codeintel_rev.typing import NDArrayF32
 
@@ -110,12 +110,12 @@ def _get_numpy() -> ModuleType:
     )
 
 
-def _default_http_client_factory(config: VLLMConfig) -> httpx.Client:
+def _default_http_client_factory(config: VLLMSettings) -> httpx.Client:
     """Create default synchronous HTTP client for vLLM requests.
 
     Parameters
     ----------
-    config : VLLMConfig
+    config : VLLMSettings
         vLLM configuration containing timeout settings.
 
     Returns
@@ -132,12 +132,12 @@ def _default_http_client_factory(config: VLLMConfig) -> httpx.Client:
     )
 
 
-def _default_async_http_client_factory(config: VLLMConfig) -> httpx.AsyncClient:
+def _default_async_http_client_factory(config: VLLMSettings) -> httpx.AsyncClient:
     """Create default asynchronous HTTP client for vLLM requests.
 
     Parameters
     ----------
-    config : VLLMConfig
+    config : VLLMSettings
         vLLM configuration containing timeout settings.
 
     Returns
@@ -154,12 +154,12 @@ def _default_async_http_client_factory(config: VLLMConfig) -> httpx.AsyncClient:
     )
 
 
-def _default_inprocess_embedder_factory(config: VLLMConfig) -> InprocessVLLMEmbedder:
+def _default_inprocess_embedder_factory(config: VLLMSettings) -> InprocessVLLMEmbedder:
     """Create default in-process vLLM embedder instance.
 
     Parameters
     ----------
-    config : VLLMConfig
+    config : VLLMSettings
         vLLM configuration for embedder initialization.
 
     Returns
@@ -174,11 +174,24 @@ def _default_inprocess_embedder_factory(config: VLLMConfig) -> InprocessVLLMEmbe
 
 @dataclass(frozen=True)
 class VLLMTransportContext:
-    """Dependencies for constructing VLLM transport clients."""
+    """Dependencies for constructing VLLM transport clients.
 
-    http_client_factory: Callable[[VLLMConfig], httpx.Client]
-    async_client_factory: Callable[[VLLMConfig], httpx.AsyncClient]
-    inprocess_embedder_factory: Callable[[VLLMConfig], InprocessVLLMEmbedder]
+    Attributes
+    ----------
+    http_client_factory : Callable[[VLLMSettings], httpx.Client]
+        Factory function that creates a synchronous HTTP client from VLLM
+        settings. Used for dependency injection in tests.
+    async_client_factory : Callable[[VLLMSettings], httpx.AsyncClient]
+        Factory function that creates an asynchronous HTTP client from VLLM
+        settings. Used for dependency injection in tests.
+    inprocess_embedder_factory : Callable[[VLLMSettings], InprocessVLLMEmbedder]
+        Factory function that creates an in-process embedder from VLLM settings.
+        Used for dependency injection in tests.
+    """
+
+    http_client_factory: Callable[[VLLMSettings], httpx.Client]
+    async_client_factory: Callable[[VLLMSettings], httpx.AsyncClient]
+    inprocess_embedder_factory: Callable[[VLLMSettings], InprocessVLLMEmbedder]
 
     @classmethod
     def production(cls) -> VLLMTransportContext:
@@ -217,7 +230,7 @@ class EmbeddingRequest(msgspec.Struct):
         Model identifier string. Must match a model loaded by the vLLM server.
         Defaults to "nomic-ai/nomic-embed-code" which is a code-specific
         embedding model with 3584 dimensions. The embedding dimensionality is
-        surfaced via :class:`codeintel_rev.config.settings.VLLMConfig` ``embedding_dim``.
+        surfaced via :class:`codeintel_rev.config.api.VLLMSettings` ``embedding_dim``.
     """
 
     input: str | list[str]
@@ -238,7 +251,7 @@ class EmbeddingData(msgspec.Struct):
         Embedding vector as a list of floats. The length matches the model's
         dimension (e.g., 3584 for nomic-embed-code). Values are typically
         normalized for cosine similarity. The expected size is available as
-        ``VLLMConfig.embedding_dim``.
+        ``VLLMSettings.embedding_dim``.
     index : int
         Zero-based index indicating the position of this embedding in the
         original input batch. Used to match embeddings back to their input
@@ -294,15 +307,15 @@ class VLLMClient:
 
     Parameters
     ----------
-    config : VLLMConfig
+    config : VLLMSettings
         vLLM configuration including base URL, timeout, and model name.
 
     Examples
     --------
     Create client and embed batch:
 
-    >>> from codeintel_rev.config.settings import VLLMConfig
-    >>> config = VLLMConfig(base_url="http://localhost:8000", model="test-model")
+    >>> from codeintel_rev.config.api import VLLMSettings
+    >>> config = VLLMSettings(base_url="http://localhost:8000", model="test-model")
     >>> client = VLLMClient(config)
     >>> vectors = client.embed_batch(["def hello(): pass", "def world(): pass"])
     >>> vectors.shape
@@ -333,7 +346,7 @@ class VLLMClient:
 
     def __init__(
         self,
-        config: VLLMConfig,
+        config: VLLMSettings,
         *,
         transport_context: VLLMTransportContext | None = None,
     ) -> None:
@@ -341,7 +354,7 @@ class VLLMClient:
 
         Parameters
         ----------
-        config : VLLMConfig
+        config : VLLMSettings
             VLLM configuration (model, host, port, etc.).
         transport_context : VLLMTransportContext | None, optional
             Optional transport context for HTTP client customization.
@@ -349,7 +362,7 @@ class VLLMClient:
         self.config = config
         self._encoder = msgspec.json.Encoder()
         self._decoder = msgspec.json.Decoder(EmbeddingResponse)
-        self._mode = getattr(config.run, "mode", "inprocess")
+        self._mode = config.run_mode
         self._client: httpx.Client | None = None
         self._async_client: httpx.AsyncClient | None = None
         self._local_engine: InprocessVLLMEmbedder | None = None
@@ -686,7 +699,15 @@ class VLLMClient:
 class _StubVLLMClient:
     """Minimal stand-in for :class:`VLLMClient` used in test environments."""
 
-    def __init__(self, config: VLLMConfig) -> None:
+    def __init__(self, config: VLLMSettings) -> None:
+        """Initialize stub VLLM client for testing.
+
+        Parameters
+        ----------
+        config : VLLMSettings
+            VLLM configuration. Used to determine embedding dimensions
+            but not for actual network requests.
+        """
         self.config = config
 
     def _zeros(self, count: int) -> NDArrayF32:
@@ -756,12 +777,12 @@ class _StubVLLMClient:
         """Close stubbed client (no-op)."""
 
 
-def build_vllm_client(config: VLLMConfig) -> VLLMClient:
+def build_vllm_client(config: VLLMSettings) -> VLLMClient:
     """Return a real or stubbed VLLM client based on environment configuration.
 
     Parameters
     ----------
-    config : VLLMConfig
+    config : VLLMSettings
         vLLM configuration object propagated from settings.
 
     Returns
@@ -772,7 +793,7 @@ def build_vllm_client(config: VLLMConfig) -> VLLMClient:
     """
     if _use_stub_client():
         return cast("VLLMClient", _StubVLLMClient(config))
-    if getattr(config.run, "mode", "inprocess") == "inprocess" and not _module_available("vllm"):
+    if config.run_mode == "inprocess" and not _module_available("vllm"):
         LOGGER.warning(
             "vLLM extras are not installed; falling back to stubbed embeddings client.",
         )

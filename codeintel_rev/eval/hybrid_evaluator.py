@@ -26,7 +26,35 @@ else:  # pragma: no cover - imported lazily in CLI paths
 
 @dataclass(frozen=True)
 class EvalConfig:
-    """Evaluator configuration."""
+    """Evaluator configuration.
+
+    Attributes
+    ----------
+    pool_path : Path
+        Output path for evaluation pool JSONL file. Contains per-query pool
+        rows with retrieved documents, channels, ranks, and scores.
+    metrics_path : Path
+        Output path for evaluation metrics JSON file. Contains recall metrics,
+        query counts, and oracle statistics.
+    k : int, optional
+        Evaluation k parameter (number of top results to compare). Defaults to 10.
+        Determines recall@k computation and oracle comparison depth.
+    k_factor : float, optional
+        Multiplier for search_k relative to fetch_k. search_k = k * k_factor.
+        Defaults to 2.0. Larger values retrieve more candidates for oracle
+        reranking but increase search cost.
+    nprobe : int | None, optional
+        Optional FAISS nprobe parameter for IVF index search. If None, uses
+        FAISS manager's default. Higher values improve recall but increase
+        search time. Defaults to None.
+    max_queries : int | None, optional
+        Maximum number of queries to evaluate. If None, evaluates all available
+        query vectors. Used for limiting evaluation scope during development.
+        Defaults to None.
+    use_xtr_oracle : bool, optional
+        Whether to use XTR index for oracle rescoring. If True, XTR rescoring
+        is performed on candidate results for oracle comparison. Defaults to False.
+    """
 
     pool_path: Path
     metrics_path: Path
@@ -39,7 +67,34 @@ class EvalConfig:
 
 @dataclass(frozen=True)
 class EvalReport:
-    """Summary for an offline ANN vs oracle comparison."""
+    """Summary for an offline ANN vs oracle comparison.
+
+    Attributes
+    ----------
+    queries : int
+        Number of queries evaluated. Total queries processed during evaluation.
+    k : int
+        Evaluation k parameter used for recall computation. Number of top
+        results compared between ANN and oracle.
+    k_factor : float
+        k_factor multiplier used for search_k computation. search_k = k * k_factor.
+    nprobe : int | None
+        FAISS nprobe parameter used during evaluation, if specified. None if
+        default nprobe was used.
+    recall_at_k : float
+        Recall@k metric computed as oracle_matches / (queries * k). Measures
+        the fraction of oracle top-k results that were retrieved by ANN search.
+        Range: [0.0, 1.0].
+    oracle_matches : int
+        Total number of matches between ANN results and oracle top-k results
+        across all queries. Incremented when ANN results overlap with oracle.
+    ann_hits : int
+        Total number of ANN (approximate nearest neighbor) hits retrieved
+        across all queries. Sum of search_k results for each query.
+    xtr_records : int
+        Total number of XTR-rescored results accumulated during evaluation.
+        Non-zero only when use_xtr_oracle is enabled. Defaults to 0.
+    """
 
     queries: int
     k: int

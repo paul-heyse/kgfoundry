@@ -150,6 +150,14 @@ class PyseriniBM25Backend(BM25Backend):
         return results
 
     def _create_searcher(self) -> _LuceneSearcher:
+        """Create a new Lucene searcher instance configured with BM25 parameters.
+
+        Returns
+        -------
+        _LuceneSearcher
+            A Lucene searcher instance bound to the index directory and configured
+            with the k1 and b BM25 parameters from this backend's configuration.
+        """
         lucene = _lucene.module()
         searcher = cast("_LuceneSearcher", lucene.LuceneSearcher(str(self._index_dir)))
         try:
@@ -159,6 +167,15 @@ class PyseriniBM25Backend(BM25Backend):
         return searcher
 
     def _ensure_rm3_searcher(self) -> _LuceneSearcher:
+        """Create or return a cached RM3-configured searcher instance.
+
+        Returns
+        -------
+        _LuceneSearcher
+            A Lucene searcher instance configured with RM3 query expansion
+            parameters. The searcher is cached after first creation to avoid
+            redundant initialization overhead.
+        """
         if self._rm3_searcher is not None:
             return self._rm3_searcher
         searcher = self._create_searcher()
@@ -175,6 +192,20 @@ class PyseriniBM25Backend(BM25Backend):
         return searcher
 
     def _should_use_rm3(self, query_text: str) -> bool:
+        """Determine whether RM3 query expansion should be used for a query.
+
+        Parameters
+        ----------
+        query_text : str
+            The query text to evaluate for RM3 eligibility.
+
+        Returns
+        -------
+        bool
+            True if RM3 should be enabled for this query based on configuration
+            and heuristics. False if RM3 should be disabled or auto-detection
+            determines it's not beneficial.
+        """
         if self._rm3_enabled_default and not self._auto_rm3:
             return True
         if not self._auto_rm3:
@@ -185,6 +216,20 @@ class PyseriniBM25Backend(BM25Backend):
 
 
 def _safe_int(value: object) -> int | None:
+    """Convert a value to an integer, returning None on failure.
+
+    Parameters
+    ----------
+    value : object
+        Value to convert to an integer. Can be any type that can be converted
+        via str() and then int().
+
+    Returns
+    -------
+    int | None
+        The integer representation of the value, or None if conversion fails
+        due to TypeError or ValueError.
+    """
     try:
         return int(str(value))
     except (TypeError, ValueError):  # pragma: no cover - defensive
@@ -200,15 +245,77 @@ __all__ = [
 
 
 class _LuceneHit(Protocol):
+    """Protocol describing a Lucene search result hit.
+
+    Attributes
+    ----------
+    docid : str | int
+        Document identifier from the search result.
+    score : float
+        Relevance score assigned by the search engine.
+    """
+
     docid: str | int
     score: float
 
 
 class _LuceneSearcher(Protocol):
-    def search(self, query_text: str, k: int) -> TypingSequence[_LuceneHit]: ...
+    """Protocol describing the Pyserini Lucene searcher interface.
 
-    def set_bm25(self, k1: float, b: float) -> None: ...
+    This protocol abstracts the Pyserini LuceneSearcher API to enable
+    type-safe interaction with search functionality while maintaining
+    compatibility across different Pyserini versions.
+    """
 
-    def set_rm3(self, fb_docs: int, fb_terms: int, original_query_weight: float) -> None: ...
+    def search(self, query_text: str, k: int) -> TypingSequence[_LuceneHit]:
+        """Search the index for documents matching the query.
 
-    def set_analyzer(self, analyzer: str) -> None: ...
+        Parameters
+        ----------
+        query_text : str
+            Query string to search for.
+        k : int
+            Maximum number of results to return.
+
+        Returns
+        -------
+        TypingSequence[_LuceneHit]
+            Sequence of search hits ordered by relevance score descending.
+        """
+        ...
+
+    def set_bm25(self, k1: float, b: float) -> None:
+        """Configure BM25 ranking parameters.
+
+        Parameters
+        ----------
+        k1 : float
+            Term frequency saturation parameter.
+        b : float
+            Length normalization parameter.
+        """
+        ...
+
+    def set_rm3(self, fb_docs: int, fb_terms: int, original_query_weight: float) -> None:
+        """Configure RM3 query expansion parameters.
+
+        Parameters
+        ----------
+        fb_docs : int
+            Number of feedback documents to use for expansion.
+        fb_terms : int
+            Number of expansion terms to add to the query.
+        original_query_weight : float
+            Weight given to the original query terms versus expansion terms.
+        """
+        ...
+
+    def set_analyzer(self, analyzer: str) -> None:
+        """Set the text analyzer for query processing.
+
+        Parameters
+        ----------
+        analyzer : str
+            Name of the analyzer to use (e.g., "english", "standard").
+        """
+        ...

@@ -31,6 +31,13 @@ _VIEW_CHUNKS = "chunks"
 
 
 class Stage0Runner(Protocol):
+    """Protocol describing a Stage-0 hybrid search runner.
+
+    This protocol defines the interface for executing Stage-0 hybrid retrieval,
+    enabling type-safe interaction with search functionality while maintaining
+    compatibility across different search implementations.
+    """
+
     def __call__(
         self,
         engine: HybridSearchEngine,
@@ -39,7 +46,31 @@ class Stage0Runner(Protocol):
         semantic_hits: Sequence[tuple[int, float]] | None,
         limit: int,
         options: Stage0Options | None = None,
-    ) -> Stage0Result: ...
+    ) -> Stage0Result:
+        """Execute Stage-0 hybrid search with the provided engine and query.
+
+        Parameters
+        ----------
+        engine : HybridSearchEngine
+            Hybrid search engine instance to use for retrieval.
+        query : str
+            Query text to search for.
+        semantic_hits : Sequence[tuple[int, float]] | None, optional
+            Optional pre-computed semantic search hits to use as input.
+            If None, semantic search is performed as part of Stage-0.
+        limit : int
+            Maximum number of results to return.
+        options : Stage0Options | None, optional
+            Optional configuration for Stage-0 execution, including fusion
+            weights and other search parameters. Defaults to None.
+
+        Returns
+        -------
+        Stage0Result
+            Result containing document IDs, scores, warnings, and method metadata
+            from the Stage-0 hybrid search execution.
+        """
+        ...
 
 
 StageGateDecider = Callable[[Mapping[str, object], StageGateConfig], StageDecision]
@@ -92,6 +123,27 @@ def _semantic_search_sync(
     limit: int,
     hooks: SemanticRuntimeHooks | None,
 ) -> AnswerEnvelope:
+    """Execute synchronous Stage-0 hybrid retrieval and hydrate findings.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context providing access to search engines, catalog, and
+        configuration.
+    query : str
+        Query text to search for. Empty queries result in error envelopes.
+    limit : int
+        Maximum number of results to return. Clamped by context limits.
+    hooks : SemanticRuntimeHooks | None, optional
+        Runtime hooks for dependency injection. If None, uses default
+        production implementations.
+
+    Returns
+    -------
+    AnswerEnvelope
+        Structured MCP response containing findings, method metadata, limits,
+        confidence score, and any warnings or fallback indicators.
+    """
     hooks = hooks or SemanticRuntimeHooks.default()
     query = (query or "").strip()
     if not query:
@@ -162,6 +214,26 @@ def _hydrate_findings(
     ids: Sequence[int],
     scores: Sequence[float],
 ) -> list[Finding]:
+    """Hydrate finding payloads from chunk IDs and scores using DuckDB catalog.
+
+    Parameters
+    ----------
+    catalog : DuckDBCatalog
+        DuckDB catalog instance for querying chunk metadata. Must have a
+        "chunks" view or table available.
+    ids : Sequence[int]
+        Sequence of chunk IDs to hydrate, ordered by relevance.
+    scores : Sequence[float]
+        Sequence of relevance scores corresponding to each chunk ID. Must
+        match the length of ids.
+
+    Returns
+    -------
+    list[Finding]
+        List of finding dictionaries containing chunk_id, score, and optionally
+        title (URI) if available from the catalog. Returns empty list if ids
+        is empty or the chunks relation does not exist.
+    """
     if not ids:
         return []
     with catalog.connection() as conn:
@@ -240,6 +312,27 @@ def _faiss_guard(context: ApplicationContext) -> Iterator[dict[str, bool]]:
         tracker["raised"] = True
 
     def _wrapped_search(*args: object, **kwargs: object) -> object:
+        """Wrap FAISS search to track exceptions.
+
+        Parameters
+        ----------
+        *args : object
+            Positional arguments passed to the original search method.
+        **kwargs : object
+            Keyword arguments passed to the original search method.
+
+        Returns
+        -------
+        object
+            Result from the original search method.
+
+        Notes
+        -----
+        This wrapper function intercepts calls to the FAISS search method and
+        tracks any exceptions that occur. If an exception is raised by the
+        original search method, it sets tracker["raised"] = True before
+        re-raising the exception. The exception is propagated to the caller.
+        """
         try:
             return original_search(*args, **kwargs)
         except Exception:

@@ -31,7 +31,17 @@ _pyarrow_parquet = LazyModule("pyarrow.parquet", "ID map export helpers")
 
 @dataclass(frozen=True, slots=True)
 class IndexArtifactPaths:
-    """Filesystem layout for FAISS index artifacts."""
+    """Filesystem layout for FAISS index artifacts.
+
+    Attributes
+    ----------
+    primary_index_path : Path
+        Path to the primary FAISS index file.
+    secondary_suffix : str, optional
+        Filename suffix for the secondary index file. The secondary index
+        path is derived by inserting this suffix before the file extension.
+        Defaults to ".secondary".
+    """
 
     primary_index_path: Path
     secondary_suffix: str = ".secondary"

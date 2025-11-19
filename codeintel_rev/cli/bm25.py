@@ -14,7 +14,6 @@ from tools import CliContext, EnvelopeBuilder, cli_operation, sha256_file
 
 from codeintel_rev.config import load_app_config
 from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.io.bm25_manager import BM25BuildOptions, BM25IndexManager
 
 
@@ -56,8 +55,7 @@ def _default_bm25_manager_factory() -> BM25IndexManager:
     BM25IndexManager
         Manager configured from the active settings.
     """
-    settings = settings_from_app_config(_cached_app_config())
-    return BM25IndexManager(settings)
+    return BM25IndexManager(_cached_app_config())
 
 
 app = typer.Typer(

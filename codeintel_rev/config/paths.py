@@ -18,7 +18,51 @@ type PathInput = str | os.PathLike[str] | Path
 
 @dataclass(frozen=True, slots=True)
 class ResolvedPaths:
-    """Immutable collection of canonical filesystem locations."""
+    """Immutable collection of canonical filesystem locations.
+
+    Attributes
+    ----------
+    repo_root : Path
+        Repository root directory path. All other paths are resolved relative
+        to this root.
+    config_dir : Path
+        Directory path for application configuration files.
+    config_file : Path
+        Path to the main application configuration file (typically app.yml).
+    data_dir : Path
+        Directory path for application data files.
+    vectors_dir : Path
+        Directory path containing vector embedding Parquet files.
+    faiss_index : Path
+        Path to the FAISS vector index file.
+    faiss_idmap_path : Path
+        Path to the FAISS ID map Parquet file mapping FAISS row indices to
+        external chunk IDs.
+    lucene_dir : Path
+        Directory path containing Lucene indexes (BM25, SPLADE).
+    splade_dir : Path
+        Directory path for SPLADE-specific indexes and artifacts.
+    duckdb_path : Path
+        Path to the DuckDB catalog database file.
+    scip_index : Path
+        Path to the SCIP symbol index file.
+    coderank_vectors_dir : Path
+        Directory path for CodeRank vector embeddings.
+    coderank_faiss_index : Path
+        Path to the CodeRank FAISS index file.
+    warp_index_dir : Path
+        Directory path for WARP XTR indexes.
+    xtr_dir : Path
+        Directory path for XTR token-level indexes.
+    logs_dir : Path
+        Directory path for application log files.
+    cache_dir : Path
+        Directory path for cached artifacts and temporary data.
+    tmp_dir : Path
+        Directory path for temporary files.
+    plugins_dir : Path
+        Directory path for application plugins.
+    """
 
     repo_root: Path
     config_dir: Path

@@ -337,7 +337,32 @@ def convert_exception_to_envelope(
 
 
 def _log_exception(exc: BaseException, operation: str, problem: ProblemDetails) -> None:
-    """Emit structured logs for adapter exceptions."""
+    """Emit structured logs for adapter exceptions.
+
+    Parameters
+    ----------
+    exc : BaseException
+        Exception to log. Can be any exception type. KgFoundryError instances
+        are logged at their configured log_level with error_code context.
+        Other exceptions are logged at WARNING or ERROR level based on type.
+    operation : str
+        Operation identifier in format "category:operation" (e.g.,
+        "files:open_file"). Used for structured logging context.
+    problem : ProblemDetails
+        RFC 9457 Problem Details dictionary containing error metadata. Used to
+        extract detail message and error code for logging.
+
+    Notes
+    -----
+    Logging behavior:
+    - KgFoundryError: Logged at exception's log_level with error_code in extra.
+      Includes exception info (traceback) if log_level >= ERROR.
+    - UnicodeDecodeError: Logged at WARNING level with component context.
+    - Known exception types (from EXCEPTION_TO_ERROR_CODE): Logged at WARNING
+      level with component context.
+    - Unknown exceptions: Logged at ERROR level with exception_type in extra
+      and full traceback.
+    """
     detail = problem.get("detail", str(exc))
     if isinstance(exc, KgFoundryError):
         code_value = getattr(exc.code, "value", exc.code)

@@ -11,9 +11,14 @@ import msgspec
 from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
     AppConfig,
+    BM25Settings,
+    EmbeddingsSettings,
     FAISSSettings,
     LoggingSettings,
     SearchSettings,
+    SpladeSettings,
+    VLLMSettings,
+    XTRSettings,
 )
 from codeintel_rev.config.api import (
     DuckDBSettings as ApiDuckDBSettings,
@@ -27,7 +32,7 @@ from codeintel_rev.ops.runtime.xtr_open import APP, XtrOpenContext
 from typer.testing import CliRunner
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import DEFAULT_XTR_SETTINGS, build_settings_for_repo
 
 RUNNER = CliRunner(mix_stderr=False)
 
@@ -91,6 +96,31 @@ def _app_config_loader(repo_root: Path) -> Callable[[], AppConfig]:
         ),
         duckdb=ApiDuckDBSettings(database=data_dir / "catalog.duckdb"),
         faiss=FAISSSettings(index_path=repo_root / "indexes" / "code.ivfpq.faiss"),
+        bm25=BM25Settings(
+            corpus_json_dir=data_dir / "bm25_json",
+            index_dir=repo_root / "indexes" / "bm25",
+        ),
+        splade=SpladeSettings(
+            model_dir=repo_root / "models" / "splade",
+            onnx_dir=repo_root / "models" / "splade" / "onnx",
+            onnx_file="model.onnx",
+            vectors_dir=data_dir / "splade_vectors",
+            index_dir=repo_root / "indexes" / "splade",
+            provider="CPUExecutionProvider",
+            quantization=100,
+            max_terms=1000,
+            max_clause_count=4096,
+            batch_size=16,
+            threads=4,
+            enabled=False,
+            max_query_terms=32,
+            prune_below=0.0,
+            analyzer="wordpiece",
+            static_prune_pct=0.0,
+        ),
+        xtr=DEFAULT_XTR_SETTINGS,
+        embeddings=EmbeddingsSettings(),
+        vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
     )

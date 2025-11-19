@@ -54,7 +54,94 @@ def _dedupe_strings(values: Iterable[object]) -> list[str]:
 
 @dataclass(slots=True)
 class ModuleRecord(MutableMapping[str, Any]):
-    """Canonical per-module row emitted to ``modules.jsonl``."""
+    """Canonical per-module row emitted to ``modules.jsonl``.
+
+    Attributes
+    ----------
+    path : str
+        File path relative to repository root (e.g., "src/module.py").
+    repo_path : str, optional
+        Repository-relative path (may differ from path for submodules).
+        Defaults to empty string.
+    module_name : str | None, optional
+        Python module name (e.g., "module.submodule"). None if module name
+        cannot be determined. Defaults to None.
+    stable_id : str, optional
+        Stable identifier for this module (e.g., "module:path/to/module.py").
+        Defaults to empty string.
+    docstring : str | None, optional
+        Module-level docstring text. None if no docstring. Defaults to None.
+    doc_has_summary : bool, optional
+        Whether the docstring has a summary line. Defaults to False.
+    doc_param_parity : bool, optional
+        Whether function docstrings have parameter parity with signatures.
+        Defaults to True.
+    doc_examples_present : bool, optional
+        Whether the module docstring contains examples. Defaults to False.
+    imports : list[dict[str, Any]], optional
+        List of import statement dictionaries with module, names, aliases.
+        Defaults to empty list.
+    defs : list[dict[str, Any]], optional
+        List of definition dictionaries (functions, classes, variables).
+        Defaults to empty list.
+    exports : list[str], optional
+        List of symbol names exported by this module. Defaults to empty list.
+    exports_declared : list[str], optional
+        List of symbol names declared in __all__. Defaults to empty list.
+    outline_nodes : list[dict[str, Any]], optional
+        List of outline node dictionaries from Tree-sitter parsing.
+        Defaults to empty list.
+    scip_symbols : list[str], optional
+        List of SCIP symbol identifiers found in this module. Defaults to
+        empty list.
+    parse_ok : bool, optional
+        Whether the module parsed successfully. Defaults to True.
+    errors : list[str], optional
+        List of error messages encountered during processing. Defaults to
+        empty list.
+    tags : list[str], optional
+        List of tags inferred for this module (e.g., ["cli", "test"]).
+        Defaults to empty list.
+    type_errors : int, optional
+        Number of type errors reported (deprecated, use type_error_count).
+        Defaults to 0.
+    type_error_count : int, optional
+        Number of type errors reported by Pyrefly/Pyright. Defaults to 0.
+    doc_summary : str | None, optional
+        Extracted docstring summary line. None if no summary. Defaults to None.
+    doc_metrics : dict[str, Any], optional
+        Dictionary of docstring metrics (length, sections, etc.).
+        Defaults to empty dictionary.
+    doc_items : list[dict[str, Any]], optional
+        List of documented items (functions, classes) with their docstrings.
+        Defaults to empty list.
+    annotation_ratio : dict[str, Any], optional
+        Dictionary of type annotation coverage ratios. Defaults to empty
+        dictionary.
+    untyped_defs : int, optional
+        Number of definitions without type annotations. Defaults to 0.
+    side_effects : dict[str, Any], optional
+        Dictionary of side effect indicators (file I/O, network, etc.).
+        Defaults to empty dictionary.
+    raises : list[str], optional
+        List of exception types raised by functions in this module.
+        Defaults to empty list.
+    complexity : dict[str, Any], optional
+        Dictionary of complexity metrics (cyclomatic, cognitive, etc.).
+        Defaults to empty dictionary.
+    covered_lines_ratio : float, optional
+        Ratio of lines covered by tests (0.0 to 1.0). Defaults to 0.0.
+    covered_defs_ratio : float, optional
+        Ratio of definitions covered by tests (0.0 to 1.0). Defaults to 0.0.
+    config_refs : list[str], optional
+        List of configuration references found in this module. Defaults to
+        empty list.
+    overlay_needed : bool, optional
+        Whether this module needs a type stub overlay. Defaults to False.
+    _extra : dict[str, Any], optional
+        Additional fields not in the standard schema. Not included in repr.
+        Defaults to empty dictionary.
+    """
 
     path: str
     repo_path: str = ""

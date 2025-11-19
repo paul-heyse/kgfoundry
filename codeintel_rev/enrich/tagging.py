@@ -14,7 +14,19 @@ import yaml
 
 @dataclass(frozen=True)
 class TagResult:
-    """Result of running :func:`infer_tags`."""
+    """Result of running :func:`infer_tags`.
+
+    Attributes
+    ----------
+    path : str
+        File path that was tagged (relative to repository root).
+    tags : set[str]
+        Set of tag names inferred for this file (e.g., {"cli", "test"}).
+    reasons : dict[str, str], optional
+        Dictionary mapping tag names to reason strings explaining why each
+        tag was applied. Empty dictionary if no reasons are tracked.
+        Defaults to empty dictionary.
+    """
 
     path: str
     tags: set[str]
@@ -23,7 +35,33 @@ class TagResult:
 
 @dataclass(frozen=True)
 class ModuleTraits:
-    """Traits derived from a module used for tagging."""
+    """Traits derived from a module used for tagging.
+
+    Attributes
+    ----------
+    imported_modules : list[str]
+        List of module names imported by this module.
+    has_all : bool
+        Whether the module defines an __all__ export list.
+    is_reexport_hub : bool
+        Whether the module primarily re-exports symbols from other modules.
+    type_error_count : int, optional
+        Number of type errors reported for this module. Defaults to 0.
+    fan_in : int, optional
+        Number of modules that import this module. Defaults to 0.
+    fan_out : int, optional
+        Number of modules this module imports. Defaults to 0.
+    hotspot_score : float, optional
+        Hotspot score indicating code complexity and change frequency.
+        Defaults to 0.0.
+    covered_lines_ratio : float, optional
+        Ratio of lines covered by tests (0.0 to 1.0). Defaults to 1.0.
+    doc_has_summary : bool, optional
+        Whether the module docstring has a summary line. Defaults to True.
+    doc_param_parity : bool, optional
+        Whether function docstrings have parameter parity with signatures.
+        Defaults to True.
+    """
 
     imported_modules: list[str]
     has_all: bool

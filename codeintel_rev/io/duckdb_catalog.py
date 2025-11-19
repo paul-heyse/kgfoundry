@@ -121,7 +121,31 @@ _CST_KIND_QUERIES: dict[str, str] = {
 
 @dataclass(frozen=True)
 class _ScopeFilterSpec:
-    """Structured scope filter metadata used during scoped queries."""
+    """Structured scope filter metadata used during scoped queries.
+
+    Attributes
+    ----------
+    chunk_ids : tuple[int, ...]
+        Tuple of chunk IDs to filter by. Empty tuple means no ID filtering.
+    simple_include_globs : tuple[str, ...] | None
+        Simple glob patterns for inclusion (no wildcards in directory segments).
+        None means no inclusion filtering. Used for efficient SQL filtering.
+    simple_exclude_globs : tuple[str, ...] | None
+        Simple glob patterns for exclusion (no wildcards in directory segments).
+        None means no exclusion filtering. Used for efficient SQL filtering.
+    complex_include_patterns : tuple[str, ...]
+        Complex glob patterns for inclusion (may contain wildcards in directory
+        segments). Empty tuple means no complex inclusion filtering. Requires
+        post-query filtering in Python.
+    complex_exclude_patterns : tuple[str, ...]
+        Complex glob patterns for exclusion (may contain wildcards in directory
+        segments). Empty tuple means no complex exclusion filtering. Requires
+        post-query filtering in Python.
+    language_extensions : frozenset[str]
+        Set of file extensions to filter by language. Empty set means no
+        language filtering. Extensions should include the leading dot (e.g.,
+        {".py", ".ts"}).
+    """
 
     chunk_ids: tuple[int, ...]
     simple_include_globs: tuple[str, ...] | None
@@ -132,13 +156,39 @@ class _ScopeFilterSpec:
 
     @property
     def has_complex_globs(self) -> bool:
-        """Return ``True`` when complex include/exclude patterns exist."""
+        """Return ``True`` when complex include/exclude patterns exist.
+
+        Returns
+        -------
+        bool
+            True if either complex_include_patterns or complex_exclude_patterns
+            contains any patterns, False otherwise.
+        """
         return bool(self.complex_include_patterns or self.complex_exclude_patterns)
 
 
 @dataclass(slots=True, frozen=True)
 class StructureAnnotations:
-    """Structure-aware metadata joined onto explainability pools."""
+    """Structure-aware metadata joined onto explainability pools.
+
+    Attributes
+    ----------
+    uri : str
+        File URI or path identifier for the chunk. Matches the URI field
+        from chunk records.
+    symbol_hits : tuple[str, ...]
+        Tuple of SCIP symbol identifiers that match the chunk. Empty tuple
+        if no symbols match. Symbols are in SCIP format (e.g.,
+        "python kgfoundry.core#Function.main").
+    ast_node_kinds : tuple[str, ...]
+        Tuple of AST node kind identifiers found in the chunk. Empty tuple
+        if no AST nodes match. Node kinds are language-specific (e.g.,
+        "FunctionDef", "ClassDef" for Python).
+    cst_matches : tuple[str, ...]
+        Tuple of CST (Concrete Syntax Tree) node kind identifiers found in
+        the chunk. Empty tuple if no CST nodes match. Used for structure-aware
+        search and explainability.
+    """
 
     uri: str
     symbol_hits: tuple[str, ...]
@@ -148,7 +198,31 @@ class StructureAnnotations:
 
 @dataclass(frozen=True)
 class _StructMaterializationPlan:
-    """Precomputed SQL statements for struct table materialization."""
+    """Precomputed SQL statements for struct table materialization.
+
+    Attributes
+    ----------
+    create_sql : str
+        SQL statement to create the materialized table structure (empty table).
+    meta_create_sql : str
+        SQL statement to create the metadata table for tracking materialization
+        state (checksum, updated_at timestamp).
+    meta_select_sql : str
+        SQL statement to select the checksum from the metadata table for
+        change detection.
+    delete_sql : str
+        SQL statement to delete all rows from the materialized table before
+        refresh.
+    insert_sql : str
+        SQL statement to insert rows from the source view/table into the
+        materialized table.
+    meta_delete_sql : str
+        SQL statement to delete metadata rows before updating checksum.
+    meta_insert_sql : str
+        SQL statement to insert checksum and timestamp into the metadata table.
+    count_sql : str
+        SQL statement to count rows in the materialized table for validation.
+    """
 
     create_sql: str
     meta_create_sql: str
@@ -226,7 +300,28 @@ _STRUCT_MATERIALIZATION_PLANS: dict[str, _StructMaterializationPlan] = {
 
 @dataclass(slots=True)
 class DuckDBCatalogOptions:
-    """Optional configuration bundle for DuckDB catalog instantiation."""
+    """Optional configuration bundle for DuckDB catalog instantiation.
+
+    Attributes
+    ----------
+    materialize : bool, optional
+        Whether to materialize views immediately when creating the catalog.
+        If True, views are computed and persisted; if False, views are
+        registered but not computed until explicitly materialized. Defaults
+        to False.
+    manager : DuckDBManager | None, optional
+        Optional DuckDB manager instance for connection management. If None,
+        a new manager is created. Defaults to None.
+    log_queries : bool | None, optional
+        Whether to log SQL queries executed by the catalog. If None, uses
+        manager's default logging setting. Defaults to None.
+    repo_root : Path | None, optional
+        Optional repository root path for path resolution. If None, uses
+        manager's default. Defaults to None.
+    query_builder_factory : Callable[[], DuckDBQueryBuilder] | None, optional
+        Optional factory function for creating query builder instances. If None,
+        uses default query builder. Defaults to None.
+    """
 
     materialize: bool = False
     manager: DuckDBManager | None = None

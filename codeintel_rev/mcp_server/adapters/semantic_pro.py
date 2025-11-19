@@ -50,6 +50,13 @@ ProOptions = SemanticProOptions
 
 
 class Stage0Runner(Protocol):
+    """Protocol describing a Stage-0 hybrid search runner.
+
+    This protocol defines the interface for executing Stage-0 hybrid retrieval,
+    enabling type-safe interaction with search functionality while maintaining
+    compatibility across different search implementations.
+    """
+
     def __call__(
         self,
         engine: HybridSearchEngine,
@@ -58,26 +65,100 @@ class Stage0Runner(Protocol):
         semantic_hits: Sequence[tuple[int, float]] | None,
         limit: int,
         options: Stage0Options | None = None,
-    ) -> Stage0Result: ...
+    ) -> Stage0Result:
+        """Execute Stage-0 hybrid search with the provided engine and query.
+
+        Parameters
+        ----------
+        engine : HybridSearchEngine
+            Hybrid search engine instance to use for retrieval.
+        query : str
+            Query text to search for.
+        semantic_hits : Sequence[tuple[int, float]] | None, optional
+            Optional pre-computed semantic search hits to use as input.
+            If None, semantic search is performed as part of Stage-0.
+        limit : int
+            Maximum number of results to return.
+        options : Stage0Options | None, optional
+            Optional configuration for Stage-0 execution, including fusion
+            weights and other search parameters. Defaults to None.
+
+        Returns
+        -------
+        Stage0Result
+            Result containing document IDs, scores, warnings, and method metadata
+            from the Stage-0 hybrid search execution.
+        """
+        ...
 
 
 class LateInteractionRunner(Protocol):
+    """Protocol describing a late-interaction rescoring runner.
+
+    This protocol defines the interface for executing late-interaction rescoring
+    (e.g., XTR/WARP) on candidate documents, enabling type-safe interaction
+    with rescoring functionality.
+    """
+
     def rescore(
         self,
         query: str,
         candidate_ids: Sequence[int],
         *,
         explain: bool = False,
-    ) -> LateInteractionResult: ...
+    ) -> LateInteractionResult:
+        """Rescore candidate documents using late-interaction methods.
+
+        Parameters
+        ----------
+        query : str
+            Query text to use for rescoring.
+        candidate_ids : Sequence[int]
+            Sequence of document/chunk IDs to rescore.
+        explain : bool, optional
+            Whether to include explanation metadata in the result. Defaults to False.
+
+        Returns
+        -------
+        LateInteractionResult
+            Result containing rescored IDs, scores, and optional explanation
+            metadata from the late-interaction execution.
+        """
+        ...
 
 
 class Reranker(Protocol):
+    """Protocol describing a reranking interface.
+
+    This protocol defines the interface for reranking search results, enabling
+    type-safe interaction with reranking functionality while maintaining
+    compatibility across different reranker implementations.
+    """
+
     def rerank(
         self,
         query: str,
         ids: Iterable[int],
         scores: Iterable[float],
-    ) -> RerankResult: ...
+    ) -> RerankResult:
+        """Rerank search results using the query and initial scores.
+
+        Parameters
+        ----------
+        query : str
+            Query text to use for reranking.
+        ids : Iterable[int]
+            Iterable of document/chunk IDs to rerank.
+        scores : Iterable[float]
+            Iterable of initial relevance scores corresponding to each ID.
+
+        Returns
+        -------
+        RerankResult
+            Result containing reranked IDs and scores, potentially reordered
+            and rescored based on the reranker's algorithm.
+        """
+        ...
 
 
 StageGateDecider = Callable[[Mapping[str, object], StageGateConfig], StageDecision]
@@ -109,7 +190,14 @@ class SemanticProHooks:
         """
 
         class _NoopRerankerAdapter:
+            """Adapter wrapping NoopReranker to conform to Reranker protocol.
+
+            This adapter provides a no-op reranking implementation that preserves
+            the original order and scores of search results without modification.
+            """
+
             def __init__(self) -> None:
+                """Initialize the no-op reranker adapter."""
                 self._inner = NoopReranker()
 
             def rerank(
@@ -118,9 +206,34 @@ class SemanticProHooks:
                 ids: Iterable[int],
                 scores: Iterable[float],
             ) -> RerankResult:
+                """Rerank results using the no-op reranker (preserves order).
+
+                Parameters
+                ----------
+                query : str
+                    Query text (unused by no-op reranker).
+                ids : Iterable[int]
+                    Document/chunk IDs to rerank.
+                scores : Iterable[float]
+                    Initial relevance scores.
+
+                Returns
+                -------
+                RerankResult
+                    Result containing the same IDs and scores in the same order,
+                    as the no-op reranker does not modify results.
+                """
                 return self._inner.rerank(query, ids, scores)
 
         def _build_default_reranker() -> Reranker:
+            """Build the default no-op reranker instance.
+
+            Returns
+            -------
+            Reranker
+                A no-op reranker adapter that preserves original result order
+                and scores without modification.
+            """
             return cast("Reranker", _NoopRerankerAdapter())
 
         return cls(
@@ -157,6 +270,31 @@ def _semantic_search_pro_sync(
     options: SemanticProOptions | None,
     hooks: SemanticProHooks | None,
 ) -> AnswerEnvelope:
+    """Execute synchronous two-stage semantic search with optional reranking.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context providing access to search engines, catalog, XTR
+        index, and configuration.
+    query : str
+        Query text to search for. Empty queries result in error envelopes.
+    limit : int
+        Maximum number of results to return. Clamped by context limits.
+    options : SemanticProOptions | None, optional
+        User-facing options controlling late-interaction, reranking, and
+        explanation behavior. If None, uses defaults.
+    hooks : SemanticProHooks | None, optional
+        Runtime hooks for dependency injection. If None, uses default
+        production implementations.
+
+    Returns
+    -------
+    AnswerEnvelope
+        Structured MCP response containing findings, method metadata, limits,
+        confidence score, and stage execution details including gating decisions
+        and optional late-interaction/reranking results.
+    """
     hooks = hooks or SemanticProHooks.default()
     options = options or SemanticProOptions()
     query = (query or "").strip()
@@ -236,6 +374,26 @@ def _hydrate_ids(
     ids: Sequence[int],
     scores: Sequence[float],
 ) -> list[Finding]:
+    """Hydrate finding payloads from chunk IDs and scores using DuckDB catalog.
+
+    Parameters
+    ----------
+    catalog : DuckDBCatalog
+        DuckDB catalog instance for querying chunk metadata. Must have a
+        "chunks" view or table available.
+    ids : Sequence[int]
+        Sequence of chunk IDs to hydrate, ordered by relevance.
+    scores : Sequence[float]
+        Sequence of relevance scores corresponding to each chunk ID. Must
+        match the length of ids.
+
+    Returns
+    -------
+    list[Finding]
+        List of finding dictionaries containing chunk_id, score, and optionally
+        title (URI) if available from the catalog. Returns empty list if ids
+        is empty or the chunks relation does not exist.
+    """
     if not ids:
         return []
     with catalog.connection() as conn:
@@ -268,6 +426,28 @@ def _build_method(
     stages: list[StageInfo],
     reranker_summary: MethodRerankerInfo | None,
 ) -> MethodInfo:
+    """Assemble typed method metadata for the pro semantic search envelope.
+
+    Parameters
+    ----------
+    stage0 : Stage0Result
+        Result from Stage-0 hybrid search execution.
+    decision : StageDecision
+        Gating decision determining whether secondary stages ran.
+    notes : list[str]
+        List of warning or informational notes from execution.
+    stages : list[StageInfo]
+        List of stage execution records documenting late-interaction and
+        reranking stage status.
+    reranker_summary : MethodRerankerInfo | None, optional
+        Optional reranker metadata if reranking was executed.
+
+    Returns
+    -------
+    MethodInfo
+        Structured method dictionary summarizing Stage-0, gating decisions,
+        stage execution details, and optional reranker information.
+    """
     gating: MethodGatingInfo = {
         "should_run_secondary_stage": decision.should_run,
         "reason": decision.reason,

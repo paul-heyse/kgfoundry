@@ -31,7 +31,27 @@ CloseStatus = Literal["ok", "error", "noop"]
 
 @dataclass(slots=True, frozen=True)
 class RuntimeCellCloseResult:
-    """Immutable payload describing close outcome."""
+    """Immutable payload describing close outcome.
+
+    Attributes
+    ----------
+    cell : str
+        Name identifier of the runtime cell that was closed.
+    had_payload : bool
+        Whether the cell had a payload before closing. True if the cell
+        was initialized, False if it was never initialized.
+    close_called : bool
+        Whether the close() method was actually invoked. False if the
+        cell was already closed or never initialized.
+    status : CloseStatus
+        Close operation status: "ok" for successful close, "error" if an
+        exception occurred, "noop" if close was skipped.
+    duration_ms : float
+        Duration of the close operation in milliseconds.
+    error : Exception | None
+        Exception raised during close, if any. None if close succeeded
+        or was skipped.
+    """
 
     cell: str
     had_payload: bool
@@ -43,7 +63,17 @@ class RuntimeCellCloseResult:
 
 @dataclass(slots=True, frozen=True)
 class RuntimeCellInitContext:
-    """Request-scoped metadata captured during initialization."""
+    """Request-scoped metadata captured during initialization.
+
+    Attributes
+    ----------
+    session_id : str | None
+        Session identifier from request context, if available. Used for
+        tracking initialization across request boundaries.
+    capability_stamp : str | None
+        Capability stamp from request context, if available. Used for
+        tracking initialization across capability changes.
+    """
 
     session_id: str | None
     capability_stamp: str | None
@@ -51,7 +81,30 @@ class RuntimeCellInitContext:
 
 @dataclass(slots=True, frozen=True)
 class RuntimeCellInitResult:
-    """Immutable payload describing initialization outcome."""
+    """Immutable payload describing initialization outcome.
+
+    Attributes
+    ----------
+    cell : str
+        Name identifier of the runtime cell that was initialized.
+    payload : object | None
+        Initialized payload object, if initialization succeeded. None if
+        initialization failed or was skipped.
+    status : InitStatus
+        Initialization status: "ok" for successful initialization, "error"
+        if an exception occurred.
+    duration_ms : float
+        Duration of the initialization operation in milliseconds.
+    error : Exception | None
+        Exception raised during initialization, if any. None if initialization
+        succeeded.
+    generation : int
+        Generation number of this initialization attempt. Increments with
+        each initialization cycle.
+    context : RuntimeCellInitContext | None
+        Request-scoped context captured during initialization, if available.
+        Contains session_id and capability_stamp for tracking.
+    """
 
     cell: str
     payload: object | None

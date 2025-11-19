@@ -11,7 +11,19 @@ from typing import TYPE_CHECKING, cast
 
 import msgspec
 import pytest
-from codeintel_rev.config.settings import Settings
+from codeintel_rev.config.api import (
+    AppConfig,
+    BM25Settings,
+    DuckDBSettings,
+    EmbeddingsSettings,
+    FAISSSettings,
+    LoggingSettings,
+    PathsConfig,
+    SearchSettings,
+    SpladeSettings,
+    VLLMSettings,
+    XTRSettings,
+)
 from codeintel_rev.io.splade_manager import (
     SpladeArtifactMetadata,
     SpladeArtifactsContext,
@@ -33,16 +45,80 @@ from kgfoundry_common.subprocess_utils import SubprocessError
 if TYPE_CHECKING:
     from codeintel_rev.io.splade_manager import _SparseEncoderProtocol
 from tests._helpers import assertions
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import DEFAULT_XTR_SETTINGS
 
 
-def _bootstrap_repo(tmp_path: Path) -> tuple[Path, Settings]:
-    """Prepare a synthetic repository layout and corresponding settings.
+def _make_app_config(repo_root: Path) -> AppConfig:
+    """Return an AppConfig populated with repo-relative defaults.
 
     Returns
     -------
-    tuple[Path, Settings]
-        Tuple containing repo root path and configured Settings.
+    AppConfig
+        Immutable configuration referencing ``repo_root``.
+    """
+    data_dir = repo_root / "data"
+    paths = PathsConfig(
+        repo_root=repo_root,
+        data_dir=data_dir,
+        cache_dir=repo_root / ".cache",
+        logs_dir=repo_root / "logs",
+    )
+    duck_cfg = DuckDBSettings(database=data_dir / "catalog.duckdb")
+    faiss_cfg = FAISSSettings(index_path=data_dir / "faiss" / "code.ivfpq.faiss")
+    bm25_cfg = BM25Settings(
+        corpus_json_dir=data_dir / "bm25_json",
+        index_dir=repo_root / "indexes" / "bm25",
+        threads=8,
+        enabled=True,
+        k1=0.9,
+        b=0.4,
+        rm3_enabled=False,
+        rm3_fb_docs=10,
+        rm3_fb_terms=10,
+        rm3_original_query_weight=0.5,
+        analyzer="code",
+    )
+    splade_cfg = SpladeSettings(
+        model_id="naver/splade-v3",
+        model_dir=repo_root / "models" / "splade-v3",
+        onnx_dir=repo_root / "models" / "splade-v3" / "onnx",
+        onnx_file="model_qint8.onnx",
+        vectors_dir=data_dir / "splade_vectors",
+        index_dir=repo_root / "indexes" / "splade_v3_impact",
+        provider="CPUExecutionProvider",
+        quantization=100,
+        max_terms=3000,
+        max_clause_count=4096,
+        batch_size=32,
+        threads=8,
+        enabled=True,
+        max_query_terms=64,
+        prune_below=0.0,
+        analyzer="wordpiece",
+        static_prune_pct=0.0,
+    )
+    return AppConfig(
+        version="1.0",
+        paths=paths,
+        duckdb=duck_cfg,
+        faiss=faiss_cfg,
+        bm25=bm25_cfg,
+        splade=splade_cfg,
+        xtr=DEFAULT_XTR_SETTINGS,
+        embeddings=EmbeddingsSettings(),
+        vllm=VLLMSettings(),
+        search=SearchSettings(),
+        logging=LoggingSettings(),
+    )
+
+
+def _bootstrap_repo(tmp_path: Path) -> tuple[Path, AppConfig]:
+    """Prepare a synthetic repository layout and corresponding AppConfig.
+
+    Returns
+    -------
+    tuple[Path, AppConfig]
+        Tuple containing repo root path and configured AppConfig.
     """
     repo_root = tmp_path / "repo"
     models_dir = repo_root / "models" / "splade-v3" / "onnx"
@@ -61,22 +137,18 @@ def _bootstrap_repo(tmp_path: Path) -> tuple[Path, Settings]:
     (repo_root / "data" / "catalog.duckdb").touch()
     (repo_root / "index.scip").write_text("{}", encoding="utf-8")
 
-    settings = build_settings_for_repo(
-        repo_root,
-        splade_overrides={
-            "threads": 4,
-            "batch_size": 8,
-            "model_dir": str(repo_root / "models" / "splade-v3"),
-            "onnx_dir": str(models_dir),
-            "vectors_dir": str(vectors_dir),
-            "index_dir": str(splade_index_dir),
-        },
-        bm25_overrides={
-            "corpus_json_dir": str(repo_root / "data" / "jsonl"),
-            "index_dir": str(bm25_dir),
-        },
+    app_config = _make_app_config(repo_root)
+    splade_cfg = replace(
+        app_config.splade,
+        threads=4,
+        batch_size=8,
+        model_dir=repo_root / "models" / "splade-v3",
+        onnx_dir=models_dir,
+        vectors_dir=vectors_dir,
+        index_dir=splade_index_dir,
     )
-    return repo_root, settings
+    app_config = replace(app_config, splade=splade_cfg)
+    return repo_root, app_config
 
 
 def _stub_save_pretrained(path: str) -> None:
@@ -193,11 +265,11 @@ def _build_stub_encoder_factory() -> Callable[[], Callable[..., _SparseEncoderPr
 
 def test_export_onnx_writes_metadata(tmp_path: Path) -> None:
     """Exporting ONNX artifacts should persist metadata and respect configuration overrides."""
-    _, settings = _bootstrap_repo(tmp_path)
+    _, app_config = _bootstrap_repo(tmp_path)
     encoder_context = SpladeEncoderContext(encoder_factory=_build_stub_encoder_factory())
 
     def fake_export_helpers() -> tuple[Callable[..., None], Callable[..., None]]:
-        onnx_dir = Path(settings.splade.onnx_dir)
+        onnx_dir = app_config.splade.onnx_dir
 
         def optimizer(**_: object) -> None:
             (onnx_dir / "model_O3.onnx").write_text("optimized", encoding="utf-8")
@@ -212,7 +284,7 @@ def test_export_onnx_writes_metadata(tmp_path: Path) -> None:
         export_helpers_factory=fake_export_helpers,
         clock=lambda: datetime(2024, 1, 1, tzinfo=UTC),
     )
-    manager = SpladeArtifactsManager(settings, artifacts_context=artifacts_context)
+    manager = SpladeArtifactsManager(app_config, artifacts_context=artifacts_context)
 
     summary = manager.export_onnx(
         SpladeExportOptions(
@@ -241,7 +313,7 @@ def test_encode_corpus_writes_vectors(
     tmp_path: Path,
 ) -> None:
     """Encoding should emit JsonVectorCollection shards and metadata."""
-    repo_root, settings = _bootstrap_repo(tmp_path)
+    repo_root, app_config = _bootstrap_repo(tmp_path)
     source = repo_root / "datasets" / "corpus.jsonl"
     source.parent.mkdir(parents=True, exist_ok=True)
     rows = [
@@ -256,7 +328,7 @@ def test_encode_corpus_writes_vectors(
     quantized_file.write_text("quantized", encoding="utf-8")
 
     encoder_context = SpladeEncoderContext(encoder_factory=_build_stub_encoder_factory())
-    service = SpladeEncoderService(settings, encoder_context=encoder_context)
+    service = SpladeEncoderService(app_config, encoder_context=encoder_context)
 
     summary = service.encode_corpus(
         source,
@@ -280,14 +352,14 @@ def test_encode_corpus_writes_vectors(
 
 def test_benchmark_queries_reports_latency(tmp_path: Path) -> None:
     """Benchmarking should report latency percentiles for SPLADE query encoding."""
-    repo_root, settings = _bootstrap_repo(tmp_path)
+    repo_root, app_config = _bootstrap_repo(tmp_path)
     quantized_file = Path(repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx")
     quantized_file.write_text("quantized", encoding="utf-8")
 
     encoder_context = SpladeEncoderContext(encoder_factory=_build_stub_encoder_factory())
     timings = iter([0.0, 0.005, 0.100, 0.120, 0.200, 0.240])
     service = SpladeEncoderService(
-        settings,
+        app_config,
         encoder_context=encoder_context,
         timer=lambda: next(timings),
     )
@@ -310,8 +382,8 @@ def test_benchmark_queries_reports_latency(tmp_path: Path) -> None:
 
 def test_build_index_persists_metadata(tmp_path: Path) -> None:
     """Index builds should invoke Pyserini via subprocess and record metadata."""
-    _, settings = _bootstrap_repo(tmp_path)
-    vectors_dir = Path(settings.splade.vectors_dir)
+    _, app_config = _bootstrap_repo(tmp_path)
+    vectors_dir = app_config.splade.vectors_dir
     metadata_struct = SpladeEncodingMetadata(
         doc_count=3,
         shard_count=1,
@@ -333,7 +405,7 @@ def test_build_index_persists_metadata(tmp_path: Path) -> None:
     def fake_run(cmd: list[str], env: dict[str, str] | None = None) -> str:
         captured_commands.append(cmd)
         _ = env
-        index_dir = Path(settings.splade.index_dir)
+        index_dir = app_config.splade.index_dir
         index_dir.mkdir(parents=True, exist_ok=True)
         (index_dir / "segments_1").write_text("stub", encoding="utf-8")
         return ""
@@ -344,7 +416,7 @@ def test_build_index_persists_metadata(tmp_path: Path) -> None:
         version_provider=lambda: "test",
         clock=lambda: datetime(2024, 1, 1, tzinfo=UTC),
     )
-    manager = SpladeIndexManager(settings, index_context=index_context)
+    manager = SpladeIndexManager(app_config, index_context=index_context)
 
     metadata = manager.build_index(
         SpladeBuildOptions(
@@ -369,7 +441,7 @@ def test_build_index_persists_metadata(tmp_path: Path) -> None:
 
 def test_build_index_raises_when_subprocess_fails(tmp_path: Path) -> None:
     """Pyserini failures should surface as SubprocessError."""
-    _, settings = _bootstrap_repo(tmp_path)
+    _, app_config = _bootstrap_repo(tmp_path)
 
     def fake_run(cmd: list[str], env: dict[str, str] | None = None) -> str:
         _ = cmd, env
@@ -380,7 +452,7 @@ def test_build_index_raises_when_subprocess_fails(tmp_path: Path) -> None:
         SpladeIndexContext.production(),
         subprocess_runner=fake_run,
     )
-    manager = SpladeIndexManager(settings, index_context=index_context)
+    manager = SpladeIndexManager(app_config, index_context=index_context)
 
     with pytest.raises(SubprocessError):
         manager.build_index()

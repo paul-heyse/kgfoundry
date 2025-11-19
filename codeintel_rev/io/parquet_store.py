@@ -72,7 +72,31 @@ EMBEDDINGS_RANK: int = 2
 
 @dataclass(slots=True, frozen=True)
 class ParquetWriteOptions:
-    """Configuration for Parquet persistence."""
+    """Configuration for Parquet persistence.
+
+    Attributes
+    ----------
+    start_id : int, optional
+        Starting chunk ID for sequential ID assignment. Used when id_strategy
+        is "sequence". Defaults to 0.
+    vec_dim : int, optional
+        Embedding vector dimension. Must match the dimension of embeddings
+        being written. Defaults to 3584.
+    preview_max_chars : int, optional
+        Maximum number of characters to include in chunk preview text. Longer
+        previews are truncated. Defaults to 240.
+    id_strategy : Literal["sequence", "stable_hash"], optional
+        Strategy for generating chunk IDs. "sequence" uses sequential IDs
+        starting from start_id. "stable_hash" uses content-based hashing
+        with id_hash_salt. Defaults to "sequence".
+    id_hash_salt : str, optional
+        Salt string used for stable hash ID generation when id_strategy is
+        "stable_hash". Empty string means no salt. Defaults to "".
+    table_meta : dict[str, str] | None, optional
+        Optional metadata dictionary to attach to the Parquet table. Keys
+        and values must be strings. Used for storing provenance or version
+        information. Defaults to None.
+    """
 
     start_id: int = 0
     vec_dim: int = 3584

@@ -13,17 +13,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import Any, Protocol, cast
 
 import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.config.api import AppConfig
 from codeintel_rev.io.bm25_engine import BM25Engine
 from codeintel_rev.io.path_utils import resolve_within_repo
 from kgfoundry_common.subprocess_utils import run_subprocess
-
-if TYPE_CHECKING:
-    from codeintel_rev.config.settings import Settings
 
 GENERATOR_NAME = "codeintel_rev.io.bm25_manager"
 CORPUS_METADATA_FILENAME = "metadata.json"
@@ -35,30 +33,125 @@ _lucene_search = LazyModule("pyserini.search.lucene", "bm25 search runtime")
 
 
 class _LuceneHit(Protocol):
+    """Protocol describing a Lucene search result hit.
+
+    Attributes
+    ----------
+    docid : str | int
+        Document identifier from the search result.
+    score : float
+        Relevance score assigned by the search engine.
+    """
+
     docid: str | int
     score: float
 
 
 class _LuceneSearcher(Protocol):
-    def search(self, query: str, k: int) -> TypingSequence[_LuceneHit]: ...
+    """Protocol describing the Pyserini Lucene searcher interface.
 
-    def set_bm25(self, k1: float, b: float) -> None: ...
+    This protocol abstracts the Pyserini LuceneSearcher API to enable
+    type-safe interaction with search functionality while maintaining
+    compatibility across different Pyserini versions.
+    """
 
-    def set_rm3(self, fb_docs: int, fb_terms: int, original_query_weight: float) -> None: ...
+    def search(self, query: str, k: int) -> TypingSequence[_LuceneHit]:
+        """Search the index for documents matching the query.
 
-    def set_analyzer(self, analyzer: str) -> None: ...
+        Parameters
+        ----------
+        query : str
+            Query string to search for.
+        k : int
+            Maximum number of results to return.
+
+        Returns
+        -------
+        TypingSequence[_LuceneHit]
+            Sequence of search hits ordered by relevance score descending.
+        """
+        ...
+
+    def set_bm25(self, k1: float, b: float) -> None:
+        """Configure BM25 ranking parameters.
+
+        Parameters
+        ----------
+        k1 : float
+            Term frequency saturation parameter.
+        b : float
+            Length normalization parameter.
+        """
+        ...
+
+    def set_rm3(self, fb_docs: int, fb_terms: int, original_query_weight: float) -> None:
+        """Configure RM3 query expansion parameters.
+
+        Parameters
+        ----------
+        fb_docs : int
+            Number of feedback documents to use for expansion.
+        fb_terms : int
+            Number of expansion terms to add to the query.
+        original_query_weight : float
+            Weight given to the original query terms versus expansion terms.
+        """
+        ...
+
+    def set_analyzer(self, analyzer: str) -> None:
+        """Set the text analyzer for query processing.
+
+        Parameters
+        ----------
+        analyzer : str
+            Name of the analyzer to use (e.g., "english", "standard").
+        """
+        ...
 
 
 class _LuceneMultiFieldSearcher(Protocol):
+    """Protocol describing a multi-field Lucene searcher interface.
+
+    This protocol extends the basic Lucene searcher with support for
+    searching across multiple fields with per-field boost weights.
+    """
+
     def search_fields(
         self,
         query: str,
         fields: Sequence[str],
         boosts: Sequence[float],
         k: int,
-    ) -> TypingSequence[_LuceneHit]: ...
+    ) -> TypingSequence[_LuceneHit]:
+        """Search multiple fields with per-field boost weights.
 
-    def set_analyzer(self, analyzer: str) -> None: ...
+        Parameters
+        ----------
+        query : str
+            Query string to search for.
+        fields : Sequence[str]
+            Field names to search across.
+        boosts : Sequence[float]
+            Boost weights for each field, must match the length of fields.
+        k : int
+            Maximum number of results to return.
+
+        Returns
+        -------
+        TypingSequence[_LuceneHit]
+            Sequence of search hits ordered by relevance score descending.
+        """
+        ...
+
+    def set_analyzer(self, analyzer: str) -> None:
+        """Set the text analyzer for query processing.
+
+        Parameters
+        ----------
+        analyzer : str
+            Name of the analyzer to use (e.g., "english", "standard").
+        """
+        ...
 
 
 class BM25CorpusMetadata(msgspec.Struct, frozen=True):
@@ -137,7 +230,7 @@ class BM25IndexManager:
 
     def __init__(
         self,
-        settings: Settings,
+        app_config: AppConfig,
         *,
         logger_: logging.Logger | None = None,
         build_context: BM25BuildContext | None = None,
@@ -146,17 +239,16 @@ class BM25IndexManager:
 
         Parameters
         ----------
-        settings : Settings
-            Application settings containing BM25 configuration.
+        app_config : AppConfig
+            Immutable application configuration containing BM25 settings.
         logger_ : logging.Logger | None, optional
             Custom logger instance. If None, uses module logger.
         build_context : BM25BuildContext | None, optional
             Build context for index construction. If None, uses production context.
         """
-        self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
-        self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
-        self._config = settings.bm25
+        self._repo_root = Path(app_config.paths.repo_root).expanduser().resolve()
+        self._config = app_config.bm25
         self._build_context = build_context or BM25BuildContext.production()
 
     @property
@@ -664,6 +756,20 @@ class BM25QueryEngine:
         return [self.search(query, options=options) for query in queries]
 
     def _ensure_searcher(self, module: object) -> _LuceneSearcher:
+        """Create or return a cached Lucene searcher instance.
+
+        Parameters
+        ----------
+        module : object
+            The Pyserini Lucene search module containing the LuceneSearcher class.
+
+        Returns
+        -------
+        _LuceneSearcher
+            A Lucene searcher instance bound to the index directory. The searcher
+            is cached after first creation and configured with the analyzer if
+            one was specified during engine initialization.
+        """
         searcher = self._searcher
         if searcher is not None:
             return searcher
@@ -682,6 +788,29 @@ class BM25QueryEngine:
         default_searcher: _LuceneSearcher,
         limit: int,
     ) -> TypingSequence[_LuceneHit] | None:
+        """Perform multi-field search with per-field boost weights.
+
+        Parameters
+        ----------
+        module : object
+            The Pyserini Lucene search module, used to create a multi-field
+            searcher if available.
+        query : str
+            Query text to search for.
+        weights : dict[str, float]
+            Dictionary mapping field names to boost weights.
+        default_searcher : _LuceneSearcher
+            Fallback searcher to use if multi-field search is not available.
+        limit : int
+            Maximum number of results to return.
+
+        Returns
+        -------
+        TypingSequence[_LuceneHit] | None
+            Sequence of search hits if multi-field search is supported, None
+            if multi-field search is not available and fallback to default
+            searcher failed.
+        """
         if self._mf_searcher is None:
             mf_cls = getattr(module, "LuceneMultiFieldSearcher", None)
             if mf_cls is not None:
@@ -701,6 +830,22 @@ class BM25QueryEngine:
 
     @staticmethod
     def _compose_fielded_query(query: str, weights: dict[str, float] | None) -> str:
+        """Compose a Lucene query string with field-specific boosts.
+
+        Parameters
+        ----------
+        query : str
+            Base query text to search for.
+        weights : dict[str, float] | None
+            Dictionary mapping field names to boost weights. If None or empty,
+            returns the base query unchanged.
+
+        Returns
+        -------
+        str
+            A Lucene query string combining the base query with field-specific
+            boosted queries. Format: "(query) (field1:(query))^weight1 ..."
+        """
         if not weights:
             return query
         parts = [f"({query})"]

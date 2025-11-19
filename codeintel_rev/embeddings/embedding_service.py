@@ -13,12 +13,8 @@ from dataclasses import dataclass
 from types import ModuleType, TracebackType
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
-from codeintel_rev.config.settings import (
-    EmbeddingsConfig,
-    IndexConfig,
-    Settings,
-    VLLMConfig,
-)
+from codeintel_rev.config.api import EmbeddingsSettings, VLLMSettings
+from codeintel_rev.config.settings import IndexConfig
 from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 from codeintel_rev.runtime.imports import gate_import
 from codeintel_rev.typing import NDArrayF32
@@ -36,7 +32,29 @@ class EmbeddingConfigError(ValueError):
 
 @dataclass(frozen=True)
 class EmbeddingMetadata:
-    """Structured metadata describing the active embedding provider."""
+    """Structured metadata describing the active embedding provider.
+
+    Attributes
+    ----------
+    provider : str
+        Provider identifier (e.g., "vllm", "hf" for HuggingFace). Used for
+        provider selection and logging.
+    model_name : str
+        Model identifier (e.g., "nomic-ai/nomic-embed-code"). Used for model
+        loading and fingerprinting.
+    dimension : int
+        Embedding vector dimension. All embeddings produced by this provider
+        have this dimension.
+    dtype : str
+        NumPy dtype string for embeddings (e.g., "float32"). Used for type
+        validation and array creation.
+    normalize : bool
+        Whether embeddings are L2-normalized. Normalized embeddings have unit
+        length, enabling cosine similarity via dot product.
+    device : str
+        Device identifier where embeddings are computed (e.g., "cpu", "cuda",
+        "mps"). Used for device placement and logging.
+    """
 
     provider: str
     model_name: str
@@ -416,7 +434,7 @@ class _ProviderState:
 
     Attributes
     ----------
-    config : EmbeddingsConfig
+    config : EmbeddingsSettings
         Embedding configuration settings.
     index : IndexConfig
         Index configuration including vector dimension.
@@ -436,7 +454,7 @@ class _ProviderState:
         Cached provider fingerprint hash, None until first access.
     """
 
-    config: EmbeddingsConfig
+    config: EmbeddingsSettings
     index: IndexConfig
     provider_name: str
     device_label: str
@@ -454,7 +472,7 @@ class _ProviderBase(EmbeddingProvider):
         self,
         *,
         provider_name: str,
-        config: EmbeddingsConfig,
+        config: EmbeddingsSettings,
         index: IndexConfig,
         device_label: str,
     ) -> None:
@@ -464,7 +482,7 @@ class _ProviderBase(EmbeddingProvider):
         ----------
         provider_name : str
             Name identifier for this provider (e.g., "vllm", "hf").
-        config : EmbeddingsConfig
+        config : EmbeddingsSettings
             Embedding service configuration.
         index : IndexConfig
             Index configuration for dimension and normalization settings.
@@ -803,19 +821,19 @@ class VLLMProvider(_ProviderBase):
     def __init__(
         self,
         *,
-        embeddings: EmbeddingsConfig,
+        embeddings: EmbeddingsSettings,
         index: IndexConfig,
-        vllm_config: VLLMConfig,
+        vllm_config: VLLMSettings,
     ) -> None:
         """Initialize vLLM embedding provider.
 
         Parameters
         ----------
-        embeddings : EmbeddingsConfig
+        embeddings : EmbeddingsSettings
             Embedding service configuration.
         index : IndexConfig
             Index configuration for dimension and normalization.
-        vllm_config : VLLMConfig
+        vllm_config : VLLMSettings
             vLLM-specific configuration (model, host, port, etc.).
         """
         super().__init__(
@@ -847,8 +865,10 @@ class VLLMProvider(_ProviderBase):
 
 
 def get_embedding_provider(
-    settings: Settings,
     *,
+    embeddings: EmbeddingsSettings,
+    index: IndexConfig,
+    vllm: VLLMSettings,
     prefer: str | None = None,
 ) -> EmbeddingProvider:
     """Return the configured embedding provider, falling back when allowed.
@@ -861,15 +881,18 @@ def get_embedding_provider(
 
     Parameters
     ----------
-    settings : Settings
-        Application settings containing embedding configuration (provider name,
-        model name, device, normalization, etc.) and index configuration (vector
-        dimension). Used to initialize the selected provider.
+    embeddings : EmbeddingsSettings
+        Embedding provider configuration (provider name, model, device, batching,
+        normalization, and fallback behavior).
+    index : IndexConfig
+        Index configuration supplying vector dimensionality and normalization
+        defaults used by embedding providers.
+    vllm : VLLMSettings
+        vLLM runtime configuration for in-process embedding execution.
     prefer : str | None, optional
-        Preferred provider name to use instead of settings.embeddings.provider.
-        If None, uses the configured provider from settings. Valid values are
-        "vllm" or "hf" (case-insensitive). Used to override default provider
-        selection.
+        Preferred provider name to use instead of embeddings.provider. If None,
+        uses the configured provider. Valid values are "vllm" or "hf"
+        (case-insensitive). Used to override default provider selection.
 
     Returns
     -------
@@ -902,28 +925,28 @@ def get_embedding_provider(
     when fallback is enabled, or raises appropriate errors when no provider can
     be initialized.
     """
-    provider_name = (prefer or settings.embeddings.provider).lower()
+    provider_name = (prefer or embeddings.provider).lower()
     if provider_name == "hf":
         try:
-            return HFEmbeddingProvider(embeddings=settings.embeddings, index=settings.index)
+            return HFEmbeddingProvider(embeddings=embeddings, index=index)
         except Exception as exc:
             msg = f"Failed to initialize HF provider: {exc}"
             raise EmbeddingRuntimeError(msg) from exc
     if provider_name != "vllm":
-        msg = f"Unsupported embedding provider: {prefer or settings.embeddings.provider}"
+        msg = f"Unsupported embedding provider: {prefer or embeddings.provider}"
         raise EmbeddingConfigError(msg)
     try:
         return VLLMProvider(
-            embeddings=settings.embeddings,
-            index=settings.index,
-            vllm_config=settings.vllm,
+            embeddings=embeddings,
+            index=index,
+            vllm_config=vllm,
         )
     except Exception as vllm_error:
-        if settings.embeddings.allow_hf_fallback:
+        if embeddings.allow_hf_fallback:
             try:
                 return HFEmbeddingProvider(
-                    embeddings=settings.embeddings,
-                    index=settings.index,
+                    embeddings=embeddings,
+                    index=index,
                 )
             except Exception as hf_error:
                 message = (
@@ -938,12 +961,12 @@ def get_embedding_provider(
 class HFEmbeddingProvider(_ProviderBase):
     """Hugging Face transformers fallback provider."""
 
-    def __init__(self, *, embeddings: EmbeddingsConfig, index: IndexConfig) -> None:
+    def __init__(self, *, embeddings: EmbeddingsSettings, index: IndexConfig) -> None:
         """Initialize Hugging Face transformers embedding provider.
 
         Parameters
         ----------
-        embeddings : EmbeddingsConfig
+        embeddings : EmbeddingsSettings
             Embedding service configuration.
         index : IndexConfig
             Index configuration for dimension and normalization.

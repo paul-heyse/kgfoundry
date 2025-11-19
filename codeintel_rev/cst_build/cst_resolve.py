@@ -15,7 +15,16 @@ from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 
 @dataclass(slots=True, frozen=True)
 class ModuleRow:
-    """Lightweight projection of a module.jsonl row."""
+    """Lightweight projection of a module.jsonl row.
+
+    Attributes
+    ----------
+    module_id : str
+        Unique identifier for the module (e.g., "module:path/to/module.py").
+    raw : Mapping[str, Any]
+        Raw module metadata dictionary from modules.jsonl. Contains all fields
+        from the original module record.
+    """
 
     module_id: str
     raw: Mapping[str, Any]
@@ -23,7 +32,15 @@ class ModuleRow:
 
 @dataclass(slots=True, frozen=True)
 class StitchCounters:
-    """Aggregate match counters used for index.json."""
+    """Aggregate match counters used for index.json.
+
+    Attributes
+    ----------
+    module_matches : int, optional
+        Number of CST nodes successfully matched to module records. Defaults to 0.
+    scip_matches : int, optional
+        Number of CST nodes successfully matched to SCIP symbols. Defaults to 0.
+    """
 
     module_matches: int = 0
     scip_matches: int = 0

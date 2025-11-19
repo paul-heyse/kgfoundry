@@ -9,15 +9,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.config.settings import XTRConfig
+from codeintel_rev.config.api import XTRSettings
 from codeintel_rev.runtime import RuntimeCell
 from codeintel_rev.runtime.imports import gate_import
 from codeintel_rev.typing import NDArrayF32, TorchModule
 
 if TYPE_CHECKING:
     import numpy as np
+    from codeintel_rev.config.settings import XTRConfig as LegacyXTRConfig
 else:
     np = cast("np", LazyModule("numpy", "XTR index operations"))
+    LegacyXTRConfig = object
 
 
 class XTRMetadata(TypedDict):
@@ -46,6 +48,12 @@ class _XTRIndexRuntime:
     )
 
     def __init__(self) -> None:
+        """Initialize XTR index runtime state.
+
+        Creates a new runtime state tracker with all fields set to None.
+        Fields are populated during index loading and must be cleaned up
+        via the close() method to release resources.
+        """
         self.meta: XTRMetadata | None = None
         self.tokens: np.memmap | None = None
         self.tokenizer: Any | None = None
@@ -65,17 +73,54 @@ class _XTRIndexRuntime:
         self.test_vectors = None
 
 
+def _coerce_xtr_settings(config: XTRSettings | LegacyXTRConfig) -> XTRSettings:
+    """Return XTRSettings from either dataclass or legacy struct.
+
+    Parameters
+    ----------
+    config : XTRSettings | object
+        Candidate configuration object that may already be ``XTRSettings`` or
+        a msgspec struct from :mod:`codeintel_rev.config.settings`.
+
+    Returns
+    -------
+    XTRSettings
+        Normalized dataclass representation of the supplied configuration.
+    """
+    if isinstance(config, XTRSettings):
+        return config
+    dtype_value = str(getattr(config, "dtype", "float16")).lower()
+    dtype: Literal["float16", "float32"] = "float32" if dtype_value == "float32" else "float16"
+    mode_value = str(getattr(config, "mode", "narrow")).lower()
+    mode: Literal["narrow", "wide"] = "wide" if mode_value == "wide" else "narrow"
+    return XTRSettings(
+        model_id=getattr(config, "model_id", "nomic-ai/CodeRankEmbed"),
+        device=getattr(config, "device", "cuda"),
+        max_query_tokens=int(getattr(config, "max_query_tokens", 256)),
+        candidate_k=int(getattr(config, "candidate_k", 200)),
+        dim=int(getattr(config, "dim", 768)),
+        dtype=dtype,
+        enable=bool(getattr(config, "enable", False)),
+        mode=mode,
+    )
+
+
 @dataclass(slots=True, frozen=True)
 class XTRIndex:
     """Memory-mapped XTR token index with query encoding + scoring helpers."""
 
     root: Path
-    config: XTRConfig
+    config: XTRSettings | LegacyXTRConfig
     _cell: RuntimeCell[_XTRIndexRuntime] = field(
         default_factory=lambda: RuntimeCell(name="xtr-index"),
         init=False,
         repr=False,
     )
+
+    def __post_init__(self) -> None:
+        """Normalize config to AppConfig dataclass."""
+        normalized = _coerce_xtr_settings(self.config)
+        object.__setattr__(self, "config", normalized)
 
     def seed_runtime_for_tests(self, encoder_vectors: NDArrayF32 | None = None) -> None:
         """Seed runtime state with explicit encoder vectors for testing."""

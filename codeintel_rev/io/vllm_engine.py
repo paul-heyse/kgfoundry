@@ -69,7 +69,7 @@ class PoolerConfig(Protocol):
 if TYPE_CHECKING:
     import numpy as np
 
-    from codeintel_rev.config.settings import VLLMConfig
+    from codeintel_rev.config.api import VLLMSettings
 
     transformers = cast("Any", None)
     vllm = cast("Any", None)
@@ -119,10 +119,23 @@ class _InprocessVLLMRuntime:
 
 @dataclass(slots=True, frozen=True)
 class InprocessVLLMContext:
-    """Dependency providers for in-process vLLM embeddings."""
+    """Dependency providers for in-process vLLM embeddings.
+
+    Attributes
+    ----------
+    tokenizer_factory : Callable[[str], TokenizerProtocol]
+        Factory function that creates a TokenizerProtocol instance from a
+        model identifier string. Used for dependency injection in tests.
+    llm_factory : Callable[[VLLMSettings], LLM]
+        Factory function that creates an LLM instance from VLLM settings.
+        Used for dependency injection in tests.
+    tokens_prompt_factory : Callable[[Sequence[int]], TokensPrompt]
+        Factory function that creates a TokensPrompt from a sequence of token
+        IDs. Used for dependency injection in tests.
+    """
 
     tokenizer_factory: Callable[[str], TokenizerProtocol]
-    llm_factory: Callable[[VLLMConfig], LLM]
+    llm_factory: Callable[[VLLMSettings], LLM]
     tokens_prompt_factory: Callable[[Sequence[int]], TokensPrompt]
 
     @classmethod
@@ -155,7 +168,7 @@ class InprocessVLLMContext:
             )
             return cast("TokenizerProtocol", tokenizer)
 
-        def _llm(cfg: VLLMConfig) -> LLM:
+        def _llm(cfg: VLLMSettings) -> LLM:
             """Create vLLM LLM instance from configuration.
 
             Parameters
@@ -234,7 +247,7 @@ class InprocessVLLMEmbedder:
     1
     """
 
-    config: VLLMConfig
+    config: VLLMSettings
     _cell: RuntimeCell[_InprocessVLLMRuntime] = field(
         default_factory=lambda: RuntimeCell(name="inprocess-vllm"),
         init=False,

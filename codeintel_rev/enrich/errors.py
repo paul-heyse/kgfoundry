@@ -21,7 +21,24 @@ __all__ = [
 
 @dataclass(slots=True, frozen=True)
 class StageError(Exception):
-    """Base error describing a failed enrichment stage."""
+    """Base error describing a failed enrichment stage.
+
+    Attributes
+    ----------
+    stage : str
+        Enrichment stage name where the error occurred (e.g., "scip", "type-signals").
+    reason : str
+        Brief reason string describing the error.
+    path : str | None, optional
+        File path where the error occurred. None if path is not applicable.
+        Defaults to None.
+    detail : str | None, optional
+        Detailed error message or stack trace. None if no detail is available.
+        Defaults to None.
+    data : Mapping[str, Any], optional
+        Additional error context data. Empty dictionary if no additional data.
+        Defaults to empty dictionary.
+    """
 
     stage: str
     reason: str

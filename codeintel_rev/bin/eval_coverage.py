@@ -94,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
 @lru_cache(maxsize=1)
 def _cached_app_config() -> AppConfig:
     """Load and cache AppConfig for CLI invocations.

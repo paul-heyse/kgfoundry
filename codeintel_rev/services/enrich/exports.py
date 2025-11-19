@@ -40,7 +40,15 @@ from codeintel_rev.uses_builder import write_use_graph
 
 
 def write_exports_outputs(result: PipelineResult, out: Path) -> None:
-    """Write modules.jsonl, markdown sheets, repo map, and tag index."""
+    """Write modules.jsonl, markdown sheets, repo map, and tag index.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing module rows and tag index to export.
+    out : Path
+        Output directory where export files will be written.
+    """
     with _stage(StageMeta("write-exports", {"modules": len(result.module_rows)})) as meta:
         write_modules_json(out, result.module_rows)
         write_markdown_modules(out, result.module_rows)
@@ -50,7 +58,15 @@ def write_exports_outputs(result: PipelineResult, out: Path) -> None:
 
 
 def write_graph_outputs(result: PipelineResult, out: Path) -> None:
-    """Write symbol/import graphs."""
+    """Write symbol/import graphs.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing symbol edges and import graph to export.
+    out : Path
+        Output directory where graph files will be written.
+    """
     with _stage(StageMeta("write-graphs", {"symbols": len(result.symbol_edges)})) as meta:
         write_symbol_graph(out, result.symbol_edges)
         write_import_graph(result.import_graph, out / "graphs" / "imports.parquet")
@@ -58,7 +74,15 @@ def write_graph_outputs(result: PipelineResult, out: Path) -> None:
 
 
 def write_uses_output(result: PipelineResult, out: Path) -> None:
-    """Write uses graph parquet."""
+    """Write uses graph parquet.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing use graph to export.
+    out : Path
+        Output directory where use graph files will be written.
+    """
     with _stage(StageMeta("write-uses", {"files": len(result.use_graph.uses_by_file)})) as meta:
         write_use_graph(result.use_graph, out / "graphs" / "uses.parquet")
         meta["edges"] = sum(len(paths) for paths in result.use_graph.uses_by_file.values())
@@ -73,10 +97,23 @@ def apply_ownership(
 ) -> OwnershipIndex:
     """Compute ownership analytics and attach to module rows.
 
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing module rows and repository root.
+    out : Path
+        Output directory where ownership analytics will be written.
+    history_window_days : int
+        Number of days to look back for ownership history. Used to compute
+        churn windows.
+    commits_window : int
+        Number of recent commits to analyze for ownership. Must be at least 1.
+
     Returns
     -------
     OwnershipIndex
-        Ownership records keyed by repo path.
+        Ownership records keyed by repo path, including owner, primary authors,
+        bus factor, and churn metrics.
     """
     churn_windows = (30, max(1, history_window_days))
     repo_paths = [str(row.get("repo_path") or row.get("path") or "") for row in result.module_rows]
@@ -101,7 +138,15 @@ def apply_ownership(
 
 
 def write_ownership_output(ownership: OwnershipIndex, out: Path) -> None:
-    """Persist ownership analytics."""
+    """Persist ownership analytics.
+
+    Parameters
+    ----------
+    ownership : OwnershipIndex
+        Ownership index containing ownership records to persist.
+    out : Path
+        Output directory where ownership analytics parquet file will be written.
+    """
     rows: list[dict[str, Any]] = []
     for path, entry in ownership.by_file.items():
         record: dict[str, Any] = {
@@ -122,7 +167,19 @@ def write_slices_output(
     *,
     slices_filter: list[str] | None = None,
 ) -> None:
-    """Emit tag slices when enabled."""
+    """Emit tag slices when enabled.
+
+    Parameters
+    ----------
+    module_rows : Sequence[Mapping[str, Any]]
+        Sequence of module record dictionaries to process for slice generation.
+    out : Path
+        Output directory where slice files will be written.
+    slices_filter : list[str] | None, optional
+        Optional list of tag names to filter slices. If provided, only modules
+        with at least one matching tag are included. If None, all modules are
+        included. Defaults to None.
+    """
     filters = tuple(filter(None, slices_filter or []))
     slice_payloads: list[dict[str, Any]] = []
     for row in module_rows:
@@ -156,7 +213,15 @@ def write_slices_output(
 
 
 def write_typedness_output(result: PipelineResult, out: Path) -> None:
-    """Write typedness analytics datasets."""
+    """Write typedness analytics datasets.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing module rows with type error and annotation data.
+    out : Path
+        Output directory where typedness analytics parquet file will be written.
+    """
     rows = [
         {
             "path": row.get("path"),
@@ -171,7 +236,16 @@ def write_typedness_output(result: PipelineResult, out: Path) -> None:
 
 
 def write_doc_output(result: PipelineResult, out: Path) -> None:
-    """Write documentation health analytics."""
+    """Write documentation health analytics.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing module rows with documentation metadata.
+    out : Path
+        Output directory where documentation health analytics parquet file
+        will be written.
+    """
     rows = [
         {
             "path": row.get("path"),
@@ -186,22 +260,58 @@ def write_doc_output(result: PipelineResult, out: Path) -> None:
 
 
 def write_coverage_output(result: PipelineResult, out: Path) -> None:
-    """Persist coverage summary."""
+    """Persist coverage summary.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing coverage rows to persist.
+    out : Path
+        Output directory where coverage analytics parquet file will be written.
+    """
     write_tabular_records(out / "analytics" / "coverage.parquet", result.coverage_rows)
 
 
 def write_config_output(result: PipelineResult, out: Path) -> None:
-    """Persist config index with references."""
+    """Persist config index with references.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing config index to persist.
+    out : Path
+        Output directory where config index JSON file will be written.
+    """
     write_json(out / "analytics" / "config_index.json", result.config_index)
 
 
 def write_hotspot_output(result: PipelineResult, out: Path) -> None:
-    """Persist hotspot analytics."""
+    """Persist hotspot analytics.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing hotspot rows to persist.
+    out : Path
+        Output directory where hotspot analytics parquet file will be written.
+    """
     write_tabular_records(out / "analytics" / "hotspots.parquet", result.hotspot_rows)
 
 
 def write_ast_outputs(result: PipelineResult, out: Path, *, emit_ast: bool) -> None:
-    """Write AST nodes + metrics if enabled."""
+    """Write AST nodes + metrics if enabled.
+
+    Parameters
+    ----------
+    result : PipelineResult
+        Pipeline result containing module rows and repository root for AST
+        artifact collection.
+    out : Path
+        Output directory where AST JSONL files will be written.
+    emit_ast : bool
+        Whether to emit AST artifacts. If False, function returns immediately
+        without writing any files.
+    """
     if not emit_ast:
         return
     files = [
@@ -217,7 +327,16 @@ def write_ast_outputs(result: PipelineResult, out: Path, *, emit_ast: bool) -> N
 
 
 def write_repo_map(out: Path, result: PipelineResult) -> None:
-    """Write repo_map.json summary."""
+    """Write repo_map.json summary.
+
+    Parameters
+    ----------
+    out : Path
+        Output directory where repo_map.json will be written.
+    result : PipelineResult
+        Pipeline result containing repository metadata, module counts, and
+        tag index to summarize.
+    """
     tag_counts = {tag: len(paths) for tag, paths in result.tag_index.items()}
     write_json(
         out / "repo_map.json",
@@ -238,10 +357,16 @@ def write_repo_map(out: Path, result: PipelineResult) -> None:
 def record_to_json(record: SimpleModuleRecord) -> Mapping[str, Any]:
     """Convert a service-level ModuleRecord to a JSON-compatible mapping.
 
+    Parameters
+    ----------
+    record : SimpleModuleRecord
+        Module record to convert to JSON-compatible format.
+
     Returns
     -------
     Mapping[str, Any]
-        JSON-serializable representation of the record.
+        JSON-serializable representation of the record containing path, module,
+        language, loc, tags, and meta fields.
     """
     return {
         "path": str(record.path),
@@ -256,6 +381,13 @@ def record_to_json(record: SimpleModuleRecord) -> Mapping[str, Any]:
 def emit_modules_jsonl(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
     """Write modules.jsonl for the refactored CLI.
 
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context containing output directory path.
+    records : Iterable[SimpleModuleRecord]
+        Iterable of module records to write to JSONL format.
+
     Returns
     -------
     Path
@@ -269,6 +401,13 @@ def emit_modules_jsonl(ctx: PipelineContext, records: Iterable[SimpleModuleRecor
 
 def emit_repo_map(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
     """Emit a lightweight repo_map.json file.
+
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context containing repository paths and output directory.
+    records : Iterable[SimpleModuleRecord]
+        Iterable of module records used to compute summary statistics.
 
     Returns
     -------
@@ -288,6 +427,13 @@ def emit_repo_map(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -
 def emit_tag_index(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
     """Emit a tag->count mapping for module tags.
 
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context containing output directory path.
+    records : Iterable[SimpleModuleRecord]
+        Iterable of module records containing tags to index.
+
     Returns
     -------
     Path
@@ -305,6 +451,13 @@ def emit_tag_index(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) 
 
 def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
     """Emit Markdown sheets summarizing each module.
+
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context containing output directory path.
+    records : Iterable[SimpleModuleRecord]
+        Iterable of module records to write as Markdown files.
 
     Returns
     -------
@@ -329,10 +482,18 @@ def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[SimpleModuleRec
 def run_all_exports(ctx: PipelineContext, records: list[SimpleModuleRecord]) -> ExportResult:
     """Emit all enrich artifacts for the simplified CLI.
 
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context containing output directory and configuration.
+    records : list[SimpleModuleRecord]
+        List of module records to export in various formats.
+
     Returns
     -------
     ExportResult
-        Dataclass pointing to the emitted artifacts.
+        Dataclass pointing to the emitted artifacts including modules.jsonl,
+        repo_map.json, tag_index.json, and markdown sheets directory.
     """
     modules_jsonl = emit_modules_jsonl(ctx, records)
     repo_map = emit_repo_map(ctx, records)

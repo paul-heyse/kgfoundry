@@ -43,10 +43,11 @@ def discover_python_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
 
     Parameters
     ----------
-    root :
+    root : Path
         Repository root or subfolder to scan.
-    patterns :
-        Glob include patterns relative to ``root``.
+    patterns : tuple[str, ...]
+        Glob include patterns relative to ``root``. If empty, all Python files
+        are included.
 
     Returns
     -------
@@ -88,10 +89,11 @@ def iter_python_files(root: Path, patterns: tuple[str, ...] | None = None) -> It
 
     Parameters
     ----------
-    root :
+    root : Path
         Repository root to traverse.
-    patterns :
-        Optional glob include filters.
+    patterns : tuple[str, ...] | None, optional
+        Optional glob include filters. If None or empty, all Python files
+        are yielded (subject to skip rules).
 
     Yields
     ------
@@ -109,6 +111,13 @@ def iter_python_files(root: Path, patterns: tuple[str, ...] | None = None) -> It
 
 def should_skip_candidate(candidate: Path, root: Path) -> bool:
     """Return whether the candidate should be skipped.
+
+    Parameters
+    ----------
+    candidate : Path
+        File path candidate to check for exclusion.
+    root : Path
+        Repository root directory for relative path computation.
 
     Returns
     -------
@@ -128,6 +137,11 @@ def should_skip_candidate(candidate: Path, root: Path) -> bool:
 def load_scip_artifacts(path: Path) -> tuple[SCIPIndex, ScipContext]:
     """Load SCIP index and derive helper context.
 
+    Parameters
+    ----------
+    path : Path
+        Path to the SCIP index file to load.
+
     Returns
     -------
     tuple[SCIPIndex, ScipContext]
@@ -144,6 +158,15 @@ def collect_type_signal_map(
     root: Path, *, pyrefly_json: Path | None
 ) -> Mapping[str, FileTypeSignals]:
     """Collect Pyrefly/Pyright summaries and normalize path keys.
+
+    Parameters
+    ----------
+    root : Path
+        Repository root directory. Used for path normalization and as the
+        base path for Pyright JSON report discovery.
+    pyrefly_json : Path | None, optional
+        Optional path to Pyrefly JSON report file. If None, only Pyright
+        reports are collected.
 
     Returns
     -------
@@ -174,6 +197,14 @@ def collect_coverage_map(
 ) -> Mapping[str, Mapping[str, float]]:
     """Collect coverage metrics keyed by normalized path.
 
+    Parameters
+    ----------
+    root : Path
+        Repository root directory used for path normalization.
+    coverage_xml : Path | None, optional
+        Optional path to coverage XML report file. If None or the file
+        doesn't exist, returns an empty mapping.
+
     Returns
     -------
     Mapping[str, Mapping[str, float]]
@@ -192,6 +223,11 @@ def collect_coverage_map(
 def index_config_records(root: Path) -> list[dict[str, Any]]:
     """Return discovered config records under ``root``.
 
+    Parameters
+    ----------
+    root : Path
+        Repository root directory to scan for configuration files.
+
     Returns
     -------
     list[dict[str, Any]]
@@ -205,6 +241,12 @@ def index_config_records(root: Path) -> list[dict[str, Any]]:
 
 def load_tagging_rules(path: Path | None) -> Mapping[str, Any]:
     """Load YAML tagging rules or fall back to defaults.
+
+    Parameters
+    ----------
+    path : Path | None, optional
+        Optional path to custom YAML tagging rules file. If None, uses
+        default tagging rules.
 
     Returns
     -------
@@ -229,6 +271,12 @@ def load_tagging_rules(path: Path | None) -> Mapping[str, Any]:
 
 def prepare_pipeline(pipeline: PipelineOptions) -> PreparedPipeline:
     """Materialize pipeline context (SCIP, type signals, tagging rules, etc.).
+
+    Parameters
+    ----------
+    pipeline : PipelineOptions
+        Pipeline configuration options including paths to SCIP index, type
+        signal reports, coverage XML, tagging rules, and file inclusion patterns.
 
     Returns
     -------
@@ -275,6 +323,16 @@ def scan_modules(
 ) -> tuple[list[ModuleRecord], list[tuple[str, str]]]:
     """Scan python modules returning ModuleRecord rows and symbol edges.
 
+    Parameters
+    ----------
+    ctx : LegacyPipelineContext
+        Pipeline context containing SCIP index, type signals, coverage data,
+        and tagging rules.
+    pipeline : PipelineOptions
+        Pipeline configuration including max file size limits and other options.
+    files : Sequence[Path]
+        Sequence of Python file paths to scan and process.
+
     Returns
     -------
     tuple[list[ModuleRecord], list[tuple[str, str]]]
@@ -304,10 +362,17 @@ def scan_modules(
 def run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
     """Execute the enrichment pipeline and return an aggregate result bundle.
 
+    Parameters
+    ----------
+    pipeline : PipelineOptions
+        Pipeline configuration options specifying input paths, output settings,
+        and processing options.
+
     Returns
     -------
     PipelineResult
-        Enrichment output artifacts and analytics.
+        Enrichment output artifacts and analytics including module rows,
+        symbol edges, import graphs, coverage data, and hotspot analysis.
     """
     prepared = prepare_pipeline(pipeline)
     ctx = prepared.context
@@ -332,10 +397,19 @@ def _iter_source_files(
 ) -> Iterator[Path]:
     """Yield Python files honoring include/exclude globs.
 
+    Parameters
+    ----------
+    root : Path
+        Repository root directory to search for Python files.
+    include_globs : tuple[str, ...]
+        Glob patterns for files to include. If empty, all Python files are included.
+    exclude_globs : tuple[str, ...]
+        Glob patterns for files to exclude. Files matching any pattern are skipped.
+
     Yields
     ------
     Path
-        Matched Python file path.
+        Matched Python file path that passes both include and exclude filters.
     """
     for file_path in root.rglob("*.py"):
         rel = file_path.relative_to(root)
@@ -397,6 +471,20 @@ def scan_repo(
 ) -> list[SimpleModuleRecord]:
     """Scan the repository and return lightweight module records.
 
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context containing repository paths and logger.
+    include : tuple[str, ...], optional
+        Glob patterns for files to include. If empty, all Python files are
+        included (subject to exclude patterns). Defaults to empty tuple.
+    exclude : tuple[str, ...], optional
+        Glob patterns for files to exclude. Files matching any pattern are
+        skipped. Defaults to common build/dist/venv exclusion patterns.
+    infer_tags : bool, optional
+        Whether to automatically infer tags based on file path (e.g., "cli",
+        "test"). Defaults to True.
+
     Returns
     -------
     list[SimpleModuleRecord]
@@ -437,6 +525,13 @@ def _normalize_type_signal_map(
 ) -> dict[str, FileTypeSignals]:
     """Normalize type-signal keys relative to ``root``.
 
+    Parameters
+    ----------
+    signals : Mapping[str, FileTypeSignals]
+        Raw type signal mapping with potentially absolute or relative paths.
+    root : Path
+        Repository root directory used for path normalization.
+
     Returns
     -------
     dict[str, FileTypeSignals]
@@ -455,6 +550,13 @@ def _normalize_metric_map(
 ) -> dict[str, Mapping[str, float]]:
     """Normalize coverage metric keys relative to ``root``.
 
+    Parameters
+    ----------
+    metrics : Mapping[str, Mapping[str, float]]
+        Raw coverage metrics mapping with potentially absolute or relative paths.
+    root : Path
+        Repository root directory used for path normalization.
+
     Returns
     -------
     dict[str, Mapping[str, float]]
@@ -470,10 +572,19 @@ def _normalize_metric_map(
 def _normalize_path_key(path: str, root: Path) -> str:
     """Normalize ``path`` relative to ``root`` when possible.
 
+    Parameters
+    ----------
+    path : str
+        File path string to normalize. Can be absolute or relative.
+    root : Path
+        Repository root directory used for relative path computation.
+
     Returns
     -------
     str
-        Normalized string representation.
+        Normalized string representation. If path is absolute and can be
+        made relative to root, returns the relative path. Otherwise returns
+        the original path string.
     """
     candidate = Path(path)
     if candidate.is_absolute():

@@ -75,6 +75,14 @@ def write_modules_json(
 ) -> Path:
     """Persist module rows to ``modules/modules.jsonl``.
 
+    Parameters
+    ----------
+    out : Path
+        Output directory where the modules subdirectory will be created.
+    module_rows : Sequence[ModuleRecord | Mapping[str, Any]]
+        Sequence of module records to write. Can be ModuleRecord objects or
+        dictionaries.
+
     Returns
     -------
     Path
@@ -92,6 +100,13 @@ def write_modules_json(
 
 def write_markdown_modules(out: Path, module_rows: Sequence[Mapping[str, Any]]) -> Path:
     """Emit Markdown module sheets.
+
+    Parameters
+    ----------
+    out : Path
+        Output directory where the modules subdirectory will be created.
+    module_rows : Sequence[Mapping[str, Any]]
+        Sequence of module record dictionaries to write as Markdown files.
 
     Returns
     -------
@@ -112,6 +127,13 @@ def write_markdown_modules(out: Path, module_rows: Sequence[Mapping[str, Any]]) 
 def write_symbol_graph(out: Path, symbol_edges: list[tuple[str, str]]) -> Path:
     """Write symbol graph edges to JSON.
 
+    Parameters
+    ----------
+    out : Path
+        Output directory where the graphs subdirectory will be created.
+    symbol_edges : list[tuple[str, str]]
+        List of (symbol, file) tuples representing symbol-to-file edges.
+
     Returns
     -------
     Path
@@ -126,7 +148,16 @@ def write_symbol_graph(out: Path, symbol_edges: list[tuple[str, str]]) -> Path:
 
 
 def write_tabular_records(parquet_path: Path, rows: list[dict[str, Any]]) -> None:
-    """Persist Parquet + JSONL pair for tabular analytics."""
+    """Persist Parquet + JSONL pair for tabular analytics.
+
+    Parameters
+    ----------
+    parquet_path : Path
+        Output path for the Parquet file. A JSONL file with the same name
+        (different extension) will also be created.
+    rows : list[dict[str, Any]]
+        List of record dictionaries to write to both Parquet and JSONL formats.
+    """
     write_parquet(parquet_path, rows)
     legacy_write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
 
@@ -137,10 +168,19 @@ def collect_ast_artifacts(
 ) -> tuple[list[AstNodeRow], list[AstMetricsRow]]:
     """Collect AST nodes and metrics for ``files``.
 
+    Parameters
+    ----------
+    root : Path
+        Repository root directory used for relative path computation.
+    files : Iterable[Path]
+        Iterable of Python file paths to parse and analyze.
+
     Returns
     -------
     tuple[list[AstNodeRow], list[AstMetricsRow]]
-        Node/metric rows ready for serialization.
+        Node/metric rows ready for serialization. Files that fail to parse
+        or read are logged and skipped, with empty metrics rows added for
+        parse failures.
     """
     node_rows: list[AstNodeRow] = []
     metric_rows: list[AstMetricsRow] = []
@@ -163,17 +203,33 @@ def collect_ast_artifacts(
 
 
 def write_ast_jsonl(path: Path, rows: Iterable[AstNodeRow | AstMetricsRow]) -> None:
-    """Persist AST artifacts to JSONL for portability."""
+    """Persist AST artifacts to JSONL for portability.
+
+    Parameters
+    ----------
+    path : Path
+        Output path for the JSONL file.
+    rows : Iterable[AstNodeRow | AstMetricsRow]
+        Iterable of AST node or metrics rows to serialize.
+    """
     legacy_write_jsonl(path, [row.as_record() for row in rows])
 
 
 def write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> Path | None:
     """Write tags/tags_index.yaml if YAML is available.
 
+    Parameters
+    ----------
+    out : Path
+        Output directory where the tags subdirectory will be created.
+    tag_index : Mapping[str, list[str]]
+        Dictionary mapping tag names to lists of file paths that have that tag.
+
     Returns
     -------
     Path | None
-        Path to the YAML file when emitted, otherwise ``None``.
+        Path to the YAML file when emitted, otherwise ``None`` if YAML
+        module is not available.
     """
     if yaml_module is None:
         return None
@@ -189,7 +245,15 @@ def write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> Path | Non
 
 
 def atomic_write_text(path: Path, data: str) -> None:
-    """Write text atomically via a temporary file swap."""
+    """Write text atomically via a temporary file swap.
+
+    Parameters
+    ----------
+    path : Path
+        Target file path where data should be written.
+    data : str
+        Text content to write to the file.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         "w", delete=False, dir=str(path.parent), encoding="utf-8"

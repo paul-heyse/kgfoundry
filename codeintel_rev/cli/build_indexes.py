@@ -11,7 +11,6 @@ import typer
 
 from codeintel_rev.config import load_app_config
 from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.indexing.index_lifecycle import LuceneAssets, link_current_lucene
 from codeintel_rev.io.bm25_manager import BM25BuildOptions, BM25IndexManager
 from codeintel_rev.io.splade_manager import SpladeBuildOptions, SpladeIndexManager
@@ -107,15 +106,14 @@ def _cached_app_config() -> AppConfig:
 
 
 def _bm25_manager() -> BM25IndexManager:
-    """Return a BM25 index manager configured from the active settings.
+    """Return a BM25 index manager configured from the active AppConfig.
 
     Returns
     -------
     BM25IndexManager
-        Manager initialised with the currently loaded settings.
+        Manager initialised with the cached AppConfig.
     """
-    settings = settings_from_app_config(_cached_app_config())
-    return BM25IndexManager(settings)
+    return BM25IndexManager(_cached_app_config())
 
 
 def _splade_manager() -> SpladeIndexManager:
@@ -126,8 +124,7 @@ def _splade_manager() -> SpladeIndexManager:
     SpladeIndexManager
         Manager initialised with the currently loaded settings.
     """
-    settings = settings_from_app_config(_cached_app_config())
-    return SpladeIndexManager(settings)
+    return SpladeIndexManager(_cached_app_config())
 
 
 @app.command("bm25")
@@ -138,7 +135,22 @@ def build_bm25_index(
     threads: ThreadsOption = None,
     overwrite: OverwriteFlag = True,
 ) -> None:
-    """Build a Lucene BM25 index with positional/docvector/raw storage enabled."""
+    """Build a Lucene BM25 index with positional/docvector/raw storage enabled.
+
+    Parameters
+    ----------
+    jsonl_dir : JsonDirOption, optional
+        JsonCollection directory containing JSONL files. Defaults to configured
+        BM25 corpus directory if not specified.
+    index_dir : IndexDirOption, optional
+        Output directory for the Lucene BM25 index. Defaults to configured
+        index directory if not specified.
+    threads : ThreadsOption, optional
+        Number of worker threads for Pyserini index building. Defaults to
+        configuration value if not specified.
+    overwrite : OverwriteFlag, optional
+        Whether to overwrite the target directory when rebuilding. Defaults to True.
+    """
     manager = _bm25_manager()
     options = BM25BuildOptions(
         json_dir=jsonl_dir,
@@ -165,7 +177,25 @@ def build_splade_impact_index(
     max_clause_count: MaxClauseOption = None,
     overwrite: OverwriteFlag = True,
 ) -> None:
-    """Build a SPLADE Lucene impact index from JsonVectorCollection shards."""
+    """Build a SPLADE Lucene impact index from JsonVectorCollection shards.
+
+    Parameters
+    ----------
+    vectors_dir : VectorsDirOption, optional
+        JsonVectorCollection directory containing SPLADE vector shards. Defaults
+        to configured SPLADE vectors directory if not specified.
+    index_dir : IndexDirOption, optional
+        Output directory for the Lucene impact index. Defaults to configured
+        index directory if not specified.
+    threads : ThreadsOption, optional
+        Number of worker threads for Pyserini index building. Defaults to
+        configuration value if not specified.
+    max_clause_count : MaxClauseOption, optional
+        Override Lucene maxClauseCount parameter. Must be at least 1024.
+        Defaults to configured SPLADE setting if not specified.
+    overwrite : OverwriteFlag, optional
+        Whether to overwrite the target directory when rebuilding. Defaults to True.
+    """
     manager = _splade_manager()
     options = SpladeBuildOptions(
         vectors_dir=vectors_dir,
@@ -188,7 +218,20 @@ def publish_lucene_assets(
     bm25_dir: Bm25DirOption = None,
     splade_dir: SpladeDirOption = None,
 ) -> None:
-    """Copy Lucene assets into the lifecycle root and flip the CURRENT pointer."""
+    """Copy Lucene assets into the lifecycle root and flip the CURRENT pointer.
+
+    Parameters
+    ----------
+    version : VersionArgument
+        Version identifier used for the lifecycle pointer (e.g., "v1", "2024-01-01").
+    base_dir : BaseDirOption, optional
+        Index lifecycle root directory containing the CURRENT pointer. Defaults
+        to "indexes" if not specified.
+    bm25_dir : Bm25DirOption, optional
+        BM25 index directory to publish. If None, BM25 assets are not published.
+    splade_dir : SpladeDirOption, optional
+        SPLADE index directory to publish. If None, SPLADE assets are not published.
+    """
     assets = LuceneAssets(
         bm25_dir=bm25_dir.resolve() if bm25_dir is not None else None,
         splade_dir=splade_dir.resolve() if splade_dir is not None else None,

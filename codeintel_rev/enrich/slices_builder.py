@@ -17,7 +17,47 @@ __all__ = ["SliceRecord", "build_slice_record", "write_slice"]
 
 @dataclass(slots=True, frozen=True)
 class SliceRecord:
-    """Serializable context packet describing a module and its surroundings."""
+    """Serializable context packet describing a module and its surroundings.
+
+    Attributes
+    ----------
+    slice_id : str
+        Unique identifier for this slice (e.g., "slice:path/to/module.py").
+    path : str
+        File path relative to repository root.
+    module_name : str | None, optional
+        Python module name. None if module name cannot be determined.
+        Defaults to None.
+    exports : list[str], optional
+        List of symbol names exported by this module. Defaults to empty list.
+    imports : list[dict[str, Any]], optional
+        List of import statement dictionaries. Defaults to empty list.
+    defs : list[dict[str, Any]], optional
+        List of definition dictionaries. Defaults to empty list.
+    doc_summary : str | None, optional
+        Extracted docstring summary. None if no summary. Defaults to None.
+    tags : list[str], optional
+        List of tags inferred for this module. Defaults to empty list.
+    graph : dict[str, Any], optional
+        Dictionary of graph metrics (imports, uses, etc.). Defaults to empty
+        dictionary.
+    usage : dict[str, Any], optional
+        Dictionary of usage metrics (fan-in, fan-out, etc.). Defaults to empty
+        dictionary.
+    coverage : dict[str, float], optional
+        Dictionary of coverage metrics (lines, definitions, etc.).
+        Defaults to empty dictionary.
+    config_refs : list[str], optional
+        List of configuration references. Defaults to empty list.
+    owners : dict[str, Any], optional
+        Dictionary of ownership metadata (owner, authors, bus factor).
+        Defaults to empty dictionary.
+    extras : dict[str, Any], optional
+        Additional metadata fields. Defaults to empty dictionary.
+    timestamp : str, optional
+        ISO 8601 timestamp when this slice was created. Defaults to current
+        UTC time.
+    """
 
     slice_id: str
     path: str

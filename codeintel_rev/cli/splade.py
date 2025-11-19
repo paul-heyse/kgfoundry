@@ -16,8 +16,6 @@ from tools import CliContext, EnvelopeBuilder, cli_operation, sha256_file
 
 from codeintel_rev.config import load_app_config
 from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.settings import Settings
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.io.splade_manager import (
     SpladeArtifactsManager,
     SpladeBenchmarkOptions,
@@ -86,7 +84,7 @@ def _default_artifacts_manager_factory() -> SpladeArtifactsManager:
     SpladeArtifactsManager
         Manager configured with production settings.
     """
-    return SpladeArtifactsManager(_cached_settings())
+    return SpladeArtifactsManager(_cached_app_config())
 
 
 def _default_encoder_service_factory() -> SpladeEncoderService:
@@ -97,7 +95,7 @@ def _default_encoder_service_factory() -> SpladeEncoderService:
     SpladeEncoderService
         Encoder service configured with production settings.
     """
-    return SpladeEncoderService(_cached_settings())
+    return SpladeEncoderService(_cached_app_config())
 
 
 def _default_index_manager_factory() -> SpladeIndexManager:
@@ -108,7 +106,7 @@ def _default_index_manager_factory() -> SpladeIndexManager:
     SpladeIndexManager
         Index manager configured with production settings.
     """
-    return SpladeIndexManager(_cached_settings())
+    return SpladeIndexManager(_cached_app_config())
 
 
 app = typer.Typer(
@@ -129,17 +127,6 @@ def _cached_app_config() -> AppConfig:
         Cached immutable configuration derived from env/file sources.
     """
     return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
-
-
-def _cached_settings() -> Settings:
-    """Return legacy Settings derived from AppConfig.
-
-    Returns
-    -------
-    Settings
-        Legacy msgspec settings populated from AppConfig.
-    """
-    return settings_from_app_config(_cached_app_config())
 
 
 def _cli_context(ctx: typer.Context | None = None) -> SpladeCliContext:

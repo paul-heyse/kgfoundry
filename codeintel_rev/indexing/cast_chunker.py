@@ -79,7 +79,26 @@ class Chunk:
 
 @dataclass(frozen=True)
 class LineIndex:
-    """Line start bookkeeping for both character and byte positions."""
+    """Line start bookkeeping for both character and byte positions.
+
+    Attributes
+    ----------
+    char_starts : list[int]
+        List of character offsets for the start of each line (0-indexed).
+        Includes position 0 for the first line.
+    byte_starts : list[int]
+        List of byte offsets for the start of each line (0-indexed). Includes
+        position 0 for the first line. Used for precise text extraction.
+    char_to_byte : list[int]
+        Mapping from character index to byte offset. Index i contains the
+        byte offset for character i. Length is text_length + 1.
+
+    Notes
+    -----
+    This index enables efficient conversion between line/character positions
+    (used by SCIP ranges) and byte offsets (used for text extraction). The
+    char_to_byte mapping accounts for multi-byte UTF-8 characters.
+    """
 
     char_starts: list[int]
     byte_starts: list[int]
@@ -87,7 +106,14 @@ class LineIndex:
 
     @property
     def text_length(self) -> int:
-        """Return the decoded text length in characters."""
+        """Return the decoded text length in characters.
+
+        Returns
+        -------
+        int
+            Number of characters in the decoded text, computed from the
+            char_to_byte mapping length minus 1.
+        """
         return len(self.char_to_byte) - 1
 
 
@@ -224,7 +250,25 @@ def range_to_bytes(text: str, line_index: LineIndex, rng: Range) -> tuple[int, i
 
 @dataclass(slots=True, frozen=True)
 class _ChunkAccumulator:
-    """Immutable accumulator configuration; delegates mutation to a builder."""
+    """Immutable accumulator configuration; delegates mutation to a builder.
+
+    Attributes
+    ----------
+    uri : str
+        File URI or path identifier for chunks created from this accumulator.
+    text : str
+        Decoded source file text content.
+    encoded : bytes
+        UTF-8 encoded bytes of the source file. Used for precise byte-range
+        extraction when creating chunks.
+    line_index : LineIndex
+        Line index containing character and byte start positions for each line.
+    budget : int
+        Maximum character budget per chunk. Symbols are packed greedily up
+        to this limit.
+    language : str
+        Programming language identifier for the file (e.g., "python", "typescript").
+    """
 
     uri: str
     text: str
@@ -287,6 +331,15 @@ class _ChunkBuilder:
     )
 
     def __init__(self, config: _ChunkAccumulator) -> None:
+        """Initialize chunk builder with accumulator configuration.
+
+        Parameters
+        ----------
+        config : _ChunkAccumulator
+            Immutable accumulator configuration containing file URI, text content,
+            encoded bytes, line index, character budget, and language. The builder
+            uses this configuration to create chunks with consistent settings.
+        """
         self._config = config
         self._chunks: list[Chunk] = []
         self._current_start_char: int | None = None
@@ -390,7 +443,13 @@ class _ChunkBuilder:
         self._current_symbols = [symbol]
 
     def _flush_current(self) -> None:
-        """Finalize and append the current chunk, then reset builder state."""
+        """Finalize and append the current chunk, then reset builder state.
+
+        If a chunk is in progress (current boundaries are set), creates a Chunk
+        object from the accumulated state and appends it to the chunks list. Then
+        resets the builder state to prepare for the next chunk. This method is
+        called when starting a new chunk or during finalization.
+        """
         if self._current_start_char is None or self._current_end_char is None:
             return
         self._append_chunk(
@@ -485,7 +544,12 @@ class _ChunkBuilder:
             position = tentative_end
 
     def _reset(self) -> None:
-        """Reset builder state to prepare for a new chunk."""
+        """Reset builder state to prepare for a new chunk.
+
+        Clears the current chunk boundaries and symbol list, allowing the builder
+        to start accumulating a new chunk. This method is called after finalizing
+        a chunk or when starting a new chunk after splitting a large symbol.
+        """
         self._current_start_char = None
         self._current_end_char = None
         self._current_symbols = []
@@ -573,7 +637,23 @@ def chunk_file(
 
 @dataclass(frozen=True)
 class ChunkOverlapOptions:
-    """Configuration for adding call-site overlap snippets."""
+    """Configuration for adding call-site overlap snippets.
+
+    Attributes
+    ----------
+    file_occurrences : list[tuple[str, int, int, int, int]]
+        List of (symbol, start_line, start_char, end_line, end_char) tuples
+        representing symbol occurrences in the file. Used to find call sites
+        that reference symbols defined in other chunks.
+    def_chunk_lookup : dict[str, int]
+        Dictionary mapping symbol identifiers to chunk indices where they are
+        defined. Used to locate the definition chunk for each referenced symbol.
+    max_related : int, optional
+        Maximum number of related symbol snippets to add per chunk. Defaults to 8.
+    overlap_lines : int, optional
+        Number of lines to include before and after the symbol definition when
+        creating overlap snippets. Defaults to 8.
+    """
 
     file_occurrences: list[tuple[str, int, int, int, int]]
     def_chunk_lookup: dict[str, int]
@@ -583,7 +663,20 @@ class ChunkOverlapOptions:
 
 @dataclass(frozen=True)
 class ChunkOptions:
-    """Chunk generation configuration."""
+    """Chunk generation configuration.
+
+    Attributes
+    ----------
+    budget : int, optional
+        Maximum character budget per chunk. Symbols are greedily packed up to
+        this limit. Defaults to 2200 characters.
+    language : str | None, optional
+        Programming language identifier for the file. If None, inferred from
+        the first symbol definition. Defaults to None.
+    overlap : ChunkOverlapOptions | None, optional
+        Optional configuration for adding call-site overlap snippets to chunks.
+        If None, overlap snippets are not added. Defaults to None.
+    """
 
     budget: int = 2200
     language: str | None = None

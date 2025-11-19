@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import pytest
-from codeintel_rev.config.settings import VLLMConfig, VLLMEmbeddingMode
+from codeintel_rev.config.api import VLLMSettings
 
 from tests._helpers import assertions
 
 
 def test_vllm_config_pooling_type_property() -> None:
     """Embedding mode drives pooling literal and kwargs."""
-    cfg = VLLMConfig(embedding_mode=VLLMEmbeddingMode.CLS)
+    cfg = VLLMSettings(embedding_mode="CLS")
     assertions.expect_equal(cfg.pooling_type, "CLS")
     kwargs = cfg.pooler_kwargs()
     assertions.expect_equal(kwargs["pooling_type"], "CLS")
@@ -19,6 +19,6 @@ def test_vllm_config_pooling_type_property() -> None:
 
 def test_vllm_config_warns_on_legacy_task() -> None:
     """Providing task raises a deprecation warning."""
-    cfg = VLLMConfig(task="embed")
+    cfg = VLLMSettings(task="embed")
     with pytest.deprecated_call():
         _ = cfg.resolved_embedding_mode()

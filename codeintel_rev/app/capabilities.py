@@ -191,7 +191,42 @@ def _path_exists(path: Path | None) -> bool:
 
 @dataclass(frozen=True, slots=True)
 class Capabilities:
-    """Capability snapshot used for MCP tool gating and the /capz endpoint."""
+    """Capability snapshot used for MCP tool gating and the /capz endpoint.
+
+    Attributes
+    ----------
+    faiss_index : bool, optional
+        Whether a FAISS vector index is available and loaded. Defaults to False.
+    duckdb : bool, optional
+        Whether a DuckDB catalog is available and accessible. Defaults to False.
+    scip_index : bool, optional
+        Whether a SCIP symbol index is available and loaded. Defaults to False.
+    vllm_client : bool, optional
+        Whether a vLLM embedding client is available and configured. Defaults to False.
+    coderank_index_present : bool, optional
+        Whether a CodeRank FAISS index is present on the filesystem. Defaults to False.
+    warp_index_present : bool, optional
+        Whether a WARP XTR index is present on the filesystem. Defaults to False.
+    xtr_index_present : bool, optional
+        Whether an XTR token-level index is present on the filesystem. Defaults to False.
+    faiss_importable : bool, optional
+        Whether the FAISS library can be imported. Defaults to False.
+    duckdb_importable : bool, optional
+        Whether the DuckDB library can be imported. Defaults to False.
+    httpx_importable : bool, optional
+        Whether the httpx HTTP client library can be imported. Defaults to False.
+    torch_importable : bool, optional
+        Whether PyTorch can be imported. Defaults to False.
+    lucene_importable : bool, optional
+        Whether Lucene/Pyserini libraries can be imported. Defaults to False.
+    onnxruntime_importable : bool, optional
+        Whether ONNX Runtime can be imported. Defaults to False.
+    active_index_version : str | None, optional
+        Version identifier of the currently active index (e.g., "v1", "2024-01-01").
+        None if no index version is active. Defaults to None.
+    versions_available : int, optional
+        Number of index versions available in the lifecycle directory. Defaults to 0.
+    """
 
     faiss_index: bool = False
     duckdb: bool = False

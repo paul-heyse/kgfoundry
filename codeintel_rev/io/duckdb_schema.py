@@ -11,7 +11,17 @@ from typing import Final
 
 @dataclass(frozen=True, slots=True)
 class IdMapMeta:
-    """Observability summary for FAISS idmap materialization."""
+    """Observability summary for FAISS idmap materialization.
+
+    Attributes
+    ----------
+    checksum : str
+        SHA256 checksum of the ID map Parquet file contents.
+    rows : int
+        Number of rows in the ID map. Must be non-negative.
+    refreshed : bool
+        Whether the ID map was refreshed (rebuilt) during this operation.
+    """
 
     checksum: str
     rows: int
@@ -20,7 +30,27 @@ class IdMapMeta:
 
 @dataclass(frozen=True, slots=True)
 class StructMaterializationPlan:
-    """SQL bundle describing struct table materialization steps."""
+    """SQL bundle describing struct table materialization steps.
+
+    Attributes
+    ----------
+    create_sql : str
+        SQL statement for creating the materialized table.
+    meta_create_sql : str
+        SQL statement for creating the metadata table.
+    meta_select_sql : str
+        SQL SELECT statement for querying metadata.
+    delete_sql : str
+        SQL DELETE statement for clearing the materialized table.
+    insert_sql : str
+        SQL INSERT statement for populating the materialized table.
+    meta_delete_sql : str
+        SQL DELETE statement for clearing the metadata table.
+    meta_insert_sql : str
+        SQL INSERT statement for populating the metadata table.
+    count_sql : str
+        SQL SELECT COUNT(*) statement for counting rows in the materialized table.
+    """
 
     create_sql: str
     meta_create_sql: str

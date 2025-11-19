@@ -25,7 +25,19 @@ __all__ = [
 
 @dataclass(slots=True)
 class ProbeResult:
-    """Outcome of a filesystem probe."""
+    """Outcome of a filesystem probe.
+
+    Attributes
+    ----------
+    subject : Path
+        File or directory path that was probed.
+    status : Status
+        Probe status indicating success ("ok") or failure ("error").
+    message : str
+        Human-readable message describing the probe result. For successful
+        probes, typically "ok" or a descriptive message. For failures,
+        contains an error description.
+    """
 
     subject: Path
     status: Status

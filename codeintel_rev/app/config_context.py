@@ -62,7 +62,13 @@ import numpy as np
 
 from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.scope_store import ScopeStore
-from codeintel_rev.config.api import AppConfig, FAISSSettings, LoggingSettings, SearchSettings
+from codeintel_rev.config.api import (
+    AppConfig,
+    FAISSSettings,
+    LoggingSettings,
+    SearchSettings,
+    SpladeSettings,
+)
 from codeintel_rev.config.loader import load_app_config
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
@@ -165,7 +171,7 @@ class ApplicationContextOverrides:
         from :class:`Settings`.
     vllm_client : VLLMClient | None
         Preconstructed vLLM client. When omitted, :func:`build_vllm_client`
-        constructs one using ``settings.vllm``.
+        constructs one using ``app_config.vllm``.
     faiss_manager : FAISSManager | None
         FAISS manager override. The default is constructed from ``settings`` and
         the resolved paths.
@@ -205,12 +211,21 @@ class ApplicationContextOverrides:
 
 @dataclass(slots=True, frozen=True)
 class GateConfig:
-    """Overrides for runtime dependency gates."""
+    """Overrides for runtime dependency gates.
+
+    Attributes
+    ----------
+    gate_import : Callable[[str, str], object] | None, optional
+        Optional override function for gate_import calls. If provided, replaces
+        the default gate_import implementation. Used primarily for testing.
+        Defaults to None.
+    """
 
     gate_import: Callable[[str, str], object] | None = None
 
 
 _GATE_CONFIG_STACK: list[GateConfig] = [GateConfig()]
+
 
 def _configure_logging_from_app(logging_cfg: LoggingSettings) -> None:
     """Configure root logging handlers from AppConfig logging settings."""
@@ -310,7 +325,15 @@ def paths() -> ResolvedPaths:
 
 @dataclass(slots=True)
 class RuntimeFactoryOverrides:
-    """Test-only overrides for runtime factory callables."""
+    """Test-only overrides for runtime factory callables.
+
+    Attributes
+    ----------
+    hybrid_engine_factory : Callable[[], HybridSearchEngine] | None, optional
+        Optional factory function for creating HybridSearchEngine instances.
+        If provided, replaces the default factory. Used primarily for testing.
+        Defaults to None.
+    """
 
     hybrid_engine_factory: Callable[[], HybridSearchEngine] | None = None
 
@@ -919,13 +942,34 @@ class _FaissRuntimeState:
     __slots__ = ("loaded", "lock")
 
     def __init__(self) -> None:
+        """Initialize FAISS runtime state tracker.
+
+        Creates a new state tracker with a lock for thread-safe initialization
+        tracking and a loaded flag indicating whether FAISS has been initialized.
+        """
         self.lock = Lock()
         self.loaded = False
 
 
 @dataclass(slots=True, frozen=True)
 class _ContextRuntimeState:
-    """Mutable runtime state backing the frozen ApplicationContext."""
+    """Mutable runtime state backing the frozen ApplicationContext.
+
+    Attributes
+    ----------
+    hybrid : RuntimeCell[HybridSearchEngine]
+        Runtime cell for the hybrid search engine. Lazily initialized on first
+        access and shared across requests.
+    coderank_faiss : RuntimeCell[FAISSManager]
+        Runtime cell for the CodeRank FAISS index manager. Lazily initialized
+        on first access.
+    xtr : RuntimeCell[XTRIndex]
+        Runtime cell for the XTR token-level index. Lazily initialized on first
+        access.
+    faiss : _FaissRuntimeState
+        FAISS runtime state tracker for initialization bookkeeping and thread
+        safety.
+    """
 
     hybrid: RuntimeCell[HybridSearchEngine] = field(
         default_factory=lambda: RuntimeCell(name="hybrid-engine")
@@ -1178,7 +1222,7 @@ class ApplicationContext:
         set_paths(paths)
         _configure_logging_from_app(app_config.logging)
 
-        vllm_client = effective_overrides.vllm_client or build_vllm_client(settings.vllm)
+        vllm_client = effective_overrides.vllm_client or build_vllm_client(app_config.vllm)
         faiss_manager = effective_overrides.faiss_manager or _build_faiss_manager(
             settings,
             paths,
@@ -1464,7 +1508,7 @@ class ApplicationContext:
         RuntimeUnavailableError
             If configuration enables XTR but artifacts or dependencies are missing.
         """
-        if not self.settings.xtr.enable:
+        if not self.app_config.xtr.enable:
             return None
         cell = self._runtime.xtr
         existing = cell.peek()
@@ -1577,18 +1621,18 @@ class ApplicationContext:
             If configuration disables XTR or required artifacts/dependencies are missing.
         """
         runtime = "xtr"
-        if not self.settings.xtr.enable:
+        if not self.app_config.xtr.enable:
             message = "XTR runtime disabled in configuration"
             raise RuntimeUnavailableError(
                 message,
                 runtime=runtime,
-                detail="settings.xtr.enable is False",
+                detail="app_config.xtr.enable is False",
             )
         root = self.paths.xtr_dir
         _ensure_path_exists(root, runtime=runtime, description="XTR artifact directory")
         _require_dependency("torch", runtime=runtime, purpose="XTR encoder runtime")
         index_cls = _import_xtr_index_cls()
-        index = index_cls(root=root, config=self.settings.xtr)
+        index = index_cls(root=root, config=self.app_config.xtr)
         index.open()
         if not index.ready:
             message = "XTR artifacts incomplete"
@@ -1624,13 +1668,13 @@ class ApplicationContext:
             Configured BM25 engine instance or disabled stub.
         """
         settings = self.settings
-        if not (settings.bm25.enabled and settings.index.enable_bm25_channel):
+        bm25_cfg = self.app_config.bm25
+        if not (bm25_cfg.enabled and settings.index.enable_bm25_channel):
             return BM25Engine(_DisabledBM25Backend())
-        index_dir = self._resolve_repo_path(settings.bm25.index_dir)
         rm3_params = RM3Params(
-            fb_docs=settings.bm25.rm3_fb_docs,
-            fb_terms=settings.bm25.rm3_fb_terms,
-            orig_weight=settings.bm25.rm3_original_query_weight,
+            fb_docs=bm25_cfg.rm3_fb_docs,
+            fb_terms=bm25_cfg.rm3_fb_terms,
+            orig_weight=bm25_cfg.rm3_original_query_weight,
         )
         heuristics: RM3Heuristics | None = None
         prf_cfg = settings.index.prf
@@ -1644,14 +1688,15 @@ class ApplicationContext:
         rm3_cfg = BM25Rm3Config(
             params=rm3_params,
             heuristics=heuristics,
-            enable_rm3=settings.bm25.rm3_enabled,
+            enable_rm3=bm25_cfg.rm3_enabled,
             auto_rm3=prf_cfg.enable_auto,
         )
+        index_dir = self._resolve_repo_path(bm25_cfg.index_dir)
         try:
             backend = PyseriniBM25Backend(
                 index_dir=index_dir,
-                k1=settings.bm25.k1,
-                b=settings.bm25.b,
+                k1=bm25_cfg.k1,
+                b=bm25_cfg.b,
                 rm3=rm3_cfg,
             )
         except FileNotFoundError:
@@ -1671,21 +1716,22 @@ class ApplicationContext:
             Configured SPLADE engine instance or disabled stub.
         """
         settings = self.settings
-        if not (settings.splade.enabled and settings.index.enable_splade_channel):
+        splade_cfg = self.app_config.splade
+        if not (splade_cfg.enabled and settings.index.enable_splade_channel):
             return SPLADEEngine(_DisabledSpladeBackend())
         backend_config = SpladeImpactBackendConfig(
-            model_dir=self._resolve_repo_path(settings.splade.model_dir),
-            onnx_dir=self._resolve_repo_path(settings.splade.onnx_dir),
-            onnx_file=settings.splade.onnx_file,
-            provider=settings.splade.provider,
-            index_dir=self._resolve_repo_path(settings.splade.index_dir),
-            quantization=settings.splade.quantization,
-            max_terms=settings.splade.max_terms,
-            max_query_terms=settings.splade.max_query_terms,
-            prune_below=settings.splade.prune_below,
-            static_prune_pct=settings.splade.static_prune_pct,
+            model_dir=self._resolve_repo_path(splade_cfg.model_dir),
+            onnx_dir=self._resolve_repo_path(splade_cfg.onnx_dir),
+            onnx_file=splade_cfg.onnx_file,
+            provider=splade_cfg.provider,
+            index_dir=self._resolve_repo_path(splade_cfg.index_dir),
+            quantization=splade_cfg.quantization,
+            max_terms=splade_cfg.max_terms,
+            max_query_terms=splade_cfg.max_query_terms,
+            prune_below=splade_cfg.prune_below,
+            static_prune_pct=splade_cfg.static_prune_pct,
         )
-        onnx_encoder = self._build_splade_query_encoder()
+        onnx_encoder = self._build_splade_query_encoder(splade_cfg)
         try:
             backend = SpladeImpactBackend(backend_config, onnx_encoder=onnx_encoder)
         except FileNotFoundError:
@@ -1697,8 +1743,30 @@ class ApplicationContext:
             return SPLADEEngine(_DisabledSpladeBackend())
         return SPLADEEngine(backend=backend)
 
-    def _build_splade_query_encoder(self) -> object | None:
-        cfg = getattr(self.settings.splade, "onnx_query", None)
+    def _build_splade_query_encoder(self, splade_cfg: SpladeSettings) -> object | None:
+        """Build a SPLADE ONNX query encoder from configuration.
+
+        Parameters
+        ----------
+        splade_cfg : SpladeSettings
+            SPLADE configuration containing ONNX model paths and encoder settings.
+
+        Returns
+        -------
+        object | None
+            An OnnxSpladeQueryEncoder instance if ONNX query encoding is enabled
+            and dependencies are available, None otherwise. Returns None if
+            the encoder is disabled, dependencies are missing, or the model
+            file does not exist.
+
+        Notes
+        -----
+        This method performs lazy loading of the ONNX encoder. If optional
+        dependencies (onnxruntime, transformers) are missing, a warning is
+        emitted and None is returned. The model path is resolved relative
+        to the repository root if not absolute.
+        """
+        cfg = splade_cfg.onnx_query
         if cfg is None or not cfg.enabled:
             return None
         if OnnxSpladeConfig is None or OnnxSpladeQueryEncoder is None:
@@ -1707,19 +1775,18 @@ class ApplicationContext:
                 stacklevel=2,
             )
             return None
-        model_rel = cfg.model_path or self.settings.splade.onnx_file
-        model_dir = self._resolve_repo_path(self.settings.splade.onnx_dir)
-        model_path = Path(model_rel)
+        model_dir = self._resolve_repo_path(splade_cfg.onnx_dir)
+        model_path = cfg.model_path or Path(splade_cfg.onnx_file)
         if not model_path.is_absolute():
-            model_path = model_dir / model_rel
-        model_path = model_path.resolve()
+            model_path = model_dir / model_path
+        model_path = model_path.expanduser().resolve()
         if not model_path.exists():
             warnings.warn(
                 f"SPLADE ONNX model not found: {model_path}",
                 stacklevel=2,
             )
             return None
-        tokenizer_name = cfg.tokenizer_name or self.settings.splade.model_id
+        tokenizer_name = cfg.tokenizer_name or splade_cfg.model_id
         try:
             onnx_cfg = OnnxSpladeConfig(
                 model_path=model_path,
@@ -1742,6 +1809,21 @@ class ApplicationContext:
             return None
 
     def _resolve_repo_path(self, value: str | Path) -> Path:
+        """Resolve a path relative to the repository root.
+
+        Parameters
+        ----------
+        value : str | Path
+            Path to resolve. If absolute, returned as-is. If relative, resolved
+            relative to the repository root from context paths.
+
+        Returns
+        -------
+        Path
+            Absolute resolved path. If the input was absolute, returns it
+            expanded and resolved. If relative, returns it resolved relative
+            to the repository root.
+        """
         base = Path(self.paths.repo_root).expanduser()
         candidate = Path(value).expanduser()
         if candidate.is_absolute():
@@ -1854,6 +1936,7 @@ class ApplicationContext:
         *,
         settings: Settings | None = None,
         paths: ResolvedPaths | None = None,
+        app_config: AppConfig | None = None,
         **components: object,
     ) -> ApplicationContext:
         """Return a new context with the provided overrides.
@@ -1876,6 +1959,9 @@ class ApplicationContext:
         paths : ResolvedPaths | None, optional
             Resolved file system paths to override. If None, uses the current context's
             paths. Defaults to None.
+        app_config : AppConfig | None, optional
+            Immutable application configuration override. When None, reuses the
+            active :class:`AppConfig`.
         **components : object
             Keyword arguments for component overrides. Accepted keys are:
             ``vllm_client``, ``faiss_manager``, ``scope_store``, ``duckdb_manager``,
@@ -1936,7 +2022,7 @@ class ApplicationContext:
             return cast("TOverride", components.get(name, default))
 
         return ApplicationContext(
-            app_config=self.app_config,
+            app_config=app_config or self.app_config,
             settings=settings or self.settings,
             paths=paths or self.paths,
             vllm_client=_component_value("vllm_client", self.vllm_client),

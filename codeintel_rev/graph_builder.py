@@ -20,7 +20,24 @@ from codeintel_rev.typing import PolarsModule
 
 @dataclass(slots=True, frozen=True)
 class ImportGraph:
-    """Graph representation of intra-repo imports."""
+    """Graph representation of intra-repo imports.
+
+    Attributes
+    ----------
+    edges : dict[str, set[str]]
+        Dictionary mapping module names to sets of imported module names.
+        Represents the directed import graph edges.
+    fan_in : dict[str, int]
+        Dictionary mapping module names to their fan-in count (number of
+        modules that import this module).
+    fan_out : dict[str, int]
+        Dictionary mapping module names to their fan-out count (number of
+        modules this module imports).
+    cycle_group : dict[str, int]
+        Dictionary mapping module names to their cycle group identifier.
+        Modules in the same strongly connected component share the same
+        cycle group ID.
+    """
 
     edges: dict[str, set[str]]
     fan_in: dict[str, int]
