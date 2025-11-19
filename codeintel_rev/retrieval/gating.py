@@ -11,7 +11,37 @@ from codeintel_rev.retrieval.types import StageDecision, StageSignals
 
 @dataclass(slots=True, frozen=True)
 class StageGateConfig:
-    """Configuration inputs for deciding whether to invoke a follow-up stage."""
+    """Configuration inputs for deciding whether to invoke a follow-up stage.
+
+    Attributes
+    ----------
+    min_candidates : int, optional
+        Minimum number of candidates required to proceed to next stage. Must be
+        positive. Defaults to 40.
+    margin_threshold : float, optional
+        Minimum score margin (best - second_best) required to proceed. Must be
+        non-negative. Defaults to 0.1.
+    budget_ms : int, optional
+        Maximum time budget in milliseconds for stage execution. Must be
+        positive. Defaults to 150.
+    enable_query_aware_budgets : bool, optional
+        Whether to adjust budgets based on query characteristics. Defaults to True.
+    default_depths : Mapping[str, int], optional
+        Default search depths per channel for normal queries. Keys are channel
+        names, values are depth limits. Defaults to {"semantic": 100, "bm25": 50,
+        "splade": 50}.
+    literal_depths : Mapping[str, int], optional
+        Search depths per channel for literal queries. Defaults to {"semantic":
+        80, "bm25": 80, "splade": 30}.
+    vague_depths : Mapping[str, int], optional
+        Search depths per channel for vague queries. Defaults to {"semantic":
+        150, "bm25": 60, "splade": 80}.
+    rrf_k_default : int, optional
+        Default RRF k parameter for normal queries. Must be positive.
+        Defaults to 60.
+    rrf_k_literal : int, optional
+        RRF k parameter for literal queries. Must be positive. Defaults to 40.
+    """
 
     min_candidates: int = 40
     margin_threshold: float = 0.1

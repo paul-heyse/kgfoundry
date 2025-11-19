@@ -31,7 +31,20 @@ class ToThreadCallable(Protocol[TResult]):
 
 @dataclass(slots=True, frozen=True)
 class AsyncSearchDependencies:
-    """Bundle the async primitives adapters rely on."""
+    """Bundle the async primitives adapters rely on.
+
+    Attributes
+    ----------
+    scope_resolver : Callable[[ApplicationContext, str | None], Awaitable[ScopeIn | None]]
+        Async function that resolves scope from application context and optional
+        scope identifier. Returns None if scope cannot be resolved.
+    session_provider : Callable[[], str | None]
+        Function that returns the current session identifier. Returns None if no
+        session is active.
+    to_thread : ToThreadCallable[Any]
+        Function for executing synchronous code in a thread pool. Used for
+        running blocking operations asynchronously.
+    """
 
     scope_resolver: Callable[[ApplicationContext, str | None], Awaitable[ScopeIn | None]]
     session_provider: Callable[[], str | None]

@@ -14,7 +14,19 @@ _EXPLANATION_INDEX: Final[int] = 2
 
 @dataclass(frozen=True, slots=True)
 class LateInteractionResult:
-    """Rescoring payload returned by late-interaction engines."""
+    """Rescoring payload returned by late-interaction engines.
+
+    Attributes
+    ----------
+    ids : list[int]
+        List of document/chunk IDs after rescoring, sorted by score descending.
+    scores : list[float]
+        List of rescored relevance scores corresponding to ids. Higher scores
+        indicate better matches.
+    explanations : list[tuple[int, dict[str, object]]] | None, optional
+        Optional list of (doc_id, explanation_dict) tuples for explainability.
+        None if explanations are not requested. Defaults to None.
+    """
 
     ids: list[int]
     scores: list[float]
@@ -37,7 +49,13 @@ class LateInteraction(Protocol):
 
 @dataclass(slots=True)
 class XTRLateInteraction:
-    """Late-interaction wrapper around :class:`codeintel_rev.io.xtr_manager.XTRIndex`."""
+    """Late-interaction wrapper around :class:`codeintel_rev.io.xtr_manager.XTRIndex`.
+
+    Attributes
+    ----------
+    index : XTRIndex
+        XTR token-level index instance for late-interaction rescoring.
+    """
 
     index: XTRIndex
 

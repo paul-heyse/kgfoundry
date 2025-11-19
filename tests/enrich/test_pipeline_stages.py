@@ -61,6 +61,11 @@ def test_build_module_row_captures_docstring_and_types(
     assertions.expect_equal(record["docstring"], "Alpha.")
     assertions.expect_equal(record["type_error_count"], 3)
     assertions.expect_sequence_equal(edges, [])
+    meta = record["meta"]
+    assertions.expect_true(isinstance(meta, dict), reason="meta payload should be dict")
+    assertions.expect_true(meta["docs"]["module_has_doc"])
+    assertions.expect_in("imports", meta)
+    assertions.expect_true(meta["metrics"]["defs_total"] >= 0)
 
 
 def test_outline_nodes_for_python() -> None:

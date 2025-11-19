@@ -67,7 +67,14 @@ class DuckDBConnector(Protocol):
 
 @dataclass(slots=True, frozen=True)
 class DuckDBManagerContext:
-    """Dependency providers for DuckDBManager."""
+    """Dependency providers for DuckDBManager.
+
+    Attributes
+    ----------
+    connector : DuckDBConnector
+        Function that creates DuckDB connections. Used for dependency injection
+        in tests.
+    """
 
     connector: DuckDBConnector
 

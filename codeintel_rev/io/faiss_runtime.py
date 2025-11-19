@@ -209,7 +209,19 @@ class RefineSearchConfig:
 
 @dataclass(frozen=True, slots=True)
 class _SearchExecutionParams:
-    """Runtime parameters applied during dual search execution."""
+    """Runtime parameters applied during dual search execution.
+
+    Attributes
+    ----------
+    nprobe : int
+        Number of clusters to probe in IVF indexes. Must be positive.
+    ef_search : int | None
+        HNSW ef_search parameter override. None means use default from runtime
+        options. Must be positive if specified.
+    quantizer_ef_search : int | None
+        Quantizer ef_search parameter override. None means use default. Must be
+        positive if specified.
+    """
 
     nprobe: int
     ef_search: int | None
@@ -218,7 +230,19 @@ class _SearchExecutionParams:
 
 @dataclass(frozen=True, slots=True)
 class _SearchPlan:
-    """Resolved parameters and query buffer for a search."""
+    """Resolved parameters and query buffer for a search.
+
+    Attributes
+    ----------
+    queries : NDArrayF32
+        Query vectors as a 2D float32 array (n_queries, dim).
+    k : int
+        Number of nearest neighbors to retrieve. Must be positive.
+    search_k : int
+        Number of candidates to retrieve before refinement. Must be >= k.
+    params : _SearchExecutionParams
+        Runtime execution parameters (nprobe, ef_search, etc.).
+    """
 
     queries: NDArrayF32
     k: int

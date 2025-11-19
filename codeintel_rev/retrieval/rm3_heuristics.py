@@ -11,7 +11,20 @@ __all__ = ["RM3Heuristics", "RM3Params"]
 
 @dataclass(frozen=True)
 class RM3Params:
-    """Default RM3 parameters used when pseudo-relevance feedback is enabled."""
+    """Default RM3 parameters used when pseudo-relevance feedback is enabled.
+
+    Attributes
+    ----------
+    fb_docs : int, optional
+        Number of feedback documents to use for RM3 expansion. Must be positive.
+        Defaults to 10.
+    fb_terms : int, optional
+        Number of feedback terms to extract from top documents. Must be positive.
+        Defaults to 10.
+    orig_weight : float, optional
+        Weight for the original query in RM3 (0.0 to 1.0). Higher values give
+        more weight to the original query. Defaults to 0.5.
+    """
 
     fb_docs: int = 10
     fb_terms: int = 10

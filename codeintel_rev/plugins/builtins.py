@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from threading import Lock
 
-from codeintel_rev.config.settings import SpladeConfig
+from codeintel_rev.config.api import SpladeSettings
 from codeintel_rev.io.bm25_engine import BM25Engine, BM25Rm3Config, PyseriniBM25Backend
 from codeintel_rev.io.splade_engine import (
     SPLADEEngine,
@@ -117,8 +117,9 @@ class _BM25Channel(Channel):
     requires = frozenset({"warp_index_present", "lucene_importable"})
 
     def __init__(self, context: ChannelContext) -> None:
-        self._settings = context.settings
+        self._app_config = context.app_config
         self._paths = context.paths
+        self._legacy_settings = context.settings
         self._engine: BM25Engine | None = None
         self._provider_error: str | None = None
         self._skip_reason: str | None = None
@@ -200,7 +201,7 @@ class _BM25Channel(Channel):
             return self._engine
         if self._provider_error is not None:
             return None
-        if not self._settings.bm25.enabled:
+        if not self._app_config.bm25.enabled:
             self._provider_error = "BM25 channel disabled by configuration"
             self._skip_reason = "disabled"
             return None
@@ -208,8 +209,8 @@ class _BM25Channel(Channel):
             if self._engine is not None:
                 return self._engine
             try:
-                bm25_settings = self._settings.bm25
-                prf_settings = self._settings.index.prf
+                bm25_settings = self._app_config.bm25
+                prf_settings = self._legacy_settings.index.prf
                 rm3_params = RM3Params(
                     fb_docs=bm25_settings.rm3_fb_docs,
                     fb_terms=bm25_settings.rm3_fb_terms,
@@ -231,9 +232,9 @@ class _BM25Channel(Channel):
                         default_params=rm3_params,
                     )
                 backend = PyseriniBM25Backend(
-                    index_dir=_resolve_path(self._paths.repo_root, self._settings.bm25.index_dir),
-                    k1=self._settings.index.bm25_k1,
-                    b=self._settings.index.bm25_b,
+                    index_dir=_resolve_path(self._paths.repo_root, bm25_settings.index_dir),
+                    k1=bm25_settings.k1,
+                    b=bm25_settings.b,
                     rm3=BM25Rm3Config(
                         params=rm3_params,
                         heuristics=heuristics,
@@ -277,7 +278,7 @@ class _SpladeChannel(Channel):
     requires = frozenset({"lucene_importable", "onnxruntime_importable"})
 
     def __init__(self, context: ChannelContext) -> None:
-        self._settings = context.settings
+        self._config = context.app_config.splade
         self._paths = context.paths
         self._engine: SPLADEEngine | None = None
         self._provider_error: str | None = None
@@ -362,7 +363,7 @@ class _SpladeChannel(Channel):
             return self._engine
         if self._provider_error is not None:
             return None
-        if not self._settings.splade.enabled:
+        if not self._config.enabled:
             self._provider_error = "SPLADE channel disabled by configuration"
             self._skip_reason = "disabled"
             return None
@@ -370,7 +371,7 @@ class _SpladeChannel(Channel):
             if self._engine is not None:
                 return self._engine
             try:
-                splade = self._settings.splade
+                splade = self._config
                 config = SpladeImpactBackendConfig(
                     model_dir=_resolve_path(self._paths.repo_root, splade.model_dir),
                     onnx_dir=_resolve_path(self._paths.repo_root, splade.onnx_dir),
@@ -395,15 +396,15 @@ class _SpladeChannel(Channel):
             return engine
 
 
-def _resolve_path(repo_root: Path, value: str) -> Path:
+def _resolve_path(repo_root: Path, value: Path | str) -> Path:
     """Resolve a path string relative to repo root or as absolute.
 
     Parameters
     ----------
     repo_root : Path
         Repository root directory for resolving relative paths.
-    value : str
-        Path string to resolve. May be absolute, relative, or contain ~ expansion.
+    value : Path | str
+        Path to resolve. May be absolute, relative, or contain ~ expansion.
 
     Returns
     -------
@@ -418,16 +419,15 @@ def _resolve_path(repo_root: Path, value: str) -> Path:
 
 
 def _build_onnx_encoder(
-    splade_settings: SpladeConfig,
+    splade_settings: SpladeSettings,
     repo_root: Path,
     logger: logging.Logger,
 ) -> object | None:
-    cfg = getattr(splade_settings, "onnx_query", None)
+    cfg = splade_settings.onnx_query
     if cfg is None or not cfg.enabled:
         return None
-    model_rel = cfg.model_path or splade_settings.onnx_file
     base_dir = _resolve_path(repo_root, splade_settings.onnx_dir)
-    model_path = Path(model_rel)
+    model_path = cfg.model_path or (splade_settings.onnx_dir / splade_settings.onnx_file)
     if not model_path.is_absolute():
         model_path = base_dir / model_path
     model_path = model_path.resolve()

@@ -98,6 +98,24 @@ class SpladeImpactBackendConfig:
         Directory path containing SPLADE PyTorch model files.
     onnx_dir : Path
         Directory path containing ONNX model files for SPLADE encoding.
+    onnx_file : str
+        Filename of the ONNX model file within onnx_dir.
+    provider : str
+        Device provider for SPLADE encoding (e.g., "cpu", "cuda").
+    index_dir : Path
+        Directory path containing the SPLADE Lucene impact index.
+    quantization : int
+        Quantization level for model weights (typically 100 for int8).
+    max_terms : int
+        Maximum number of terms in SPLADE representations. Must be positive.
+    max_query_terms : int
+        Maximum number of terms to extract from queries. Must be non-negative.
+    prune_below : float
+        Minimum token weight threshold for pruning SPLADE tokens. Tokens below
+        this threshold are discarded. Must be non-negative.
+    static_prune_pct : float
+        Static pruning percentage for SPLADE tokens (0.0 to 1.0). Tokens are
+        pruned based on this percentage before max_query_terms filtering.
     """
 
     model_dir: Path

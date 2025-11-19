@@ -73,7 +73,28 @@ class NoopFactoryAdjuster:
 
 @dataclass(slots=True, frozen=True)
 class DefaultFactoryAdjuster:
-    """Reference adjuster that tunes common runtimes after creation."""
+    """Reference adjuster that tunes common runtimes after creation.
+
+    Attributes
+    ----------
+    faiss_nprobe : int | None, optional
+        Override for FAISS nprobe parameter. None means use defaults. Must be
+        positive if specified. Defaults to None.
+    hybrid_rrf_k : int | None, optional
+        Override for hybrid search RRF k parameter. None means use defaults.
+        Must be positive if specified. Defaults to None.
+    hybrid_bm25_weight : float | None, optional
+        Override for BM25 channel weight in hybrid search. None means use
+        defaults. Must be positive if specified. Defaults to None.
+    hybrid_splade_weight : float | None, optional
+        Override for SPLADE channel weight in hybrid search. None means use
+        defaults. Must be positive if specified. Defaults to None.
+    vllm_mode : str | None, optional
+        Override for VLLM execution mode. None means use defaults. Defaults to None.
+    vllm_timeout_s : float | None, optional
+        Override for VLLM timeout in seconds. None means use defaults. Must be
+        positive if specified. Defaults to None.
+    """
 
     faiss_nprobe: int | None = None
     hybrid_rrf_k: int | None = None

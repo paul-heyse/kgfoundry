@@ -21,7 +21,24 @@ from codeintel_rev.mcp_server.schemas import (
 
 @dataclass(slots=True, frozen=True)
 class MethodInfoComponents:
-    """Bundle the optional pieces that make up a MethodInfo payload."""
+    """Bundle the optional pieces that make up a MethodInfo payload.
+
+    Attributes
+    ----------
+    retrieval_channels : Sequence[str]
+        Sequence of retrieval channel names used (e.g., ["faiss", "bm25"]).
+    coverage : str
+        Coverage string describing search coverage (e.g., "full", "partial").
+    stage0 : Mapping[str, object] | None, optional
+        Optional Stage-0 metadata dictionary. None if Stage-0 metadata is not
+        available. Defaults to None.
+    gating : MethodGatingInfo | None, optional
+        Optional gating decision metadata. None if gating info is not available.
+        Defaults to None.
+    reranker : MethodRerankerInfo | None, optional
+        Optional reranker metadata. None if reranker info is not available.
+        Defaults to None.
+    """
 
     retrieval_channels: Sequence[str]
     coverage: str

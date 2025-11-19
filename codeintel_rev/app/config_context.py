@@ -904,8 +904,8 @@ class _DisabledSpladeBackend(SpladeBackend):  # type: ignore[misc]
 
         Returns
         -------
-        NDArrayF32
-            Zero vector of shape (1,).
+        SpladeQueryRepresentation
+            Zero vector of shape (1,) wrapped in a SpladeQueryRepresentation.
         """
         _ = self, text
         return cast("NDArrayF32", np.zeros((1,), dtype=np.float32))

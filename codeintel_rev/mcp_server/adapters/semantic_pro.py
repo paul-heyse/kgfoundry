@@ -37,7 +37,24 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class SemanticProOptions:
-    """User-facing options for the pro semantic adapter."""
+    """User-facing options for the pro semantic adapter.
+
+    Attributes
+    ----------
+    use_warp : bool, optional
+        Whether to use WARP (XTR) late-interaction rescoring. Defaults to True.
+    use_reranker : bool, optional
+        Whether to use reranking after late-interaction. Defaults to False.
+    stage_weights : Mapping[str, float] | None, optional
+        Optional channel weight overrides for Stage-0 fusion. Keys are channel
+        names, values are fusion weights. None means use defaults.
+        Defaults to None.
+    xtr_k : int, optional
+        Maximum number of results to retrieve from XTR late-interaction.
+        Must be positive. Defaults to 50.
+    explain : bool, optional
+        Whether to include explanation metadata in results. Defaults to False.
+    """
 
     use_warp: bool = True
     use_reranker: bool = False
@@ -170,7 +187,23 @@ RerankerFactory = Callable[[], Reranker]
 
 @dataclass(frozen=True, slots=True)
 class SemanticProHooks:
-    """Configurable collaborators for the semantic pro adapter pipeline."""
+    """Configurable collaborators for the semantic pro adapter pipeline.
+
+    Attributes
+    ----------
+    run_stage0 : Stage0Runner
+        Protocol implementation for executing Stage-0 hybrid search.
+    decide_secondary_stage : StageGateDecider
+        Protocol implementation for deciding whether to run secondary stages.
+    hydrate_ids : HydrateIds
+        Protocol implementation for hydrating chunk IDs with metadata.
+    resolve_xtr_index : ResolveXtrIndex
+        Protocol implementation for resolving XTR index from application context.
+    late_interaction_factory : LateInteractionFactory
+        Factory function for creating late-interaction rescoring engines.
+    reranker_factory : RerankerFactory
+        Factory function for creating reranking engines.
+    """
 
     run_stage0: Stage0Runner
     decide_secondary_stage: StageGateDecider
@@ -468,7 +501,23 @@ def _build_method(
 
 @dataclass(slots=True)
 class _StageContext:
-    """Accumulator references shared across stage helpers."""
+    """Accumulator references shared across stage helpers.
+
+    Attributes
+    ----------
+    context : ApplicationContext
+        Application context providing runtime dependencies.
+    options : SemanticProOptions
+        User-facing options for the semantic pro adapter.
+    decision : StageDecision
+        Gating decision for secondary stage execution.
+    stage_records : list[StageInfo]
+        List of stage info dictionaries for observability.
+    notes : list[str]
+        List of notes providing context for decisions.
+    hooks : SemanticProHooks
+        Dependency hooks for stage execution.
+    """
 
     context: ApplicationContext
     options: SemanticProOptions

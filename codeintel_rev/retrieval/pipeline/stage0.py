@@ -11,7 +11,24 @@ from codeintel_rev.retrieval.types import HybridSearchResult
 
 @dataclass(frozen=True, slots=True)
 class Stage0Options:
-    """Optional knobs passed to the hybrid search engine."""
+    """Optional knobs passed to the hybrid search engine.
+
+    Attributes
+    ----------
+    weights : Mapping[str, float] | None, optional
+        Optional channel weight overrides. Keys are channel names ("bm25",
+        "splade"), values are fusion weights. None means use defaults.
+        Defaults to None.
+    per_channel_k : int | None, optional
+        Optional override for maximum results per channel before fusion. None
+        means use defaults. Must be positive if specified. Defaults to None.
+    fusion_k : int | None, optional
+        Optional override for maximum results after fusion. None means use
+        defaults. Must be positive if specified. Defaults to None.
+    rrf_base : int | None, optional
+        Optional override for RRF base parameter. None means use defaults.
+        Must be positive if specified. Defaults to None.
+    """
 
     weights: Mapping[str, float] | None = None
     per_channel_k: int | None = None
@@ -21,7 +38,21 @@ class Stage0Options:
 
 @dataclass(frozen=True, slots=True)
 class Stage0Result:
-    """Normalized Stage-0 fusion outputs."""
+    """Normalized Stage-0 fusion outputs.
+
+    Attributes
+    ----------
+    ids : list[int]
+        List of document/chunk IDs after Stage-0 fusion, sorted by score
+        descending.
+    scores : list[float]
+        List of fused relevance scores corresponding to ids. Higher scores
+        indicate better matches.
+    warnings : list[str]
+        List of warning messages encountered during Stage-0 execution.
+    method : dict[str, object]
+        Method metadata dictionary describing the fusion algorithm and parameters.
+    """
 
     ids: list[int]
     scores: list[float]

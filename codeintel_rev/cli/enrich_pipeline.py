@@ -68,6 +68,11 @@ write_json = _write_json
 def execute_pipeline_or_exit(ctx: typer.Context) -> tuple[PipelineResult, CLIContextState]:
     """Execute the enrichment pipeline or exit with a diagnostic on failure.
 
+    Parameters
+    ----------
+    ctx : typer.Context
+        Typer context containing CLI state and configuration.
+
     Returns
     -------
     tuple[PipelineResult, CLIContextState]

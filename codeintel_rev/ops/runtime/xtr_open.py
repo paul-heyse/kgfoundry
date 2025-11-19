@@ -61,7 +61,26 @@ _VerboseOption = Annotated[
 
 @dataclass(slots=True, frozen=True)
 class XtrOpenContext:
-    """Dependency injection context for the xtr-open CLI."""
+    """Dependency injection context for the xtr-open CLI.
+
+    Attributes
+    ----------
+    settings_factory : Callable[[], Settings]
+        Factory function that returns application settings. Used for dependency
+        injection in tests.
+    paths_resolver : Callable[[Settings], ResolvedPaths]
+        Function that resolves filesystem paths from settings. Used for
+        dependency injection in tests.
+    index_factory : Callable[[Path, Settings], XTRIndex]
+        Factory function that creates an XTR index from root path and settings.
+        Used for dependency injection in tests.
+    app_config_loader : Callable[[], AppConfig]
+        Function that loads application configuration. Used for dependency
+        injection in tests.
+    path_merger : Callable[[ResolvedPaths, AppConfig], ResolvedPaths]
+        Function that merges resolved paths with app config. Used for dependency
+        injection in tests.
+    """
 
     settings_factory: Callable[[], Settings]
     paths_resolver: Callable[[Settings], ResolvedPaths]

@@ -16,6 +16,7 @@ from codeintel_rev.typing import NDArrayF32, TorchModule
 
 if TYPE_CHECKING:
     import numpy as np
+
     from codeintel_rev.config.settings import XTRConfig as LegacyXTRConfig
 else:
     np = cast("np", LazyModule("numpy", "XTR index operations"))
@@ -107,7 +108,16 @@ def _coerce_xtr_settings(config: XTRSettings | LegacyXTRConfig) -> XTRSettings:
 
 @dataclass(slots=True, frozen=True)
 class XTRIndex:
-    """Memory-mapped XTR token index with query encoding + scoring helpers."""
+    """Memory-mapped XTR token index with query encoding + scoring helpers.
+
+    Attributes
+    ----------
+    root : Path
+        Root directory path containing XTR index files (token embeddings,
+        metadata JSON).
+    config : XTRSettings | LegacyXTRConfig
+        XTR configuration settings. Normalized to XTRSettings in __post_init__.
+    """
 
     root: Path
     config: XTRSettings | LegacyXTRConfig

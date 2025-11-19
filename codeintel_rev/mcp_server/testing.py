@@ -10,7 +10,13 @@ from codeintel_rev.mcp_server.registry import McpDeps, call_tool, list_tools
 
 @dataclass(slots=True, frozen=True)
 class InProcessMCP:
-    """Minimal harness for exercising MCP tools without FastMCP wiring."""
+    """Minimal harness for exercising MCP tools without FastMCP wiring.
+
+    Attributes
+    ----------
+    deps : McpDeps
+        Dependencies bundle containing catalog and search functions.
+    """
 
     deps: McpDeps
 

@@ -305,6 +305,15 @@ def handle_dry_run(
 ) -> bool:
     """Emit deterministic dry-run summaries.
 
+    Parameters
+    ----------
+    command : str
+        Command name to display in the dry-run summary.
+    dry_run : bool
+        Whether dry-run mode is enabled.
+    result : PipelineResult
+        Pipeline execution result containing module rows, edges, and tags.
+
     Returns
     -------
     bool

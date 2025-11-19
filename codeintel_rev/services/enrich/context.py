@@ -136,7 +136,16 @@ def _stage_span(stage: str, **start_meta: object) -> Iterator[dict[str, object]]
 
 @dataclass(slots=True, frozen=True)
 class StageMeta:
-    """Structured metadata describing a stage run."""
+    """Structured metadata describing a stage run.
+
+    Attributes
+    ----------
+    name : str
+        Stage name identifier (e.g., "scip", "type-signals").
+    start : Mapping[str, object], optional
+        Initial metadata dictionary for the stage. Empty dictionary if no
+        initial metadata. Defaults to empty dictionary.
+    """
 
     name: str
     start: Mapping[str, object] = field(default_factory=dict)
@@ -169,7 +178,33 @@ def _stage(meta: StageMeta) -> Iterator[dict[str, object]]:
 
 @dataclass(slots=True, frozen=True)
 class PipelineOptions:
-    """Resolved paths and filters required for pipeline execution."""
+    """Resolved paths and filters required for pipeline execution.
+
+    Attributes
+    ----------
+    root : Path, optional
+        Repository root directory path. Defaults to current directory.
+    scip : Path | None, optional
+        Optional path to SCIP index file. None if SCIP is not available.
+        Defaults to None.
+    out : Path, optional
+        Output directory path for enrichment artifacts. Defaults to
+        "codeintel_rev/io/ENRICHED".
+    pyrefly_json : Path | None, optional
+        Optional path to Pyrefly JSON output file. None if Pyrefly data is not
+        available. Defaults to None.
+    tags_yaml : Path | None, optional
+        Optional path to tags YAML file. None if tags file is not available.
+        Defaults to None.
+    coverage_xml : Path, optional
+        Path to coverage XML file. Defaults to "coverage.xml".
+    only : tuple[str, ...], optional
+        Tuple of file path patterns to include. Empty tuple means process all
+        files. Defaults to empty tuple.
+    max_file_bytes : int, optional
+        Maximum file size in bytes to process. Files larger than this are
+        skipped. Must be positive. Defaults to DEFAULT_MAX_FILE_BYTES.
+    """
 
     root: Path = Path()
     scip: Path | None = None
@@ -183,7 +218,25 @@ class PipelineOptions:
 
 @dataclass(slots=True, frozen=True)
 class AnalyticsOptions:
-    """Optional analytics toggles shared across commands."""
+    """Optional analytics toggles shared across commands.
+
+    Attributes
+    ----------
+    owners : bool, optional
+        Whether to compute ownership analytics. Defaults to
+        DEFAULT_ENABLE_OWNERS.
+    history_window_days : int, optional
+        Number of days to look back for ownership history. Must be positive.
+        Defaults to DEFAULT_OWNER_HISTORY_DAYS.
+    commits_window : int, optional
+        Number of commits to analyze for ownership. Must be positive.
+        Defaults to DEFAULT_COMMITS_WINDOW.
+    emit_slices : bool, optional
+        Whether to emit slice artifacts. Defaults to DEFAULT_EMIT_SLICES_FLAG.
+    slices_filter : tuple[str, ...], optional
+        Tuple of slice filter patterns. Empty tuple means no filtering.
+        Defaults to empty tuple.
+    """
 
     owners: bool = DEFAULT_ENABLE_OWNERS
     history_window_days: int = DEFAULT_OWNER_HISTORY_DAYS
@@ -194,7 +247,15 @@ class AnalyticsOptions:
 
 @dataclass(slots=True, frozen=True)
 class CLIContextState:
-    """CLI-scoped state shared between commands."""
+    """CLI-scoped state shared between commands.
+
+    Attributes
+    ----------
+    pipeline : PipelineOptions, optional
+        Pipeline execution options. Defaults to PipelineOptions().
+    analytics : AnalyticsOptions, optional
+        Analytics configuration options. Defaults to AnalyticsOptions().
+    """
 
     pipeline: PipelineOptions = field(default_factory=PipelineOptions)
     analytics: AnalyticsOptions = field(default_factory=AnalyticsOptions)
@@ -202,7 +263,39 @@ class CLIContextState:
 
 @dataclass(slots=True)
 class OverlayCLIOptions:
-    """Mutable overlay generation options parsed from CLI/config."""
+    """Mutable overlay generation options parsed from CLI/config.
+
+    Attributes
+    ----------
+    stubs_root : Path, optional
+        Root directory for stub files. Defaults to Path("stubs").
+    overlays_root : Path, optional
+        Root directory for overlay stub files. Defaults to Path("stubs/overlays").
+    min_errors : int, optional
+        Minimum number of type errors required to trigger overlay generation.
+        Must be positive. Defaults to DEFAULT_MIN_ERRORS.
+    max_overlays : int, optional
+        Maximum number of overlays to generate. Must be positive.
+        Defaults to DEFAULT_MAX_OVERLAYS.
+    include_public_defs : bool, optional
+        Whether to include public definition stubs in overlays.
+        Defaults to DEFAULT_INCLUDE_PUBLIC_DEFS.
+    inject_getattr_any : bool, optional
+        Whether to inject __getattr__ returning Any for star imports.
+        Defaults to DEFAULT_INJECT_GETATTR_ANY.
+    dry_run : bool, optional
+        Whether to perform a dry run without writing files.
+        Defaults to DEFAULT_DRY_RUN.
+    activate : bool, optional
+        Whether to activate overlays after generation.
+        Defaults to DEFAULT_ACTIVATE.
+    deactivate_all_first : bool, optional
+        Whether to deactivate all overlays before generating new ones.
+        Defaults to DEFAULT_DEACTIVATE.
+    type_error_overlays : bool, optional
+        Whether to generate overlays based on type error counts.
+        Defaults to DEFAULT_USE_TYPE_ERROR_OVERLAYS.
+    """
 
     stubs_root: Path = Path("stubs")
     overlays_root: Path = Path("stubs/overlays")
@@ -218,7 +311,27 @@ class OverlayCLIOptions:
 
 @dataclass(slots=True, frozen=True)
 class OverlayContext:
-    """Aggregated context used during overlay generation."""
+    """Aggregated context used during overlay generation.
+
+    Attributes
+    ----------
+    root : Path
+        Repository root directory path.
+    package_name : str
+        Python package name for overlay generation.
+    overlays_root : Path
+        Root directory where overlay stub files will be written.
+    stubs_root : Path
+        Root directory for stub files.
+    scip_index : SCIPIndex
+        SCIP symbol index for symbol resolution.
+    type_counts : Mapping[str, int]
+        Dictionary mapping file paths to type error counts.
+    policy : OverlayPolicy
+        Overlay generation policy configuration.
+    inputs : OverlayInputs
+        Runtime inputs influencing overlay generation.
+    """
 
     root: Path
     package_name: str
@@ -232,7 +345,15 @@ class OverlayContext:
 
 @dataclass(frozen=True)
 class ScipContext:
-    """Cache of SCIP lookups used during scanning."""
+    """Cache of SCIP lookups used during scanning.
+
+    Attributes
+    ----------
+    index : SCIPIndex
+        SCIP symbol index instance.
+    by_file : Mapping[str, Document]
+        Dictionary mapping file paths to SCIP Document objects.
+    """
 
     index: SCIPIndex
     by_file: Mapping[str, Document]
@@ -240,7 +361,25 @@ class ScipContext:
 
 @dataclass(frozen=True)
 class ScanInputs:
-    """Bundle of contextual inputs used during module row construction."""
+    """Bundle of contextual inputs used during module row construction.
+
+    Attributes
+    ----------
+    scip_ctx : ScipContext
+        SCIP context containing symbol index and document cache.
+    type_signals : Mapping[str, FileTypeSignals]
+        Dictionary mapping file paths to type signal metadata.
+    coverage_map : Mapping[str, Mapping[str, float]]
+        Dictionary mapping file paths to coverage metrics dictionaries.
+    tagging_rules : Mapping[str, Any]
+        Dictionary of tagging rules for module classification.
+    repo_root : Path
+        Repository root directory path.
+    max_file_bytes : int
+        Maximum file size in bytes to process. Must be positive.
+    package_prefix : str | None
+        Optional package prefix for module name resolution. None if no prefix.
+    """
 
     scip_ctx: ScipContext
     type_signals: Mapping[str, FileTypeSignals]
@@ -253,7 +392,29 @@ class ScanInputs:
 
 @dataclass(slots=True, frozen=True)
 class LegacyPipelineContext:
-    """Aggregated context derived from CLI inputs and repo state."""
+    """Aggregated context derived from CLI inputs and repo state.
+
+    Attributes
+    ----------
+    root : Path
+        Working directory root path.
+    repo_root : Path
+        Repository root directory path.
+    scip_index : SCIPIndex
+        SCIP symbol index instance.
+    scip_ctx : ScipContext
+        SCIP context containing symbol index and document cache.
+    type_signals : Mapping[str, FileTypeSignals]
+        Dictionary mapping file paths to type signal metadata.
+    coverage_map : Mapping[str, Mapping[str, float]]
+        Dictionary mapping file paths to coverage metrics dictionaries.
+    config_records : list[dict[str, Any]]
+        List of configuration reference records.
+    tagging_rules : Mapping[str, Any]
+        Dictionary of tagging rules for module classification.
+    package_prefix : str | None
+        Optional package prefix for module name resolution. None if no prefix.
+    """
 
     root: Path
     repo_root: Path
@@ -268,7 +429,31 @@ class LegacyPipelineContext:
 
 @dataclass(slots=True, frozen=True)
 class PipelineResult:
-    """Aggregate artifact bundle produced by a pipeline run."""
+    """Aggregate artifact bundle produced by a pipeline run.
+
+    Attributes
+    ----------
+    root : Path
+        Working directory root path.
+    repo_root : Path
+        Repository root directory path.
+    module_rows : list[ModuleRecord]
+        List of module record objects.
+    symbol_edges : list[tuple[str, str]]
+        List of (source_symbol, target_symbol) edges.
+    import_graph : ImportGraph
+        Import graph structure.
+    use_graph : UseGraph
+        Usage graph structure.
+    config_index : list[dict[str, Any]]
+        List of configuration reference dictionaries.
+    coverage_rows : list[dict[str, Any]]
+        List of coverage metric dictionaries.
+    hotspot_rows : list[dict[str, Any]]
+        List of hotspot metric dictionaries.
+    tag_index : dict[str, list[str]]
+        Dictionary mapping tag names to lists of file paths.
+    """
 
     root: Path
     repo_root: Path
@@ -284,7 +469,15 @@ class PipelineResult:
 
 @dataclass(slots=True, frozen=True)
 class PreparedPipeline:
-    """Resolved pipeline context plus discovered files."""
+    """Resolved pipeline context plus discovered files.
+
+    Attributes
+    ----------
+    context : LegacyPipelineContext
+        Resolved pipeline context with all dependencies.
+    files : list[Path]
+        List of file paths to process.
+    """
 
     context: LegacyPipelineContext
     files: list[Path]
@@ -292,7 +485,23 @@ class PreparedPipeline:
 
 @dataclass(slots=True, frozen=True)
 class AnalyticsArtifacts:
-    """Derived analytics products emitted after scanning modules."""
+    """Derived analytics products emitted after scanning modules.
+
+    Attributes
+    ----------
+    import_graph : ImportGraph
+        Import graph structure.
+    use_graph : UseGraph
+        Usage graph structure.
+    config_index : list[dict[str, Any]]
+        List of configuration reference dictionaries.
+    coverage_rows : list[dict[str, Any]]
+        List of coverage metric dictionaries.
+    hotspot_rows : list[dict[str, Any]]
+        List of hotspot metric dictionaries.
+    tag_index : dict[str, list[str]]
+        Dictionary mapping tag names to lists of file paths.
+    """
 
     import_graph: ImportGraph
     use_graph: UseGraph
@@ -304,7 +513,17 @@ class AnalyticsArtifacts:
 
 @dataclass(slots=True, frozen=True)
 class ConfigReferenceState:
-    """Intermediate config reference tracking used during augmentation."""
+    """Intermediate config reference tracking used during augmentation.
+
+    Attributes
+    ----------
+    records : list[dict[str, Any]]
+        List of configuration reference records.
+    by_dir : Mapping[str, tuple[str, ...]]
+        Dictionary mapping directory paths to tuples of config keys.
+    references : dict[str, set[str]]
+        Dictionary mapping config keys to sets of referencing file paths.
+    """
 
     records: list[dict[str, Any]]
     by_dir: Mapping[str, tuple[str, ...]]
@@ -313,7 +532,20 @@ class ConfigReferenceState:
 
 @dataclass(slots=True)
 class PipelineContext:
-    """Thin context used by the refactored enrich CLI."""
+    """Thin context used by the refactored enrich CLI.
+
+    Attributes
+    ----------
+    paths : ResolvedPaths
+        Resolved filesystem paths for enrichment operations.
+    config : Mapping[str, Any]
+        Configuration dictionary.
+    logger : logging.Logger
+        Logger instance for enrichment operations.
+    db : DuckDBPyConnection | None, optional
+        Optional DuckDB database connection. None if database is not enabled.
+        Defaults to None.
+    """
 
     paths: ResolvedPaths
     config: Mapping[str, Any]

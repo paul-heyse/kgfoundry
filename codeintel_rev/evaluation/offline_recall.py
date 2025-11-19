@@ -22,7 +22,21 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True, frozen=True)
 class EvalQuery:
-    """Single offline evaluation query with known positives."""
+    """Single offline evaluation query with known positives.
+
+    Attributes
+    ----------
+    qid : str
+        Query identifier for this evaluation query.
+    text : str
+        Query text string to evaluate.
+    positives : tuple[int, ...]
+        Tuple of chunk IDs that are known positive matches for this query.
+        Empty tuple means no known positives.
+    metadata : dict[str, object] | None, optional
+        Optional metadata dictionary for this query. None if no metadata.
+        Defaults to None.
+    """
 
     qid: str
     text: str

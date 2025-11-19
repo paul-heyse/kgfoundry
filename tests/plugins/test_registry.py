@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from importlib.metadata import EntryPoint
-from types import SimpleNamespace
+from pathlib import Path
 from typing import cast
 
-from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.settings import Settings
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.plugins.channels import Channel, ChannelContext
 from codeintel_rev.plugins.registry import ChannelRegistry, override_channel_entry_points
 from codeintel_rev.retrieval.types import SearchHit
 
 from tests._helpers import assertions
+from tests._helpers.settings import build_app_config_from_paths
 
 
 class _ToyChannel(Channel):
@@ -58,17 +58,18 @@ class _FakeEntryPoint:
         return self._factory
 
 
-def test_registry_discovers_entry_points() -> None:
+def test_registry_discovers_entry_points(tmp_path: Path) -> None:
     """Test that channel registry discovers channels via entry points."""
 
     def _factory(_: ChannelContext) -> _ToyChannel:
         return _ToyChannel()
 
     entry_points = cast("Iterable[EntryPoint]", [_FakeEntryPoint(_factory)])
-    context = ChannelContext(
-        settings=cast("Settings", SimpleNamespace()),
-        paths=cast("ResolvedPaths", SimpleNamespace()),
-    )
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    paths: ResolvedPaths = resolve_application_paths({"BASE_DIR": repo_root})
+    app_config = build_app_config_from_paths(paths)
+    context = ChannelContext(app_config=app_config, paths=paths)
     with override_channel_entry_points(entry_points):
         registry = ChannelRegistry.discover(context)
     channels = registry.channels()

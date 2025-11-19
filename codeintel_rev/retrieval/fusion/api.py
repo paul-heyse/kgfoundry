@@ -12,7 +12,16 @@ from codeintel_rev.retrieval.types import SearchHit
 
 @dataclass(frozen=True, slots=True)
 class FusionInput:
-    """Per-channel candidates that will be fused via Reciprocal Rank Fusion."""
+    """Per-channel candidates that will be fused via Reciprocal Rank Fusion.
+
+    Attributes
+    ----------
+    channel : str
+        Channel identifier (e.g., "bm25", "splade", "faiss").
+    candidates : Sequence[tuple[int, float]]
+        Sequence of (doc_id, score) pairs from this channel, sorted by score
+        descending.
+    """
 
     channel: str
     candidates: Sequence[tuple[int, float]]
@@ -20,7 +29,20 @@ class FusionInput:
 
 @dataclass(frozen=True, slots=True)
 class FusionOptions:
-    """Fusion configuration knobs."""
+    """Fusion configuration knobs.
+
+    Attributes
+    ----------
+    weights : Mapping[str, float] | None, optional
+        Optional channel weight overrides. Keys are channel names, values are
+        fusion weights. None means use default weights. Defaults to None.
+    k : int, optional
+        Maximum number of results to return after fusion. Must be positive.
+        Defaults to 50.
+    base : int, optional
+        RRF base parameter. Higher values reduce the impact of rank differences.
+        Must be positive. Defaults to 60.
+    """
 
     weights: Mapping[str, float] | None = None
     k: int = 50

@@ -101,7 +101,7 @@ def override_app_hooks(**kwargs: object) -> Iterator[None]:
 
     Yields
     ------
-    Iterator[None]
+    None
         Context manager that temporarily overrides hooks. The override is
         pushed onto a stack and popped when the context exits, restoring
         the previous hooks configuration.

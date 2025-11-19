@@ -28,7 +28,6 @@ from codeintel_rev.config.api import (
 from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings, load_settings
 
-
 DEFAULT_XTR_SETTINGS = XTRSettings(
     model_id="nomic-ai/CodeRankEmbed",
     device="cuda",
@@ -205,8 +204,8 @@ def scaffold_repo_root(repo_root: Path) -> None:
 
 
 __all__ = [
+    "DEFAULT_XTR_SETTINGS",
     "build_app_config_from_paths",
     "build_settings_for_repo",
-    "DEFAULT_XTR_SETTINGS",
     "scaffold_repo_root",
 ]

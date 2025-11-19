@@ -24,7 +24,13 @@ class BM25Backend(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class BM25Engine:
-    """Narrow engine that delegates to a backend and normalizes outputs."""
+    """Narrow engine that delegates to a backend and normalizes outputs.
+
+    Attributes
+    ----------
+    backend : BM25Backend
+        BM25 backend implementation providing search capabilities.
+    """
 
     backend: BM25Backend
 
@@ -61,7 +67,21 @@ class BM25Engine:
 
 @dataclass(frozen=True, slots=True)
 class BM25Rm3Config:
-    """RM3 parameters used by :class:`PyseriniBM25Backend`."""
+    """RM3 parameters used by :class:`PyseriniBM25Backend`.
+
+    Attributes
+    ----------
+    params : RM3Params | None, optional
+        RM3 pseudo-relevance feedback parameters. None disables RM3.
+        Defaults to None.
+    heuristics : RM3Heuristics | None, optional
+        Heuristics for deciding when to enable RM3 automatically. None disables
+        automatic RM3. Defaults to None.
+    enable_rm3 : bool, optional
+        Whether RM3 is explicitly enabled. Defaults to False.
+    auto_rm3 : bool, optional
+        Whether to automatically enable RM3 based on heuristics. Defaults to False.
+    """
 
     params: RM3Params | None = None
     heuristics: RM3Heuristics | None = None

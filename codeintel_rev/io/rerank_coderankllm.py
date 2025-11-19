@@ -30,7 +30,17 @@ _MAX_PREVIEW_CHARS = 400
 
 @dataclass(slots=True, frozen=True)
 class CoderankLLMRerankerContext:
-    """Dependency providers for CodeRank listwise reranker."""
+    """Dependency providers for CodeRank listwise reranker.
+
+    Attributes
+    ----------
+    tokenizer_factory : Callable[[str], PreTrainedTokenizerBase]
+        Factory function that creates a tokenizer from a model identifier.
+        Used for dependency injection in tests.
+    model_factory : Callable[[str], AutoModelForCausalLM]
+        Factory function that creates a language model from a model identifier.
+        Used for dependency injection in tests.
+    """
 
     tokenizer_factory: Callable[[str], PreTrainedTokenizerBase]
     model_factory: Callable[[str], AutoModelForCausalLM]
@@ -108,7 +118,19 @@ class CoderankLLMRerankerContext:
 
 @dataclass(slots=True, frozen=True)
 class CodeRankGenerationSettings:
-    """Generation parameters for CodeRank listwise reranker."""
+    """Generation parameters for CodeRank listwise reranker.
+
+    Attributes
+    ----------
+    max_new_tokens : int
+        Maximum number of tokens to generate. Must be positive.
+    temperature : float
+        Sampling temperature for generation. Higher values increase randomness.
+        Must be positive.
+    top_p : float
+        Nucleus sampling parameter (top-p). Cumulative probability threshold for
+        token sampling. Must be between 0.0 and 1.0.
+    """
 
     max_new_tokens: int
     temperature: float

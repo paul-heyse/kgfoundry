@@ -32,7 +32,7 @@ from codeintel_rev.ops.runtime.xtr_open import APP, XtrOpenContext
 from typer.testing import CliRunner
 
 from tests._helpers import assertions
-from tests._helpers.settings import DEFAULT_XTR_SETTINGS, build_settings_for_repo
+from tests._helpers.settings import build_settings_for_repo
 
 RUNNER = CliRunner(mix_stderr=False)
 
@@ -101,6 +101,7 @@ def _app_config_loader(repo_root: Path) -> Callable[[], AppConfig]:
             index_dir=repo_root / "indexes" / "bm25",
         ),
         splade=SpladeSettings(
+            model_id="naver/splade-v3",
             model_dir=repo_root / "models" / "splade",
             onnx_dir=repo_root / "models" / "splade" / "onnx",
             onnx_file="model.onnx",
@@ -118,7 +119,16 @@ def _app_config_loader(repo_root: Path) -> Callable[[], AppConfig]:
             analyzer="wordpiece",
             static_prune_pct=0.0,
         ),
-        xtr=DEFAULT_XTR_SETTINGS,
+        xtr=XTRSettings(
+            model_id="nomic-ai/CodeRankEmbed",
+            device="cuda",
+            max_query_tokens=256,
+            candidate_k=200,
+            dim=768,
+            dtype="float16",
+            enable=False,
+            mode="narrow",
+        ),
         embeddings=EmbeddingsSettings(),
         vllm=VLLMSettings(),
         search=SearchSettings(),

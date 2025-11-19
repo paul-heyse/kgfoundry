@@ -18,7 +18,23 @@ from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 
 @dataclass(frozen=True, slots=True)
 class HybridSearchOptions:
-    """Coordinator options expressed in terms of channel budgets and fusion weights."""
+    """Coordinator options expressed in terms of channel budgets and fusion weights.
+
+    Attributes
+    ----------
+    weights : Mapping[str, float] | None, optional
+        Optional channel weight overrides. Keys are channel names ("bm25", "splade"),
+        values are fusion weights. None means use default weights. Defaults to None.
+    per_channel_k : int, optional
+        Maximum number of results to retrieve from each channel before fusion.
+        Must be positive. Defaults to 100.
+    fusion_k : int, optional
+        Maximum number of results to return after fusion. Must be positive.
+        Defaults to 50.
+    rrf_base : int, optional
+        Reciprocal Rank Fusion (RRF) base parameter. Higher values reduce the
+        impact of rank differences. Must be positive. Defaults to 60.
+    """
 
     weights: Mapping[str, float] | None = None
     per_channel_k: int = 100
@@ -28,7 +44,18 @@ class HybridSearchOptions:
 
 @dataclass(slots=True)
 class HybridSearchEngine:
-    """Stage-0 coordinator that delegates to BM25/SPLADE engines and fuses the results."""
+    """Stage-0 coordinator that delegates to BM25/SPLADE engines and fuses the results.
+
+    Attributes
+    ----------
+    bm25 : BM25Engine
+        BM25 search engine backend for keyword-based retrieval.
+    splade : SPLADEEngine
+        SPLADE search engine backend for learned sparse retrieval.
+    fusion : FusionProtocol
+        Fusion algorithm for combining BM25 and SPLADE results. Defaults to
+        RRFWeighter. Not included in repr for brevity.
+    """
 
     bm25: BM25Engine
     splade: SPLADEEngine

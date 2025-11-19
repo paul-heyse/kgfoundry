@@ -43,7 +43,29 @@ HTTP_OK: Final[int] = 200
 
 @dataclass(slots=True, frozen=True)
 class ServerLaunchOptions:
-    """Configuration for launching a vLLM HTTP server."""
+    """Configuration for launching a vLLM HTTP server.
+
+    Attributes
+    ----------
+    model : str
+        HuggingFace model identifier or local path for the vLLM server.
+    host : str
+        Host address to bind the server to (e.g., "localhost", "0.0.0.0").
+    port : int
+        Port number to bind the server to. Must be between 1 and 65535.
+    served_model_name : str | None, optional
+        Optional model name to expose in the API. None means use the model
+        identifier. Defaults to None.
+    tensor_parallel_size : int | None, optional
+        Optional tensor parallelism size for multi-GPU inference. None means
+        use defaults. Must be positive if specified. Defaults to None.
+    memory_utilization : float | None, optional
+        Optional GPU memory utilization ratio (0.0 to 1.0). None means use
+        defaults. Defaults to None.
+    max_num_batched_tokens : int | None, optional
+        Optional maximum number of batched tokens. None means use defaults.
+        Must be positive if specified. Defaults to None.
+    """
 
     model: str
     host: str

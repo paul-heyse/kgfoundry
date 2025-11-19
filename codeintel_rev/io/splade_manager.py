@@ -27,6 +27,7 @@ from codeintel_rev.io.splade_engine import SPLADEEngine
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.subprocess_utils import run_subprocess
 
+
 class _ImpactHit(Protocol):
     """Protocol describing SPLADE search hits."""
 
@@ -53,6 +54,7 @@ class _LuceneImpactSearcherProtocol(Protocol):
 
 
 if TYPE_CHECKING:
+
     class _SparseEncoderProtocol(Protocol):
         """Protocol defining the interface for SPLADE sparse encoders.
 
@@ -527,9 +529,7 @@ def _docid_to_int(docid: str | int) -> int:
             return -1
 
 
-def _maybe_move_encoder_device(
-    searcher: _LuceneImpactSearcherProtocol, device: str | None
-) -> None:
+def _maybe_move_encoder_device(searcher: _LuceneImpactSearcherProtocol, device: str | None) -> None:
     """Move encoder to specified device if supported.
 
     Parameters

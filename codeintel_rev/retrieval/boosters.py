@@ -37,7 +37,25 @@ _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 @dataclass(frozen=True)
 class RecencyConfig:
-    """Configuration parameters controlling recency boosts."""
+    """Configuration parameters controlling recency boosts.
+
+    Attributes
+    ----------
+    enabled : bool, optional
+        Whether recency boosting is enabled. Defaults to False.
+    half_life_days : float, optional
+        Half-life period in days for recency decay. Must be positive.
+        Defaults to 30.0.
+    max_boost : float, optional
+        Maximum boost multiplier for recent chunks. Must be positive.
+        Defaults to 0.15.
+    table : str, optional
+        Database table name containing chunk timestamps. Defaults to "chunks".
+    chunk_id_column : str, optional
+        Column name for chunk IDs in the table. Defaults to "chunk_id".
+    commit_ts_column : str, optional
+        Column name for commit timestamps in the table. Defaults to "commit_ts".
+    """
 
     enabled: bool = False
     half_life_days: float = 30.0

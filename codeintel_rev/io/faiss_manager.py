@@ -140,6 +140,21 @@ class _RuntimeFacade:
     ) -> dict[str, object]:
         """Apply runtime overrides to the active FAISS index.
 
+        Parameters
+        ----------
+        nprobe : int | None, optional
+            Number of clusters to probe in IVF indexes. None means use defaults.
+            Defaults to None.
+        ef_search : int | None, optional
+            HNSW ef_search parameter override. None means use defaults.
+            Defaults to None.
+        quantizer_ef_search : int | None, optional
+            Quantizer ef_search parameter override. None means use defaults.
+            Defaults to None.
+        k_factor : float | None, optional
+            K factor override for search refinement. None means use defaults.
+            Defaults to None.
+
         Returns
         -------
         dict[str, object]
@@ -168,6 +183,11 @@ class _RuntimeFacade:
 
     def set_search_parameters(self, param_str: str) -> dict[str, object]:
         """Apply FAISS ParameterSpace string (``nprobe=32,efSearch=64``).
+
+        Parameters
+        ----------
+        param_str : str
+            FAISS ParameterSpace string (e.g., "nprobe=32,efSearch=64").
 
         Returns
         -------
@@ -242,6 +262,14 @@ class FAISSManager:
     def build_index(self, vectors: NDArrayF32, *, family: str | None = None) -> None:
         """Build and train FAISS index with adaptive type selection.
 
+        Parameters
+        ----------
+        vectors : NDArrayF32
+            Vector array to build the index from. Shape should be (n_vectors, vec_dim).
+        family : str | None, optional
+            Index family identifier ("ivf", "hnsw", "adaptive"). None means use
+            "adaptive". Defaults to None.
+
         Raises
         ------
         VectorIndexStateError
@@ -270,6 +298,13 @@ class FAISSManager:
     def add_vectors(self, vectors: NDArrayF32, ids: NDArrayI64) -> None:
         """Add vectors to the primary index after build.
 
+        Parameters
+        ----------
+        vectors : NDArrayF32
+            Vector array to add. Shape should be (n_vectors, vec_dim).
+        ids : NDArrayI64
+            Chunk ID array corresponding to vectors. Shape should be (n_vectors,).
+
         Raises
         ------
         RuntimeError
@@ -283,6 +318,13 @@ class FAISSManager:
 
     def update_index(self, new_vectors: NDArrayF32, new_ids: NDArrayI64) -> int:
         """Add vectors to the secondary (incremental) index.
+
+        Parameters
+        ----------
+        new_vectors : NDArrayF32
+            Vector array to add. Shape should be (n_vectors, vec_dim).
+        new_ids : NDArrayI64
+            Chunk ID array corresponding to vectors. Shape should be (n_vectors,).
 
         Returns
         -------
@@ -389,6 +431,11 @@ class FAISSManager:
     def export_idmap(self, out_path: Path) -> int:
         """Export {faiss_row -> external_id} mapping to Parquet.
 
+        Parameters
+        ----------
+        out_path : Path
+            Output file path for the Parquet ID map.
+
         Returns
         -------
         int
@@ -418,6 +465,23 @@ class FAISSManager:
         catalog: object | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Execute dual-index search with optional exact rerank.
+
+        Parameters
+        ----------
+        query : NDArrayF32
+            Query vector. Shape should be (vec_dim,) or (1, vec_dim).
+        k : int | None, optional
+            Number of nearest neighbors to retrieve. None means use default_k.
+            Defaults to None.
+        nprobe : int | None, optional
+            Number of clusters to probe in IVF indexes. None means use default_nprobe.
+            Defaults to None.
+        runtime : SearchRuntimeOverrides | None, optional
+            Optional runtime override parameters. None means use defaults.
+            Defaults to None.
+        catalog : object | None, optional
+            Optional DuckDB catalog for exact reranking. None means skip reranking.
+            Defaults to None.
 
         Returns
         -------
@@ -460,6 +524,18 @@ class FAISSManager:
         config: RefineSearchConfig | None = None,
     ) -> list[SearchHit]:
         """Execute ANN search and return structured :class:`SearchHit` rows.
+
+        Parameters
+        ----------
+        query : NDArrayF32
+            Query vector. Shape should be (vec_dim,) or (1, vec_dim).
+        k : int
+            Number of nearest neighbors to retrieve. Must be positive.
+        catalog : DuckDBCatalog
+            DuckDB catalog for hydrating search results with metadata.
+        config : RefineSearchConfig | None, optional
+            Optional refinement configuration. None means use defaults.
+            Defaults to None.
 
         Returns
         -------
@@ -620,6 +696,19 @@ class FAISSManager:
         sweep: Sequence[str] | None = None,
     ) -> dict[str, object]:
         """Sweep ParameterSpace strings and persist the best profile.
+
+        Parameters
+        ----------
+        queries : NDArrayF32
+            Query vectors array. Shape should be (n_queries, vec_dim).
+        truths : NDArrayF32
+            Ground truth vectors array. Shape should be (n_truths, vec_dim).
+        k : int, optional
+            Number of nearest neighbors to evaluate. Must be positive.
+            Defaults to 10.
+        sweep : Sequence[str] | None, optional
+            Optional sequence of ParameterSpace strings to evaluate. None means
+            use default sweep. Defaults to None.
 
         Returns
         -------

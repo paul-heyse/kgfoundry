@@ -37,7 +37,7 @@ from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server import service_context
 
 from tests._helpers import assertions
-from tests._helpers.settings import DEFAULT_XTR_SETTINGS, build_settings_for_repo
+from tests._helpers.settings import build_settings_for_repo
 
 
 class RecordingFAISSManager:
@@ -183,6 +183,7 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
             index_dir=repo_root / "indexes" / "bm25",
         ),
         splade=SpladeSettings(
+            model_id="naver/splade-v3",
             model_dir=repo_root / "models" / "splade",
             onnx_dir=repo_root / "models" / "splade" / "onnx",
             onnx_file="model.onnx",
@@ -200,7 +201,16 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
             analyzer="wordpiece",
             static_prune_pct=0.0,
         ),
-        xtr=DEFAULT_XTR_SETTINGS,
+        xtr=XTRSettings(
+            model_id="nomic-ai/CodeRankEmbed",
+            device="cuda",
+            max_query_tokens=256,
+            candidate_k=200,
+            dim=768,
+            dtype="float16",
+            enable=False,
+            mode="narrow",
+        ),
         embeddings=EmbeddingsSettings(),
         vllm=VLLMSettings(),
         search=SearchSettings(),
@@ -278,6 +288,7 @@ def test_merge_paths_with_app_config_overrides_duckdb_and_faiss(tmp_path: Path) 
             index_dir=repo_root / "indexes" / "bm25",
         ),
         splade=SpladeSettings(
+            model_id="naver/splade-v3",
             model_dir=repo_root / "models" / "splade",
             onnx_dir=repo_root / "models" / "splade" / "onnx",
             onnx_file="model.onnx",
@@ -295,7 +306,16 @@ def test_merge_paths_with_app_config_overrides_duckdb_and_faiss(tmp_path: Path) 
             analyzer="wordpiece",
             static_prune_pct=0.0,
         ),
-        xtr=DEFAULT_XTR_SETTINGS,
+        xtr=XTRSettings(
+            model_id="nomic-ai/CodeRankEmbed",
+            device="cuda",
+            max_query_tokens=256,
+            candidate_k=200,
+            dim=768,
+            dtype="float16",
+            enable=False,
+            mode="narrow",
+        ),
         embeddings=EmbeddingsSettings(),
         vllm=VLLMSettings(),
         search=SearchSettings(),

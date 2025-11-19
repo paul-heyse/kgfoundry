@@ -41,7 +41,22 @@ class SupportsEmbedSingle(Protocol):
 
 @dataclass(slots=True, frozen=True)
 class CoverageResult:
-    """Container for per-symbol coverage evaluation."""
+    """Container for per-symbol coverage evaluation.
+
+    Attributes
+    ----------
+    symbol : str
+        SCIP symbol identifier being evaluated.
+    chunk_id : int | None
+        Chunk ID where this symbol is defined. None if symbol is not found
+        in chunks.
+    chunk_covered : bool
+        Whether the symbol is covered in chunk data.
+    index_covered : bool
+        Whether the symbol is covered in the index.
+    retrieved : bool
+        Whether the symbol can be retrieved via search.
+    """
 
     symbol: str
     chunk_id: int | None

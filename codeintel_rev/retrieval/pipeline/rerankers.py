@@ -9,7 +9,16 @@ from typing import Protocol
 
 @dataclass(frozen=True, slots=True)
 class RerankResult:
-    """Normalized rerank result."""
+    """Normalized rerank result.
+
+    Attributes
+    ----------
+    ids : list[int]
+        List of document/chunk IDs after reranking, sorted by score descending.
+    scores : list[float]
+        List of reranked relevance scores corresponding to ids. Higher scores
+        indicate better matches.
+    """
 
     ids: list[int]
     scores: list[float]

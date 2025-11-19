@@ -278,7 +278,7 @@ def _default_embedding_provider_factory(settings: Settings) -> EmbeddingProvider
     app_config = _cached_app_config()
     return get_embedding_provider(
         embeddings=app_config.embeddings,
-        index=settings.index,
+        vec_dim=settings.index.vec_dim,
         vllm=app_config.vllm,
     )
 
@@ -471,7 +471,24 @@ _SWEEP_MODE_BY_NAME: dict[str, SweepMode] = {
 
 @dataclass(slots=True, frozen=True)
 class SearchCommandParams:
-    """Typed container for CLI-provided semantic search arguments."""
+    """Typed container for CLI-provided semantic search arguments.
+
+    Attributes
+    ----------
+    queries : Path
+        File path containing queries to search (JSONL format).
+    k : int
+        Maximum number of results to return per query. Must be positive.
+    dry_run : bool
+        Whether to perform a dry run without executing searches.
+    nprobe : int | None
+        Optional FAISS nprobe parameter override. None means use defaults.
+        Must be positive if specified.
+    index : Path | None
+        Optional FAISS index file path override. None means use configured path.
+    duckdb : Path | None
+        Optional DuckDB catalog file path override. None means use configured path.
+    """
 
     queries: Path
     k: int

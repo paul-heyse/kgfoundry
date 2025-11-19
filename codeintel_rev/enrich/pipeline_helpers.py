@@ -9,11 +9,12 @@ from typing import TYPE_CHECKING, Any
 
 from codeintel_rev.enrich.ast_indexer import stable_module_path
 from codeintel_rev.enrich.errors import IndexingError
-from codeintel_rev.enrich.libcst_bridge import ModuleIndex, index_module
+from codeintel_rev.enrich.libcst_bridge import ModuleIndex, index_module_with_analysis
 from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.pathnorm import module_name_from_path, stable_id_for_path
 from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags
 from codeintel_rev.enrich.tree_sitter_bridge import build_outline
+from codeintel_rev.enrich.types import ModuleAnalysis
 from codeintel_rev.export_resolver import EXPORT_HUB_THRESHOLD
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
@@ -122,16 +123,81 @@ def build_module_row(
         return record, symbol_edges
 
     try:
-        idx = _index_module_safe(rel, code)
+        idx, analysis = _index_module_safe(rel, code)
     except IndexingError as exc:  # pragma: no cover - difficult to trigger deterministically
         LOGGER.exception("LibCST index failed for %s", rel, extra=exc.log_extra())
         record.add_error(exc)
         return record, symbol_edges
 
     outline_nodes = _collect_outline_nodes(rel, code, record)
-    _apply_index_results(record, idx, outline_nodes)
+    _apply_index_results(record, idx, outline_nodes, analysis)
     record.config_refs = []
     return record, symbol_edges
+
+
+def _analysis_meta_payload(analysis: ModuleAnalysis) -> dict[str, object]:
+    """Serialize ModuleAnalysis into a JSON-friendly payload.
+
+    Parameters
+    ----------
+    analysis : ModuleAnalysis
+        Module analysis result to serialize.
+
+    Returns
+    -------
+    dict[str, object]
+        Normalized metadata ready for serialization.
+    """
+    imports = [
+        {
+            "src_module": edge.src_module,
+            "dst_module": edge.dst_module,
+            "alias": edge.alias,
+            "level": edge.level,
+        }
+        for edge in analysis.imports
+    ]
+    exports = [
+        {
+            "module": item.module,
+            "name": item.name,
+            "kind": item.kind,
+            "via_dunder_all": item.via_dunder_all,
+        }
+        for item in analysis.exports
+    ]
+    docs = {
+        "module_docstring": analysis.docs.module_docstring,
+        "module_has_doc": analysis.docs.module_has_doc,
+        "classes_with_doc": analysis.docs.classes_with_doc,
+        "classes_total": analysis.docs.classes_total,
+        "functions_with_doc": analysis.docs.functions_with_doc,
+        "functions_total": analysis.docs.functions_total,
+    }
+    metrics = {
+        "annotated_defs": analysis.metrics.annotated_defs,
+        "defs_total": analysis.metrics.defs_total,
+        "annotation_ratio": analysis.metrics.annotation_ratio,
+        "has_top_level_side_effects": analysis.metrics.has_top_level_side_effects,
+    }
+    definitions = [
+        {
+            "module": definition.module,
+            "name": definition.name,
+            "kind": definition.kind,
+            "lineno": definition.lineno,
+        }
+        for definition in analysis.definitions
+    ]
+    return {
+        "module": analysis.module,
+        "path": str(analysis.path),
+        "imports": imports,
+        "exports": exports,
+        "docs": docs,
+        "metrics": metrics,
+        "definitions": definitions,
+    }
 
 
 def outline_nodes_for(rel_path: str, code: str) -> list[dict[str, Any]]:
@@ -246,33 +312,32 @@ def _scip_symbols_and_edges(
     return symbols, [(symbol, rel_path) for symbol in symbols]
 
 
-def _index_module_safe(rel_path: str, code: str) -> ModuleIndex:
+def _index_module_safe(rel_path: str, code: str) -> tuple[ModuleIndex, ModuleAnalysis]:
     """Index a module using LibCST with error handling.
 
     Parameters
     ----------
     rel_path : str
-        Relative path to the source file (used for error reporting).
+        Relative path to the module within the repository.
     code : str
-        Source code content to parse and index.
+        Source code to parse.
 
     Returns
     -------
-    ModuleIndex
-        Parsed module metadata containing imports, defs, exports, docstrings,
-        and other analysis results.
+    tuple[ModuleIndex, ModuleAnalysis]
+        Legacy ModuleIndex plus the richer ModuleAnalysis payload.
 
     Raises
     ------
     IndexingError
-        Raised when LibCST parsing fails. The error reason is set to "libcst"
-        and includes the original exception detail.
+        Raised when LibCST fails to parse ``code``.
     """
     try:
-        return index_module(rel_path, code)
+        analysis, module_index = index_module_with_analysis(rel_path, code)
     except Exception as exc:  # pragma: no cover - defensive
         reason = "libcst"
         raise IndexingError(reason, path=rel_path, detail=str(exc)) from exc
+    return module_index, analysis
 
 
 def _read_module_source(
@@ -360,6 +425,7 @@ def _apply_index_results(
     record: ModuleRecord,
     idx: ModuleIndex,
     outline_nodes: list[dict[str, Any]],
+    analysis: ModuleAnalysis | None = None,
 ) -> None:
     """Apply LibCST indexing results to a module record.
 
@@ -376,8 +442,9 @@ def _apply_index_results(
         LibCST indexing results containing module metadata, docstrings, imports,
         definitions, exports, and analysis metrics.
     outline_nodes : list[dict[str, Any]]
-        Tree-sitter outline nodes to attach to the record. Each dict contains
-        kind, name, start, and end byte offsets.
+        Tree-sitter outline nodes to attach to the record.
+    analysis : ModuleAnalysis | None, optional
+        Raw ModuleAnalysis payload used to populate `record["meta"]`.
 
     Notes
     -----
@@ -418,6 +485,8 @@ def _apply_index_results(
     record.side_effects = dict(idx.side_effects)
     record.raises = list(idx.raises)
     record.complexity = dict(idx.complexity)
+    if analysis is not None:
+        record["meta"] = _analysis_meta_payload(analysis)
 
 
 def _coverage_value(rel_path: str, inputs: ScanInputs, key: str) -> float:

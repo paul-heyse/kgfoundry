@@ -19,7 +19,21 @@ class CatalogProtocol(Protocol):
 
 @dataclass(slots=True, frozen=True)
 class SearchDeps:
-    """Dependencies required to execute the light search helper."""
+    """Dependencies required to execute the light search helper.
+
+    Attributes
+    ----------
+    catalog : CatalogProtocol
+        Catalog protocol implementation for hydrating chunk metadata.
+    faiss_search : Callable[[str, int], list[tuple[int, float]]] | None, optional
+        Optional FAISS search function. Takes query string and k, returns list
+        of (doc_id, score) pairs. None if FAISS search is not available.
+        Defaults to None.
+    sparse_search : Callable[[str, int], list[tuple[int, float]]] | None, optional
+        Optional sparse search function (BM25/SPLADE). Takes query string and k,
+        returns list of (doc_id, score) pairs. None if sparse search is not
+        available. Defaults to None.
+    """
 
     catalog: CatalogProtocol
     faiss_search: Callable[[str, int], list[tuple[int, float]]] | None = None

@@ -32,7 +32,30 @@ _MEDIUM_CORPUS_THRESHOLD = 50_000
 
 @dataclass(frozen=True, slots=True)
 class IndexBuildConfig:
-    """Configuration for constructing the primary index."""
+    """Configuration for constructing the primary index.
+
+    Attributes
+    ----------
+    vec_dim : int
+        Vector dimension for embeddings. Must be positive.
+    default_nlist : int, optional
+        Default number of clusters for IVF indexes. Must be positive.
+        Defaults to 8192.
+    family : IndexFamily, optional
+        FAISS index family identifier ("ivf", "hnsw", "adaptive"). "adaptive"
+        selects based on data size. Defaults to "adaptive".
+    pq_m : int, optional
+        Number of subquantizers for Product Quantization (PQ). Must be positive.
+        Defaults to 32.
+    pq_bits : int, optional
+        Number of bits per PQ code. Must be positive. Defaults to 8.
+    opq_m : int, optional
+        Number of subquantizers for Optimized Product Quantization (OPQ). 0
+        disables OPQ. Must be non-negative. Defaults to 0.
+    hnsw_m : int, optional
+        HNSW parameter M (number of bi-directional links per node). Must be
+        positive. Defaults to 32.
+    """
 
     vec_dim: int
     default_nlist: int = 8192

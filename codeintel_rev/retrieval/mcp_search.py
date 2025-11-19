@@ -168,7 +168,23 @@ class VectorIndex(Protocol):
 
 @dataclass(slots=True, frozen=True)
 class SearchFilters:
-    """Normalized filter payload for the MCP search tool."""
+    """Normalized filter payload for the MCP search tool.
+
+    Attributes
+    ----------
+    languages : tuple[str, ...], optional
+        Tuple of programming language identifiers to filter by (e.g., "python",
+        "typescript"). Empty tuple means no language filter. Defaults to empty tuple.
+    include : tuple[str, ...], optional
+        Tuple of file path patterns to include. Empty tuple means no include
+        filter. Defaults to empty tuple.
+    exclude : tuple[str, ...], optional
+        Tuple of file path patterns to exclude. Empty tuple means no exclude
+        filter. Defaults to empty tuple.
+    symbols : tuple[str, ...], optional
+        Tuple of symbol identifiers to filter by. Empty tuple means no symbol
+        filter. Defaults to empty tuple.
+    """
 
     languages: tuple[str, ...] = ()
     include: tuple[str, ...] = ()
@@ -253,7 +269,19 @@ class SearchFilters:
 
 @dataclass(slots=True, frozen=True)
 class SearchRequest:
-    """Search invocation parameters."""
+    """Search invocation parameters.
+
+    Attributes
+    ----------
+    query : str
+        Query string to search for.
+    top_k : int
+        Maximum number of results to return. Must be positive.
+    rerank : bool
+        Whether to apply reranking to search results.
+    filters : SearchFilters
+        Search filters for languages, paths, and symbols.
+    """
 
     query: str
     top_k: int
@@ -263,7 +291,25 @@ class SearchRequest:
 
 @dataclass(slots=True, frozen=True)
 class SearchResult:
-    """Single search result entry."""
+    """Single search result entry.
+
+    Attributes
+    ----------
+    chunk_id : int
+        Chunk identifier for this result.
+    title : str
+        Title or heading for this result.
+    url : str
+        URL or file path for this result.
+    snippet : str
+        Text snippet or preview for this result.
+    score : float
+        Relevance score for this result. Higher scores indicate better matches.
+    source : str
+        Source channel identifier (e.g., "faiss", "bm25", "splade").
+    metadata : dict[str, object]
+        Additional metadata dictionary for this result.
+    """
 
     chunk_id: int
     title: str
@@ -276,7 +322,19 @@ class SearchResult:
 
 @dataclass(slots=True, frozen=True)
 class SearchResponse:
-    """Structured search response returned to MCP adapters."""
+    """Structured search response returned to MCP adapters.
+
+    Attributes
+    ----------
+    query_echo : str
+        Echo of the original query string for verification.
+    top_k : int
+        Maximum number of results requested. Actual results may be fewer.
+    results : list[SearchResult]
+        List of search results sorted by score descending.
+    limits : list[str]
+        List of limit identifiers that were applied (e.g., "max_tokens").
+    """
 
     query_echo: str
     top_k: int
@@ -286,7 +344,15 @@ class SearchResponse:
 
 @dataclass(slots=True, frozen=True)
 class HydrationPayload:
-    """Bundle of hydrated rows and structural annotations."""
+    """Bundle of hydrated rows and structural annotations.
+
+    Attributes
+    ----------
+    rows : Mapping[int, dict[str, object]]
+        Dictionary mapping chunk IDs to hydrated metadata dictionaries.
+    annotations : Mapping[int, StructureAnnotations]
+        Dictionary mapping chunk IDs to structural annotations (outline, symbols).
+    """
 
     rows: Mapping[int, dict[str, object]]
     annotations: Mapping[int, StructureAnnotations]
@@ -294,7 +360,18 @@ class HydrationPayload:
 
 @dataclass(slots=True)
 class _StageDurations:
-    """Per-stage latencies captured during a search run."""
+    """Per-stage latencies captured during a search run.
+
+    Attributes
+    ----------
+    ann : float, optional
+        Approximate nearest neighbor (ANN) search latency in seconds.
+        Defaults to 0.0.
+    hydrate : float, optional
+        Result hydration latency in seconds. Defaults to 0.0.
+    rerank : float, optional
+        Reranking latency in seconds. Defaults to 0.0.
+    """
 
     ann: float = 0.0
     hydrate: float = 0.0
@@ -303,7 +380,28 @@ class _StageDurations:
 
 @dataclass(slots=True, frozen=True)
 class SearchDependencies:
-    """Dependency bundle consumed by :func:`run_search`."""
+    """Dependency bundle consumed by :func:`run_search`.
+
+    Attributes
+    ----------
+    faiss : VectorIndex
+        FAISS vector index for approximate nearest neighbor search.
+    embedder : EmbeddingClient
+        Embedding client for query vectorization.
+    catalog : CatalogLike
+        Catalog for hydrating chunk metadata.
+    settings : SearchSettings
+        Search configuration settings.
+    session_id : str | None
+        Optional session identifier for request tracking. None if not tracked.
+    run_id : str | None
+        Optional run identifier for request tracking. None if not tracked.
+    limits : Sequence[str]
+        Sequence of limit identifiers applied to this search.
+    pool_dir : Path | None
+        Optional directory path for evaluation pool output. None if pools are
+        not recorded.
+    """
 
     faiss: VectorIndex
     embedder: EmbeddingClient
@@ -317,7 +415,15 @@ class SearchDependencies:
 
 @dataclass(slots=True, frozen=True)
 class FetchRequest:
-    """Fetch invocation parameters."""
+    """Fetch invocation parameters.
+
+    Attributes
+    ----------
+    object_ids : tuple[int, ...]
+        Tuple of chunk IDs to fetch. Empty tuple means fetch nothing.
+    max_tokens : int
+        Maximum number of tokens to return per chunk. Must be positive.
+    """
 
     object_ids: tuple[int, ...]
     max_tokens: int
@@ -325,7 +431,21 @@ class FetchRequest:
 
 @dataclass(slots=True, frozen=True)
 class FetchObjectResult:
-    """Single hydrated chunk."""
+    """Single hydrated chunk.
+
+    Attributes
+    ----------
+    chunk_id : int
+        Chunk identifier for this result.
+    title : str
+        Title or heading for this chunk.
+    url : str
+        URL or file path for this chunk.
+    content : str
+        Full content text for this chunk (truncated to max_tokens if needed).
+    metadata : dict[str, object]
+        Additional metadata dictionary for this chunk.
+    """
 
     chunk_id: int
     title: str
@@ -336,14 +456,28 @@ class FetchObjectResult:
 
 @dataclass(slots=True, frozen=True)
 class FetchResponse:
-    """Structured fetch response used by MCP adapters."""
+    """Structured fetch response used by MCP adapters.
+
+    Attributes
+    ----------
+    objects : list[FetchObjectResult]
+        List of fetched chunk results. May be empty if no chunks were found.
+    """
 
     objects: list[FetchObjectResult]
 
 
 @dataclass(slots=True, frozen=True)
 class FetchDependencies:
-    """Dependency bundle for :func:`run_fetch`."""
+    """Dependency bundle for :func:`run_fetch`.
+
+    Attributes
+    ----------
+    catalog : CatalogLike
+        Catalog for hydrating chunk metadata and content.
+    settings : SearchSettings
+        Search configuration settings.
+    """
 
     catalog: CatalogLike
     settings: SearchSettings
@@ -1352,7 +1486,18 @@ def _merge_metadata(
 
 @dataclass(slots=True, frozen=True)
 class _RepairStats:
-    """Aggregate counters describing validator repairs."""
+    """Aggregate counters describing validator repairs.
+
+    Attributes
+    ----------
+    inspected : int
+        Number of items inspected during validation. Must be non-negative.
+    repaired : int
+        Number of items that were repaired. Must be non-negative.
+    dropped : int
+        Number of items that were dropped due to validation failures.
+        Must be non-negative.
+    """
 
     inspected: int
     repaired: int

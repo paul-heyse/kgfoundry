@@ -11,7 +11,15 @@ __all__ = ["RerankRequest", "RerankResult", "Reranker", "ScoredDoc"]
 
 @dataclass(slots=True, frozen=True)
 class ScoredDoc:
-    """Document identifier + score pair."""
+    """Document identifier + score pair.
+
+    Attributes
+    ----------
+    doc_id : int
+        Document/chunk identifier.
+    score : float
+        Relevance score for this document. Higher scores indicate better matches.
+    """
 
     doc_id: int
     score: float
@@ -19,7 +27,15 @@ class ScoredDoc:
 
 @dataclass(slots=True, frozen=True)
 class RerankResult:
-    """Result emitted by rerankers."""
+    """Result emitted by rerankers.
+
+    Attributes
+    ----------
+    doc_id : int
+        Document/chunk identifier after reranking.
+    score : float
+        Reranked relevance score. Higher scores indicate better matches.
+    """
 
     doc_id: int
     score: float
@@ -27,7 +43,19 @@ class RerankResult:
 
 @dataclass(slots=True, frozen=True)
 class RerankRequest:
-    """Structured rerank invocation."""
+    """Structured rerank invocation.
+
+    Attributes
+    ----------
+    query : str
+        Query string to rerank documents against.
+    docs : Sequence[ScoredDoc]
+        Sequence of scored documents to rerank.
+    top_k : int
+        Maximum number of results to return after reranking. Must be positive.
+    explain : bool, optional
+        Whether to include explanation metadata in results. Defaults to False.
+    """
 
     query: str
     docs: Sequence[ScoredDoc]

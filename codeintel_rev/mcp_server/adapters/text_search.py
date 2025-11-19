@@ -50,7 +50,28 @@ class SubprocessRunner(Protocol):
 
 @dataclass(frozen=True)
 class TextSearchOptions:
-    """Parameters controlling ripgrep execution."""
+    """Parameters controlling ripgrep execution.
+
+    Attributes
+    ----------
+    query : str
+        Search query string to pass to ripgrep.
+    regex : bool, optional
+        Whether the query is a regular expression. Defaults to False.
+    case_sensitive : bool, optional
+        Whether the search is case-sensitive. Defaults to False.
+    paths : Sequence[str] | None, optional
+        Optional sequence of file paths to search. None means search all files.
+        Defaults to None.
+    include_globs : Sequence[str] | None, optional
+        Optional sequence of glob patterns for files to include. None means no
+        include filter. Defaults to None.
+    exclude_globs : Sequence[str] | None, optional
+        Optional sequence of glob patterns for files to exclude. None means no
+        exclude filter. Defaults to None.
+    max_results : int, optional
+        Maximum number of results to return. Must be positive. Defaults to 50.
+    """
 
     _ALLOWED_KEYS = frozenset(
         {
@@ -126,7 +147,19 @@ class TextSearchOptions:
 
 @dataclass(slots=True)
 class _ResolvedFilters:
-    """Normalized scope and override filters for ripgrep."""
+    """Normalized scope and override filters for ripgrep.
+
+    Attributes
+    ----------
+    paths : list[str] | None
+        Optional list of file paths to search. None means search all files.
+    include_globs : Sequence[str] | None
+        Optional sequence of glob patterns for files to include. None means no
+        include filter.
+    exclude_globs : Sequence[str] | None
+        Optional sequence of glob patterns for files to exclude. None means no
+        exclude filter.
+    """
 
     paths: list[str] | None
     include_globs: Sequence[str] | None
@@ -526,7 +559,27 @@ def _fallback_grep(
 
 @dataclass(slots=True, frozen=True)
 class RipgrepCommandParams:
-    """Parameter bundle for constructing ripgrep commands."""
+    """Parameter bundle for constructing ripgrep commands.
+
+    Attributes
+    ----------
+    query : str
+        Search query string to pass to ripgrep.
+    regex : bool
+        Whether the query is a regular expression.
+    case_sensitive : bool
+        Whether the search is case-sensitive.
+    include_globs : Sequence[str] | None
+        Optional sequence of glob patterns for files to include. None means no
+        include filter.
+    exclude_globs : Sequence[str] | None
+        Optional sequence of glob patterns for files to exclude. None means no
+        exclude filter.
+    paths : Sequence[str] | None
+        Optional sequence of file paths to search. None means search all files.
+    max_results : int
+        Maximum number of results to return. Must be positive.
+    """
 
     query: str
     regex: bool

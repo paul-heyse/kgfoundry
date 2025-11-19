@@ -54,7 +54,20 @@ OverwriteFlag = Annotated[
 
 @dataclass(slots=True, frozen=True)
 class SpladeCliContext:
-    """Dependency injection context for SPLADE CLI operations."""
+    """Dependency injection context for SPLADE CLI operations.
+
+    Attributes
+    ----------
+    artifacts_factory : Callable[[], SpladeArtifactsManager]
+        Factory function that creates a SPLADE artifacts manager. Used for
+        dependency injection in tests.
+    encoder_factory : Callable[[], SpladeEncoderService]
+        Factory function that creates a SPLADE encoder service. Used for
+        dependency injection in tests.
+    index_factory : Callable[[], SpladeIndexManager]
+        Factory function that creates a SPLADE index manager. Used for
+        dependency injection in tests.
+    """
 
     artifacts_factory: Callable[[], SpladeArtifactsManager]
     encoder_factory: Callable[[], SpladeEncoderService]
@@ -131,6 +144,12 @@ def _cached_app_config() -> AppConfig:
 
 def _cli_context(ctx: typer.Context | None = None) -> SpladeCliContext:
     """Return the active CLI context.
+
+    Parameters
+    ----------
+    ctx : typer.Context | None, optional
+        Optional Typer context. If None, attempts to get the current context.
+        Defaults to None.
 
     Returns
     -------

@@ -19,7 +19,14 @@ from codeintel_rev.io.bm25_manager import BM25BuildOptions, BM25IndexManager
 
 @dataclass(slots=True, frozen=True)
 class BM25CliContext:
-    """Dependency injection context for BM25 CLI operations."""
+    """Dependency injection context for BM25 CLI operations.
+
+    Attributes
+    ----------
+    manager_factory : Callable[[], BM25IndexManager]
+        Factory function that creates a BM25 index manager. Used for dependency
+        injection in tests.
+    """
 
     manager_factory: Callable[[], BM25IndexManager]
 

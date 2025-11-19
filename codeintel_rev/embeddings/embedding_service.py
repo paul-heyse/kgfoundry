@@ -14,7 +14,6 @@ from types import ModuleType, TracebackType
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
 from codeintel_rev.config.api import EmbeddingsSettings, VLLMSettings
-from codeintel_rev.config.settings import IndexConfig
 from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 from codeintel_rev.runtime.imports import gate_import
 from codeintel_rev.typing import NDArrayF32
@@ -436,8 +435,8 @@ class _ProviderState:
     ----------
     config : EmbeddingsSettings
         Embedding configuration settings.
-    index : IndexConfig
-        Index configuration including vector dimension.
+    vec_dim : int
+        Embedding vector dimensionality provided by the index configuration.
     provider_name : str
         Provider identifier (e.g., "vllm", "hf").
     device_label : str
@@ -455,7 +454,7 @@ class _ProviderState:
     """
 
     config: EmbeddingsSettings
-    index: IndexConfig
+    vec_dim: int
     provider_name: str
     device_label: str
     dtype: str = "float32"
@@ -473,7 +472,7 @@ class _ProviderBase(EmbeddingProvider):
         *,
         provider_name: str,
         config: EmbeddingsSettings,
-        index: IndexConfig,
+        vec_dim: int,
         device_label: str,
     ) -> None:
         """Initialize base provider with shared batching and metrics.
@@ -484,14 +483,14 @@ class _ProviderBase(EmbeddingProvider):
             Name identifier for this provider (e.g., "vllm", "hf").
         config : EmbeddingsSettings
             Embedding service configuration.
-        index : IndexConfig
-            Index configuration for dimension and normalization settings.
+        vec_dim : int
+            Embedding vector dimension derived from the index configuration.
         device_label : str
             Device identifier (e.g., "cuda", "cpu").
         """
         self._state = _ProviderState(
             config=config,
-            index=index,
+            vec_dim=vec_dim,
             provider_name=provider_name,
             device_label=device_label,
             normalize=config.normalize,
@@ -535,7 +534,7 @@ class _ProviderBase(EmbeddingProvider):
         payload = self._sanitize(texts)
         if not payload:
             np = _numpy()
-            return np.zeros((0, self._state.index.vec_dim), dtype=np.float32)
+            return np.zeros((0, self._state.vec_dim), dtype=np.float32)
         executor = self._executor
         if executor is not None and len(payload) <= self._state.config.batch_size:
             return executor.submit(payload)
@@ -614,7 +613,7 @@ class _ProviderBase(EmbeddingProvider):
         """
         meta = self._state.metadata
         if meta is None:
-            dimension = self._state.dimension or self._state.index.vec_dim
+            dimension = self._state.dimension or self._state.vec_dim
             meta = EmbeddingMetadata(
                 provider=self._state.provider_name,
                 model_name=self._state.config.model_name,
@@ -700,7 +699,7 @@ class _ProviderBase(EmbeddingProvider):
         """
         if not texts:
             np = _numpy()
-            return np.zeros((0, self._state.index.vec_dim), dtype=np.float32)
+            return np.zeros((0, self._state.vec_dim), dtype=np.float32)
         with self._inflight_guard(), _FailureCounter(self._state.provider_name):
             batch, _token_count = self._run_inference(texts)
         return self._post_process(batch)
@@ -733,10 +732,10 @@ class _ProviderBase(EmbeddingProvider):
         vec_dim = array.shape[1]
         if self._state.dimension is None:
             self._state.dimension = vec_dim
-            if vec_dim != self._state.index.vec_dim:
+            if vec_dim != self._state.vec_dim:
                 msg = (
                     "Embedding dimension mismatch: expected "
-                    f"{self._state.index.vec_dim}, observed {vec_dim}"
+                    f"{self._state.vec_dim}, observed {vec_dim}"
                 )
                 raise EmbeddingRuntimeError(msg)
         elif vec_dim != self._state.dimension:
@@ -822,7 +821,7 @@ class VLLMProvider(_ProviderBase):
         self,
         *,
         embeddings: EmbeddingsSettings,
-        index: IndexConfig,
+        vec_dim: int,
         vllm_config: VLLMSettings,
     ) -> None:
         """Initialize vLLM embedding provider.
@@ -831,15 +830,15 @@ class VLLMProvider(_ProviderBase):
         ----------
         embeddings : EmbeddingsSettings
             Embedding service configuration.
-        index : IndexConfig
-            Index configuration for dimension and normalization.
+        vec_dim : int
+            Embedding vector dimension derived from the index configuration.
         vllm_config : VLLMSettings
             vLLM-specific configuration (model, host, port, etc.).
         """
         super().__init__(
             provider_name="vllm",
             config=embeddings,
-            index=index,
+            vec_dim=vec_dim,
             device_label="cuda" if embeddings.device == "auto" else embeddings.device,
         )
         self._embedder = InprocessVLLMEmbedder(vllm_config)
@@ -867,7 +866,7 @@ class VLLMProvider(_ProviderBase):
 def get_embedding_provider(
     *,
     embeddings: EmbeddingsSettings,
-    index: IndexConfig,
+    vec_dim: int,
     vllm: VLLMSettings,
     prefer: str | None = None,
 ) -> EmbeddingProvider:
@@ -884,9 +883,8 @@ def get_embedding_provider(
     embeddings : EmbeddingsSettings
         Embedding provider configuration (provider name, model, device, batching,
         normalization, and fallback behavior).
-    index : IndexConfig
-        Index configuration supplying vector dimensionality and normalization
-        defaults used by embedding providers.
+    vec_dim : int
+        Embedding vector dimension supplied by the index configuration.
     vllm : VLLMSettings
         vLLM runtime configuration for in-process embedding execution.
     prefer : str | None, optional
@@ -928,7 +926,7 @@ def get_embedding_provider(
     provider_name = (prefer or embeddings.provider).lower()
     if provider_name == "hf":
         try:
-            return HFEmbeddingProvider(embeddings=embeddings, index=index)
+            return HFEmbeddingProvider(embeddings=embeddings, vec_dim=vec_dim)
         except Exception as exc:
             msg = f"Failed to initialize HF provider: {exc}"
             raise EmbeddingRuntimeError(msg) from exc
@@ -938,7 +936,7 @@ def get_embedding_provider(
     try:
         return VLLMProvider(
             embeddings=embeddings,
-            index=index,
+            vec_dim=vec_dim,
             vllm_config=vllm,
         )
     except Exception as vllm_error:
@@ -946,7 +944,7 @@ def get_embedding_provider(
             try:
                 return HFEmbeddingProvider(
                     embeddings=embeddings,
-                    index=index,
+                    vec_dim=vec_dim,
                 )
             except Exception as hf_error:
                 message = (
@@ -961,15 +959,15 @@ def get_embedding_provider(
 class HFEmbeddingProvider(_ProviderBase):
     """Hugging Face transformers fallback provider."""
 
-    def __init__(self, *, embeddings: EmbeddingsSettings, index: IndexConfig) -> None:
+    def __init__(self, *, embeddings: EmbeddingsSettings, vec_dim: int) -> None:
         """Initialize Hugging Face transformers embedding provider.
 
         Parameters
         ----------
         embeddings : EmbeddingsSettings
             Embedding service configuration.
-        index : IndexConfig
-            Index configuration for dimension and normalization.
+        vec_dim : int
+            Embedding vector dimension derived from the index configuration.
 
         Raises
         ------
@@ -989,7 +987,7 @@ class HFEmbeddingProvider(_ProviderBase):
             msg = "CUDA device requested but torch.cuda.is_unavailable()"
             raise EmbeddingRuntimeError(msg)
         self._device = torch_mod.device(device)
-        super().__init__(provider_name="hf", config=embeddings, index=index, device_label=device)
+        super().__init__(provider_name="hf", config=embeddings, vec_dim=vec_dim, device_label=device)
         self._tokenizer = transformers_mod.AutoTokenizer.from_pretrained(
             embeddings.model_name,
             trust_remote_code=True,

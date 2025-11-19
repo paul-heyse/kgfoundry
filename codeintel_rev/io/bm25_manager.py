@@ -201,7 +201,23 @@ class BM25BuildOptions(msgspec.Struct, frozen=True):
 
 @dataclass(frozen=True)
 class BM25BuildContext:
-    """Dependency injection hooks for BM25 index builds."""
+    """Dependency injection hooks for BM25 index builds.
+
+    Attributes
+    ----------
+    pyserini_runner : Callable[[list[str]], None]
+        Function that executes Pyserini index commands. Used for dependency
+        injection in tests.
+    version_provider : Callable[[], str]
+        Function that returns the Pyserini version string. Used for dependency
+        injection in tests.
+    directory_size : Callable[[Path], int]
+        Function that computes total size of all files in a directory. Used
+        for dependency injection in tests.
+    clock : Callable[[], datetime]
+        Clock function returning current UTC datetime. Used for timestamping
+        index builds. Used for dependency injection in tests.
+    """
 
     pyserini_runner: Callable[[list[str]], None]
     version_provider: Callable[[], str]
@@ -641,7 +657,34 @@ def _directory_size(path: Path) -> int:
 
 @dataclass(frozen=True, slots=True)
 class BM25QueryOptions:
-    """Runtime BM25 search parameters."""
+    """Runtime BM25 search parameters.
+
+    Attributes
+    ----------
+    top_k : int, optional
+        Maximum number of results to return. Must be positive. Defaults to 50.
+    k1 : float | None, optional
+        BM25 k1 parameter (term frequency saturation). None means use index
+        defaults. Must be positive if specified. Defaults to None.
+    b : float | None, optional
+        BM25 b parameter (length normalization). None means use index defaults.
+        Must be between 0.0 and 1.0 if specified. Defaults to None.
+    rm3 : bool | None, optional
+        Whether to enable RM3 pseudo-relevance feedback. None means use
+        configuration defaults. Defaults to None.
+    rm3_fb_terms : int | None, optional
+        Number of feedback terms for RM3. None means use RM3 params defaults.
+        Must be positive if specified. Defaults to None.
+    rm3_fb_docs : int | None, optional
+        Number of feedback documents for RM3. None means use RM3 params defaults.
+        Must be positive if specified. Defaults to None.
+    rm3_original_weight : float | None, optional
+        Weight for original query in RM3. None means use RM3 params defaults.
+        Must be between 0.0 and 1.0 if specified. Defaults to None.
+    field_weights : dict[str, float] | None, optional
+        Per-field weight overrides for multi-field indexes. None means use
+        index defaults. Defaults to None.
+    """
 
     top_k: int = 50
     k1: float | None = None
@@ -655,7 +698,15 @@ class BM25QueryOptions:
 
 @dataclass(frozen=True, slots=True)
 class BM25Hit:
-    """Typed BM25 hit row."""
+    """Typed BM25 hit row.
+
+    Attributes
+    ----------
+    doc_id : int
+        Document/chunk identifier returned by the search.
+    score : float
+        BM25 relevance score for this hit. Higher scores indicate better matches.
+    """
 
     doc_id: int
     score: float

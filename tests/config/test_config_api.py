@@ -17,9 +17,9 @@ from codeintel_rev.config.api import (
     SearchSettings,
     SpladeSettings,
     VLLMSettings,
+    XTRSettings,
     validate_config,
 )
-from tests._helpers.settings import DEFAULT_XTR_SETTINGS
 
 
 def _make_config(tmp_path: Path) -> AppConfig:
@@ -67,7 +67,16 @@ def _make_config(tmp_path: Path) -> AppConfig:
         analyzer="wordpiece",
         static_prune_pct=0.0,
     )
-    xtr = DEFAULT_XTR_SETTINGS
+    xtr = XTRSettings(
+        model_id="nomic-ai/CodeRankEmbed",
+        device="cuda",
+        max_query_tokens=256,
+        candidate_k=200,
+        dim=768,
+        dtype="float16",
+        enable=False,
+        mode="narrow",
+    )
     embeddings = EmbeddingsSettings(
         provider="hf",
         model_name="hf/model",

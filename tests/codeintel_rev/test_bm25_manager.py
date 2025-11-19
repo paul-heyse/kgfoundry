@@ -31,7 +31,6 @@ from codeintel_rev.io.bm25_manager import (
 
 from kgfoundry_common.subprocess_utils import SubprocessError
 from tests._helpers import assertions, constants
-from tests._helpers.settings import DEFAULT_XTR_SETTINGS
 
 DOC_COUNT = constants.BATCH_SIZES.minimal
 
@@ -92,7 +91,16 @@ def _make_app_config(repo_root: Path, bm25_threads: int | None = None) -> AppCon
         faiss=faiss_cfg,
         bm25=bm25_cfg,
         splade=splade_cfg,
-        xtr=DEFAULT_XTR_SETTINGS,
+        xtr=XTRSettings(
+            model_id="nomic-ai/CodeRankEmbed",
+            device="cuda",
+            max_query_tokens=256,
+            candidate_k=200,
+            dim=768,
+            dtype="float16",
+            enable=True,
+            mode="narrow",
+        ),
         embeddings=EmbeddingsSettings(),
         vllm=VLLMSettings(),
         search=SearchSettings(),

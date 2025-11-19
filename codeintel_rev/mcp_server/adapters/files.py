@@ -34,7 +34,22 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class FileListFilters:
-    """Configuration for file listing filters."""
+    """Configuration for file listing filters.
+
+    Attributes
+    ----------
+    include_globs : list[str] | None, optional
+        Optional list of glob patterns for files to include. None means no
+        include filter. Defaults to None.
+    exclude_globs : list[str] | None, optional
+        Optional list of glob patterns for files to exclude. None means no
+        exclude filter. Defaults to None.
+    languages : list[str] | None, optional
+        Optional list of programming language identifiers to filter by. None
+        means no language filter. Defaults to None.
+    max_results : int, optional
+        Maximum number of results to return. Must be positive. Defaults to 1000.
+    """
 
     include_globs: list[str] | None = None
     exclude_globs: list[str] | None = None
@@ -44,7 +59,22 @@ class FileListFilters:
 
 @dataclass(frozen=True)
 class DirectoryFilters:
-    """Prepared filters used during directory traversal."""
+    """Prepared filters used during directory traversal.
+
+    Attributes
+    ----------
+    includes : list[str]
+        List of glob patterns for files to include. Empty list means no include
+        filter.
+    excludes : list[str]
+        List of glob patterns for files to exclude. Empty list means no exclude
+        filter.
+    language_extensions : set[str] | None
+        Optional set of file extensions to filter by (e.g., {".py", ".ts"}).
+        None means no language filter.
+    max_results : int
+        Maximum number of results to return. Must be positive.
+    """
 
     includes: list[str]
     excludes: list[str]

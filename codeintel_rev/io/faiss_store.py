@@ -163,7 +163,7 @@ def load_secondary_index(paths: IndexArtifactPaths) -> FaissIndex:
 
     Returns
     -------
-    object
+    FaissIndex
         Loaded FAISS secondary index.
     """
     gate_import("faiss", "Loading FAISS secondary index")
@@ -178,7 +178,7 @@ def refresh_duckdb_materialization(
 
     Parameters
     ----------
-    conn : object
+    conn : DuckDBPyConnection
         DuckDB connection handle.
     idmap_parquet : Path
         Path to the ID map Parquet.
@@ -187,7 +187,7 @@ def refresh_duckdb_materialization(
 
     Returns
     -------
-    dict
+    IdMapMeta
         Metadata describing the refresh result.
     """
     return refresh_faiss_idmap_materialized(
@@ -402,7 +402,7 @@ def reconstruct_batch(index: FaissIndex, vec_dim: int, ids: Sequence[int]) -> ND
 
     Returns
     -------
-    NDArrayI64
+    NDArrayF32
         Array of reconstructed vectors with shape ``(len(ids), vec_dim)``.
 
     Raises

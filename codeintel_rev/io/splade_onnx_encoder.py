@@ -123,26 +123,28 @@ TokenizerFactory = Callable[["OnnxSpladeConfig"], _TokenizerProtocol]
 class OnnxSpladeConfig:
     """Configuration describing how to execute the SPLADE ONNX graph.
 
-    Parameters
+    Attributes
     ----------
-    model_path :
-        Path of the exported ONNX model.
-    tokenizer_name :
-        HuggingFace tokenizer identifier or path.
-    output_name :
-        Name of the logits tensor inside the graph.
-    input_ids_name :
-        Name of the tensor feeding token ids.
-    attention_mask_name :
-        Name of the attention mask tensor.
-    providers :
-        Tuple of ONNX Runtime execution providers.
-    topn :
-        Number of terms to keep after scoring.
-    min_weight :
-        Minimum score for a token to be retained.
-    normalize :
-        Whether to L2-normalize weights before returning them.
+    model_path : Path
+        Path of the exported ONNX model file.
+    tokenizer_name : str
+        HuggingFace tokenizer identifier or local path.
+    output_name : str
+        Name of the logits tensor inside the ONNX graph.
+    input_ids_name : str
+        Name of the tensor feeding token IDs to the graph.
+    attention_mask_name : str
+        Name of the attention mask tensor in the graph.
+    providers : tuple[str, ...]
+        Tuple of ONNX Runtime execution providers (e.g., "CPUExecutionProvider").
+    topn : int
+        Maximum number of top tokens to extract from SPLADE logits. Must be
+        positive.
+    min_weight : float
+        Minimum score threshold for a token to be retained. Tokens below this
+        threshold are discarded. Must be non-negative.
+    normalize : bool
+        Whether to L2-normalize token weights before returning them.
     """
 
     model_path: Path

@@ -45,7 +45,6 @@ from kgfoundry_common.subprocess_utils import SubprocessError
 if TYPE_CHECKING:
     from codeintel_rev.io.splade_manager import _SparseEncoderProtocol
 from tests._helpers import assertions
-from tests._helpers.settings import DEFAULT_XTR_SETTINGS
 
 
 def _make_app_config(repo_root: Path) -> AppConfig:
@@ -104,7 +103,16 @@ def _make_app_config(repo_root: Path) -> AppConfig:
         faiss=faiss_cfg,
         bm25=bm25_cfg,
         splade=splade_cfg,
-        xtr=DEFAULT_XTR_SETTINGS,
+        xtr=XTRSettings(
+            model_id="nomic-ai/CodeRankEmbed",
+            device="cuda",
+            max_query_tokens=256,
+            candidate_k=200,
+            dim=768,
+            dtype="float16",
+            enable=False,
+            mode="narrow",
+        ),
         embeddings=EmbeddingsSettings(),
         vllm=VLLMSettings(),
         search=SearchSettings(),

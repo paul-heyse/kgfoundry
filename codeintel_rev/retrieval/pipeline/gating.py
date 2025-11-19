@@ -54,7 +54,20 @@ _STAGE_GATE_CORE_REF: list[StageGateCore] = [_core]
 
 @dataclass(frozen=True, slots=True)
 class StageGateConfig:
-    """Minimal configuration surface consumed by adapters."""
+    """Minimal configuration surface consumed by adapters.
+
+    Attributes
+    ----------
+    time_budget_ms : int, optional
+        Maximum time budget in milliseconds for stage execution. Must be
+        positive. Defaults to 750.
+    min_candidates : int, optional
+        Minimum number of candidates required to proceed to next stage. Must be
+        positive. Defaults to 16.
+    high_margin_threshold : float, optional
+        High margin threshold for score differences. Must be non-negative.
+        Defaults to 0.25.
+    """
 
     time_budget_ms: int = 750
     min_candidates: int = 16
@@ -63,7 +76,15 @@ class StageGateConfig:
 
 @dataclass(frozen=True, slots=True)
 class StageDecision:
-    """Normalized gating decision."""
+    """Normalized gating decision.
+
+    Attributes
+    ----------
+    should_run : bool
+        Whether the stage should be executed based on gating logic.
+    reason : str
+        Human-readable reason string explaining the decision.
+    """
 
     should_run: bool
     reason: str

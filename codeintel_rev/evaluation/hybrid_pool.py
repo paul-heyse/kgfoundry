@@ -18,7 +18,19 @@ _SOURCE_ALIAS = {
 
 @dataclass(slots=True, frozen=True)
 class Hit:
-    """Individual retrieval hit provided to the hybrid pool."""
+    """Individual retrieval hit provided to the hybrid pool.
+
+    Attributes
+    ----------
+    doc_id : str
+        Document/chunk identifier as a string.
+    score : float
+        Relevance score for this hit. Higher scores indicate better matches.
+    source : str
+        Source channel identifier (e.g., "faiss", "bm25", "splade").
+    meta : Mapping[str, object]
+        Additional metadata dictionary for this hit.
+    """
 
     doc_id: str
     score: float
@@ -28,7 +40,19 @@ class Hit:
 
 @dataclass(slots=True, frozen=True)
 class PooledHit:
-    """Result after pooling with per-source component scores."""
+    """Result after pooling with per-source component scores.
+
+    Attributes
+    ----------
+    doc_id : str
+        Document/chunk identifier as a string.
+    blended_score : float
+        Final blended score after pooling. Higher scores indicate better matches.
+    components : Mapping[str, float]
+        Dictionary mapping source channel names to their component scores.
+    meta : Mapping[str, object]
+        Additional metadata dictionary for this pooled hit.
+    """
 
     doc_id: str
     blended_score: float

@@ -79,7 +79,17 @@ HydrateFindings = Callable[[DuckDBCatalog, Sequence[int], Sequence[float]], list
 
 @dataclass(frozen=True, slots=True)
 class SemanticRuntimeHooks:
-    """Structured dependency bundle for semantic adapter collaborators."""
+    """Structured dependency bundle for semantic adapter collaborators.
+
+    Attributes
+    ----------
+    run_stage0 : Stage0Runner
+        Protocol implementation for executing Stage-0 hybrid search.
+    decide_secondary_stage : StageGateDecider
+        Protocol implementation for deciding whether to run secondary stages.
+    hydrate_findings : HydrateFindings
+        Protocol implementation for hydrating search results with metadata.
+    """
 
     run_stage0: Stage0Runner
     decide_secondary_stage: StageGateDecider

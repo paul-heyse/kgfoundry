@@ -22,7 +22,21 @@ from codeintel_rev.mcp_server.types import (
 
 @dataclass(slots=True, frozen=True)
 class McpDeps:
-    """Dependencies required for running the lightweight MCP tools."""
+    """Dependencies required for running the lightweight MCP tools.
+
+    Attributes
+    ----------
+    catalog : Any
+        Catalog instance for hydrating chunk metadata.
+    faiss_search : Callable[[str, int], list[tuple[int, float]]] | None, optional
+        Optional FAISS search function. Takes query string and k, returns list
+        of (doc_id, score) pairs. None if FAISS search is not available.
+        Defaults to None.
+    sparse_search : Callable[[str, int], list[tuple[int, float]]] | None, optional
+        Optional sparse search function (BM25/SPLADE). Takes query string and k,
+        returns list of (doc_id, score) pairs. None if sparse search is not
+        available. Defaults to None.
+    """
 
     catalog: Any
     faiss_search: Callable[[str, int], list[tuple[int, float]]] | None = None
