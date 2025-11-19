@@ -163,9 +163,10 @@ async def test_semantic_search_returns_findings() -> None:
     if "notes" not in method:
         pytest.fail("expected method notes")
     assertions.expect_equal(method["notes"], ["fanout"])
-    if "limits" not in envelope:
+    limits = envelope.get("limits")
+    if limits is None:
         pytest.fail("expected limits array")
-    assertions.expect_equal(envelope["limits"], ["k=5"])
+    assertions.expect_equal(limits, ["k=5"])
 
 
 @pytest.mark.asyncio
@@ -189,7 +190,10 @@ async def test_semantic_search_clamps_limit_and_applies_stage0_settings() -> Non
     )
     context = cast("ApplicationContext", _StubContext())
     envelope = await semantic_adapter.semantic_search(context, "vector", limit=999, hooks=hooks)
-    assertions.expect_equal(envelope["limits"], [f"k={_StubContext.SEARCH_SETTINGS.max_results}"])
+    limits = envelope.get("limits")
+    if limits is None:
+        pytest.fail("expected limits array")
+    assertions.expect_equal(limits, [f"k={_StubContext.SEARCH_SETTINGS.max_results}"])
 
 
 @pytest.mark.asyncio

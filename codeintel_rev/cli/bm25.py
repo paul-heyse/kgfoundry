@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import click
 import typer
 from tools import CliContext, EnvelopeBuilder, cli_operation, sha256_file
 
-from codeintel_rev.config.settings import load_settings
+from codeintel_rev.config import load_app_config
+from codeintel_rev.config.api import AppConfig
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.io.bm25_manager import BM25BuildOptions, BM25IndexManager
 
 
@@ -32,6 +36,18 @@ class BM25CliContext:
         return cls(manager_factory=_default_bm25_manager_factory)
 
 
+@lru_cache(maxsize=1)
+def _cached_app_config() -> AppConfig:
+    """Load and cache AppConfig for CLI invocations.
+
+    Returns
+    -------
+    AppConfig
+        Cached immutable configuration derived from env/file sources.
+    """
+    return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+
+
 def _default_bm25_manager_factory() -> BM25IndexManager:
     """Return the default BM25 manager.
 
@@ -40,7 +56,8 @@ def _default_bm25_manager_factory() -> BM25IndexManager:
     BM25IndexManager
         Manager configured from the active settings.
     """
-    return BM25IndexManager(load_settings())
+    settings = settings_from_app_config(_cached_app_config())
+    return BM25IndexManager(settings)
 
 
 app = typer.Typer(

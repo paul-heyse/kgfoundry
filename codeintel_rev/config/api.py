@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 CONFIG_API_VERSION: Final[str] = "1.0"
 
@@ -63,6 +63,47 @@ class LoggingSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class SpladeOnnxQueryConfig:
+    """Optional SPLADE ONNX query encoder configuration."""
+
+    enabled: bool = False
+    model_path: Path | None = None
+    tokenizer_name: str | None = None
+    output_name: str = "logits"
+    input_ids_name: str = "input_ids"
+    attention_mask_name: str = "attention_mask"
+    providers: tuple[str, ...] = ("CPUExecutionProvider",)
+    topn: int = 64
+    min_weight: float = 1e-6
+    normalize: bool = False
+    format: Literal["string", "map"] = "string"
+
+
+@dataclass(frozen=True, slots=True)
+class SpladeSettings:
+    """SPLADE runtime configuration for artifacts, encoding, and indexing."""
+
+    model_id: str
+    model_dir: Path
+    onnx_dir: Path
+    onnx_file: str
+    vectors_dir: Path
+    index_dir: Path
+    provider: str
+    quantization: int
+    max_terms: int
+    max_clause_count: int
+    batch_size: int
+    threads: int
+    enabled: bool
+    max_query_terms: int
+    prune_below: float
+    analyzer: Literal["wordpiece", "code"]
+    static_prune_pct: float
+    onnx_query: SpladeOnnxQueryConfig | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     """Top-level immutable configuration."""
 
@@ -70,6 +111,7 @@ class AppConfig:
     paths: PathsConfig
     duckdb: DuckDBSettings
     faiss: FAISSSettings
+    splade: SpladeSettings
     search: SearchSettings = field(default_factory=SearchSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
     extras: Mapping[str, object] = field(default_factory=dict)

@@ -186,6 +186,9 @@ def refresh_faiss_idmap_materialized(
         DuckDB connection to use for executing SQL operations.
     _idmap_parquet : Path
         Path to the FAISS ID map Parquet file (unused at the DAO layer).
+    _chunks_parquet : Path | None, optional
+        Path to the chunks Parquet file (unused, kept for API compatibility).
+        Defaults to None.
     checksum : str
         Checksum of the ID map Parquet file for change detection.
 

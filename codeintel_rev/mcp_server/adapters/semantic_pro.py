@@ -163,10 +163,10 @@ def _semantic_search_pro_sync(
     if not query:
         return _error_envelope("missing query text")
 
-    default_weights = context.hybrid_fusion_weights()
-    stage_weights = (
-        dict(options.stage_weights) if options.stage_weights is not None else default_weights
-    )
+    if options.stage_weights is not None:
+        stage_weights = dict(options.stage_weights)
+    else:
+        stage_weights = context.hybrid_fusion_weights()
     limit = context.clamp_hybrid_limit(limit)
     stage0 = hooks.run_stage0(
         context.get_hybrid_engine(),

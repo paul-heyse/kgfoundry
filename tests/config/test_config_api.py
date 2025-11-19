@@ -13,6 +13,7 @@ from codeintel_rev.config.api import (
     LoggingSettings,
     PathsConfig,
     SearchSettings,
+    SpladeSettings,
     validate_config,
 )
 
@@ -30,11 +31,31 @@ def _make_config(tmp_path: Path) -> AppConfig:
     faiss = FAISSSettings(index_path=repo_root / "index.faiss")
     search = SearchSettings()
     logging_cfg = LoggingSettings()
+    splade = SpladeSettings(
+        model_id="splade-model",
+        model_dir=repo_root / "models",
+        onnx_dir=repo_root / "models" / "onnx",
+        onnx_file="model.onnx",
+        vectors_dir=repo_root / "vectors",
+        index_dir=repo_root / "index",
+        provider="CPUExecutionProvider",
+        quantization=100,
+        max_terms=1000,
+        max_clause_count=2048,
+        batch_size=8,
+        threads=4,
+        enabled=True,
+        max_query_terms=64,
+        prune_below=0.0,
+        analyzer="wordpiece",
+        static_prune_pct=0.0,
+    )
     return AppConfig(
         version="1.0",
         paths=paths,
         duckdb=duckdb,
         faiss=faiss,
+        splade=splade,
         search=search,
         logging=logging_cfg,
     )

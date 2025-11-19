@@ -100,7 +100,6 @@ def _semantic_search_sync(
     limit = context.clamp_hybrid_limit(limit)
     _, readiness_limits, _ = context.ensure_faiss_ready()
     base_weights = context.hybrid_fusion_weights()
-    stage0_options = context.build_stage0_options(weights=base_weights)
     with _faiss_guard(context) as fallback_tracker:
         try:
             stage0 = hooks.run_stage0(
@@ -108,7 +107,7 @@ def _semantic_search_sync(
                 query=query,
                 semantic_hits=[],
                 limit=limit,
-                options=stage0_options,
+                options=context.build_stage0_options(weights=base_weights),
             )
         except RuntimeError as exc:
             stage0 = Stage0Result(

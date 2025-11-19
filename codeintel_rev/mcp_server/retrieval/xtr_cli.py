@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import os
+from functools import lru_cache
 from typing import Annotated
 
 import typer
 
 from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.config_context import resolve_application_paths
-from codeintel_rev.config.settings import load_settings
+from codeintel_rev.config import load_app_config
+from codeintel_rev.config.api import AppConfig
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.indexing.xtr_build import build_xtr_index
 from codeintel_rev.io.xtr_manager import XTRIndex
 
@@ -28,10 +33,33 @@ _CandidateIdsOption = Annotated[
 _ExplainOption = Annotated[bool | None, typer.Option(help="Include token-level attributions.")]
 
 
+@lru_cache(maxsize=1)
+def _cached_app_config() -> AppConfig:
+    """Load and cache AppConfig for CLI invocations.
+
+    Returns
+    -------
+    AppConfig
+        Cached immutable configuration derived from env/file sources.
+    """
+    return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+
+
+def _cached_settings() -> Settings:
+    """Return cached legacy Settings derived from AppConfig.
+
+    Returns
+    -------
+    Settings
+        Legacy msgspec settings populated from AppConfig.
+    """
+    return settings_from_app_config(_cached_app_config())
+
+
 @app.command("build")
 def build() -> None:
     """Build token-level XTR artifacts from the DuckDB catalog."""
-    settings = load_settings()
+    settings = _cached_settings()
     summary = build_xtr_index(settings)
     typer.echo(
         "XTR build complete "
@@ -50,7 +78,7 @@ def verify() -> None:
     typer.Exit
         If artifacts are missing or unreadable.
     """
-    settings = load_settings()
+    settings = _cached_settings()
     paths = resolve_application_paths(settings)
     fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     index = XTRIndex(paths.xtr_dir, settings.xtr)
@@ -123,7 +151,7 @@ def search(
     The function performs file I/O to load the XTR index and CPU-bound tensor
     computation for encoding and scoring. Not thread-safe due to index loading.
     """
-    settings = load_settings()
+    settings = _cached_settings()
     paths = resolve_application_paths(settings)
     fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     index = XTRIndex(paths.xtr_dir, settings.xtr)

@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import os
+from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
-from codeintel_rev.config.settings import load_settings
+from codeintel_rev.config import load_app_config
+from codeintel_rev.config.api import AppConfig
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.indexing.index_lifecycle import LuceneAssets, link_current_lucene
 from codeintel_rev.io.bm25_manager import BM25BuildOptions, BM25IndexManager
 from codeintel_rev.io.splade_manager import SpladeBuildOptions, SpladeIndexManager
@@ -90,6 +94,18 @@ app = typer.Typer(
 )
 
 
+@lru_cache(maxsize=1)
+def _cached_app_config() -> AppConfig:
+    """Load and cache AppConfig for CLI invocations.
+
+    Returns
+    -------
+    AppConfig
+        Cached immutable configuration derived from env/file sources.
+    """
+    return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+
+
 def _bm25_manager() -> BM25IndexManager:
     """Return a BM25 index manager configured from the active settings.
 
@@ -98,7 +114,8 @@ def _bm25_manager() -> BM25IndexManager:
     BM25IndexManager
         Manager initialised with the currently loaded settings.
     """
-    return BM25IndexManager(load_settings())
+    settings = settings_from_app_config(_cached_app_config())
+    return BM25IndexManager(settings)
 
 
 def _splade_manager() -> SpladeIndexManager:
@@ -109,7 +126,8 @@ def _splade_manager() -> SpladeIndexManager:
     SpladeIndexManager
         Manager initialised with the currently loaded settings.
     """
-    return SpladeIndexManager(load_settings())
+    settings = settings_from_app_config(_cached_app_config())
+    return SpladeIndexManager(settings)
 
 
 @app.command("bm25")

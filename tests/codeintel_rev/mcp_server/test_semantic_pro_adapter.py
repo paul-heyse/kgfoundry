@@ -320,7 +320,10 @@ async def test_semantic_search_pro_clamps_limit_and_stage0_settings() -> None:
     )
     context = cast("ApplicationContext", _StubContext())
     envelope = await semantic_pro.semantic_search_pro(context, "query", limit=500, hooks=hooks)
+    limits = envelope.get("limits")
+    if limits is None:
+        pytest.fail("expected limits array")
     assertions.expect_equal(
-        envelope["limits"],
+        limits,
         [f"k={_StubContext.SEARCH_SETTINGS.max_results}"],
     )

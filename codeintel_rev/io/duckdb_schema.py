@@ -155,6 +155,11 @@ _COUNTABLE_TABLES: Final[dict[str, str]] = {
 def sql_create_chunks_view_from_parquet(parquet_literal: str) -> str:
     """Return SQL for creating chunks view from Parquet files.
 
+    Parameters
+    ----------
+    parquet_literal : str
+        SQL-quoted Parquet file path literal to use in the CREATE VIEW statement.
+
     Returns
     -------
     str
@@ -176,6 +181,11 @@ def sql_create_empty_chunks_view() -> str:
 
 def sql_create_chunks_materialized(parquet_literal: str) -> str:
     """Return SQL for creating materialized chunks table from Parquet.
+
+    Parameters
+    ----------
+    parquet_literal : str
+        SQL-quoted Parquet file path literal to use in the CREATE TABLE statement.
 
     Returns
     -------
@@ -220,6 +230,11 @@ def sql_create_chunks_materialized_index() -> str:
 
 def sql_create_faiss_idmap_view(parquet_literal: str) -> str:
     """Return SQL for creating FAISS ID map view from Parquet.
+
+    Parameters
+    ----------
+    parquet_literal : str
+        SQL-quoted Parquet file path literal to use in the CREATE VIEW statement.
 
     Returns
     -------

@@ -5,11 +5,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 from codeintel_rev.app.config_context import ApplicationContext
-from codeintel_rev.config.settings import load_settings
+from codeintel_rev.config import load_app_config
+from codeintel_rev.config.api import AppConfig
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.evaluation.scip_coverage import SCIPCoverageEvaluator
 
 
@@ -73,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = build_parser()
     args = parser.parse_args(argv)
-    settings = load_settings()
+    settings = _cached_settings()
     ctx = ApplicationContext.create()
     evaluator = SCIPCoverageEvaluator(
         settings=settings,
@@ -89,3 +94,24 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+@lru_cache(maxsize=1)
+def _cached_app_config() -> AppConfig:
+    """Load and cache AppConfig for CLI invocations.
+
+    Returns
+    -------
+    AppConfig
+        Cached immutable configuration derived from env/file sources.
+    """
+    return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+
+
+def _cached_settings() -> Settings:
+    """Return legacy Settings derived from AppConfig.
+
+    Returns
+    -------
+    Settings
+        Legacy msgspec settings populated from AppConfig values.
+    """
+    return settings_from_app_config(_cached_app_config())
