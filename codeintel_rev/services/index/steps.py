@@ -102,7 +102,7 @@ def _iter_batches(
         id_values = record.column(0).to_numpy(zero_copy_only=False)
         ids = cast("NDArrayI64", np.asarray(id_values, dtype="int64"))
         vec_lists = record.column(1).to_pylist()
-        vectors = cast("NDArrayF32", np.asarray(vec_lists, dtype="float32"))
+        vectors: NDArrayF32 = np.asarray(vec_lists, dtype=np.float32)
         yield ids, vectors
 
 
@@ -138,7 +138,8 @@ def _take_sample(
         are found.
     """
     if sample_size <= 0:
-        return cast("NDArrayF32", np.empty((0, vec_dim), dtype="float32"))
+        empty: NDArrayF32 = np.empty((0, vec_dim), dtype=np.float32)
+        return empty
     pq_mod = _pq.module()
     remaining = sample_size
     samples: list[NDArrayF32] = []
@@ -150,17 +151,20 @@ def _take_sample(
             batch_size=min(remaining, sample_size), columns=list(columns)
         ):
             vec_lists = record.column(1).to_pylist()
-            vectors = cast("NDArrayF32", np.asarray(vec_lists, dtype="float32"))
+            vectors: NDArrayF32 = np.asarray(vec_lists, dtype=np.float32)
             if vectors.size == 0:
                 continue
             take = min(remaining, vectors.shape[0])
-            samples.append(cast("NDArrayF32", vectors[:take]))
+            sample_batch: NDArrayF32 = vectors[:take]
+            samples.append(sample_batch)
             remaining -= take
             if remaining <= 0:
                 break
     if not samples:
-        return cast("NDArrayF32", np.empty((0, vec_dim), dtype="float32"))
-    return cast("NDArrayF32", np.vstack(samples))
+        empty: NDArrayF32 = np.empty((0, vec_dim), dtype=np.float32)
+        return empty
+    stacked: NDArrayF32 = np.vstack(samples).astype(np.float32, copy=False)
+    return stacked
 
 
 def _catalog(paths: IndexPaths, *, materialize: bool) -> DuckDBCatalog:

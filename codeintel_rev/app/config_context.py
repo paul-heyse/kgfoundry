@@ -49,7 +49,7 @@ import importlib
 import logging
 import os
 import warnings
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -87,7 +87,6 @@ from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.splade_engine import (
-    SpladeBackend,
     SPLADEEngine,
     SpladeImpactBackend,
     SpladeImpactBackendConfig,
@@ -112,6 +111,8 @@ from codeintel_rev.runtime.multiprocessing import ensure_spawn_start_method
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import setup_logging
+
+LOGGER = logging.getLogger(__name__)
 
 ensure_spawn_start_method()
 
@@ -226,11 +227,12 @@ class GateConfig:
 
 
 _GATE_CONFIG_STACK: list[GateConfig] = [GateConfig()]
+_LOGGING_STATE: dict[str, bool] = {"configured": False}
 
 
 def _configure_logging_from_app(logging_cfg: LoggingSettings) -> None:
     """Configure root logging handlers from AppConfig logging settings."""
-    if getattr(_configure_logging_from_app, "configured", False):
+    if _LOGGING_STATE["configured"]:
         return
     level_name = (logging_cfg.level or "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
@@ -242,7 +244,7 @@ def _configure_logging_from_app(logging_cfg: LoggingSettings) -> None:
             format="%(asctime)s %(levelname)s %(name)s %(message)s",
             force=True,
         )
-    _configure_logging_from_app.configured = True  # type: ignore[attr-defined]
+    _LOGGING_STATE["configured"] = True
 
 
 @contextmanager
@@ -910,42 +912,35 @@ class _DisabledBM25Backend(BM25Backend):
         return []
 
 
-class _DisabledSpladeBackend(SpladeBackend):  # type: ignore[misc]
+@dataclass(frozen=True)
+class _DisabledSpladeBackend:
     """No-op SPLADE backend used when the SPLADE channel is disabled."""
+
+    zero_vector: NDArrayF32 = field(
+        default_factory=lambda: cast("NDArrayF32", np.zeros((1,), dtype=np.float32))
+    )
 
     def encode_query(self, text: str) -> SpladeQueryRepresentation:
         """Return a zero vector to satisfy the SPLADE contract.
 
-        Parameters
-        ----------
-        text : str
-            Query text (ignored).
-
         Returns
         -------
         SpladeQueryRepresentation
-            Zero vector of shape (1,) wrapped in a SpladeQueryRepresentation.
+            Zero vector copy wrapped as a SPLADE representation.
         """
-        _ = self, text
-        return cast("NDArrayF32", np.zeros((1,), dtype=np.float32))
+        _ = text
+        return cast("SpladeQueryRepresentation", self.zero_vector.copy())
 
-    def search(self, query_vec: SpladeQueryRepresentation, k: int) -> list[tuple[int, float]]:
+    def search(self, query_vec: SpladeQueryRepresentation, k: int) -> Sequence[tuple[int, float]]:
         """Return an empty result set regardless of inputs.
-
-        Parameters
-        ----------
-        query_vec : SpladeQueryRepresentation
-            Query vector (ignored).
-        k : int
-            Maximum results (ignored).
 
         Returns
         -------
-        list[tuple[int, float]]
-            Empty list.
+        Sequence[tuple[int, float]]
+            Empty sequence to satisfy the SPLADE backend contract.
         """
         _ = self, query_vec, k
-        return []
+        return ()
 
 
 T = TypeVar("T")
@@ -1726,9 +1721,9 @@ class ApplicationContext:
                 rm3=rm3_cfg,
             )
         except FileNotFoundError:
-            warnings.warn(
-                f"BM25 index not found at {index_dir}, falling back to disabled backend.",
-                stacklevel=2,
+            LOGGER.warning(
+                "BM25 index not found at %s, falling back to disabled backend.",
+                index_dir,
             )
             return BM25Engine(_DisabledBM25Backend())
         return BM25Engine(backend=backend)
@@ -1761,10 +1756,9 @@ class ApplicationContext:
         try:
             backend = SpladeImpactBackend(backend_config, onnx_encoder=onnx_encoder)
         except FileNotFoundError:
-            warnings.warn(
-                f"SPLADE impact index not found at {backend_config.index_dir},"
-                " falling back to disabled backend.",
-                stacklevel=2,
+            LOGGER.warning(
+                "SPLADE impact index not found at %s, falling back to disabled backend.",
+                backend_config.index_dir,
             )
             return SPLADEEngine(_DisabledSpladeBackend())
         return SPLADEEngine(backend=backend)

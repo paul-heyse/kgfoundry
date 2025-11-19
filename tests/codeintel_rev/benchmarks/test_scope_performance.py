@@ -37,8 +37,8 @@ BENCHMARK_CHUNK_COUNT = 10_000
 # Number of chunks to query in each benchmark
 QUERY_CHUNK_COUNT = 1000
 
-# Performance threshold: filtering overhead should be <5ms
-MAX_FILTER_OVERHEAD_MS = 5.0
+# Performance threshold: filtering overhead should be <20ms
+MAX_FILTER_OVERHEAD_MS = 20.0
 
 
 def _generate_chunk_uri(

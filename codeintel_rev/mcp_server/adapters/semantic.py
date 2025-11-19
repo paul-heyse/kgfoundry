@@ -6,10 +6,12 @@ import asyncio
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from types import MethodType
 from typing import TYPE_CHECKING, Protocol, cast
 
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
+from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.mcp_server.schemas import (
     AnswerEnvelope,
     Finding,
@@ -23,6 +25,7 @@ from codeintel_rev.retrieval.pipeline.gating import (
     decide_secondary_stage,
 )
 from codeintel_rev.retrieval.pipeline.stage0 import Stage0Options, Stage0Result, run_stage0
+from codeintel_rev.typing import NDArrayF32, NDArrayI64
 
 if TYPE_CHECKING:
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
@@ -350,45 +353,38 @@ def _faiss_guard(context: ApplicationContext) -> Iterator[dict[str, bool]]:
     if manager is None or not callable(search_callable):
         yield tracker
         return
-    original_search: Callable[..., object] = search_callable
+    original_search = cast("_SearchGuard", search_callable)
     if getattr(search_callable, "side_effect", None) is not None:
         tracker["raised"] = True
 
-    def _wrapped_search(*args: object, **kwargs: object) -> object:
-        """Wrap FAISS search to track exceptions.
+    class _GuardedSearch:
+        def __init__(self, delegate: _SearchGuard, tracker: dict[str, bool]) -> None:
+            self._delegate = delegate
+            self._tracker = tracker
 
-        Parameters
-        ----------
-        *args : object
-            Positional arguments passed to the original search method.
-        **kwargs : object
-            Keyword arguments passed to the original search method.
+        def __call__(
+            self,
+            query: NDArrayF32,
+            k: int | None = None,
+            *,
+            nprobe: int | None = None,
+            runtime: SearchRuntimeOverrides | None = None,
+            catalog: object | None = None,
+        ) -> tuple[NDArrayF32, NDArrayI64]:
+            try:
+                return self._delegate(query, k, nprobe=nprobe, runtime=runtime, catalog=catalog)
+            except Exception:
+                self._tracker["raised"] = True
+                raise
 
-        Returns
-        -------
-        object
-            Result from the original search method.
-
-        Notes
-        -----
-        This wrapper function intercepts calls to the FAISS search method and
-        tracks any exceptions that occur. If an exception is raised by the
-        original search method, it sets tracker["raised"] = True before
-        re-raising the exception. The exception is propagated to the caller.
-        Any exception raised by the original search method is re-raised after
-        tracking.
-        """
-        try:
-            return original_search(*args, **kwargs)
-        except Exception:
-            tracker["raised"] = True
-            raise
-
-    manager.search = _wrapped_search  # type: ignore[assignment]
+    manager.search = MethodType(
+        _GuardedSearch(original_search, tracker),
+        manager,
+    )
     try:
         yield tracker
     finally:
-        manager.search = original_search  # type: ignore[assignment]
+        manager.search = original_search
 
 
 def _error_envelope(reason: str) -> AnswerEnvelope:
@@ -408,3 +404,14 @@ def _error_envelope(reason: str) -> AnswerEnvelope:
 
 
 __all__ = ["SemanticRuntimeHooks", "semantic_search"]
+class _SearchGuard(Protocol):
+    def __call__(
+        self,
+        query: NDArrayF32,
+        k: int | None = None,
+        *,
+        nprobe: int | None = None,
+        runtime: SearchRuntimeOverrides | None = None,
+        catalog: object | None = None,
+    ) -> tuple[NDArrayF32, NDArrayI64]:
+        ...

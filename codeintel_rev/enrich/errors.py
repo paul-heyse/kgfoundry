@@ -101,6 +101,10 @@ class DiscoveryError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
+        """Initialize discovery error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__("discover", reason, path=path, detail=detail, data=data or {})
 
 
@@ -127,6 +131,10 @@ class IngestError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
+        """Initialize ingest error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__("ingest", reason, path=path, detail=detail, data=data or {})
 
 
@@ -153,6 +161,10 @@ class IndexingError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
+        """Initialize indexing error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__("index", reason, path=path, detail=detail, data=data or {})
 
 
@@ -179,6 +191,10 @@ class TypeSignalError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
+        """Initialize type signal error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__("type-signals", reason, path=path, detail=detail, data=data or {})
 
 
@@ -205,6 +221,10 @@ class TaggingError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
+        """Initialize tagging error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__("tagging", reason, path=path, detail=detail, data=data or {})
 
 
@@ -231,6 +251,10 @@ class AnalyticsError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
+        """Initialize analytics error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__("analytics", reason, path=path, detail=detail, data=data or {})
 
 
@@ -257,4 +281,8 @@ class OutputError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
+        """Initialize output error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__("write", reason, path=path, detail=detail, data=data or {})

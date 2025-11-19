@@ -830,6 +830,10 @@ class VLLMProvider(_ProviderBase):
         vec_dim: int,
         vllm_config: VLLMSettings,
     ) -> None:
+        """Initialize VLLM provider instance.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__(
             provider_name="vllm",
             config=embeddings,
@@ -968,6 +972,15 @@ class HFEmbeddingProvider(_ProviderBase):
     """
 
     def __init__(self, *, embeddings: EmbeddingsSettings, vec_dim: int) -> None:
+        """Initialize Hugging Face provider instance.
+
+        Parameters are documented in the class docstring.
+
+        Raises
+        ------
+        EmbeddingRuntimeError
+            If a CUDA device is requested but unavailable.
+        """
         torch_mod = cast("Any", gate_import("torch", "Hugging Face embedding provider"))
         transformers_mod = cast(
             "Any", gate_import("transformers", "Hugging Face embedding provider")

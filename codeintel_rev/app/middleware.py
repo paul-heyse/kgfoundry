@@ -208,6 +208,10 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         session_header: str = "X-Session-ID",
         run_header: str = "X-Run-ID",
     ) -> None:
+        """Initialize middleware instance.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__(app, dispatch)
         self._capability_attr = capability_attr
         self._session_header = session_header

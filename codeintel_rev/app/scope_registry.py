@@ -114,6 +114,7 @@ class ScopeRegistry:
     """
 
     def __init__(self) -> None:
+        """Initialize scope registry with empty storage."""
         self._scopes: dict[str, tuple[ScopeIn, float]] = {}
         self._lock = RLock()
 

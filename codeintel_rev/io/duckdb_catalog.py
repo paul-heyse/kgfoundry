@@ -700,7 +700,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
 
     relation_exists: ClassVar[Callable[[duckdb.DuckDBPyConnection, str], bool]]
 
-    def __init__(  # noqa: D107
+    def __init__(
         self,
         db_path: Path,
         vectors_dir: Path,

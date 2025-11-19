@@ -146,6 +146,10 @@ class ReadinessProbe:
     """
 
     def __init__(self, context: ApplicationContext) -> None:
+        """Initialize readiness probe.
+
+        Parameters are documented in the class docstring.
+        """
         self._context = context
         self._lock = asyncio.Lock()
         self._last_checks: dict[str, CheckResult] = {}

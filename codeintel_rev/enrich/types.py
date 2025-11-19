@@ -79,6 +79,7 @@ class ModuleAnalysis:
     module: str
     imports: list[ImportEdge]
     exports: list[ExportItem]
+    dunder_all: tuple[str, ...]
     docs: DocInfo
     metrics: ModuleMetrics
     definitions: list[DefinitionInfo]

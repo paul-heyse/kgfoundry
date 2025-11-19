@@ -44,6 +44,13 @@ class ExportsVisitor(cst.CSTVisitor):
     METADATA_DEPENDENCIES = (cst_metadata.PositionProvider,)
 
     def __init__(self, module_name: str) -> None:
+        """Initialize exports visitor.
+
+        Parameters
+        ----------
+        module_name : str
+            Name of the module being analyzed.
+        """
         self.module_name = module_name
         self.items: list[ExportItem] = []
         self.definitions: list[DefinitionInfo] = []

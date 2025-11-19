@@ -114,6 +114,10 @@ class SCIPResolver:
     _USE_KINDS: ClassVar[set[str]] = {"Call", "Attribute", "Name"}
 
     def __init__(self, documents: Mapping[str, Document]) -> None:
+        """Initialize SCIP resolver instance.
+
+        Parameters are documented in the class docstring.
+        """
         self._definition_index: dict[str, dict[int, list[_SymbolCandidate]]] = {}
         self._occurrence_index: dict[str, dict[int, list[_SymbolCandidate]]] = {}
         for path, document in documents.items():

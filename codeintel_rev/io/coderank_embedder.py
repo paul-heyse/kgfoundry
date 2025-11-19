@@ -144,7 +144,7 @@ class CodeRankEmbedder:
     _MODEL_CACHE: ClassVar[dict[tuple[str, str], SentenceEncoderProtocol]] = {}
     _CACHE_LOCK: ClassVar[threading.Lock] = threading.Lock()
 
-    def __init__(  # noqa: D107
+    def __init__(
         self,
         *,
         settings: SupportsCodeRankSettings,

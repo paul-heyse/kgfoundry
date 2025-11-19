@@ -10,9 +10,9 @@ from pathlib import Path
 from codeintel_rev.cli.enrich.__main__ import app  # noqa: PLC2701
 from typer.testing import CliRunner
 
+from tests.cli.enrich._fixture_repo import write_completeness_fixture_repo
 from tests.enrich._completeness_utils import normalize_payload
 
-FIXTURE_ROOT = Path("tests/golden/enrich/completeness/fixture_repo")
 GOLDEN_REPORT = Path("tests/golden/enrich/completeness/expected_report.json")
 GOLDEN_MODULES = Path("tests/golden/enrich/completeness/modules.jsonl")
 
@@ -25,8 +25,7 @@ def _prepare_repo(dst: Path) -> Path:
     Path
         Path to the copied repository.
     """
-    shutil.copytree(FIXTURE_ROOT, dst)
-    return dst
+    return write_completeness_fixture_repo(dst)
 
 
 def test_cli_audit_golden(tmp_path: Path) -> None:

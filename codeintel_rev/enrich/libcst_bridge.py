@@ -153,6 +153,7 @@ def analyze_module_from_code(rel_path: str, code: str) -> ModuleAnalysis:
         module=module_name,
         imports=imports_visitor.edges,
         exports=exports_visitor.items,
+        dunder_all=tuple(exports_visitor.dunder_all),
         docs=docs_visitor.build_info(),
         metrics=metrics,
         definitions=exports_visitor.definitions,
@@ -214,11 +215,14 @@ def _analysis_to_module_index(rel_path: str, analysis: ModuleAnalysis) -> Module
         DefEntry(kind=definition.kind, name=definition.name, lineno=definition.lineno)
         for definition in analysis.definitions
     ]
-    exported_via_all = [item.name for item in analysis.exports if item.via_dunder_all]
-    if exported_via_all:
-        exports = set(exported_via_all)
+    if analysis.dunder_all:
+        exports = set(analysis.dunder_all)
     else:
-        exports = {item.name for item in analysis.exports if not item.name.startswith("_")}
+        exported_via_all = [item.name for item in analysis.exports if item.via_dunder_all]
+        if exported_via_all:
+            exports = set(exported_via_all)
+        else:
+            exports = {item.name for item in analysis.exports if not item.name.startswith("_")}
     docstring = analysis.docs.module_docstring
     ratio = analysis.metrics.annotation_ratio
     annotation_ratio = {"params": ratio, "returns": ratio}

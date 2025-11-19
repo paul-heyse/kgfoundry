@@ -7,15 +7,16 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from numbers import Integral, Real
 from time import perf_counter
+from types import ModuleType
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.runtime.imports import gate_import
 
 if TYPE_CHECKING:
-    import numpy as np  # type: ignore[reportMissingImports]
+    import numpy as np
 else:
-    np = cast("np", LazyModule("numpy", "faiss runtime operations"))
+    np = cast("ModuleType", LazyModule("numpy", "faiss runtime operations"))
 from codeintel_rev.typing import (
     FaissIndex,
     FaissModule,

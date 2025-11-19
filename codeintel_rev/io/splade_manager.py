@@ -548,10 +548,11 @@ def _maybe_move_encoder_device(searcher: _LuceneImpactSearcherProtocol, device: 
     if device is None:
         return
     encoder = getattr(searcher, "encoder", None)
-    if encoder is None or not hasattr(encoder, "to"):
+    to_fn = getattr(encoder, "to", None) if encoder is not None else None
+    if not callable(to_fn):
         return
     try:
-        encoder.to(device)  # type: ignore[call-arg]
+        to_fn(device)
     except (AttributeError, RuntimeError, TypeError, ValueError):  # pragma: no cover - defensive
         return
 

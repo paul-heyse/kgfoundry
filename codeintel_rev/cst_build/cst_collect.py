@@ -209,6 +209,10 @@ class CSTCollector:
         config: CollectorConfig | None = None,
         use_full_repo_manager: bool = True,
     ) -> None:
+        """Initialize CST collector instance.
+
+        Parameters are documented in the class docstring.
+        """
         self._root = root.resolve()
         self._config = config or CollectorConfig()
         self._manager: FullRepoManager | None = None

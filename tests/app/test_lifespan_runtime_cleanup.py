@@ -27,9 +27,9 @@ class _FakeScopeStore:
 
 class _FakeContext:
     def __init__(self) -> None:
-        self.settings = SimpleNamespace(
-            index=SimpleNamespace(faiss_preload=False),
-        )
+        index_settings = SimpleNamespace(faiss_preload=False)
+        self.app_config = SimpleNamespace(index=index_settings)
+        self.settings = SimpleNamespace(index=index_settings)
         self.scope_store = _FakeScopeStore()
         self.close_calls = 0
         self._xtr_calls = 0

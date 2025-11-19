@@ -71,6 +71,10 @@ class SCIPIndex:
         documents: list[Document] | None = None,
         external_symbols: dict[str, SymbolInfo] | None = None,
     ) -> None:
+        """Initialize SCIP index instance.
+
+        Parameters are documented in the class docstring.
+        """
         self._documents = documents or []
         self._external_symbols = external_symbols or {}
         self._by_file_cache: dict[str, Document] | None = None

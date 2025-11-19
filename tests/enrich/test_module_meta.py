@@ -31,6 +31,7 @@ def test_module_analysis_to_meta_serializes_expected_fields() -> None:
         exports=[
             ExportItem(module="pkg.mod", name="Foo", kind="class", via_dunder_all=True),
         ],
+        dunder_all=("Foo",),
         docs=DocInfo(
             module="pkg.mod",
             module_docstring="Doc",
@@ -65,6 +66,7 @@ def test_module_analysis_to_meta_serializes_expected_fields() -> None:
     assertions.expect_equal(meta["path"], "pkg/mod.py")
     assertions.expect_equal(meta["imports"][0]["alias"], "other")
     assertions.expect_equal(meta["exports"][0]["name"], "Foo")
+    assertions.expect_equal(meta["dunder_all"], ["Foo"])
     assertions.expect_equal(meta["docs"]["module_docstring"], "Doc")
     assertions.expect_equal(meta["metrics"]["annotation_ratio"], 0.5)
     assertions.expect_equal(meta["definitions"][0]["lineno"], 3)

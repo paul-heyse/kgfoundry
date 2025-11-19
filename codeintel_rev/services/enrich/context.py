@@ -21,9 +21,9 @@ from codeintel_rev.typedness import FileTypeSignals
 from codeintel_rev.uses_builder import UseGraph
 
 try:  # pragma: no cover - optional dependency
-    import duckdb  # type: ignore[import-not-found]
+    import duckdb
 except ImportError:  # pragma: no cover - optional dependency
-    duckdb = None  # type: ignore[assignment]
+    duckdb = None
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from duckdb import DuckDBPyConnection

@@ -84,6 +84,16 @@ class LRUCache[KeyT: Hashable, ValueT]:
         *,
         now_fn: Callable[[], float] = time.monotonic,
     ) -> None:
+        """Initialize LRU cache instance.
+
+        Parameters are documented in the class docstring.
+
+        Raises
+        ------
+        ValueError
+            If ``maxsize`` is not positive or if ``ttl_seconds`` is provided but
+            not positive (when not ``None``).
+        """
         if maxsize <= 0:
             msg = f"maxsize must be positive, got {maxsize}"
             raise ValueError(msg)
@@ -276,6 +286,7 @@ class AsyncSingleFlight[KeyT: Hashable, ValueT]:
     """
 
     def __init__(self) -> None:
+        """Initialize async single-flight deduplicator."""
         self._lock = asyncio.Lock()
         self._inflight: dict[KeyT, asyncio.Future[ValueT]] = {}
 
@@ -474,6 +485,15 @@ class ScopeStore:
         l2_ttl_seconds: int | None = 3600,
         key_prefix: str = "scope",
     ) -> None:
+        """Initialize scope store instance.
+
+        Parameters are documented in the class docstring.
+
+        Raises
+        ------
+        ValueError
+            If ``key_prefix`` is empty.
+        """
         if not key_prefix:
             msg = "key_prefix must be non-empty"
             raise ValueError(msg)

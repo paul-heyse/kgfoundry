@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from codeintel_rev.config.api import (
@@ -127,8 +128,9 @@ def _make_config(tmp_path: Path) -> AppConfig:
 def test_app_config_is_immutable(tmp_path: Path) -> None:
     """Assignments should fail on frozen dataclasses."""
     cfg = _make_config(tmp_path)
+    mutable_paths = cast("Any", cfg.paths)
     with pytest.raises(FrozenInstanceError):
-        cfg.paths.repo_root = tmp_path  # type: ignore[misc]
+        mutable_paths.repo_root = tmp_path
 
 
 def test_validate_config_rejects_invalid_values(tmp_path: Path) -> None:

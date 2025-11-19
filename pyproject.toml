@@ -701,7 +701,7 @@ exclude = "codeintel_rev/patches|codeintel_rev/cli/telemetry.py|codeintel_rev/di
 # docstrings rather than class docstrings for clarity and consistency with Python conventions.
 # DOC503: RuntimeCell.get_or_initialize raises exceptions via variable (cooldown_error), not directly
 # Pydoclint doesn't recognize that cooldown_error is a variable containing an exception, not an exception type
-skipCheckingCode = ["DOC301", "DOC503"]
+
 
 [tool.pydocstyle]
 convention = "numpy"

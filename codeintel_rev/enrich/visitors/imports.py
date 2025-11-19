@@ -61,6 +61,13 @@ class ImportsVisitor(cst.CSTVisitor):
     """Collect import edges for graph construction and legacy metadata."""
 
     def __init__(self, module_name: str) -> None:
+        """Initialize imports visitor.
+
+        Parameters
+        ----------
+        module_name : str
+            Name of the module being analyzed.
+        """
         self.module_name = module_name
         self.edges: list[ImportEdge] = []
         self.legacy_imports: list[LegacyImportRecord] = []

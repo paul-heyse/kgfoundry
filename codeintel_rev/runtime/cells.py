@@ -341,7 +341,7 @@ class RuntimeCell[T]:
         ``raise cooldown_error``. The exception type matches the original failure
         (could be RuntimeError, OSError, ImportError, or any other BaseException).
         Callers should handle this to implement retry logic with backoff. Additionally,
-        exceptions raised by the factory function during initialization are re-raised
+        any exception raised by the factory function during initialization is re-raised
         to preserve the original exception type and stack trace.
         """
         adjusted_factory = self._adjust_factory(factory)
@@ -704,7 +704,8 @@ class RuntimeCell[T]:
         -----
         Any exception raised by the factory function is re-raised after recording
         the failure in the observer. The exception type matches what the factory
-        function raises.
+        function raises. This method handles initialization lifecycle tracking and
+        error propagation.
         """
         start = time.monotonic()
         self._observer.on_init_start(cell=self._name, generation=generation, context=context)

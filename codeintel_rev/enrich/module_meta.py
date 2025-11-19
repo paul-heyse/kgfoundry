@@ -37,6 +37,7 @@ def module_analysis_to_meta(analysis: ModuleAnalysis) -> dict[str, Any]:
         "path": _as_posix(analysis.path),
         "imports": [_serialize_import(edge) for edge in analysis.imports],
         "exports": [_serialize_export(item) for item in analysis.exports],
+        "dunder_all": list(analysis.dunder_all),
         "docs": _serialize_docs(analysis.docs),
         "metrics": _serialize_metrics(analysis.metrics),
         "definitions": [_serialize_definition(item) for item in analysis.definitions],

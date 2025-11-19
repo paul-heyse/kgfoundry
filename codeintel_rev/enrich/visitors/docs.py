@@ -12,6 +12,13 @@ class DocVisitor(cst.CSTVisitor):
     """Collect docstring statistics for modules, classes, and functions."""
 
     def __init__(self, module_name: str) -> None:
+        """Initialize docstring visitor.
+
+        Parameters
+        ----------
+        module_name : str
+            Name of the module being analyzed.
+        """
         self.module_name = module_name
         self.module_docstring: str | None = None
         self.module_has_doc = False

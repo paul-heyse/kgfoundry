@@ -545,7 +545,7 @@ class AsyncGitClient:
     - ``_sync_client``: Synchronous GitClient instance wrapped by this async client
     """
 
-    def __init__(self, git_client: GitClient) -> None:  # noqa: D107
+    def __init__(self, git_client: GitClient) -> None:
         self._sync_client = git_client
 
     async def blame_range(

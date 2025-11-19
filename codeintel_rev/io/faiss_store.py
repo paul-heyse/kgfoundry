@@ -7,6 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
 import duckdb
@@ -15,9 +16,9 @@ from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.runtime.imports import gate_import
 
 if TYPE_CHECKING:
-    import numpy as np  # type: ignore[reportMissingImports]
+    import numpy as np
 else:
-    np = cast("np", LazyModule("numpy", "faiss store operations"))
+    np = cast("ModuleType", LazyModule("numpy", "faiss store operations"))
 from codeintel_rev.io.duckdb_catalog import IdMapMeta, refresh_faiss_idmap_materialized
 from codeintel_rev.typing import FaissIndex, NDArrayF32, NDArrayI64
 
