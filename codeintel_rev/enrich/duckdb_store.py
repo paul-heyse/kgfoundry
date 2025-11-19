@@ -50,15 +50,16 @@ _MODULE_COLUMNS: list[tuple[str, str]] = [
     ("covered_defs_ratio", "DOUBLE"),
     ("config_refs", "JSON"),
     ("overlay_needed", "BOOLEAN"),
+    ("meta", "JSON"),
 ]
 _INSERT_SQL = (
     "INSERT INTO modules VALUES ("
-    "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 )
 _MODULE_COLUMN_NAMES: Sequence[str] = tuple(name for name, _ in _MODULE_COLUMNS)
 
 
-def _parse_pragmas(spec: str) -> tuple[tuple[str, str], ...]:
+def _parse_pragmas(spec: str) -> tuple[tuple[str, object], ...]:
     """Parse DuckDB pragma settings from a comma-separated string.
 
     Parameters
@@ -89,7 +90,11 @@ def _parse_pragmas(spec: str) -> tuple[tuple[str, str], ...]:
         key, value = (token.strip() for token in entry.split("=", 1))
         if not key or not value or not _PRAGMA_KEY_PATTERN.fullmatch(key):
             continue
-        literal = value if value.replace(".", "", 1).isdigit() else f"'{value}'"
+        literal: object
+        if value.replace(".", "", 1).isdigit():
+            literal = float(value) if "." in value else int(value)
+        else:
+            literal = value
         settings.append((key, literal))
     return tuple(settings)
 
@@ -153,14 +158,14 @@ class DuckDBIngestContext:
     use_native_json : bool, optional
         Whether to use DuckDB's native JSON functions. If False, uses
         string-based JSON handling. Defaults to True.
-    pragmas : tuple[tuple[str, str], ...], optional
-        Tuple of (pragma_name, value) pairs to set on DuckDB connections.
-        Empty tuple means no pragmas are set. Defaults to empty tuple.
+    pragmas : tuple[tuple[str, object], ...], optional
+        Tuple of (pragma_name, value) pairs applied via DuckDB connection
+        configuration. Empty tuple means no pragmas are set. Defaults to empty tuple.
     """
 
     duckdb_module: _DuckDBModule
     use_native_json: bool = True
-    pragmas: tuple[tuple[str, str], ...] = ()
+    pragmas: tuple[tuple[str, object], ...] = ()
 
     @classmethod
     def from_env(cls) -> DuckDBIngestContext:
@@ -188,6 +193,30 @@ def _duckdb() -> _DuckDBModule:
     """
     module = gate_import("duckdb", purpose="enrichment analytics")
     return cast("_DuckDBModule", module)
+
+
+def _connect(db_path: Path, ctx: DuckDBIngestContext) -> DuckDBConnection:
+    """Return a DuckDB connection configured with pragma settings.
+
+    Parameters
+    ----------
+    db_path : Path
+        Path to the DuckDB database file.
+    ctx : DuckDBIngestContext
+        Context containing DuckDB module and pragma settings.
+
+    Returns
+    -------
+    DuckDBConnection
+        Configured DuckDB connection with pragma settings applied.
+    """
+    config: dict[str, object] | None = None
+    if ctx.pragmas:
+        config = dict(ctx.pragmas)
+    kwargs = {"database": str(db_path)}
+    if config:
+        kwargs["config"] = config
+    return ctx.duckdb_module.connect(**kwargs)
 
 
 def ensure_schema(conn: DuckConn, *, context: DuckDBIngestContext | None = None) -> None:
@@ -229,7 +258,8 @@ def ensure_schema(conn: DuckConn, *, context: DuckDBIngestContext | None = None)
                 covered_lines_ratio DOUBLE,
                 covered_defs_ratio DOUBLE,
                 config_refs JSON,
-                overlay_needed BOOLEAN
+                overlay_needed BOOLEAN,
+                meta JSON
             )
             """
         )
@@ -263,10 +293,8 @@ def ingest_modules_jsonl(
         Total number of rows now present in the ``modules`` table.
     """
     ctx = context or DuckDBIngestContext.from_env()
-    duckdb_module = ctx.duckdb_module
     ensure_schema(conn, context=ctx)
-    with duckdb_module.connect(str(conn.db_path)) as con:
-        _apply_pragmas(con, ctx.pragmas)
+    with _connect(conn.db_path, ctx) as con:
         if ctx.use_native_json:
             _ingest_via_native_json(con, modules_jsonl)
         else:
@@ -340,29 +368,6 @@ def _coerce_value(value: object, col_type: str | None) -> object:
     return value
 
 
-def _apply_pragmas(con: DuckDBConnection, pragmas: tuple[tuple[str, str], ...]) -> None:
-    """Apply DuckDB pragma settings to a connection.
-
-    Parameters
-    ----------
-    con : DuckDBConnection
-        DuckDB connection to apply pragmas to.
-    pragmas : tuple[tuple[str, str], ...]
-        Tuple of (key, literal_value) pairs representing pragma settings to apply.
-        Each pragma is executed as `PRAGMA key=literal_value`. If empty, no pragmas
-        are applied.
-
-    Notes
-    -----
-    Pragmas are applied sequentially. The literal_value should already be formatted
-    as a SQL literal (numeric or quoted string) as produced by `_parse_pragmas()`.
-    """
-    if not pragmas:
-        return
-    for key, literal in pragmas:
-        con.execute(f"PRAGMA {key}={literal}")
-
-
 def _ingest_via_native_json(con: DuckDBConnection, modules_jsonl: Path) -> None:
     """Ingest module records using DuckDB's native JSON reading capabilities.
 
@@ -398,9 +403,13 @@ def _ingest_via_native_json(con: DuckDBConnection, modules_jsonl: Path) -> None:
     for name, col_type in _MODULE_COLUMNS:
         if name not in existing_columns:
             con.execute(f"ALTER TABLE modules_stage ADD COLUMN {name} {col_type}")
-    assignments = ", ".join(f"{name}=s.{name}" for name in _MODULE_COLUMN_NAMES)
+
+    def _stage_value(name: str) -> str:
+        return "to_json(s.meta)" if name == "meta" else f"s.{name}"
+
+    assignments = ", ".join(f"{name}={_stage_value(name)}" for name in _MODULE_COLUMN_NAMES)
     insert_columns = ", ".join(_MODULE_COLUMN_NAMES)
-    insert_values = ", ".join(f"s.{name}" for name in _MODULE_COLUMN_NAMES)
+    insert_values = ", ".join(_stage_value(name) for name in _MODULE_COLUMN_NAMES)
     merge_template = """
         MERGE INTO modules t
         USING modules_stage s

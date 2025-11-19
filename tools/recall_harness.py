@@ -6,12 +6,17 @@ import argparse
 import csv
 import json
 import logging
+import os
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from itertools import product
 from pathlib import Path
 
-from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.config import load_app_config
+from codeintel_rev.config.api import AppConfig
+from codeintel_rev.config.settings import Settings
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.io.bm25_engine import BM25Engine, BM25Rm3Config, PyseriniBM25Backend
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 
@@ -31,6 +36,16 @@ class BM25SweepPlan:
     grid: Sequence[tuple[float, float]]
     rm3_mode: str
     out: Path
+
+
+@lru_cache(maxsize=1)
+def _cached_app_config() -> AppConfig:
+    return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+
+
+@lru_cache(maxsize=1)
+def _legacy_settings() -> Settings:
+    return settings_from_app_config(_cached_app_config())
 
 
 def _read_queries(path: Path) -> list[tuple[str, str]]:
@@ -231,7 +246,7 @@ def _prepare_rm3_config(settings: Settings, rm3_mode: str) -> BM25Rm3Config:
 
 def sweep_bm25(plan: BM25SweepPlan) -> None:
     """Run the sweep described by ``plan`` and emit CSV + recall metrics."""
-    settings = load_settings()
+    settings = _legacy_settings()
     rm3_config = _prepare_rm3_config(settings, plan.rm3_mode)
     max_k = max(plan.k_values)
     rows: list[dict[str, object]] = []

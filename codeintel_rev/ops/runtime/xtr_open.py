@@ -1,16 +1,4 @@
-"""Fail-fast probe for XTR artifacts.
-
-Example failure payload::
-
-    {
-        "type": "https://kgfoundry.dev/problems/resource-unavailable",
-        "title": "XTR artifacts unavailable",
-        "status": 503,
-        "detail": "Index metadata missing.",
-        "runtime": "xtr",
-        "instance": "/ops/runtime/xtr-open",
-    }
-"""
+"""Fail-fast probe for XTR artifacts."""
 
 from __future__ import annotations
 
@@ -25,15 +13,9 @@ import click
 import typer
 
 from codeintel_rev.app import readiness as fs_readiness
-from codeintel_rev.app.config_context import (
-    merge_paths_with_app_config,
-    resolve_application_paths,
-)
-from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.loader import load_app_config
+from codeintel_rev.app.config_context import resolve_application_paths
+from codeintel_rev.config import AppConfig, load_app_config
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.settings import Settings, load_settings
-from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.xtr_manager import XTRIndex
 from kgfoundry_common.errors import ConfigurationError
 
@@ -42,51 +24,23 @@ PROBLEM_INSTANCE = "/ops/runtime/xtr-open"
 _VERBOSE_DEFAULT = False
 _VERBOSE_FLAGS = ("--verbose", "-v")
 
-# Type aliases for typer CLI parameters
 _RootOption = Annotated[
     Path | None,
-    typer.Option(
-        "--root",
-        help="Override the configured XTR artifact directory.",
-    ),
+    typer.Option("--root", help="Override the configured XTR artifact directory."),
 ]
 _VerboseOption = Annotated[
     bool,
-    typer.Option(
-        *_VERBOSE_FLAGS,
-        help="Pretty-print success payloads.",
-    ),
+    typer.Option(*_VERBOSE_FLAGS, help="Pretty-print success payloads."),
 ]
 
 
 @dataclass(slots=True, frozen=True)
 class XtrOpenContext:
-    """Dependency injection context for the xtr-open CLI.
+    """Dependency injection context for the xtr-open CLI."""
 
-    Attributes
-    ----------
-    settings_factory : Callable[[], Settings]
-        Factory function that returns application settings. Used for dependency
-        injection in tests.
-    paths_resolver : Callable[[Settings], ResolvedPaths]
-        Function that resolves filesystem paths from settings. Used for
-        dependency injection in tests.
-    index_factory : Callable[[Path, Settings], XTRIndex]
-        Factory function that creates an XTR index from root path and settings.
-        Used for dependency injection in tests.
-    app_config_loader : Callable[[], AppConfig]
-        Function that loads application configuration. Used for dependency
-        injection in tests.
-    path_merger : Callable[[ResolvedPaths, AppConfig], ResolvedPaths]
-        Function that merges resolved paths with app config. Used for dependency
-        injection in tests.
-    """
-
-    settings_factory: Callable[[], Settings]
-    paths_resolver: Callable[[Settings], ResolvedPaths]
-    index_factory: Callable[[Path, Settings], XTRIndex]
     app_config_loader: Callable[[], AppConfig]
-    path_merger: Callable[[ResolvedPaths, AppConfig], ResolvedPaths]
+    paths_resolver: Callable[[AppConfig], ResolvedPaths]
+    index_factory: Callable[[Path, AppConfig], XTRIndex]
 
     @classmethod
     def production(cls) -> XtrOpenContext:
@@ -95,16 +49,17 @@ class XtrOpenContext:
         Returns
         -------
         XtrOpenContext
-            Context configured with production factories.
+            Production context with default implementations for app config loading,
+            paths resolution, and XTR index factory.
         """
+
+        def _loader() -> AppConfig:
+            return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+
         return cls(
-            settings_factory=load_settings,
+            app_config_loader=_loader,
             paths_resolver=resolve_application_paths,
-            index_factory=lambda root, settings: XTRIndex(root, settings.xtr),
-            app_config_loader=lambda: load_app_config(
-                file=os.environ.get("CODEINTEL_CONFIG_FILE"),
-            ),
-            path_merger=merge_paths_with_app_config,
+            index_factory=lambda root, cfg: XTRIndex(root, cfg.xtr),
         )
 
 
@@ -117,12 +72,13 @@ def _cli_context(ctx: typer.Context | None = None) -> XtrOpenContext:
     Parameters
     ----------
     ctx : typer.Context | None, optional
-        Typer context, or None to attempt Click context lookup.
+        Optional Typer context. If None, attempts to get the current context.
+        Defaults to None.
 
     Returns
     -------
     XtrOpenContext
-        CLI context from context state or default production context.
+        Context attached to the Typer state or the default context.
     """
     active = ctx or click.get_current_context(silent=True)
     if active is None:
@@ -143,66 +99,23 @@ def xtr_open(
 ) -> None:
     """Validate that XTR artifacts are present and readable.
 
-    Extended Summary
-    ----------------
-    This CLI command performs a fail-fast probe for XTR (eXtended Token Retrieval)
-    artifacts. It validates that the XTR index directory exists, can be opened,
-    and is ready for use. The command is used for health checks and deployment
-    validation. On success, it prints a JSON payload with readiness status and
-    metadata (chunk count, token count, dimension, dtype). On failure, it exits
-    with a non-zero code and prints RFC 9457 Problem Details.
-
     Parameters
     ----------
-    root : _RootOption, optional
-        Override the configured XTR artifact directory. If None (default), uses
-        the directory resolved from application settings. Type alias for
-        ``Annotated[Path | None, typer.Option(...)]`` for CLI option specification.
-        Defaults to None.
-    verbose : _VerboseOption, optional
-        Pretty-print success payloads with indentation. When False (default),
-        outputs compact JSON. Type alias for ``Annotated[bool, typer.Option(...)]``
-        for CLI option specification. Defaults to False.
+    root : Path | None, optional
+        Override the configured XTR artifact directory. If None, uses the configured
+        directory from app config. Defaults to None.
+    verbose : bool, optional
+        Pretty-print success payloads. Defaults to False.
 
     Raises
     ------
     typer.Exit
-        Raised by Typer to signal successful completion (code=0) or failure
-        (code=1). On failure, the exit includes RFC 9457 Problem Details
-        printed to stderr.
-
-    Notes
-    -----
-    Time complexity O(1) for directory checks; O(I) for index opening where I
-    is the cost of loading index metadata. The function performs filesystem I/O
-    to validate paths and open the index. Thread-safe if called from a single
-    process. The function is idempotent - multiple calls with the same inputs
-    produce the same results.
-
-    Examples
-    --------
-    >>> # Validate default XTR directory
-    >>> xtr_open(root=None, verbose=False)
-    {"ready": true, "limits": [], "metadata": {...}}
-
-    >>> # Validate custom directory with verbose output
-    >>> xtr_open(root=Path("/custom/xtr"), verbose=True)
-    {
-      "ready": true,
-      "limits": [],
-      "metadata": {
-        "root": "/custom/xtr",
-        "chunks": 1000,
-        "tokens": 50000,
-        "dim": 768,
-        "dtype": "float32"
-      }
-    }
+        Exits with code 0 when XTR is disabled or artifacts are ready.
+        Exits with code 1 when artifacts are unavailable or invalid.
     """
     context = _cli_context()
-    settings = context.settings_factory()
     app_config = context.app_config_loader()
-    paths = context.path_merger(context.paths_resolver(settings), app_config)
+    paths = context.paths_resolver(app_config)
     try:
         fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     except ConfigurationError as exc:
@@ -211,25 +124,25 @@ def xtr_open(
             detail=str(exc),
             cause=exc,
         )
+
+    if not app_config.xtr.enable:
+        payload = {"ready": False, "limits": ["xtr disabled"]}
+        typer.echo(json.dumps(payload, indent=2 if verbose else None))
+        raise typer.Exit(code=0)
+
     xtr_root = root or paths.xtr_dir
     if root is not None and not root.is_dir():
         _exit_with_problem(
             "XTR artifacts unavailable",
             detail=f"Not a directory: {root}",
         )
-
-    if not settings.xtr.enable:
-        payload = {"ready": False, "limits": ["xtr disabled"]}
-        typer.echo(json.dumps(payload, indent=2 if verbose else None))
-        raise typer.Exit(code=0)
-
     if not xtr_root.exists():
         _exit_with_problem(
             "XTR artifacts unavailable",
             detail=f"Directory does not exist: {xtr_root}",
         )
 
-    index = context.index_factory(xtr_root, settings)
+    index = context.index_factory(xtr_root, app_config)
     try:
         index.open()
     except (OSError, RuntimeError, ValueError) as exc:
@@ -238,7 +151,6 @@ def xtr_open(
             detail=str(exc),
             cause=exc,
         )
-
     if not index.ready:
         _exit_with_problem("XTR artifacts loaded but not ready")
 
@@ -258,42 +170,41 @@ def xtr_open(
 
 
 def _exit_with_problem(
-    message: str,
+    title: str,
     *,
     detail: str | None = None,
     cause: Exception | None = None,
 ) -> None:
-    """Exit with RFC 9457 Problem Details payload.
+    """Emit RFC 9457 Problem Details payload and exit.
 
     Parameters
     ----------
-    message : str
-        Problem title and message.
+    title : str
+        Problem title string.
     detail : str | None, optional
-        Detailed error description.
+        Optional detailed error message. Defaults to None.
     cause : Exception | None, optional
-        Underlying exception that caused the problem.
+        Optional exception that caused the problem. Defaults to None.
 
     Raises
     ------
     typer.Exit
-        Always raises with exit code 1 after printing Problem Details to stderr.
+        Always exits with code 1, optionally chained from the cause exception.
     """
-    problem = RuntimeUnavailableError(
-        message,
-        runtime="xtr",
-        detail=detail,
-        cause=cause,
-    ).to_problem_details(instance=PROBLEM_INSTANCE)
-    problem["title"] = message
-    typer.echo(json.dumps(problem), err=True)
-    raise typer.Exit(code=1)
-
-
-def main() -> None:  # pragma: no cover - Typer entrypoint
-    """Execute the Typer CLI."""
-    APP()
+    payload = {
+        "type": "https://kgfoundry.dev/problems/resource-unavailable",
+        "title": title,
+        "status": 503,
+        "runtime": "xtr",
+        "instance": PROBLEM_INSTANCE,
+    }
+    if detail:
+        payload["detail"] = detail
+    typer.echo(json.dumps(payload, indent=2), err=True)
+    if cause is None:
+        raise typer.Exit(code=1)
+    raise typer.Exit(code=1) from cause
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()
+    APP()

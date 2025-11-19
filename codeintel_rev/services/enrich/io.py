@@ -9,7 +9,6 @@ import logging
 import os
 import tempfile
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Protocol, TypedDict, Unpack, cast
 
@@ -69,6 +68,17 @@ class _YamlDumpFn(Protocol):
     ) -> str: ...
 
 
+def _row_payload(row: ModuleRecord | Mapping[str, Any]) -> dict[str, Any]:
+    """Return a JSON-ready mapping for ``row``.
+
+    Returns
+    -------
+    dict[str, Any]
+        Serialized mapping representing the module row.
+    """
+    return row.as_json_row() if isinstance(row, ModuleRecord) else dict(row)
+
+
 def write_modules_json(
     out: Path,
     module_rows: Sequence[ModuleRecord | Mapping[str, Any]],
@@ -90,11 +100,7 @@ def write_modules_json(
     """
     target = out / "modules" / "modules.jsonl"
     target.parent.mkdir(parents=True, exist_ok=True)
-    legacy_write_jsonl(
-        target,
-        [dict(row) if isinstance(row, Mapping) else asdict(row) for row in module_rows],
-        writer_version="v2",
-    )
+    legacy_write_jsonl(target, [_row_payload(row) for row in module_rows], writer_version="v2")
     return target
 
 
@@ -116,11 +122,12 @@ def write_markdown_modules(out: Path, module_rows: Sequence[Mapping[str, Any]]) 
     modules_dir = out / "modules"
     modules_dir.mkdir(parents=True, exist_ok=True)
     for record in module_rows:
-        path = record.get("path")
+        payload = _row_payload(record)
+        path = payload.get("path")
         if not isinstance(path, str):
             continue
         target = modules_dir / (Path(path).with_suffix(".md").name)
-        write_markdown_module(target, dict(record))
+        write_markdown_module(target, payload)
     return modules_dir
 
 
@@ -267,6 +274,13 @@ def atomic_write_text(path: Path, data: str) -> None:
 
 def write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> int:
     """Write JSONL rows and return the number of emitted rows.
+
+    Parameters
+    ----------
+    path : Path
+        Output file path for JSONL file.
+    rows : Iterable[Mapping[str, Any]]
+        Iterable of row dictionaries to write.
 
     Returns
     -------

@@ -138,9 +138,6 @@ class ModuleRecord(MutableMapping[str, Any]):
         empty list.
     overlay_needed : bool, optional
         Whether this module needs a type stub overlay. Defaults to False.
-    _extra : dict[str, Any], optional
-        Additional fields not in the standard schema. Not included in repr.
-        Defaults to empty dictionary.
     """
 
     path: str

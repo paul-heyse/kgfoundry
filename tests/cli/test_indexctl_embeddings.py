@@ -20,6 +20,7 @@ from codeintel_rev.config.api import (
     BM25Settings,
     EmbeddingsSettings,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
     SearchSettings,
     SpladeSettings,
@@ -246,6 +247,7 @@ def _app_config_with_duckdb(repo_root: Path, duckdb_path: Path) -> AppConfig:
         vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
+        index=IndexSettings(),
     )
 
 

@@ -6,18 +6,14 @@ import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 
-from codeintel_rev.config.settings import EvalConfig, PathsConfig, Settings
+from codeintel_rev.config.api import EvalSettings
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
 from codeintel_rev.io.vllm_client import VLLMClient
-
-if TYPE_CHECKING:
-    from codeintel_rev.config.paths import ResolvedPaths
 
 
 @dataclass(slots=True, frozen=True)
@@ -50,8 +46,8 @@ class OfflineRecallEvaluator:
     def __init__(
         self,
         *,
-        settings: Settings,
-        paths: PathsConfig | ResolvedPaths,
+        eval_settings: EvalSettings,
+        repo_root: str | Path,
         faiss_manager: FAISSManager,
         vllm_client: VLLMClient,
         duckdb_manager: DuckDBManager,
@@ -60,10 +56,10 @@ class OfflineRecallEvaluator:
 
         Parameters
         ----------
-        settings : Settings
-            Application settings.
-        paths : PathsConfig | ResolvedPaths
-            Resolved application paths.
+        eval_settings : EvalSettings
+            Evaluation configuration.
+        repo_root : str | Path
+            Repository root used to resolve relative output paths.
         faiss_manager : FAISSManager
             FAISS manager for vector search.
         vllm_client : VLLMClient
@@ -71,8 +67,8 @@ class OfflineRecallEvaluator:
         duckdb_manager : DuckDBManager
             DuckDB manager for catalog access.
         """
-        self._settings = settings
-        self._repo_root = Path(paths.repo_root)
+        self._eval_settings = eval_settings
+        self._repo_root = Path(repo_root)
         self._faiss = faiss_manager
         self._vllm = vllm_client
         self._symbol_catalog = SymbolCatalog(duckdb_manager)
@@ -101,7 +97,7 @@ class OfflineRecallEvaluator:
             queries are synthesized from symbol catalog using configured strategy.
         output_dir : Path | None, optional
             Directory for evaluation artifacts (per-query results, aggregate stats).
-            If None, uses `settings.eval.output_dir`.
+            If None, uses the configured default output directory.
 
         Returns
         -------
@@ -118,7 +114,7 @@ class OfflineRecallEvaluator:
         directory for analysis. Time complexity: O(n_queries * search_time) where
         search_time depends on index size and k values.
         """
-        cfg = self._settings.eval
+        cfg = self._eval_settings
         k_values = cfg.k_values or (10,)
         max_k = max(k_values)
         queries = list(self._prepare_queries(cfg, queries_path))
@@ -141,8 +137,8 @@ class OfflineRecallEvaluator:
 
         count = len(per_query)
         summary = {k: (aggregate[k] / count if count else 0.0) for k in k_values}
-        output_root = self._resolve_output_dir(output_dir or cfg.output_dir)
-        self._write_artifacts(output_root, per_query, summary)
+        output_base = output_dir or cfg.output_dir
+        self._write_artifacts(self._resolve_output_dir(output_base), per_query, summary)
         return {"queries": count, "summary": summary}
 
     def _resolve_output_dir(self, raw: str | Path) -> Path:
@@ -235,7 +231,7 @@ class OfflineRecallEvaluator:
                 )
         return queries
 
-    def _synthesize_queries(self, cfg: EvalConfig) -> Iterable[EvalQuery]:
+    def _synthesize_queries(self, cfg: EvalSettings) -> Iterable[EvalQuery]:
         """Synthesize evaluation queries from symbol definitions in the catalog.
 
         This method generates evaluation queries by extracting symbol definitions
@@ -247,7 +243,7 @@ class OfflineRecallEvaluator:
 
         Parameters
         ----------
-        cfg : EvalConfig
+        cfg : EvalSettings
             Evaluation configuration containing limits and synthesis parameters.
             The max_queries setting limits the number of synthesized queries.
 
@@ -401,7 +397,7 @@ class OfflineRecallEvaluator:
 
     def _prepare_queries(
         self,
-        cfg: EvalConfig,
+        cfg: EvalSettings,
         queries_path: Path | None,
     ) -> Iterable[EvalQuery]:
         """Prepare evaluation queries from file or synthesis.
@@ -414,7 +410,7 @@ class OfflineRecallEvaluator:
 
         Parameters
         ----------
-        cfg : EvalConfig
+        cfg : EvalSettings
             Evaluation configuration containing synthesis parameters and limits.
             Used when synthesizing queries from the symbol catalog.
         queries_path : Path | None

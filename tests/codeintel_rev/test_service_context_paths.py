@@ -215,6 +215,7 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
         vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
+        index=IndexSettings(),
     )
 
     service_context.reset_service_context()
@@ -320,6 +321,7 @@ def test_merge_paths_with_app_config_overrides_duckdb_and_faiss(tmp_path: Path) 
         vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
+        index=IndexSettings(),
     )
     merged = merge_paths_with_app_config(base_paths, app_config)
     assertions.expect_equal(merged.duckdb_path, custom_duckdb)

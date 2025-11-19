@@ -288,6 +288,20 @@ async def semantic_search_pro(
 ) -> AnswerEnvelope:
     """Execute Stage-0 → gating → optional late-interaction → optional rerank.
 
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context providing access to search engines, catalog, XTR
+        indexes, and configuration.
+    query : str
+        Search query string.
+    limit : int, optional
+        Maximum number of results to return. Defaults to 20.
+    options : SemanticProOptions | None, optional
+        Optional search options for customizing behavior. Defaults to None.
+    hooks : SemanticProHooks | None, optional
+        Optional runtime hooks for customizing search behavior. Defaults to None.
+
     Returns
     -------
     AnswerEnvelope
@@ -536,6 +550,17 @@ def _run_late_interaction_stage(
 ) -> tuple[list[int], list[float]]:
     """Execute the late-interaction stage when enabled and permitted.
 
+    Parameters
+    ----------
+    stage_ctx : _StageContext
+        Stage context containing options, hooks, and decision state.
+    query : str
+        Search query string.
+    ids : list[int]
+        Candidate chunk identifiers from previous stage.
+    scores : list[float]
+        Relevance scores corresponding to ids.
+
     Returns
     -------
     tuple[list[int], list[float]]
@@ -585,6 +610,17 @@ def _run_reranker_stage(
 ) -> tuple[list[int], list[float], MethodRerankerInfo | None]:
     """Execute the reranker stage when enabled and candidates exist.
 
+    Parameters
+    ----------
+    stage_ctx : _StageContext
+        Stage context containing options, hooks, and decision state.
+    query : str
+        Search query string.
+    ids : list[int]
+        Candidate chunk identifiers from previous stage.
+    scores : list[float]
+        Relevance scores corresponding to ids.
+
     Returns
     -------
     tuple[list[int], list[float], MethodRerankerInfo | None]
@@ -620,6 +656,15 @@ def _run_reranker_stage(
 def _make_finding(chunk_id: int, score: float, uri: str | None = None) -> Finding:
     """Create a minimal finding payload for hydrated chunks.
 
+    Parameters
+    ----------
+    chunk_id : int
+        Chunk identifier from the search result.
+    score : float
+        Relevance score for the chunk.
+    uri : str | None, optional
+        Optional URI for the chunk. Defaults to None.
+
     Returns
     -------
     Finding
@@ -633,6 +678,11 @@ def _make_finding(chunk_id: int, score: float, uri: str | None = None) -> Findin
 
 def _resolve_xtr_index(context: ApplicationContext) -> XTRIndex | None:
     """Resolve the XTR index via runtime cells when available.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing runtime cells and XTR index accessors.
 
     Returns
     -------
@@ -648,6 +698,11 @@ def _resolve_xtr_index(context: ApplicationContext) -> XTRIndex | None:
 
 def _error_envelope(reason: str) -> AnswerEnvelope:
     """Return a typed error envelope for invalid adapter inputs.
+
+    Parameters
+    ----------
+    reason : str
+        Error reason message to include in the envelope.
 
     Returns
     -------

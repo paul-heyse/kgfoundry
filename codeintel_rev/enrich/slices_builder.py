@@ -10,6 +10,11 @@ from hashlib import blake2s
 from pathlib import Path
 from typing import Any
 
+from codeintel_rev.enrich.meta_compat import (
+    definition_entries,
+    export_names_from_meta,
+    import_entries,
+)
 from codeintel_rev.enrich.output_writers import write_json, write_markdown_module
 
 __all__ = ["SliceRecord", "build_slice_record", "write_slice"]
@@ -146,13 +151,16 @@ def build_slice_record(module_row: Mapping[str, Any]) -> SliceRecord:
         "stable_id": module_row.get("stable_id"),
         "exports_resolved": module_row.get("exports_resolved"),
     }
+    exports = export_names_from_meta(module_row)
+    imports = import_entries(module_row)
+    defs = definition_entries(module_row)
     return SliceRecord(
         slice_id=slice_id,
         path=path,
         module_name=module_name,
-        exports=list(module_row.get("exports_declared") or module_row.get("exports") or []),
-        imports=list(module_row.get("imports") or []),
-        defs=list(module_row.get("defs") or []),
+        exports=exports,
+        imports=imports,
+        defs=defs,
         doc_summary=module_row.get("doc_summary"),
         tags=list(module_row.get("tags") or []),
         graph={

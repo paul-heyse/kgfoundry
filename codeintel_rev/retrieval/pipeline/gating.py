@@ -22,17 +22,6 @@ class StageGateCoreResult(Protocol):
     This protocol defines the interface for gating decisions returned by the
     core gating function, enabling type-safe interaction with gating results
     while maintaining compatibility across different gating implementations.
-
-    Attributes
-    ----------
-    should_run : bool
-        Whether the secondary stage should be executed based on the gating
-        decision. True indicates the stage should run, False indicates it
-        should be skipped.
-    reason : object
-        Explanation for the gating decision. Typically a string describing
-        why the stage should or should not run, but can be any object for
-        flexibility in different gating implementations.
     """
 
     @property
@@ -131,6 +120,11 @@ def override_stage_gate_core(core: StageGateCore) -> Iterator[None]:
 
 def _normalize_signals(signals: Mapping[str, object]) -> StageSignals:
     """Convert raw mappings into :class:`StageSignals` instances.
+
+    Parameters
+    ----------
+    signals : Mapping[str, object]
+        Raw signal mapping with string keys and arbitrary values.
 
     Returns
     -------

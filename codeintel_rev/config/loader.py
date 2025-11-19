@@ -7,7 +7,7 @@ import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Final, Literal, TypeVar, cast
 
 from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
@@ -15,9 +15,12 @@ from codeintel_rev.config.api import (
     BM25Settings,
     DuckDBSettings,
     EmbeddingsSettings,
+    EvalSettings,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
     PathsConfig,
+    PRFSettings,
     SearchSettings,
     SpladeOnnxQueryConfig,
     SpladeSettings,
@@ -28,6 +31,14 @@ from codeintel_rev.config.api import (
 from codeintel_rev.runtime.imports import gate_import
 
 LookupFn = Callable[[str, object], object]
+_MappingValue = TypeVar("_MappingValue", int, float)
+_DEFAULT_RRF_WEIGHTS: Final[dict[str, float]] = {
+    "semantic": 1.0,
+    "bm25": 1.0,
+    "splade": 1.0,
+    "warp": 1.1,
+}
+_DEFAULT_PREFETCH: Final[dict[str, int]] = {"semantic": 200, "bm25": 200, "splade": 200}
 
 
 def _to_bool(value: str | None, *, default: bool = False) -> bool:
@@ -83,6 +94,144 @@ def _coerce_int(value: object, *, default: int) -> int:
         return int(text)
     except ValueError:
         return default
+
+
+def _optional_int(value: object | None) -> int | None:
+    """Return integer for value or None if parsing fails/absent.
+
+    Returns
+    -------
+    int | None
+        Parsed integer value, or None if value is None, empty, or cannot be
+        parsed as an integer.
+    """
+    if value is None:
+        return None
+    try:
+        text = str(value).strip()
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def _parse_int_list(value: object, default: tuple[int, ...]) -> tuple[int, ...]:
+    """Parse a comma-delimited list of integers.
+
+    Parameters
+    ----------
+    value : object
+        Value to parse. Should be a string containing comma-delimited integers.
+    default : tuple[int, ...]
+        Default value to return if parsing fails or value is empty.
+
+    Returns
+    -------
+    tuple[int, ...]
+        Tuple of parsed integers, or default if parsing fails or value is empty.
+    """
+    try:
+        text = str(value).strip()
+    except (AttributeError, TypeError, ValueError):
+        return default
+    if not text:
+        return default
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    parsed: list[int] = []
+    for part in parts:
+        try:
+            parsed.append(int(part))
+        except ValueError:
+            continue
+    return tuple(parsed) if parsed else default
+
+
+def _parse_mapping(
+    value: object,
+    *,
+    default: Mapping[str, _MappingValue],
+    coerce: Callable[[object], _MappingValue],
+) -> dict[str, _MappingValue]:
+    """Parse a JSON or mapping value into a ``str -> number`` dictionary.
+
+    Parameters
+    ----------
+    value : object
+        Value to parse. Can be a Mapping, JSON string, or other object.
+    default : Mapping[str, _MappingValue]
+        Default mapping to return if parsing fails or value is empty.
+    coerce : Callable[[object], _MappingValue]
+        Function to coerce individual values to the target type.
+
+    Returns
+    -------
+    dict[str, _MappingValue]
+        Dictionary mapping string keys to coerced values, or default if parsing fails.
+    """
+    if isinstance(value, Mapping):
+        parsed: dict[str, _MappingValue] = {}
+        for key, mapping_value in value.items():
+            try:
+                parsed[str(key)] = coerce(mapping_value)
+            except (TypeError, ValueError):
+                continue
+        return parsed or dict(default)
+    text = _as_optional_str(value)
+    if not text:
+        return dict(default)
+    try:
+        payload = json.loads(text)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return dict(default)
+    if isinstance(payload, Mapping):
+        parsed_payload: dict[str, _MappingValue] = {}
+        for key, mapping_value in payload.items():
+            try:
+                parsed_payload[str(key)] = coerce(mapping_value)
+            except (TypeError, ValueError):
+                continue
+        return parsed_payload or dict(default)
+    return dict(default)
+
+
+def _parse_float_mapping(value: object, *, default: Mapping[str, float]) -> dict[str, float]:
+    """Return mapping of floats using :func:`_parse_mapping`.
+
+    Parameters
+    ----------
+    value : object
+        Value to parse. Can be a Mapping, JSON string, or other object.
+    default : Mapping[str, float]
+        Default mapping to return if parsing fails or value is empty.
+
+    Returns
+    -------
+    dict[str, float]
+        Dictionary mapping string keys to float values, or default if parsing fails.
+    """
+    return _parse_mapping(value, default=default, coerce=lambda raw: float(raw))
+
+
+def _parse_int_mapping(value: object, *, default: Mapping[str, int]) -> dict[str, int]:
+    """Return mapping of ints using :func:`_parse_mapping`.
+
+    Parameters
+    ----------
+    value : object
+        Value to parse. Can be a Mapping, JSON string, or other object.
+    default : Mapping[str, int]
+        Default mapping to return if parsing fails or value is empty.
+
+    Returns
+    -------
+    dict[str, int]
+        Dictionary mapping string keys to int values, or default if parsing fails.
+    """
+    return _parse_mapping(value, default=default, coerce=lambda raw: int(raw))
 
 
 def _coerce_float(value: object, *, default: float) -> float:
@@ -522,6 +671,42 @@ def _logging_settings(get: LookupFn) -> LoggingSettings:
     level = _as_str(get("LOG_LEVEL", "INFO"))
     as_json = _to_bool(_as_optional_str(get("LOG_JSON", "false")), default=False)
     return LoggingSettings(level=level, json=as_json)
+
+
+def _eval_settings(paths: PathsConfig, get: LookupFn) -> EvalSettings:
+    """Build EvalSettings from lookup function with defaults.
+
+    Parameters
+    ----------
+    paths : PathsConfig
+        Filesystem paths configuration for resolving relative paths.
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    EvalSettings
+        Evaluation settings with enabled flag, queries path, output directory,
+        k values, max queries, oracle top-k, and XTR-as-oracle flag.
+    """
+    enabled = _to_bool(_as_optional_str(get("EVAL_ENABLED", "false")), default=False)
+    queries_raw = _as_optional_str(get("EVAL_QUERIES_PATH", None))
+    queries_path = _optional_repo_path(paths, queries_raw) if queries_raw else None
+    default_output = paths.repo_root / "artifacts" / "eval"
+    output_dir = _repo_path(paths, get("EVAL_OUTPUT_DIR", default_output), default=default_output)
+    k_values = _parse_int_list(get("EVAL_K_VALUES", ""), (5, 10, 20))
+    max_queries = _optional_int(get("EVAL_MAX_QUERIES", None))
+    oracle_top_k = _coerce_int(get("EVAL_ORACLE_TOP_K", "50"), default=50)
+    xtr_as_oracle = _to_bool(_as_optional_str(get("EVAL_XTR_AS_ORACLE", "false")), default=False)
+    return EvalSettings(
+        enabled=enabled,
+        queries_path=queries_path,
+        output_dir=output_dir,
+        k_values=k_values,
+        max_queries=max_queries,
+        oracle_top_k=oracle_top_k,
+        xtr_as_oracle=xtr_as_oracle,
+    )
 
 
 def _embeddings_settings(get: LookupFn) -> EmbeddingsSettings:
@@ -968,6 +1153,136 @@ def _xtr_settings(get: LookupFn) -> XTRSettings:
     )
 
 
+def _rrf_weights(get: LookupFn) -> dict[str, float]:
+    """Return configured RRF weights.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    dict[str, float]
+        Dictionary mapping channel names to RRF weight values.
+    """
+    return _parse_float_mapping(get("RRF_WEIGHTS_JSON", ""), default=_DEFAULT_RRF_WEIGHTS)
+
+
+def _hybrid_prefetch_config(get: LookupFn) -> dict[str, int]:
+    """Return hybrid prefetch limits.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    dict[str, int]
+        Dictionary mapping channel names to prefetch limit values.
+    """
+    return _parse_int_mapping(get("HYBRID_PREFETCH_JSON", ""), default=_DEFAULT_PREFETCH)
+
+
+def _hybrid_weight_overrides(get: LookupFn) -> dict[str, float]:
+    """Return hybrid weight overrides.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    dict[str, float]
+        Dictionary mapping channel names to weight override values.
+    """
+    return _parse_float_mapping(get("HYBRID_WEIGHTS_OVERRIDE_JSON", ""), default={})
+
+
+def _prf_settings(get: LookupFn) -> PRFSettings:
+    """Return pseudo relevance feedback settings.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    PRFSettings
+        Pseudo relevance feedback configuration settings.
+    """
+    return PRFSettings(
+        enable_auto=_to_bool(_as_optional_str(get("BM25_PRF_ENABLE_AUTO", None)), default=True),
+        fb_docs=_coerce_int(get("BM25_PRF_FB_DOCS", "10"), default=10),
+        fb_terms=_coerce_int(get("BM25_PRF_FB_TERMS", "10"), default=10),
+        orig_weight=_coerce_float(get("BM25_PRF_ORIG_WEIGHT", "0.5"), default=0.5),
+        short_query_max_terms=_coerce_int(get("BM25_PRF_SHORT_QUERY_MAX_TERMS", "3"), default=3),
+        symbol_like_regex=_as_optional_str(get("BM25_PRF_SYMBOL_REGEX", None)),
+        head_terms_csv=_as_optional_str(get("BM25_PRF_HEAD_TERMS_CSV", None)),
+    )
+
+
+def _index_settings(get: LookupFn) -> IndexSettings:
+    """Return IndexSettings populated from lookup.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    IndexSettings
+        Index configuration settings including vector dimension, recency settings,
+        and other index parameters.
+    """
+    recency_enabled = _to_bool(_as_optional_str(get("INDEX_RECENCY_ENABLED", None)), default=False)
+    recency_half_life = _coerce_float(get("INDEX_RECENCY_HALF_LIFE_DAYS", "30.0"), default=30.0)
+    recency_max_boost = _coerce_float(get("INDEX_RECENCY_MAX_BOOST", "0.15"), default=0.15)
+    recency_table = _as_str(get("INDEX_RECENCY_TABLE", "chunks"))
+    return IndexSettings(
+        vec_dim=_coerce_int(get("VEC_DIM", "3584"), default=3584),
+        chunk_budget=_coerce_int(get("CHUNK_BUDGET", "2200"), default=2200),
+        faiss_nlist=_coerce_int(get("FAISS_NLIST", "8192"), default=8192),
+        faiss_nprobe=_coerce_int(get("FAISS_NPROBE", "128"), default=128),
+        bm25_k1=_coerce_float(get("BM25_K1", "0.9"), default=0.9),
+        bm25_b=_coerce_float(get("BM25_B", "0.4"), default=0.4),
+        rrf_k=_coerce_int(get("RRF_K", "60"), default=60),
+        enable_bm25_channel=_to_bool(
+            _as_optional_str(get("HYBRID_ENABLE_BM25", None)), default=True
+        ),
+        enable_splade_channel=_to_bool(
+            _as_optional_str(get("HYBRID_ENABLE_SPLADE", None)),
+            default=True,
+        ),
+        hybrid_top_k_per_channel=_coerce_int(
+            get("HYBRID_TOP_K_PER_CHANNEL", "50"),
+            default=50,
+        ),
+        faiss_preload=_to_bool(_as_optional_str(get("FAISS_PRELOAD", None)), default=False),
+        duckdb_materialize=_to_bool(
+            _as_optional_str(get("DUCKDB_MATERIALIZE", None)), default=False
+        ),
+        preview_max_chars=_coerce_int(get("PREVIEW_MAX_CHARS", "240"), default=240),
+        compaction_threshold=_coerce_float(
+            get("FAISS_COMPACTION_THRESHOLD", "0.05"),
+            default=0.05,
+        ),
+        rrf_weights=_rrf_weights(get),
+        hybrid_prefetch=_hybrid_prefetch_config(get),
+        hybrid_use_rrf=_to_bool(_as_optional_str(get("HYBRID_USE_RRF", None)), default=True),
+        hybrid_weights_override=_hybrid_weight_overrides(get),
+        prf=_prf_settings(get),
+        recency_enabled=recency_enabled,
+        recency_half_life_days=recency_half_life,
+        recency_max_boost=recency_max_boost,
+        recency_table=recency_table,
+    )
+
+
 def _app_config_from_lookup(get: LookupFn) -> AppConfig:
     """Build complete AppConfig from lookup function.
 
@@ -994,10 +1309,12 @@ def _app_config_from_lookup(get: LookupFn) -> AppConfig:
         bm25=_bm25_settings(get, paths),
         splade=_splade_settings(get, paths),
         xtr=_xtr_settings(get),
+        index=_index_settings(get),
         embeddings=embeddings,
         vllm=vllm,
         search=_search_settings(get),
         logging=_logging_settings(get),
+        eval=_eval_settings(paths, get),
     )
 
 

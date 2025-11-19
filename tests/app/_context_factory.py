@@ -8,13 +8,14 @@ test fixtures based on environment configuration.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import MagicMock
 
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
+from codeintel_rev.config.shim import settings_from_app_config
 
 from tests._helpers.settings import build_app_config_from_paths
 
@@ -206,47 +207,43 @@ def build_application_context(
         Configured application context with mocked dependencies for testing.
     """
     paths = _prepare_paths(tmp_path)
-    warp_dir = paths.warp_index_dir
+    app_config = build_app_config_from_paths(paths)
+    data_dir = paths.data_dir
+    bm25_index_dir = paths.lucene_dir / "bm25"
+    bm25_corpus_dir = data_dir / "bm25_json"
+    splade_vectors_dir = data_dir / "splade_vectors"
+    splade_index_dir = paths.splade_dir / "impact"
+    splade_model_dir = paths.repo_root / "models" / "splade"
+    splade_onnx_dir = splade_model_dir / "onnx"
+    for directory in (
+        bm25_index_dir,
+        bm25_corpus_dir,
+        splade_vectors_dir,
+        splade_index_dir,
+        splade_model_dir,
+        splade_onnx_dir,
+    ):
+        directory.mkdir(parents=True, exist_ok=True)
+    bm25_cfg = replace(
+        app_config.bm25,
+        enabled=enable_bm25,
+        index_dir=bm25_index_dir,
+        corpus_json_dir=bm25_corpus_dir,
+    )
+    splade_cfg = replace(
+        app_config.splade,
+        enabled=enable_splade,
+        vectors_dir=splade_vectors_dir,
+        index_dir=splade_index_dir,
+        model_dir=splade_model_dir,
+        onnx_dir=splade_onnx_dir,
+    )
+    xtr_cfg = replace(app_config.xtr, enable=xtr_enabled)
+    app_config = replace(app_config, bm25=bm25_cfg, splade=splade_cfg, xtr=xtr_cfg)
+    typed_settings = cast("Settings", settings_from_app_config(app_config))
 
-    index_cfg = SimpleNamespace(
-        faiss_nlist=64,
-        faiss_preload=False,
-        enable_bm25_channel=enable_bm25,
-        enable_splade_channel=enable_splade,
-        vec_dim=2,
-        default_k=50,
-        default_nprobe=32,
-        hnsw_ef_search=64,
-        refine_k_factor=1.0,
-        duckdb_materialize=False,
-    )
-    xtr_cfg = SimpleNamespace(
-        enable=xtr_enabled,
-        mode="narrow",
-        max_query_tokens=32,
-        candidate_k=32,
-        dim=2,
-        dtype="float16",
-    )
-    settings = SimpleNamespace(
-        index=index_cfg,
-        xtr=xtr_cfg,
-        bm25=SimpleNamespace(index_dir=str(warp_dir / "bm25")),
-        splade=SimpleNamespace(
-            model_dir=str(warp_dir / "splade-model"),
-            onnx_dir=str(warp_dir / "splade-onnx"),
-            index_dir=str(warp_dir / "splade-index"),
-            onnx_file="splade.onnx",
-            provider="cpu",
-            quantization="int8",
-            max_terms=32,
-        ),
-        warp=SimpleNamespace(budget_ms=200, enabled=True, device="cpu", top_k=5),
-    )
-
-    typed_settings = cast("Settings", settings)
     return ApplicationContext(
-        app_config=build_app_config_from_paths(paths),
+        app_config=app_config,
         settings=typed_settings,
         paths=paths,
         vllm_client=MagicMock(),

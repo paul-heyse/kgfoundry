@@ -15,6 +15,7 @@ from codeintel_rev.config.api import (
     DuckDBSettings,
     EmbeddingsSettings,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
     PathsConfig,
     SearchSettings,
@@ -105,6 +106,7 @@ def _make_app_config(repo_root: Path, bm25_threads: int | None = None) -> AppCon
         vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
+        index=IndexSettings(),
     )
 
 

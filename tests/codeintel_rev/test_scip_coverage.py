@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import msgspec
 import numpy as np
-from codeintel_rev.config.settings import EvalConfig, PathsConfig, load_settings
 from codeintel_rev.evaluation.scip_coverage import SCIPCoverageEvaluator
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
@@ -50,6 +48,7 @@ def _create_stub_vllm_client() -> _StubVLLMClient:
 
 
 def _prepare_catalog(path: Path) -> DuckDBManager:
+    path.parent.mkdir(parents=True, exist_ok=True)
     manager = DuckDBManager(path)
     catalog = SymbolCatalog(manager)
     catalog.ensure_schema()
@@ -77,27 +76,15 @@ def _prepare_catalog(path: Path) -> DuckDBManager:
 
 def test_scip_coverage_reports_full_metrics(tmp_path: Path) -> None:
     """Test that SCIP coverage evaluator reports full coverage metrics."""
-    base_settings = load_settings()
-    paths = PathsConfig(
-        repo_root=str(tmp_path),
-        data_dir=str(tmp_path / "data"),
-        vectors_dir=str(tmp_path / "vectors"),
-        faiss_index=str(tmp_path / "index.faiss"),
-        duckdb_path=str(tmp_path / "catalog.duckdb"),
-        scip_index=str(tmp_path / "index.scip"),
-    )
-    settings = msgspec.structs.replace(
-        base_settings,
-        paths=paths,
-        eval=EvalConfig(enabled=True, output_dir=str(tmp_path / "artifacts")),
-    )
-    duckdb_manager = _prepare_catalog(Path(paths.duckdb_path))
+    repo_root = tmp_path / "repo"
+    duckdb_path = repo_root / "catalog.duckdb"
+    duckdb_manager = _prepare_catalog(duckdb_path)
     evaluator = SCIPCoverageEvaluator(
-        settings=settings,
-        repo_root=paths.repo_root,
+        repo_root=repo_root,
         duckdb_manager=duckdb_manager,
         faiss_manager=_create_stub_faiss_manager(),
         vllm_client=_create_stub_vllm_client(),
+        default_output_dir=repo_root / "artifacts",
     )
     summary = evaluator.run(k=5)
     assertions.expect_equal(summary["chunk_coverage"], 1.0)

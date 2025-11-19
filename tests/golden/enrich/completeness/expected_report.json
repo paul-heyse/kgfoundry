@@ -1,0 +1,33 @@
+{
+  "missing_modules": [
+    "pkg",
+    "pkg.b",
+    "pkg.sub.module"
+  ],
+  "extra_modules": [
+    "pkg.extra"
+  ],
+  "unresolved_local_imports": [
+    [
+      "pkg.a",
+      "pkg.missing",
+      "dangling_local_import"
+    ]
+  ],
+  "invalid_relative_imports": [
+    [
+      "pkg.a",
+      "outside",
+      "relative_import_out_of_bounds"
+    ]
+  ],
+  "missing_package_inits": [
+    "pkg/sub"
+  ],
+  "impacts": {
+    "pkg.a": [
+      "outside",
+      "pkg.missing"
+    ]
+  }
+}

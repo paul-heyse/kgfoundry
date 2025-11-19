@@ -29,7 +29,6 @@ from codeintel_rev.cli.bm25 import BM25CliContext
 from codeintel_rev.cli.enrich_pipeline import OverlayContext, ScanInputs, ScipContext
 from codeintel_rev.cli.splade import SpladeCliContext
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.settings import Settings
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
 from codeintel_rev.io.bm25_manager import BM25IndexManager
@@ -484,24 +483,21 @@ def fixture_xtr_cli_context_builder() -> Callable[..., XtrOpenContext]:
     Returns
     -------
     Callable[..., XtrOpenContext]
-        Factory accepting dependency overrides for settings, paths, and indexes.
+        Builder function that creates XtrOpenContext instances with optional
+        overrides for app_config_loader, paths_resolver, and index_factory.
     """
     base = XtrOpenContext.production()
 
     def build(
         *,
-        settings_factory: Callable[[], Settings] | None = None,
-        paths_resolver: Callable[[Settings], ResolvedPaths] | None = None,
-        index_factory: Callable[[Path, Settings], XTRIndex] | None = None,
         app_config_loader: Callable[[], AppConfig] | None = None,
-        path_merger: Callable[[ResolvedPaths, AppConfig], ResolvedPaths] | None = None,
+        paths_resolver: Callable[[AppConfig], ResolvedPaths] | None = None,
+        index_factory: Callable[[Path, AppConfig], XTRIndex] | None = None,
     ) -> XtrOpenContext:
         return XtrOpenContext(
-            settings_factory=settings_factory or base.settings_factory,
+            app_config_loader=app_config_loader or base.app_config_loader,
             paths_resolver=paths_resolver or base.paths_resolver,
             index_factory=index_factory or base.index_factory,
-            app_config_loader=app_config_loader or base.app_config_loader,
-            path_merger=path_merger or base.path_merger,
         )
 
     return build

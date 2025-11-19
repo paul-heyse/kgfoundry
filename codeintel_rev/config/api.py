@@ -126,6 +126,80 @@ class SearchSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PRFSettings:
+    """Pseudo-relevance feedback (RM3) configuration."""
+
+    enable_auto: bool = True
+    fb_docs: int = 10
+    fb_terms: int = 10
+    orig_weight: float = 0.5
+    short_query_max_terms: int = 3
+    symbol_like_regex: str | None = None
+    head_terms_csv: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IndexSettings:
+    """Index build/search knobs spanning FAISS, BM25, SPLADE, and hybrid fusion."""
+
+    vec_dim: int = 3584
+    chunk_budget: int = 2200
+    faiss_nlist: int = 8192
+    faiss_nprobe: int = 128
+    bm25_k1: float = 0.9
+    bm25_b: float = 0.4
+    rrf_k: int = 60
+    enable_bm25_channel: bool = True
+    enable_splade_channel: bool = True
+    hybrid_top_k_per_channel: int = 50
+    faiss_preload: bool = False
+    duckdb_materialize: bool = False
+    preview_max_chars: int = 240
+    compaction_threshold: float = 0.05
+    rrf_weights: Mapping[str, float] = field(
+        default_factory=lambda: {"semantic": 1.0, "bm25": 1.0, "splade": 1.0, "warp": 1.1}
+    )
+    hybrid_prefetch: Mapping[str, int] = field(
+        default_factory=lambda: {"semantic": 200, "bm25": 200, "splade": 200}
+    )
+    hybrid_use_rrf: bool = True
+    hybrid_weights_override: Mapping[str, float] = field(default_factory=dict)
+    prf: PRFSettings = field(default_factory=PRFSettings)
+    recency_enabled: bool = False
+    recency_half_life_days: float = 30.0
+    recency_max_boost: float = 0.15
+    recency_table: str = "chunks"
+    faiss_family: Literal[
+        "auto",
+        "flat",
+        "ivf_flat",
+        "ivf_pq",
+        "ivf_pq_refine",
+        "hnsw",
+    ] = "auto"
+    nlist: int | None = None
+    pq_m: int = 64
+    pq_nbits: int = 8
+    opq_m: int = 0
+    hnsw_m: int = 32
+    hnsw_ef_construction: int = 200
+    default_k: int = 50
+    default_nprobe: int | None = None
+    hnsw_ef_search: int = 128
+    refine_k_factor: float = 2.0
+    autotune_on_start: bool = False
+    enable_range_search: bool = False
+    semantic_min_score: float = 0.0
+
+    def __post_init__(self) -> None:
+        """Normalize optional FAISS knobs with legacy fallbacks."""
+        nlist_value = self.nlist or self.faiss_nlist
+        default_nprobe_value = self.default_nprobe or self.faiss_nprobe
+        object.__setattr__(self, "nlist", nlist_value)
+        object.__setattr__(self, "default_nprobe", default_nprobe_value)
+
+
+@dataclass(frozen=True, slots=True)
 class LoggingSettings:
     """Settings for log output.
 
@@ -141,6 +215,19 @@ class LoggingSettings:
 
     level: str = "INFO"
     json: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EvalSettings:
+    """Offline evaluation configuration."""
+
+    enabled: bool = False
+    queries_path: Path | None = None
+    output_dir: Path = Path("artifacts") / "eval"
+    k_values: tuple[int, ...] = (5, 10, 20)
+    max_queries: int | None = None
+    oracle_top_k: int = 50
+    xtr_as_oracle: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -543,6 +630,8 @@ class AppConfig:
         SPLADE sparse retrieval configuration and model settings.
     xtr : XTRSettings
         XTR token-level retrieval configuration and model settings.
+    index : IndexSettings
+        Combined FAISS/BM25/SPLADE/hybrid tuning knobs for indexing and search.
     embeddings : EmbeddingsSettings
         Embedding provider configuration shared across CLIs and services.
     vllm : VLLMSettings
@@ -552,6 +641,9 @@ class AppConfig:
         SearchSettings() with default values.
     logging : LoggingSettings, optional
         Logging output configuration. Defaults to LoggingSettings() with default
+        values.
+    eval : EvalSettings, optional
+        Evaluation settings configuration. Defaults to EvalSettings() with default
         values.
     extras : Mapping[str, object], optional
         Additional configuration key-value pairs for extensibility. Defaults to
@@ -565,10 +657,12 @@ class AppConfig:
     bm25: BM25Settings
     splade: SpladeSettings
     xtr: XTRSettings
+    index: IndexSettings
     embeddings: EmbeddingsSettings
     vllm: VLLMSettings
     search: SearchSettings = field(default_factory=SearchSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
+    eval: EvalSettings = field(default_factory=EvalSettings)
     extras: Mapping[str, object] = field(default_factory=dict)
 
 
@@ -665,3 +759,39 @@ def validate_config(cfg: AppConfig) -> None:
     _require("xtr.dim must be positive", condition=cfg.xtr.dim > 0)
     _require("xtr.max_query_tokens must be positive", condition=cfg.xtr.max_query_tokens > 0)
     _require("xtr.candidate_k must be positive", condition=cfg.xtr.candidate_k > 0)
+    _require("eval.oracle_top_k must be positive", condition=cfg.eval.oracle_top_k > 0)
+    if cfg.eval.max_queries is not None:
+        _require("eval.max_queries must be positive", condition=cfg.eval.max_queries > 0)
+    for value in cfg.eval.k_values:
+        _require("eval.k_values entries must be positive", condition=value > 0)
+    index_cfg = cfg.index
+    _require("index.vec_dim must be positive", condition=index_cfg.vec_dim > 0)
+    _require("index.chunk_budget must be positive", condition=index_cfg.chunk_budget > 0)
+    _require("index.faiss_nlist must be positive", condition=index_cfg.faiss_nlist > 0)
+    _require("index.faiss_nprobe must be positive", condition=index_cfg.faiss_nprobe > 0)
+    _require("index.nlist must be positive", condition=(index_cfg.nlist or 0) > 0)
+    _require(
+        "index.default_nprobe must be positive",
+        condition=(index_cfg.default_nprobe or 0) > 0,
+    )
+    _require("index.default_k must be positive", condition=index_cfg.default_k > 0)
+    _require("index.rrf_k must be positive", condition=index_cfg.rrf_k > 0)
+    _require(
+        "index.hybrid_top_k_per_channel must be positive",
+        condition=index_cfg.hybrid_top_k_per_channel > 0,
+    )
+    _require("index.preview_max_chars must be positive", condition=index_cfg.preview_max_chars > 0)
+    _require("index.pq_m must be positive", condition=index_cfg.pq_m > 0)
+    _require("index.pq_nbits must be positive", condition=index_cfg.pq_nbits > 0)
+    _require("index.hnsw_m must be positive", condition=index_cfg.hnsw_m > 0)
+    _require(
+        "index.hnsw_ef_construction must be positive",
+        condition=index_cfg.hnsw_ef_construction > 0,
+    )
+    _require("index.hnsw_ef_search must be positive", condition=index_cfg.hnsw_ef_search > 0)
+    _require("index.refine_k_factor must be positive", condition=index_cfg.refine_k_factor > 0)
+    _require(
+        "index.recency_half_life_days must be positive",
+        condition=(not index_cfg.recency_enabled or index_cfg.recency_half_life_days > 0),
+    )
+    _require("index.recency_max_boost must be non-negative", condition=index_cfg.recency_max_boost >= 0)

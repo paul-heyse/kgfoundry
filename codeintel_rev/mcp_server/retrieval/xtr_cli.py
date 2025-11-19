@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -12,8 +13,6 @@ from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config import load_app_config
 from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.settings import Settings
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.indexing.xtr_build import build_xtr_index
 from codeintel_rev.io.xtr_manager import XTRIndex
 
@@ -34,33 +33,24 @@ _ExplainOption = Annotated[bool | None, typer.Option(help="Include token-level a
 
 
 @lru_cache(maxsize=1)
-def _cached_app_config() -> AppConfig:
-    """Load and cache AppConfig for CLI invocations.
+def _app_inputs() -> tuple[AppConfig, Path]:
+    """Return cached AppConfig and resolved XTR directory path.
 
     Returns
     -------
-    AppConfig
-        Cached immutable configuration derived from env/file sources.
+    tuple[AppConfig, Path]
+        Cached configuration and canonical XTR artifact directory.
     """
-    return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
-
-
-def _cached_settings() -> Settings:
-    """Return cached legacy Settings derived from AppConfig.
-
-    Returns
-    -------
-    Settings
-        Legacy msgspec settings populated from AppConfig.
-    """
-    return settings_from_app_config(_cached_app_config())
+    cfg = load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+    paths = resolve_application_paths(cfg)
+    return cfg, paths.xtr_dir
 
 
 @app.command("build")
 def build() -> None:
     """Build token-level XTR artifacts from the DuckDB catalog."""
-    settings = _cached_settings()
-    summary = build_xtr_index(settings)
+    app_config, _ = _app_inputs()
+    summary = build_xtr_index(app_config=app_config)
     typer.echo(
         "XTR build complete "
         f"(chunks={summary.chunk_count}, tokens={summary.token_count}, dtype={summary.dtype})."
@@ -78,14 +68,14 @@ def verify() -> None:
     typer.Exit
         If artifacts are missing or unreadable.
     """
-    settings = _cached_settings()
-    paths = resolve_application_paths(settings)
+    app_config, xtr_dir = _app_inputs()
+    paths = resolve_application_paths(app_config)
     fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
-    index = XTRIndex(paths.xtr_dir, settings.xtr)
+    index = XTRIndex(xtr_dir, app_config.xtr)
     index.open()
     if not index.ready:
         typer.echo(
-            f"XTR artifacts missing or unreadable at {paths.xtr_dir}.",
+        f"XTR artifacts missing or unreadable at {paths.xtr_dir}.",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -151,10 +141,10 @@ def search(
     The function performs file I/O to load the XTR index and CPU-bound tensor
     computation for encoding and scoring. Not thread-safe due to index loading.
     """
-    settings = _cached_settings()
-    paths = resolve_application_paths(settings)
+    app_config, xtr_dir = _app_inputs()
+    paths = resolve_application_paths(app_config)
     fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
-    index = XTRIndex(paths.xtr_dir, settings.xtr)
+    index = XTRIndex(xtr_dir, app_config.xtr)
     index.open()
     if not index.ready:
         typer.echo("XTR artifacts not ready; run `xtr build` first.", err=True)

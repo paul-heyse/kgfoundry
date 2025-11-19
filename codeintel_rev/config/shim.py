@@ -12,6 +12,9 @@ from codeintel_rev.config.settings import (
     EmbeddingsConfig as LegacyEmbeddingsConfig,
 )
 from codeintel_rev.config.settings import (
+    PRFConfig as LegacyPRFConfig,
+)
+from codeintel_rev.config.settings import (
     Settings,
     load_settings,
 )
@@ -241,12 +244,55 @@ def settings_from_app_config(app_config: AppConfig, *, base: Settings | None = N
     embeddings_cfg = _convert_embeddings_config(app_config)
     vllm_cfg = _convert_vllm_config(app_config)
     xtr_cfg = _convert_xtr_config(app_config)
+    index_cfg = app_config.index
+    prf_cfg = LegacyPRFConfig(
+        enable_auto=index_cfg.prf.enable_auto,
+        fb_docs=index_cfg.prf.fb_docs,
+        fb_terms=index_cfg.prf.fb_terms,
+        orig_weight=index_cfg.prf.orig_weight,
+        short_query_max_terms=index_cfg.prf.short_query_max_terms,
+        symbol_like_regex=index_cfg.prf.symbol_like_regex,
+        head_terms_csv=index_cfg.prf.head_terms_csv,
+    )
     patched_index = structs.replace(
         base_settings.index,
-        enable_bm25_channel=app_config.bm25.enabled,
-        bm25_k1=app_config.bm25.k1,
-        bm25_b=app_config.bm25.b,
-        enable_splade_channel=app_config.splade.enabled,
+        vec_dim=index_cfg.vec_dim,
+        chunk_budget=index_cfg.chunk_budget,
+        faiss_nlist=index_cfg.faiss_nlist,
+        faiss_nprobe=index_cfg.faiss_nprobe,
+        bm25_k1=index_cfg.bm25_k1,
+        bm25_b=index_cfg.bm25_b,
+        rrf_k=index_cfg.rrf_k,
+        enable_bm25_channel=index_cfg.enable_bm25_channel,
+        enable_splade_channel=index_cfg.enable_splade_channel,
+        hybrid_top_k_per_channel=index_cfg.hybrid_top_k_per_channel,
+        faiss_preload=index_cfg.faiss_preload,
+        duckdb_materialize=index_cfg.duckdb_materialize,
+        preview_max_chars=index_cfg.preview_max_chars,
+        compaction_threshold=index_cfg.compaction_threshold,
+        rrf_weights=dict(index_cfg.rrf_weights),
+        hybrid_prefetch=dict(index_cfg.hybrid_prefetch),
+        hybrid_use_rrf=index_cfg.hybrid_use_rrf,
+        hybrid_weights_override=dict(index_cfg.hybrid_weights_override),
+        prf=prf_cfg,
+        recency_enabled=index_cfg.recency_enabled,
+        recency_half_life_days=index_cfg.recency_half_life_days,
+        recency_max_boost=index_cfg.recency_max_boost,
+        recency_table=index_cfg.recency_table,
+        faiss_family=index_cfg.faiss_family,
+        nlist=index_cfg.nlist,
+        pq_m=index_cfg.pq_m,
+        pq_nbits=index_cfg.pq_nbits,
+        opq_m=index_cfg.opq_m,
+        hnsw_m=index_cfg.hnsw_m,
+        hnsw_ef_construction=index_cfg.hnsw_ef_construction,
+        default_k=index_cfg.default_k,
+        default_nprobe=index_cfg.default_nprobe,
+        hnsw_ef_search=index_cfg.hnsw_ef_search,
+        refine_k_factor=index_cfg.refine_k_factor,
+        autotune_on_start=index_cfg.autotune_on_start,
+        enable_range_search=index_cfg.enable_range_search,
+        semantic_min_score=index_cfg.semantic_min_score,
     )
     return structs.replace(
         base_settings,

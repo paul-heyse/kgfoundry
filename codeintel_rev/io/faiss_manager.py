@@ -768,6 +768,11 @@ class FAISSManager:
     def estimate_memory_usage(self, n_vectors: int) -> dict[str, int]:
         """Estimate memory usage in bytes for a given number of vectors.
 
+        Parameters
+        ----------
+        n_vectors : int
+            Number of vectors to estimate memory for. Must be positive.
+
         Returns
         -------
         dict[str, int]
@@ -1093,6 +1098,17 @@ class FAISSManager:
         k: int,
     ) -> dict[str, object]:
         """Compose the persisted profile metadata for an autotune candidate.
+
+        Parameters
+        ----------
+        param_str : str
+            Parameter string evaluated during autotune sweep.
+        recall : float
+            Recall@k metric achieved with this parameter configuration.
+        latency_ms : float
+            Average search latency in milliseconds for this configuration.
+        k : int
+            Number of nearest neighbors evaluated. Must be positive.
 
         Returns
         -------

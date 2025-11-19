@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,7 +12,9 @@ from typing import TYPE_CHECKING, Any, cast
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app import readiness as fs_readiness
 from codeintel_rev.app.config_context import resolve_application_paths
-from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.config import load_app_config
+from codeintel_rev.config.api import AppConfig
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.typing import NDArrayAny
@@ -229,7 +232,26 @@ def _write_token_matrix(
     return token_path
 
 
-def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
+def _resolve_inputs(app_config: AppConfig | None) -> tuple[AppConfig, ResolvedPaths]:
+    """Return application config and resolved paths, loading from disk if needed.
+
+    Parameters
+    ----------
+    app_config : AppConfig | None, optional
+        Optional application configuration. If None, loads from disk using
+        CODEINTEL_CONFIG_FILE environment variable. Defaults to None.
+
+    Returns
+    -------
+    tuple[AppConfig, ResolvedPaths]
+        Tuple containing the effective application configuration and resolved
+        filesystem paths.
+    """
+    effective_config = app_config or load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+    return effective_config, resolve_application_paths(effective_config)
+
+
+def build_xtr_index(*, app_config: AppConfig | None = None) -> XTRBuildSummary:
     """Build XTR token artifacts from DuckDB chunks.
 
     Extended Summary
@@ -243,9 +265,9 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
 
     Parameters
     ----------
-    settings : Settings | None, optional
-        Application settings containing XTR configuration, paths, and model settings.
-        If None, settings are loaded from the default location. Defaults to None.
+    app_config : AppConfig | None, optional
+        Immutable application configuration. When not provided, configuration is
+        loaded from environment variables via :func:`load_app_config`.
 
     Returns
     -------
@@ -267,22 +289,21 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
     and file I/O. Not thread-safe due to catalog and file system operations.
     The function creates the XTR directory if it doesn't exist.
     """
-    settings = settings or load_settings()
-    paths = resolve_application_paths(settings)
+    config, paths = _resolve_inputs(app_config)
     fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     catalog = DuckDBCatalog(
         db_path=paths.duckdb_path,
         vectors_dir=paths.vectors_dir,
-        materialize=settings.index.duckdb_materialize,
+        materialize=config.index.duckdb_materialize,
         repo_root=paths.repo_root,
     )
     catalog.open()
 
     xtr_dir = paths.xtr_dir
     xtr_dir.mkdir(parents=True, exist_ok=True)
-    dtype = np.dtype(np.float32 if settings.xtr.dtype == "float32" else np.float16)
+    dtype = np.dtype(np.float32 if config.xtr.dtype == "float32" else np.float16)
     buffers, chunk_ids, offsets, lengths, total_tokens = _gather_chunk_vectors(
-        index=XTRIndex(root=xtr_dir, config=settings.xtr),
+        index=XTRIndex(root=xtr_dir, config=config.xtr),
         catalog=catalog,
         dtype=dtype,
     )
@@ -294,14 +315,14 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
     token_path = _write_token_matrix(
         buffers=buffers,
         dtype=dtype,
-        dim=settings.xtr.dim,
+        dim=config.xtr.dim,
         root=xtr_dir,
         total_tokens=total_tokens,
     )
 
     dtype_label = "float32" if dtype is np.float32 else "float16"
     meta = {
-        "dim": settings.xtr.dim,
+        "dim": config.xtr.dim,
         "dtype": dtype_label,
         "total_tokens": int(total_tokens),
         "doc_count": len(chunk_ids),
@@ -316,7 +337,7 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
     return XTRBuildSummary(
         chunk_count=len(chunk_ids),
         token_count=total_tokens,
-        dim=settings.xtr.dim,
+        dim=config.xtr.dim,
         dtype=dtype_label,
         token_path=str(token_path),
         meta_path=str(meta_path),

@@ -460,6 +460,11 @@ def ensure_package_overlays(  # noqa: PLR0913
 def _load_overlay_file(path: Path) -> dict[str, dict[str, Any]]:
     """Load overlay metadata from either JSON or JSONL.
 
+    Parameters
+    ----------
+    path : Path
+        Path to the overlay file (JSON or JSONL format).
+
     Returns
     -------
     dict[str, dict[str, Any]]
@@ -496,6 +501,15 @@ def apply_overlays(
     overlay_files: Iterable[Path],
 ) -> list[SimpleModuleRecord]:
     """Merge overlay metadata into scanned records.
+
+    Parameters
+    ----------
+    ctx : PipelineContext
+        Pipeline context for logging and configuration.
+    records : list[SimpleModuleRecord]
+        Module records to merge overlay metadata into.
+    overlay_files : Iterable[Path]
+        Paths to overlay files (JSON or JSONL format).
 
     Returns
     -------

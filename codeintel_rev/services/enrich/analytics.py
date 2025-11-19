@@ -8,10 +8,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from codeintel_rev.enrich.graph_builder import (
-    ImportGraph,
-    build_import_graph,
-)
+from codeintel_rev.enrich.graph_builder import ImportGraph, build_import_graph
+from codeintel_rev.enrich.meta_compat import export_names_from_meta
 from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.pipeline_helpers import apply_tagging as _apply_tagging
 from codeintel_rev.enrich.scip_reader import SCIPIndex
@@ -431,12 +429,10 @@ def should_mark_overlay(row: Mapping[str, Any]) -> bool:
         returns_ratio = float(ratio.get("returns", 1.0))
     untyped_defs = int(row.get("untyped_defs") or 0)
     fan_in = int(row.get("fan_in") or 0)
-    exports = row.get("exports") or row.get("exports_declared") or []
+    exports = export_names_from_meta(row)
     reexports = row.get("reexports") or {}
     tags = row.get("tags") or []
-    is_public = (
-        bool(exports) or bool(reexports) or (isinstance(tags, list) and "public-api" in tags)
-    )
+    is_public = bool(exports) or bool(reexports) or (isinstance(tags, list) and "public-api" in tags)
     needs_annotations = (
         (params_ratio < OVERLAY_PARAM_THRESHOLD)
         or (returns_ratio < OVERLAY_PARAM_THRESHOLD)

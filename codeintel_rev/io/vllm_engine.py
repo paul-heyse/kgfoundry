@@ -232,10 +232,13 @@ class InprocessVLLMEmbedder:
 
     Attributes
     ----------
-    config : VLLMConfig
+    config : VLLMSettings
         Fully populated vLLM configuration. The ``run.mode`` field must be
         ``"inprocess"`` to avoid HTTP calls. Contains model path, pooling type,
         normalization settings, and memory configuration for the embedding server.
+    context : InprocessVLLMContext | None, optional
+        Optional runtime context for the in-process vLLM engine. None means
+        context will be initialized on first use. Defaults to None.
 
     Examples
     --------

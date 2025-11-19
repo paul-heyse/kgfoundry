@@ -65,13 +65,14 @@ from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.api import (
     AppConfig,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
     SearchSettings,
     SpladeSettings,
 )
 from codeintel_rev.config.loader import load_app_config
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
+from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.indexing.index_lifecycle import IndexLifecycleManager
@@ -368,32 +369,25 @@ def _infer_index_root(paths: ResolvedPaths) -> Path:
     return faiss_parent
 
 
-def _build_factory_adjuster(settings: Settings) -> FactoryAdjuster:
-    """Return a DefaultFactoryAdjuster derived from settings.
+def _build_factory_adjuster(index_cfg: IndexSettings) -> FactoryAdjuster:
+    """Return a DefaultFactoryAdjuster derived from index settings.
 
     Parameters
     ----------
-    settings : Settings
-        Application settings containing index configuration defaults.
+    index_cfg : IndexSettings
+        Immutable index configuration sourced from :class:`AppConfig`.
 
     Returns
     -------
     FactoryAdjuster
-        Adjuster informed by ``settings.index`` defaults. If settings are invalid
-        or missing required attributes, returns `NoopFactoryAdjuster()` as fallback.
-
-    Notes
-    -----
-    This helper extracts FAISS and hybrid search tuning parameters from settings
-    and constructs a factory adjuster that applies these defaults when creating
-    runtime cells. Defensively handles missing or malformed settings by falling
-    back to a no-op adjuster.
+        Adjuster informed by AppConfig defaults. If configuration is invalid,
+        returns :class:`NoopFactoryAdjuster`.
     """
     try:
-        rrf_weights = getattr(settings.index, "rrf_weights", {})
+        rrf_weights = dict(index_cfg.rrf_weights)
         return DefaultFactoryAdjuster(
-            faiss_nprobe=getattr(settings.index, "faiss_nprobe", None),
-            hybrid_rrf_k=getattr(settings.index, "rrf_k", None),
+            faiss_nprobe=index_cfg.faiss_nprobe,
+            hybrid_rrf_k=index_cfg.rrf_k,
             hybrid_bm25_weight=rrf_weights.get("bm25"),
             hybrid_splade_weight=rrf_weights.get("splade"),
         )
@@ -431,7 +425,7 @@ def _build_faiss_manager(
     Raises
     ------
     ConfigurationError
-        If IndexConfig.nlist is None during context creation.
+        If IndexSettings.nlist is None during context creation.
     """
     if factory is not None:
         try:
@@ -439,46 +433,35 @@ def _build_faiss_manager(
         except TypeError:
             return factory(settings, paths)
     faiss_manager_cls = _import_faiss_manager_cls()
-    runtime_opts = _faiss_runtime_options_from_config(settings.index, app_config.faiss)
-    nlist_value = settings.index.nlist
+    index_cfg = app_config.index
+    runtime_opts = _faiss_runtime_options_from_config(index_cfg, app_config.faiss)
+    nlist_value = index_cfg.nlist
     if nlist_value is None:
-        msg = "IndexConfig.nlist cannot be None during context creation"
+        msg = "IndexSettings.nlist cannot be None during context creation"
         raise ConfigurationError(msg)
     return faiss_manager_cls(
         index_path=app_config.faiss.index_path,
-        vec_dim=settings.index.vec_dim,
+        vec_dim=index_cfg.vec_dim,
         nlist=nlist_value,
         runtime=runtime_opts,
     )
 
 
-def _default_duckdb_catalog_factory(
+def _build_duckdb_catalog_from_app_config(
     paths: ResolvedPaths,
-    settings: Settings,
+    app_config: AppConfig,
     manager: DuckDBManager,
+    *,
+    log_queries: bool,
 ) -> DuckDBCatalog:
-    """Create a DuckDB catalog instance with default configuration.
+    """Return a DuckDB catalog configured from AppConfig data."""
 
-    Parameters
-    ----------
-    paths : ResolvedPaths
-        Resolved application paths containing DuckDB and vectors directory paths.
-    settings : Settings
-        Application settings containing DuckDB and index configuration.
-    manager : DuckDBManager
-        DuckDB manager instance for catalog lifecycle management.
-
-    Returns
-    -------
-    DuckDBCatalog
-        Configured catalog instance with ID map path set from resolved paths.
-    """
     catalog = DuckDBCatalog(
         paths.duckdb_path,
         paths.vectors_dir,
-        materialize=settings.index.duckdb_materialize,
+        materialize=app_config.index.duckdb_materialize,
         manager=manager,
-        log_queries=settings.duckdb.log_queries,
+        log_queries=log_queries,
         repo_root=paths.repo_root,
     )
     catalog.set_idmap_path(paths.faiss_idmap_path)
@@ -605,7 +588,7 @@ def _import_faiss_runtime_opts_cls() -> type:
     return module.FAISSRuntimeOptions
 
 
-def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOptions:
+def _faiss_runtime_options_from_index(index_cfg: IndexSettings) -> FAISSRuntimeOptions:
     """Materialize FAISS runtime options from the structured index config.
 
     Parameters
@@ -622,10 +605,10 @@ def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOpt
 
     Notes
     -----
-    This helper converts structured `IndexConfig` (from settings or index manifest)
-    into FAISS-specific runtime options for the CPU-only runtime. It dynamically
-    imports the FAISS runtime options class and instantiates it with values from the
-    config.
+    This helper converts structured ``IndexSettings`` (from AppConfig or index
+    manifest) into FAISS-specific runtime options for the CPU-only runtime. It
+    dynamically imports the FAISS runtime options class and instantiates it with
+    values from the config.
     """
     runtime_cls = _import_faiss_runtime_opts_cls()
     return runtime_cls(
@@ -646,15 +629,15 @@ def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOpt
 
 
 def _faiss_runtime_options_from_config(
-    index_cfg: IndexConfig,
+    index_cfg: IndexSettings,
     faiss_cfg: FAISSSettings,
 ) -> FAISSRuntimeOptions:
     """Return runtime options merged from Settings and AppConfig.
 
     Parameters
     ----------
-    index_cfg : IndexConfig
-        Index configuration from Settings.
+    index_cfg : IndexSettings
+        Index configuration from AppConfig.
     faiss_cfg : FAISSSettings
         FAISS-specific settings from AppConfig.
 
@@ -1106,9 +1089,9 @@ class ApplicationContext:
     duckdb_manager: DuckDBManager
     git_client: GitClient
     async_git_client: AsyncGitClient
-    duckdb_catalog_factory: Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] = (
-        field(default=_default_duckdb_catalog_factory, repr=False)
-    )
+    duckdb_catalog_factory: Callable[
+        [ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog
+    ] | None = field(default=None, repr=False)
     runtime_observer: RuntimeCellObserver = field(
         default_factory=NullRuntimeCellObserver, repr=False
     )
@@ -1126,6 +1109,22 @@ class ApplicationContext:
         self._runtime.attach_adjuster(self.factory_adjuster)
         index_root = _infer_index_root(self.paths)
         _assign_frozen(self, "index_manager", IndexLifecycleManager(index_root))
+        if self.duckdb_catalog_factory is None:
+            log_queries = getattr(self.settings.duckdb, "log_queries", False)
+
+            def _factory(
+                resolved: ResolvedPaths,
+                _legacy_settings: Settings,
+                manager: DuckDBManager,
+            ) -> DuckDBCatalog:
+                return _build_duckdb_catalog_from_app_config(
+                    resolved,
+                    self.app_config,
+                    manager,
+                    log_queries=log_queries,
+                )
+
+            _assign_frozen(self, "duckdb_catalog_factory", _factory)
 
     @classmethod
     def create(
@@ -1210,10 +1209,13 @@ class ApplicationContext:
         load_settings : Loads Settings from environment variables
         resolve_application_paths : Validates and resolves paths
         """
-        settings = settings or load_settings()
         effective_overrides = overrides or ApplicationContextOverrides()
         app_config = app_config or load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
-        paths = merge_paths_with_app_config(resolve_application_paths(settings), app_config)
+        if settings is None:
+            settings = load_settings()
+            paths = resolve_application_paths(app_config)
+        else:
+            paths = merge_paths_with_app_config(resolve_application_paths(settings), app_config)
         try:
             _ensure_filesystem_readiness(paths)
         except fs_readiness.ReadinessError as exc:
@@ -1233,14 +1235,29 @@ class ApplicationContext:
         duckdb_manager = effective_overrides.duckdb_manager or DuckDBManager(
             app_config.duckdb.database, _duckdb_config_from_app(app_config)
         )
-        duckdb_catalog_factory = (
-            effective_overrides.duckdb_catalog_factory or _default_duckdb_catalog_factory
-        )
+        if effective_overrides.duckdb_catalog_factory is not None:
+            duckdb_catalog_factory = effective_overrides.duckdb_catalog_factory
+        else:
+            log_queries = settings.duckdb.log_queries
+
+            def _factory(
+                resolved: ResolvedPaths,
+                legacy_settings: Settings,
+                manager: DuckDBManager,
+            ) -> DuckDBCatalog:
+                return _build_duckdb_catalog_from_app_config(
+                    resolved,
+                    app_config,
+                    manager,
+                    log_queries=log_queries,
+                )
+
+            duckdb_catalog_factory = _factory
         git_client, async_git_client = _select_git_clients(paths, effective_overrides)
 
         observer = effective_overrides.runtime_observer or NullRuntimeCellObserver()
 
-        adjuster = effective_overrides.factory_adjuster or _build_factory_adjuster(settings)
+        adjuster = effective_overrides.factory_adjuster or _build_factory_adjuster(app_config.index)
         return cls(
             app_config=app_config,
             settings=settings,
@@ -1284,7 +1301,7 @@ class ApplicationContext:
 
     def _autotune_if_requested(self) -> None:
         """Run a quick ParameterSpace sweep when enabled and no profile exists."""
-        if not self.settings.index.autotune_on_start:
+        if not self.app_config.index.autotune_on_start:
             return
         legacy_path = getattr(self.faiss_manager, "_legacy_autotune_profile_path", None)
         if self.faiss_manager.autotune_profile_path.exists() or (
@@ -1304,7 +1321,7 @@ class ApplicationContext:
             self.faiss_manager.autotune(
                 queries,
                 vectors,
-                k=min(self.settings.index.default_k, queries.shape[0]),
+            k=min(self.app_config.index.default_k, queries.shape[0]),
             )
         except (RuntimeError, ValueError):  # pragma: no cover - defensive logging
             return
@@ -1424,17 +1441,18 @@ class ApplicationContext:
         RuntimeError
             If offline evaluation has been disabled via configuration.
         """
-        if not self.settings.eval.enabled:
+        eval_settings = self.app_config.eval
+        if not eval_settings.enabled:
             msg = "Offline evaluation is disabled in configuration"
             raise RuntimeError(msg)
         evaluator = self._offline_evaluator
         if evaluator is not None:
             return evaluator
 
-        faiss_manager = self.get_coderank_faiss_manager(self.settings.index.vec_dim)
+        faiss_manager = self.get_coderank_faiss_manager(self.app_config.index.vec_dim)
         evaluator = OfflineRecallEvaluator(
-            settings=self.settings,
-            paths=self.paths,
+            eval_settings=eval_settings,
+            repo_root=self.paths.repo_root,
             faiss_manager=faiss_manager,
             vllm_client=self.vllm_client,
             duckdb_manager=self.duckdb_manager,
@@ -1592,10 +1610,11 @@ class ApplicationContext:
         _ensure_path_exists(index_path, runtime=runtime, description="CodeRank FAISS index")
         _require_dependency("faiss", runtime=runtime, purpose="CodeRank FAISS manager")
         manager_cls = _import_faiss_manager_cls()
-        runtime_opts = _faiss_runtime_options_from_index(self.settings.index)
-        nlist_value = self.settings.index.nlist
+        index_cfg = self.app_config.index
+        runtime_opts = _faiss_runtime_options_from_index(index_cfg)
+        nlist_value = index_cfg.nlist
         if nlist_value is None:
-            msg = "IndexConfig.nlist cannot be None when building CodeRank FAISS manager"
+            msg = "IndexSettings.nlist cannot be None when building CodeRank FAISS manager"
             raise ConfigurationError(msg)
         nlist = nlist_value
         manager = manager_cls(
@@ -1667,9 +1686,9 @@ class ApplicationContext:
         BM25Engine
             Configured BM25 engine instance or disabled stub.
         """
-        settings = self.settings
         bm25_cfg = self.app_config.bm25
-        if not (bm25_cfg.enabled and settings.index.enable_bm25_channel):
+        index_cfg = self.app_config.index
+        if not (bm25_cfg.enabled and index_cfg.enable_bm25_channel):
             return BM25Engine(_DisabledBM25Backend())
         rm3_params = RM3Params(
             fb_docs=bm25_cfg.rm3_fb_docs,
@@ -1677,7 +1696,7 @@ class ApplicationContext:
             orig_weight=bm25_cfg.rm3_original_query_weight,
         )
         heuristics: RM3Heuristics | None = None
-        prf_cfg = settings.index.prf
+        prf_cfg = index_cfg.prf
         if prf_cfg.enable_auto:
             heuristics = RM3Heuristics(
                 short_query_max_terms=prf_cfg.short_query_max_terms,
@@ -1715,9 +1734,9 @@ class ApplicationContext:
         SPLADEEngine
             Configured SPLADE engine instance or disabled stub.
         """
-        settings = self.settings
         splade_cfg = self.app_config.splade
-        if not (splade_cfg.enabled and settings.index.enable_splade_channel):
+        index_cfg = self.app_config.index
+        if not (splade_cfg.enabled and index_cfg.enable_splade_channel):
             return SPLADEEngine(_DisabledSpladeBackend())
         backend_config = SpladeImpactBackendConfig(
             model_dir=self._resolve_repo_path(splade_cfg.model_dir),

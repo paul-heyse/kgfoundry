@@ -20,6 +20,7 @@ import numpy as np
 import typer
 
 from codeintel_rev.config import AppConfig, load_app_config
+from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.embeddings import EmbeddingProvider, get_embedding_provider
@@ -83,7 +84,7 @@ def _cached_app_config() -> AppConfig:
 
 
 def _default_faiss_manager_factory(
-    settings: Settings,
+    _settings: Settings,
     index_override: Path | None,
 ) -> FAISSManager:
     """Create and load a FAISS manager instance from settings.
@@ -95,9 +96,10 @@ def _default_faiss_manager_factory(
 
     Parameters
     ----------
-    settings : Settings
+    _settings : Settings
         Application settings containing FAISS vector dimension and nlist
         configuration. Index path defaults are sourced from :class:`AppConfig`.
+        This parameter is unused but kept for API compatibility.
     index_override : Path | None
         Optional path override for the FAISS index file. If provided, this
         path is used instead of the settings path. The path is expanded and
@@ -117,12 +119,13 @@ def _default_faiss_manager_factory(
     is loaded immediately to ensure it's available for operations.
     """
     app_config = _cached_app_config()
+    index_cfg = app_config.index
     default_index = app_config.faiss.index_path
     index_path = (index_override or default_index).expanduser().resolve()
-    nlist = int(settings.index.nlist or settings.index.faiss_nlist)
+    nlist = int(index_cfg.nlist or index_cfg.faiss_nlist)
     manager = FAISSManager(
         index_path=index_path,
-        vec_dim=settings.index.vec_dim,
+        vec_dim=index_cfg.vec_dim,
         nlist=nlist,
     )
     manager.load_cpu_index()
@@ -165,14 +168,15 @@ def _default_duckdb_catalog_factory(
     The function handles path resolution and catalog configuration, providing a
     ready-to-use catalog instance with proper ID map and materialization settings.
     """
-    default_db = _cached_app_config().duckdb.database
+    app_config = _cached_app_config()
+    default_db = app_config.duckdb.database
     db_path = (path_override or default_db).expanduser().resolve()
     vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
     catalog = DuckDBCatalog(
         db_path=db_path,
         vectors_dir=vectors_dir,
         repo_root=Path(settings.paths.repo_root).expanduser().resolve(),
-        materialize=settings.index.duckdb_materialize,
+        materialize=app_config.index.duckdb_materialize,
     )
     catalog.set_idmap_path(Path(settings.paths.faiss_idmap_path).expanduser().resolve())
     return catalog
@@ -261,14 +265,15 @@ def _default_count_idmap_rows(path: Path) -> int:
     return metadata.num_rows if metadata is not None else 0
 
 
-def _default_embedding_provider_factory(settings: Settings) -> EmbeddingProvider:
+def _default_embedding_provider_factory(_settings: Settings) -> EmbeddingProvider:
     """Create an embedding provider instance from the active configuration.
 
     Parameters
     ----------
-    settings : Settings
+    _settings : Settings
         Legacy settings struct that supplies index configuration (vector
         dimensionality). Embedding/vLLM parameters are sourced from AppConfig.
+        This parameter is unused but kept for API compatibility.
 
     Returns
     -------
@@ -276,9 +281,10 @@ def _default_embedding_provider_factory(settings: Settings) -> EmbeddingProvider
         Configured embedding provider instance ready for generating embeddings.
     """
     app_config = _cached_app_config()
+    index_cfg = app_config.index
     return get_embedding_provider(
         embeddings=app_config.embeddings,
-        vec_dim=settings.index.vec_dim,
+        vec_dim=index_cfg.vec_dim,
         vllm=app_config.vllm,
     )
 
@@ -1570,7 +1576,7 @@ def _execute_embeddings_build(
             embeddings,
             options=ParquetWriteOptions(
                 vec_dim=provider.metadata.dimension,
-                preview_max_chars=settings.index.preview_max_chars,
+                preview_max_chars=_cached_app_config().index.preview_max_chars,
                 id_strategy="stable_hash",
                 table_meta=_parquet_meta(provider),
             ),
@@ -2022,7 +2028,7 @@ def _embedding_provider(settings: Settings) -> EmbeddingProvider:
     return _cli_context().embedding_provider_factory(settings)
 
 
-def _load_xtr_index(settings: Settings) -> XTRIndex | None:
+def _load_xtr_index(app_config: AppConfig) -> XTRIndex | None:
     """Load XTR index if enabled and available.
 
     This function attempts to load an XTR index from settings if XTR is enabled.
@@ -2031,10 +2037,9 @@ def _load_xtr_index(settings: Settings) -> XTRIndex | None:
 
     Parameters
     ----------
-    settings : Settings
-        Application settings containing XTR configuration (enable flag, root
-        directory, config). Used to determine if XTR is enabled and locate the
-        index directory.
+    app_config : AppConfig
+        Application configuration containing XTR enablement flag, artifact
+        directories, and runtime configuration.
 
     Returns
     -------
@@ -2050,10 +2055,11 @@ def _load_xtr_index(settings: Settings) -> XTRIndex | None:
     returning None, ensuring commands can run even when XTR indexes are missing
     or unavailable. This supports both XTR-enabled and XTR-disabled workflows.
     """
-    if not settings.xtr.enable:
+    if not app_config.xtr.enable:
         return None
-    root = Path(settings.paths.xtr_dir).expanduser().resolve()
-    index = XTRIndex(root=root, config=settings.xtr)
+    paths = resolve_application_paths(app_config)
+    root = paths.xtr_dir
+    index = XTRIndex(root=root, config=app_config.xtr)
     try:
         index.open()
     except (OSError, RuntimeError, ValueError):  # pragma: no cover - defensive logging
@@ -2063,18 +2069,12 @@ def _load_xtr_index(settings: Settings) -> XTRIndex | None:
     return index
 
 
-def _eval_paths(settings: Settings) -> tuple[Path, Path]:
+def _eval_paths(base_dir: Path) -> tuple[Path, Path]:
     """Generate evaluation output paths with timestamp and run ID.
 
     This function creates evaluation output paths by combining base directory,
     timestamp, and random run ID. The function creates the output directory
     if it doesn't exist and returns paths for Parquet and JSON output files.
-
-    Parameters
-    ----------
-    settings : Settings
-        Application settings containing evaluation output directory configuration.
-        The output directory is expanded and resolved to absolute form.
 
     Returns
     -------
@@ -2091,7 +2091,7 @@ def _eval_paths(settings: Settings) -> tuple[Path, Path]:
     conflicts and enables tracking of multiple evaluation runs. The function
     creates directories automatically, ensuring output paths are ready for writing.
     """
-    base_dir = Path(settings.eval.output_dir).expanduser().resolve()
+    base_dir = Path(base_dir).expanduser().resolve()
     timestamp = datetime.now(UTC).strftime("%y%m%d-%H%M")
     run_id = uuid.uuid4().hex[:8]
     output_dir = base_dir / timestamp
@@ -2560,10 +2560,11 @@ def _run_autotune(manager: FAISSManager, mode: SweepMode) -> None:
     queries = vectors[: min(32, vectors.shape[0])]
     sweep_values = (16, 32, 48, 64, 96, 128) if mode == "quick" else (16, 32, 64, 96, 128, 192, 256)
     sweep = tuple(f"nprobe={value}" for value in sweep_values)
+    index_cfg = _cached_app_config().index
     manager.autotune(
         queries,
         vectors,
-        k=min(int(settings.index.default_k), queries.shape[0]),
+        k=min(int(index_cfg.default_k), queries.shape[0]),
         sweep=sweep,
     )
 
@@ -2577,15 +2578,17 @@ def eval_command(
 ) -> None:
     """Run ANN vs Flat evaluation and optionally rescore with XTR."""
     settings = _get_settings()
+    app_config = _cached_app_config()
+    eval_settings = app_config.eval
     manager = _faiss_manager()
     catalog = _duckdb_catalog()
-    xtr_index = _load_xtr_index(settings) if xtr_oracle else None
-    pool_path, metrics_path = _eval_paths(settings)
+    xtr_index = _load_xtr_index(app_config) if xtr_oracle else None
+    pool_path, metrics_path = _eval_paths(eval_settings.output_dir)
     config = EvalConfig(
         k=k,
         k_factor=k_factor,
         nprobe=nprobe,
-        max_queries=settings.eval.max_queries,
+        max_queries=eval_settings.max_queries,
         use_xtr_oracle=bool(xtr_index and xtr_oracle),
         pool_path=pool_path,
         metrics_path=metrics_path,

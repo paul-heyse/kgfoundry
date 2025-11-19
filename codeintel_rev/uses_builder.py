@@ -5,12 +5,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
+from codeintel_rev.enrich.graph.io import write_use_edges
 from codeintel_rev.enrich.scip_reader import SCIPIndex
-from codeintel_rev.polars_support import resolve_polars_frame_factory
-from codeintel_rev.runtime.imports import gate_import
-from codeintel_rev.typing import PolarsModule
 
 
 @dataclass(slots=True, frozen=True)
@@ -76,34 +73,30 @@ def write_use_graph(
     use_graph: UseGraph,
     path: str | Path,
     *,
-    polars_module: PolarsModule | None = None,
-) -> None:
-    """Persist use graph edges to Parquet (or JSONL fallback).
+    jsonl_fallback: Path | None = None,
+) -> Path:
+    """Persist use graph edges to disk and return the output path.
 
     Parameters
     ----------
     use_graph : UseGraph
-        Graph to serialize.
+        Use graph containing edges to write.
     path : str | Path
-        Destination file path.
-    polars_module : PolarsModule | None, optional
-        Explicit polars module for Parquet writes. When ``None`` (default),
-        the helper imports polars dynamically.
+        Target path for the output file (Parquet preferred).
+    jsonl_fallback : Path | None, optional
+        Optional fallback JSONL path if Parquet is unavailable.
+        Defaults to None.
+
+    Returns
+    -------
+    Path
+        The actual path used for writing (Parquet or JSONL fallback).
     """
-    target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    records = [
+    records = (
         {"def_path": def_path, "use_path": use_path, "symbol": symbol}
         for def_path, use_path, symbol in use_graph.edges
-    ]
-    if not records:
-        target.write_text("", encoding="utf-8")
-        return
-    if _write_parquet(records, target, polars_module=polars_module):  # pragma: no cover
-        return
-    with target.open("w", encoding="utf-8") as handle:
-        for record in records:
-            handle.write(f"{record}\n")
+    )
+    return write_use_edges(records, path, jsonl_fallback=jsonl_fallback)
 
 
 def _is_definition(roles: list[str]) -> bool:
@@ -124,40 +117,3 @@ def _is_definition(roles: list[str]) -> bool:
         if "definition" in normalized or normalized.endswith("def"):
             return True
     return False
-
-
-def _write_parquet(
-    records: list[dict[str, str]],
-    target: Path,
-    *,
-    polars_module: PolarsModule | None = None,
-) -> bool:
-    """Write records via polars when available.
-
-    Parameters
-    ----------
-    records : list[dict[str, str]]
-        List of dictionary records to write.
-    target : Path
-        File system path for the output Parquet file.
-    polars_module : PolarsModule | None, optional
-        Injected polars module; when ``None`` an import is attempted.
-
-    Returns
-    -------
-    bool
-        True if polars is available and write succeeded, False otherwise.
-    """
-    if polars_module is None:
-        try:
-            polars = cast("PolarsModule", gate_import("polars", "use graph export"))
-        except ImportError:
-            return False
-    else:
-        polars = polars_module
-    frame_factory = resolve_polars_frame_factory(polars)
-    if frame_factory is None:
-        return False
-    data_frame = frame_factory(records)
-    data_frame.write_parquet(str(target))
-    return True

@@ -243,6 +243,23 @@ def meta_snapshot(  # noqa: PLR0913,PLR0917
 ) -> dict[str, object]:
     """Return persisted metadata merged with current configuration.
 
+    Parameters
+    ----------
+    index_path : Path
+        Path to the FAISS index file.
+    vec_dim : int
+        Vector dimensionality.
+    faiss_family : str | None
+        Index family identifier ("ivf", "hnsw", etc.). None means unknown.
+    default_nprobe : int | None
+        Default nprobe value for IVF indexes. None means not applicable.
+    hnsw_ef_search : int
+        HNSW ef_search parameter value.
+    refine_k_factor : float
+        K factor for search refinement.
+    meta_path : Path
+        Output path for the metadata JSON file.
+
     Returns
     -------
     dict[str, object]

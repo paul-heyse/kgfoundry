@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import logging
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from fnmatch import fnmatch
 from pathlib import Path
@@ -34,6 +35,8 @@ from codeintel_rev.services.enrich.context import (
 )
 from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
 from codeintel_rev.typedness import FileTypeSignals, collect_type_signals
+
+LOGGER = logging.getLogger(__name__)
 
 _EXCLUDED_SCAN_SEGMENTS = {"stubs", "overlays"}
 
@@ -353,6 +356,8 @@ def scan_modules(
         for fp in files:
             row_dict, edges = build_module_row(fp, ctx.root, scan_inputs)
             ModuleRecordModel.model_validate(row_dict)
+            if not row_dict.get("meta"):
+                LOGGER.warning("Module record missing meta payload", extra={"path": row_dict.get("path")})
             module_rows.append(row_dict)
             symbol_edges.extend(edges)
         meta["modules"] = len(module_rows)

@@ -41,6 +41,29 @@ class StageGateConfig:
         Defaults to 60.
     rrf_k_literal : int, optional
         RRF k parameter for literal queries. Must be positive. Defaults to 40.
+    rrf_k_vague : int, optional
+        RRF k parameter for vague queries. Must be positive. Defaults to 90.
+    rm3_auto : bool, optional
+        Whether to automatically enable RM3 query expansion. Defaults to True.
+    rm3_min_len : int, optional
+        Minimum query length to enable RM3. Must be positive. Defaults to 2.
+    rm3_max_len : int, optional
+        Maximum query length to enable RM3. Must be positive. Defaults to 12.
+    rm3_enable_on_ambiguity : bool, optional
+        Whether to enable RM3 when query ambiguity is detected. Defaults to True.
+    rm3_fb_docs : int, optional
+        Number of feedback documents for RM3 expansion. Must be positive.
+        Defaults to 10.
+    rm3_fb_terms : int, optional
+        Number of feedback terms for RM3 expansion. Must be positive.
+        Defaults to 10.
+    rm3_original_weight : float, optional
+        Weight for original query terms in RM3 expansion (0.0 to 1.0).
+        Defaults to 0.5.
+    code_token_patterns : tuple[str, ...], optional
+        Regular expression patterns for identifying code tokens in queries.
+        Defaults to patterns matching identifiers, camelCase, dot-separated
+        names, and general code-like strings.
     """
 
     min_candidates: int = 40

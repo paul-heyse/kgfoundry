@@ -119,6 +119,18 @@ async def semantic_search(
 ) -> AnswerEnvelope:
     """Execute Stage-0 hybrid retrieval and hydrate findings from DuckDB.
 
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context providing access to search engines, catalog, and
+        configuration.
+    query : str
+        Search query string.
+    limit : int, optional
+        Maximum number of results to return. Defaults to 20.
+    hooks : SemanticRuntimeHooks | None, optional
+        Optional runtime hooks for customizing search behavior. Defaults to None.
+
     Returns
     -------
     AnswerEnvelope
@@ -269,6 +281,15 @@ def _hydrate_findings(
 def _make_finding(chunk_id: int, score: float, uri: str | None = None) -> Finding:
     """Create a minimal finding payload for hydrated chunks.
 
+    Parameters
+    ----------
+    chunk_id : int
+        Chunk identifier from the search result.
+    score : float
+        Relevance score for the chunk.
+    uri : str | None, optional
+        Optional URI for the chunk. Defaults to None.
+
     Returns
     -------
     Finding
@@ -282,6 +303,13 @@ def _make_finding(chunk_id: int, score: float, uri: str | None = None) -> Findin
 
 def _build_method(stage0: Stage0Result, decision: StageDecision) -> MethodInfo:
     """Assemble typed method metadata for the envelope.
+
+    Parameters
+    ----------
+    stage0 : Stage0Result
+        Stage-0 search result containing method information and warnings.
+    decision : StageDecision
+        Gating decision indicating whether secondary stage should run.
 
     Returns
     -------
@@ -306,9 +334,14 @@ def _build_method(stage0: Stage0Result, decision: StageDecision) -> MethodInfo:
 def _faiss_guard(context: ApplicationContext) -> Iterator[dict[str, bool]]:
     """Track FAISS search failures and restore the manager after invocation.
 
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing the FAISS manager to guard.
+
     Yields
     ------
-    Iterator[dict[str, bool]]
+    dict[str, bool]
         Mutable tracker indicating whether a failure was observed.
     """
     tracker: dict[str, bool] = {"raised": False}
@@ -342,6 +375,7 @@ def _faiss_guard(context: ApplicationContext) -> Iterator[dict[str, bool]]:
         tracks any exceptions that occur. If an exception is raised by the
         original search method, it sets tracker["raised"] = True before
         re-raising the exception. The exception is propagated to the caller.
+        Any exception raised by the original search method is re-raised.
         """
         try:
             return original_search(*args, **kwargs)
@@ -358,6 +392,11 @@ def _faiss_guard(context: ApplicationContext) -> Iterator[dict[str, bool]]:
 
 def _error_envelope(reason: str) -> AnswerEnvelope:
     """Return a typed error envelope for invalid adapter inputs.
+
+    Parameters
+    ----------
+    reason : str
+        Error reason message to include in the envelope.
 
     Returns
     -------

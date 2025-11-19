@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from codeintel_rev.config.api import AppConfig
 from codeintel_rev.config.settings import PathsConfig, Settings
 
 __all__ = ["ResolvedPaths", "resolve_application_paths"]
@@ -419,14 +420,62 @@ def _build_from_settings(settings: Settings) -> ResolvedPaths:
     )
 
 
-def resolve_application_paths(settings: Settings | Mapping[str, Any]) -> ResolvedPaths:
+def _build_from_app_config(app_config: AppConfig) -> ResolvedPaths:
+    """Build ResolvedPaths directly from AppConfig values.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Immutable configuration describing repository layout and subsystem paths.
+
+    Returns
+    -------
+    ResolvedPaths
+        Canonical filesystem paths derived from AppConfig defaults with standard
+        fallbacks for legacy artifacts.
+    """
+    paths_cfg = app_config.paths
+    repo_root = _norm(_to_path(paths_cfg.repo_root))
+
+    def _repo_path(candidate: Path | str) -> Path:
+        return _resolve_relative(repo_root, candidate)
+
+    data_dir = _repo_path(paths_cfg.data_dir)
+    faiss_dir = _norm(data_dir / "faiss")
+    vectors_dir = _norm(data_dir / "vectors")
+    config_dir = _norm(repo_root / "config")
+    config_file = _norm(config_dir / "app.yml")
+    return ResolvedPaths(
+        repo_root=repo_root,
+        config_dir=config_dir,
+        config_file=config_file,
+        data_dir=data_dir,
+        vectors_dir=vectors_dir,
+        faiss_index=_repo_path(app_config.faiss.index_path),
+        faiss_idmap_path=_norm(faiss_dir / "faiss_idmap.parquet"),
+        lucene_dir=_repo_path(app_config.bm25.index_dir),
+        splade_dir=_repo_path(app_config.splade.index_dir),
+        duckdb_path=_repo_path(app_config.duckdb.database),
+        scip_index=_norm(repo_root / "index.scip"),
+        coderank_vectors_dir=_norm(data_dir / "coderank_vectors"),
+        coderank_faiss_index=_norm(faiss_dir / "coderank.ivfpq.faiss"),
+        warp_index_dir=_norm(repo_root / "indexes" / "warp_xtr"),
+        xtr_dir=_norm(data_dir / "xtr"),
+        logs_dir=_repo_path(paths_cfg.logs_dir),
+        cache_dir=_repo_path(paths_cfg.cache_dir),
+        tmp_dir=_norm(repo_root / ".tmp"),
+        plugins_dir=_norm(repo_root / "plugins"),
+    )
+
+
+def resolve_application_paths(settings: Settings | Mapping[str, Any] | AppConfig) -> ResolvedPaths:
     """Return canonical filesystem paths derived from ``settings``.
 
     Parameters
     ----------
-    settings : Settings | Mapping[str, Any]
-        Either a fully constructed :class:`Settings` instance or a mapping that
-        mimics the environment layout (useful for tests and tooling).
+    settings : Settings | Mapping[str, Any] | AppConfig
+        Either a fully constructed :class:`Settings` instance, an AppConfig, or
+        a mapping that mimics the environment layout (useful for tests and tooling).
 
     Returns
     -------
@@ -435,6 +484,8 @@ def resolve_application_paths(settings: Settings | Mapping[str, Any]) -> Resolve
         Paths are fully normalized (expanded, resolved, and case-normalized on
         Windows) so downstream consumers can rely on absolute locations.
     """
+    if isinstance(settings, AppConfig):
+        return _build_from_app_config(settings)
     if isinstance(settings, Mapping):
         return _build_from_mapping(settings)
     return _build_from_settings(settings)

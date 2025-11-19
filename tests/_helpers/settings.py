@@ -13,6 +13,7 @@ from codeintel_rev.config.api import (
     BM25Settings,
     EmbeddingsSettings,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
     SearchSettings,
     SpladeSettings,
@@ -145,6 +146,7 @@ def build_app_config_from_paths(paths: ResolvedPaths) -> AppConfig:
     embeddings_cfg = EmbeddingsSettings()
     vllm_cfg = VLLMSettings()
     xtr_cfg = DEFAULT_XTR_SETTINGS
+    index_cfg = IndexSettings()
     splade_cfg = SpladeSettings(
         model_id="naver/splade-v3",
         model_dir=paths.repo_root / "models" / "splade-v3",
@@ -172,6 +174,7 @@ def build_app_config_from_paths(paths: ResolvedPaths) -> AppConfig:
         bm25=bm25_cfg,
         splade=splade_cfg,
         xtr=xtr_cfg,
+        index=index_cfg,
         embeddings=embeddings_cfg,
         vllm=vllm_cfg,
         search=SearchSettings(),

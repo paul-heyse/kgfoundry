@@ -10,6 +10,7 @@ from codeintel_rev.config.api import (
     DuckDBSettings,
     EmbeddingsSettings,
     FAISSSettings,
+    IndexSettings,
     SearchSettings,
     SpladeSettings,
     VLLMSettings,
@@ -21,6 +22,7 @@ __all__: Final = [
     "duckdb_settings",
     "embeddings_settings",
     "faiss_settings",
+    "index_settings",
     "search_settings",
     "splade_settings",
     "vllm_settings",
@@ -154,3 +156,19 @@ def xtr_settings(cfg: AppConfig) -> XTRSettings:
         XTR-specific configuration segment.
     """
     return cfg.xtr
+
+
+def index_settings(cfg: AppConfig) -> IndexSettings:
+    """Return index configuration from the supplied config.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
+
+    Returns
+    -------
+    IndexSettings
+        Index configuration settings segment.
+    """
+    return cfg.index

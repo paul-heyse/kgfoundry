@@ -116,9 +116,53 @@ def test_apply_tagging_assigns_cli_tag() -> None:
         module_name="pkg.app",
         stable_id="id1",
     )
-    record["imports"] = [
-        {"module": "typer", "names": ["Typer"], "aliases": {}, "is_star": False, "level": 0}
-    ]
+    record["meta"] = {
+        "imports": [
+            {"src_module": "pkg.app", "dst_module": "typer", "alias": None, "level": 0},
+        ],
+        "legacy_imports": [
+            {
+                "module": "typer",
+                "names": ["Typer"],
+                "aliases": {},
+                "is_star": False,
+                "level": 0,
+            }
+        ],
+        "definitions": [],
+        "exports": [],
+    }
+    apply_tagging([record], {"cli": {"any_import": ["typer"], "reason": "cli detected"}})
+    tags = record.get("tags")
+    assertions.expect_true(isinstance(tags, list), reason="tags should be list")
+    if not isinstance(tags, list):  # pragma: no cover - defensive
+        pytest.fail("tags should be a list")
+    assertions.expect_in("cli", tags)
+
+
+def test_apply_tagging_uses_meta_imports() -> None:
+    """Verify tagging falls back to meta payload when legacy imports missing."""
+    record = ModuleRecord(
+        path="pkg/app.py",
+        repo_path="pkg/app.py",
+        module_name="pkg.app",
+        stable_id="id1",
+    )
+    record["meta"] = {
+        "imports": [{"src_module": "pkg.app", "dst_module": "typer", "alias": None, "level": 0}],
+        "exports": [],
+        "definitions": [],
+        "legacy_imports": [
+            {
+                "module": "typer",
+                "names": ["Typer"],
+                "aliases": {},
+                "is_star": False,
+                "level": 0,
+            }
+        ],
+    }
+    record["imports"] = []
     apply_tagging([record], {"cli": {"any_import": ["typer"], "reason": "cli detected"}})
     tags = record.get("tags")
     assertions.expect_true(isinstance(tags, list), reason="tags should be list")
@@ -151,6 +195,39 @@ def test_write_markdown_module_emits_sections(tmp_path: Path) -> None:
     assertions.expect_in("pkg.utils", content)
     assertions.expect_in("run", content)
     assertions.expect_in("cli", content)
+
+
+def test_write_markdown_module_uses_meta_fallback(tmp_path: Path) -> None:
+    """Markdown writer should fall back to meta payload when legacy fields missing."""
+    row: dict[str, Any] = {
+        "path": "pkg/app.py",
+        "meta": {
+            "legacy_imports": [
+                {
+                    "module": "pkg.utils",
+                    "names": ["helper"],
+                    "aliases": {},
+                    "is_star": False,
+                    "level": 0,
+                }
+            ],
+            "definitions": [
+                {
+                    "module": "pkg.app",
+                    "name": "run",
+                    "kind": "function",
+                    "lineno": 12,
+                }
+            ],
+        },
+        "tags": [],
+        "errors": [],
+    }
+    target = tmp_path / "meta.md"
+    write_markdown_module(target, row)
+    content = target.read_text(encoding="utf-8")
+    assertions.expect_in("pkg.utils", content)
+    assertions.expect_in("run", content)
 
 
 def test_module_record_validator_accepts_payload() -> None:

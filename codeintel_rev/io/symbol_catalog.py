@@ -75,6 +75,13 @@ class SymbolOccurrenceRow:
         Ending column number of the occurrence (0-based, exclusive).
     roles : int
         Bitmask of occurrence roles (e.g., DEFINITION, REFERENCE, CALL).
+    kind : str | None
+        Symbol kind identifier (e.g., "function", "class", "variable").
+        None if kind cannot be determined.
+    language : str
+        Programming language identifier (e.g., "python", "typescript").
+    chunk_id : int
+        Chunk identifier linking this occurrence to a code chunk.
     """
 
     symbol: str

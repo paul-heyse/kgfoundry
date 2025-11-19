@@ -477,7 +477,7 @@ class SpladeQueryEngine:
 
         Returns
         -------
-        object
+        _LuceneImpactSearcherProtocol
             A Pyserini LuceneImpactSearcher instance bound to the index directory
             and encoder. The searcher is cached after first creation and the encoder
             device is moved if specified.

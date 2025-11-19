@@ -23,7 +23,7 @@ def get_spawn_context() -> SpawnContext:
 
     Returns
     -------
-    multiprocessing.context.SpawnContext
+    SpawnContext
         Context bound to the ``spawn`` start method.
     """
     return mp.get_context("spawn")
@@ -70,7 +70,7 @@ def spawn_process(
 
     Returns
     -------
-    multiprocessing.Process
+    mp.Process
         Process instance configured with the ``spawn`` start method.
     """
     ctx = get_spawn_context()
@@ -85,9 +85,15 @@ def spawn_process(
 def spawn_process_pool(*, max_workers: int | None = None) -> ProcessPoolExecutor:
     """Return a ProcessPoolExecutor bound to the ``spawn`` context.
 
+    Parameters
+    ----------
+    max_workers : int | None, optional
+        Maximum number of worker processes. None means use default.
+        Defaults to None.
+
     Returns
     -------
-    concurrent.futures.ProcessPoolExecutor
+    ProcessPoolExecutor
         Executor configured to use the ``spawn`` start method.
     """
     return ProcessPoolExecutor(

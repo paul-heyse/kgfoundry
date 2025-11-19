@@ -10,7 +10,16 @@ from typing import TYPE_CHECKING, Any
 from codeintel_rev.enrich.ast_indexer import stable_module_path
 from codeintel_rev.enrich.errors import IndexingError
 from codeintel_rev.enrich.libcst_bridge import ModuleIndex, index_module_with_analysis
+from codeintel_rev.enrich.meta_compat import (
+    export_names_from_meta,
+    has_dunder_all,
+    import_entries,
+)
+from codeintel_rev.enrich.meta_compat import (
+    imported_modules as meta_imported_modules,
+)
 from codeintel_rev.enrich.models import ModuleRecord
+from codeintel_rev.enrich.module_meta import module_analysis_to_meta
 from codeintel_rev.enrich.pathnorm import module_name_from_path, stable_id_for_path
 from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags
 from codeintel_rev.enrich.tree_sitter_bridge import build_outline
@@ -133,71 +142,6 @@ def build_module_row(
     _apply_index_results(record, idx, outline_nodes, analysis)
     record.config_refs = []
     return record, symbol_edges
-
-
-def _analysis_meta_payload(analysis: ModuleAnalysis) -> dict[str, object]:
-    """Serialize ModuleAnalysis into a JSON-friendly payload.
-
-    Parameters
-    ----------
-    analysis : ModuleAnalysis
-        Module analysis result to serialize.
-
-    Returns
-    -------
-    dict[str, object]
-        Normalized metadata ready for serialization.
-    """
-    imports = [
-        {
-            "src_module": edge.src_module,
-            "dst_module": edge.dst_module,
-            "alias": edge.alias,
-            "level": edge.level,
-        }
-        for edge in analysis.imports
-    ]
-    exports = [
-        {
-            "module": item.module,
-            "name": item.name,
-            "kind": item.kind,
-            "via_dunder_all": item.via_dunder_all,
-        }
-        for item in analysis.exports
-    ]
-    docs = {
-        "module_docstring": analysis.docs.module_docstring,
-        "module_has_doc": analysis.docs.module_has_doc,
-        "classes_with_doc": analysis.docs.classes_with_doc,
-        "classes_total": analysis.docs.classes_total,
-        "functions_with_doc": analysis.docs.functions_with_doc,
-        "functions_total": analysis.docs.functions_total,
-    }
-    metrics = {
-        "annotated_defs": analysis.metrics.annotated_defs,
-        "defs_total": analysis.metrics.defs_total,
-        "annotation_ratio": analysis.metrics.annotation_ratio,
-        "has_top_level_side_effects": analysis.metrics.has_top_level_side_effects,
-    }
-    definitions = [
-        {
-            "module": definition.module,
-            "name": definition.name,
-            "kind": definition.kind,
-            "lineno": definition.lineno,
-        }
-        for definition in analysis.definitions
-    ]
-    return {
-        "module": analysis.module,
-        "path": str(analysis.path),
-        "imports": imports,
-        "exports": exports,
-        "docs": docs,
-        "metrics": metrics,
-        "definitions": definitions,
-    }
 
 
 def outline_nodes_for(rel_path: str, code: str) -> list[dict[str, Any]]:
@@ -486,7 +430,7 @@ def _apply_index_results(
     record.raises = list(idx.raises)
     record.complexity = dict(idx.complexity)
     if analysis is not None:
-        record["meta"] = _analysis_meta_payload(analysis)
+        record["meta"] = module_analysis_to_meta(analysis)
 
 
 def _coverage_value(rel_path: str, inputs: ScanInputs, key: str) -> float:
@@ -544,25 +488,12 @@ def _traits_from_row(row: Mapping[str, Any]) -> ModuleTraits:
     Missing or invalid values are handled gracefully (e.g., coverage defaults to
     1.0, fan metrics default to 0, doc flags default to True if None).
     """
-    imports_field = row.get("imports") or []
-    imported_modules: list[str] = []
-    if isinstance(imports_field, list):
-        for entry in imports_field:
-            if not isinstance(entry, Mapping):
-                continue
-            module = entry.get("module")
-            if isinstance(module, str):
-                imported_modules.append(module)
-    exports = row.get("exports") or []
-    has_all = bool(isinstance(exports, list) and exports)
-    has_star = False
-    if isinstance(imports_field, list):
-        has_star = any(
-            isinstance(entry, Mapping) and bool(entry.get("is_star")) for entry in imports_field
-        )
-    is_reexport_hub = has_star or (
-        isinstance(exports, list) and len(exports) >= EXPORT_HUB_THRESHOLD
-    )
+    imported_modules = meta_imported_modules(row)
+    imports_field = import_entries(row)
+    exports = export_names_from_meta(row)
+    has_all = has_dunder_all(row)
+    has_star = any(entry.get("is_star") for entry in imports_field if isinstance(entry, Mapping))
+    is_reexport_hub = has_star or len(exports) >= EXPORT_HUB_THRESHOLD
 
     coverage_value = row.get("covered_lines_ratio")
     coverage_ratio = float(coverage_value) if isinstance(coverage_value, (int, float)) else 1.0

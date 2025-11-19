@@ -8,7 +8,7 @@ from pathlib import Path
 from codeintel_rev.config.paths import resolve_application_paths
 
 from tests._helpers.assertions import expect_equal, expect_true
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_app_config_from_paths, build_settings_for_repo
 
 
 def test_resolve_application_paths_from_settings(tmp_path: Path) -> None:
@@ -65,3 +65,23 @@ def test_resolved_paths_hashable(tmp_path: Path) -> None:
     another_paths = replace(paths)
     expect_equal(paths, another_paths, reason="dataclass equality uses field values")
     expect_equal(hash(paths), hash(another_paths), reason="hash remains stable for clones")
+
+
+def test_resolve_application_paths_from_app_config(tmp_path: Path) -> None:
+    """Resolver builds canonical paths from AppConfig inputs."""
+    repo_root = tmp_path / "appcfg"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    settings = build_settings_for_repo(repo_root)
+    baseline = resolve_application_paths(settings)
+    app_config = build_app_config_from_paths(baseline)
+
+    resolved = resolve_application_paths(app_config)
+
+    expect_equal(resolved.repo_root, baseline.repo_root, reason="repo root preserved")
+    expect_equal(resolved.faiss_index, app_config.faiss.index_path, reason="faiss path from config")
+    expect_equal(
+        resolved.duckdb_path,
+        app_config.duckdb.database,
+        reason="duckdb path sourced from AppConfig",
+    )
+    expect_equal(resolved.logs_dir, (repo_root / "logs").resolve(), reason="logs dir canonicalized")

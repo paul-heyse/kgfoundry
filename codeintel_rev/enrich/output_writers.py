@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from codeintel_rev.enrich.meta_compat import definition_entries, import_entries
 
 try:  # pragma: no cover - optional dependency
     import orjson
@@ -20,10 +23,12 @@ try:  # pragma: no cover - optional dependency
     import pyarrow as pa
     import pyarrow.dataset as ds
     import pyarrow.parquet as pq
+    from pyarrow.lib import ArrowException
 except ImportError:  # pragma: no cover - optional dependency
     pa = None
     ds = None
     pq = None
+    ArrowException = ()
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import pyarrow as pa_typing
@@ -33,6 +38,7 @@ else:  # pragma: no cover - runtime guard
     PaTable = Any
 
 RowMapping = Mapping[str, object]
+LOGGER = logging.getLogger(__name__)
 
 _JSONL_WRITER_ENV = "ENRICH_JSONL_WRITER"
 _JSONL_V2 = "v2"
@@ -206,19 +212,37 @@ def write_jsonl(
     rows: Iterable[RowMapping],
     *,
     writer_version: str | None = None,
-) -> None:
-    """Write newline-delimited JSON records."""
+) -> int:
+    """Write newline-delimited JSON records and return the row count.
+
+    Parameters
+    ----------
+    path : str | Path
+        Output file path for JSONL file.
+    rows : Iterable[RowMapping]
+        Iterable of row dictionaries to write.
+    writer_version : str | None, optional
+        Optional writer version identifier. None means use default or env var.
+        Defaults to None.
+
+    Returns
+    -------
+    int
+        Number of rows that were emitted.
+    """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     resolved_version = (
         writer_version or _resolve_env(_JSONL_WRITER_ENV) or _JSONL_DEFAULT_VERSION
     ).lower()
+    count = 0
     if resolved_version == _JSONL_V2 and _ORJSON_JSONL_OPTS is not None:
         with target.open("wb") as handle:
             for row in rows:
                 payload = dict(row)
                 handle.write(_dump_jsonl_bytes(payload))
-        return
+                count += 1
+        return count
     with target.open("w", encoding="utf-8") as handle:
         for row in rows:
             payload = dict(row)
@@ -227,6 +251,8 @@ def write_jsonl(
             else:
                 handle.write(_dump_json(payload))
             handle.write("\n")
+            count += 1
+    return count
 
 
 def write_parquet(path: str | Path, rows: Iterable[RowMapping]) -> None:
@@ -333,6 +359,46 @@ def _write_dataset_table(
     )
 
 
+def write_parquet_or_jsonl(
+    parquet_path: str | Path,
+    jsonl_path: str | Path,
+    rows: Iterable[RowMapping],
+) -> tuple[Path, int]:
+    """Write rows to Parquet when possible, falling back to JSONL.
+
+    Parameters
+    ----------
+    parquet_path : str | Path
+        Preferred output path for Parquet format.
+    jsonl_path : str | Path
+        Fallback output path for JSONL format when Parquet is unavailable.
+    rows : Iterable[RowMapping]
+        Iterable of row dictionaries to write.
+
+    Returns
+    -------
+    tuple[Path, int]
+        Tuple containing the path that was written and the number of emitted rows.
+    """
+    target = Path(parquet_path)
+    fallback = Path(jsonl_path)
+    materialized = [dict(row) for row in rows]
+    if not materialized:
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        fallback.write_text("", encoding="utf-8")
+        return fallback, 0
+    if pa is not None and pq is not None:
+        try:
+            table = pa.Table.from_pylist(materialized)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            pq.write_table(table, str(target))
+            return target, len(materialized)
+        except (ArrowException, OSError) as exc:  # pragma: no cover - fallback safety
+            LOGGER.warning("Parquet write failed for %s: %s", target, exc)
+    count = write_jsonl(fallback, materialized, writer_version=_JSONL_V2)
+    return fallback, count
+
+
 def _append_section(sections: list[str], title: str, lines: list[str]) -> None:
     r"""Append a Markdown section to the sections list if lines are present.
 
@@ -396,6 +462,8 @@ def _format_imports(record: dict[str, object]) -> list[str]:
     formatted: list[str] = []
     imports_obj = record.get("imports")
     if not isinstance(imports_obj, list):
+        imports_obj = import_entries(record)
+    if not isinstance(imports_obj, list):
         return formatted
     for entry in imports_obj:
         if not isinstance(entry, Mapping):
@@ -440,6 +508,8 @@ def _format_definitions(record: dict[str, object]) -> list[str]:
     """
     formatted: list[str] = []
     defs_obj = record.get("defs")
+    if not isinstance(defs_obj, list):
+        defs_obj = definition_entries(record)
     if not isinstance(defs_obj, list):
         return formatted
     for definition in defs_obj:

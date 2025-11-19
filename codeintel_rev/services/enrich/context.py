@@ -563,6 +563,19 @@ class PipelineContext:
     ) -> PipelineContext:
         """Build a context from resolved application paths.
 
+        Parameters
+        ----------
+        paths : ResolvedPaths
+            Resolved filesystem paths for enrichment operations.
+        config : Mapping[str, Any] | None, optional
+            Optional configuration dictionary. None means use empty dict.
+            Defaults to None.
+        enable_db : bool, optional
+            Whether to enable DuckDB database connection. Defaults to False.
+        duckdb_path : str | None, optional
+            Optional path to DuckDB database file. None means use default.
+            Defaults to None.
+
         Returns
         -------
         PipelineContext

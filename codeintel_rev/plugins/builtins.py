@@ -104,11 +104,11 @@ class _BM25Channel(Channel):
 
     Attributes
     ----------
-    name : str
+    name
         Channel name identifier ("bm25").
-    cost : float
+    cost
         Relative cost factor for this channel (1.0).
-    requires : frozenset[str]
+    requires
         Set of capability requirements: "warp_index_present", "lucene_importable".
     """
 
@@ -117,6 +117,13 @@ class _BM25Channel(Channel):
     requires = frozenset({"warp_index_present", "lucene_importable"})
 
     def __init__(self, context: ChannelContext) -> None:
+        """Initialize BM25 channel with application context.
+
+        Parameters
+        ----------
+        context : ChannelContext
+            Channel context containing app config, paths, and settings.
+        """
         self._app_config = context.app_config
         self._paths = context.paths
         self._legacy_settings = context.settings
@@ -264,12 +271,12 @@ class _SpladeChannel(Channel):
 
     Attributes
     ----------
-    name : str
+    name
         Channel name identifier ("splade").
-    cost : float
+    cost
         Relative cost factor for this channel (3.0, higher than BM25 due to
         ONNX inference overhead).
-    requires : frozenset[str]
+    requires
         Set of capability requirements: "lucene_importable", "onnxruntime_importable".
     """
 
@@ -278,6 +285,13 @@ class _SpladeChannel(Channel):
     requires = frozenset({"lucene_importable", "onnxruntime_importable"})
 
     def __init__(self, context: ChannelContext) -> None:
+        """Initialize SPLADE channel with application context.
+
+        Parameters
+        ----------
+        context : ChannelContext
+            Channel context containing app config, paths, and settings.
+        """
         self._config = context.app_config.splade
         self._paths = context.paths
         self._engine: SPLADEEngine | None = None
@@ -479,6 +493,13 @@ def _classify_skip_reason(exc: Exception) -> str:
 
 def _to_search_hits(channel: str, pairs: Sequence[tuple[int, float]]) -> list[SearchHit]:
     """Convert engine tuples into SearchHit records.
+
+    Parameters
+    ----------
+    channel : str
+        Channel name identifier (e.g., "bm25", "splade").
+    pairs : Sequence[tuple[int, float]]
+        Sequence of (doc_id, score) tuples from the search engine.
 
     Returns
     -------

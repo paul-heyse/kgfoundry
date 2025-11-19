@@ -10,6 +10,7 @@ from codeintel_rev.config.api import (
     DuckDBSettings,
     EmbeddingsSettings,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
     PathsConfig,
     SearchSettings,
@@ -83,6 +84,12 @@ def _make_app_config(tmp_path: Path) -> AppConfig:
     xtr = XTRSettings(enable=True, dim=512, dtype="float32", mode="wide")
     embeddings = EmbeddingsSettings()
     vllm = VLLMSettings()
+    index_cfg = IndexSettings(
+        enable_bm25_channel=bm25.enabled,
+        bm25_k1=bm25.k1,
+        bm25_b=bm25.b,
+        enable_splade_channel=splade.enabled,
+    )
     return AppConfig(
         version="1.0",
         paths=paths,
@@ -91,6 +98,7 @@ def _make_app_config(tmp_path: Path) -> AppConfig:
         bm25=bm25,
         splade=splade,
         xtr=xtr,
+        index=index_cfg,
         embeddings=embeddings,
         vllm=vllm,
         search=SearchSettings(),
@@ -119,10 +127,6 @@ def test_settings_from_app_config_updates_paths_and_splade(tmp_path: Path) -> No
             onnx_cfg.model_path,
             str(cfg.splade.onnx_query.model_path),
         )
-    assertions.expect_equal(settings.index.enable_splade_channel, cfg.splade.enabled)
-    assertions.expect_equal(settings.index.enable_bm25_channel, cfg.bm25.enabled)
-    assertions.expect_equal(settings.index.bm25_k1, cfg.bm25.k1)
-    assertions.expect_equal(settings.index.bm25_b, cfg.bm25.b)
     assertions.expect_equal(settings.xtr.enable, cfg.xtr.enable)
     assertions.expect_equal(settings.xtr.dim, cfg.xtr.dim)
     assertions.expect_equal(settings.xtr.mode, cfg.xtr.mode)

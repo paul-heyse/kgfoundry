@@ -6,6 +6,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from codeintel_rev.enrich.meta_compat import (
+    definition_entries,
+    export_names_from_meta,
+    import_entries,
+)
 from codeintel_rev.module_utils import (
     import_targets_for_entry,
     module_name_candidates,
@@ -67,8 +72,9 @@ def resolve_exports(
     reexports: dict[str, dict[str, str]] = {}
     current_module = normalize_module_name(row["path"])
 
-    for imp in row.get("imports", []) or []:
-        if not isinstance(imp, Mapping) or not imp.get("is_star"):
+    imports = import_entries(row)
+    for imp in imports:
+        if not imp.get("is_star"):
             continue
         module = imp.get("module")
         level = int(imp.get("level") or 0)
@@ -86,7 +92,7 @@ def resolve_exports(
             if not export_names:
                 continue
             resolved[target] = sorted(export_names)
-            local_defs = {definition.get("name") for definition in row.get("defs") or []}
+            local_defs = {definition.get("name") for definition in definition_entries(row)}
             for name in export_names:
                 if name in local_defs:
                     continue
@@ -107,10 +113,10 @@ def is_reexport_hub(row: Mapping[str, Any]) -> bool:
     bool
         True when the module is considered a re-export hub.
     """
-    exports = row.get("exports") or []
-    imports = row.get("imports") or []
-    has_star = any(entry.get("is_star") for entry in imports if isinstance(entry, Mapping))
-    return bool(has_star) or (isinstance(exports, list) and len(exports) >= EXPORT_HUB_THRESHOLD)
+    exports = export_names_from_meta(row)
+    imports = import_entries(row)
+    has_star = any(entry.get("is_star") for entry in imports)
+    return bool(has_star or len(exports) >= EXPORT_HUB_THRESHOLD)
 
 
 def _public_names(row: Mapping[str, Any]) -> list[str]:
@@ -127,20 +133,15 @@ def _public_names(row: Mapping[str, Any]) -> list[str]:
         List of public names (from exports if available, otherwise from
         public function/class definitions).
     """
-    exports = row.get("exports") or []
-    if isinstance(exports, list) and exports:
-        return [name for name in exports if isinstance(name, str)]
+    exports = export_names_from_meta(row)
+    if exports:
+        return exports
     names: list[str] = []
-    for definition in row.get("defs") or []:
-        if not isinstance(definition, Mapping):
-            continue
+    for definition in definition_entries(row):
         kind = definition.get("kind")
         name = definition.get("name")
-        if (
-            isinstance(name, str)
-            and isinstance(kind, str)
-            and kind in {"function", "class"}
-            and not name.startswith("_")
-        ):
+        if isinstance(name, str) and isinstance(kind, str) and kind in {"function", "class"}:
+            if name.startswith("_"):
+                continue
             names.append(name)
     return names

@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         default=None,
-        help="Directory for evaluation artifacts. Defaults to settings.eval.output_dir.",
+        help="Directory for evaluation artifacts. Defaults to configured eval output dir.",
     )
     return parser
 

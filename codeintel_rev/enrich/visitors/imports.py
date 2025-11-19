@@ -12,6 +12,8 @@ from codeintel_rev.enrich.types import ImportEdge, LegacyImportRecord
 
 @dataclass(slots=True)
 class _LegacyImportMutable:
+    """Mutable accumulator for legacy import records during AST traversal."""
+
     module: str | None
     names: list[str]
     aliases: dict[str, str]
@@ -93,7 +95,10 @@ class ImportsVisitor(cst.CSTVisitor):
             if isinstance(alias, cst.ImportStar):
                 entry.is_star = True
                 target = base or ""
-                resolved = _resolve_relative(self.module_name, level, target)
+                if level == 0:
+                    resolved = target
+                else:
+                    resolved = _resolve_relative(self.module_name, level, target)
                 self.edges.append(ImportEdge(self.module_name, resolved, None, level))
                 continue
             name = _full_name(alias.name)
@@ -104,6 +109,9 @@ class ImportsVisitor(cst.CSTVisitor):
             if alias_name:
                 entry.aliases[name] = alias_name
             target = ".".join(segment for segment in (base, name) if segment)
-            resolved = _resolve_relative(self.module_name, level, target)
+            if level == 0:
+                resolved = target or name
+            else:
+                resolved = _resolve_relative(self.module_name, level, target)
             self.edges.append(ImportEdge(self.module_name, resolved, alias_name, level))
         self.legacy_imports.append(entry.to_record())

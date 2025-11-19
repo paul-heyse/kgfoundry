@@ -701,7 +701,11 @@ class RuntimeCell[T]:
         T
             Created payload instance from factory.
 
-        Any exception raised by ``factory`` is re-raised after recording the failure.
+        Notes
+        -----
+        Any exception raised by the factory function is re-raised after recording
+        the failure in the observer. The exception type matches what the factory
+        function raises.
         """
         start = time.monotonic()
         self._observer.on_init_start(cell=self._name, generation=generation, context=context)

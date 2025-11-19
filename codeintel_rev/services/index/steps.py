@@ -198,6 +198,13 @@ def _catalog(paths: IndexPaths, *, materialize: bool) -> DuckDBCatalog:
 def step_scan_shards(state: BuildState, paths: IndexPaths, _: IndexBuildConfig) -> None:
     """Find all Parquet shards that contain embeddings.
 
+    Parameters
+    ----------
+    state : BuildState
+        Build state to update with discovered shards.
+    paths : IndexPaths
+        Index paths containing vectors directory.
+
     Raises
     ------
     FileNotFoundError
@@ -212,6 +219,15 @@ def step_scan_shards(state: BuildState, paths: IndexPaths, _: IndexBuildConfig) 
 
 def step_sample_training(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig) -> None:
     """Record how many samples are available for training.
+
+    Parameters
+    ----------
+    state : BuildState
+        Build state to update with sample row count.
+    _ : IndexPaths
+        Index paths (unused in this step).
+    cfg : IndexBuildConfig
+        Build configuration specifying sample size and column names.
 
     Raises
     ------
@@ -232,6 +248,15 @@ def step_sample_training(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig
 
 def step_train_primary(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig) -> None:
     """Train the adaptive FAISS primary index.
+
+    Parameters
+    ----------
+    state : BuildState
+        Build state to update with trained primary index.
+    _ : IndexPaths
+        Index paths (unused in this step).
+    cfg : IndexBuildConfig
+        Build configuration specifying vector dimensions and sample size.
 
     Raises
     ------

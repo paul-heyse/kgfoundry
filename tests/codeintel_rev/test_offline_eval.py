@@ -7,13 +7,12 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
-from codeintel_rev.config.settings import EvalConfig, PathsConfig, load_settings
+from codeintel_rev.config.api import EvalSettings
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
 from codeintel_rev.io.vllm_client import VLLMClient
-from msgspec import structs
 
 from tests._helpers import assertions
 
@@ -48,6 +47,7 @@ class _StubVLLMClient:
 
 
 def _prepare_symbol_catalog(db_path: Path) -> DuckDBManager:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     manager = DuckDBManager(db_path)
     catalog = SymbolCatalog(manager)
     catalog.ensure_schema()
@@ -91,31 +91,24 @@ def _prepare_symbol_catalog(db_path: Path) -> DuckDBManager:
 
 def test_offline_eval_synthesizes_queries(tmp_path: Path) -> None:
     """Test that offline evaluator synthesizes queries from symbol catalog."""
-    base_settings = load_settings()
-    paths = PathsConfig(
-        repo_root=str(tmp_path),
-        data_dir=str(tmp_path / "data"),
-        vectors_dir=str(tmp_path / "vectors"),
-        faiss_index=str(tmp_path / "index.faiss"),
-        duckdb_path=str(tmp_path / "catalog.duckdb"),
-        scip_index=str(tmp_path / "index.scip"),
+    repo_root = tmp_path / "repo"
+    duckdb_path = repo_root / "catalog.duckdb"
+    duckdb_manager = _prepare_symbol_catalog(duckdb_path)
+    eval_settings = EvalSettings(
+        enabled=True,
+        output_dir=repo_root / "artifacts",
+        k_values=(5,),
     )
-    settings = structs.replace(
-        base_settings,
-        paths=paths,
-        eval=EvalConfig(enabled=True, output_dir=str(tmp_path / "artifacts"), k_values=(5,)),
-    )
-    duckdb_manager = _prepare_symbol_catalog(Path(paths.duckdb_path))
     evaluator = OfflineRecallEvaluator(
-        settings=settings,
-        paths=paths,
+        eval_settings=eval_settings,
+        repo_root=repo_root,
         faiss_manager=cast("FAISSManager", _StubFAISSManager([101, 202])),
-        vllm_client=cast("VLLMClient", _StubVLLMClient(settings.index.vec_dim)),
+        vllm_client=cast("VLLMClient", _StubVLLMClient(2)),
         duckdb_manager=duckdb_manager,
     )
     result = evaluator.run()
     assertions.expect_equal(result["queries"], 1)
     summary = cast("Mapping[int, float]", result["summary"])
     assertions.expect_almost_equal(summary[5], 1.0)
-    summary_path = tmp_path / "artifacts" / "summary.json"
+    summary_path = repo_root / "artifacts" / "summary.json"
     assertions.expect_true(summary_path.exists(), reason="summary_path should exist")

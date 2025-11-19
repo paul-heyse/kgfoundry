@@ -219,7 +219,8 @@ def _fetch_commit_ts_duckdb(
     Notes
     -----
     Creates temporary views and tables for efficient lookups, then cleans them up.
-    Handles errors gracefully by returning an empty dictionary.
+    Handles errors gracefully by returning an empty dictionary. May re-raise
+    non-DuckDB exceptions in defensive error handling paths.
     """
     if manager is None:
         return {}

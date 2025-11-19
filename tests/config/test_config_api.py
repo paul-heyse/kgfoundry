@@ -12,6 +12,7 @@ from codeintel_rev.config.api import (
     DuckDBSettings,
     EmbeddingsSettings,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
     PathsConfig,
     SearchSettings,
@@ -106,6 +107,7 @@ def _make_config(tmp_path: Path) -> AppConfig:
         max_concurrent_requests=2,
         task="embed",
     )
+    index_cfg = IndexSettings()
     return AppConfig(
         version="1.0",
         paths=paths,
@@ -114,6 +116,7 @@ def _make_config(tmp_path: Path) -> AppConfig:
         bm25=bm25,
         splade=splade,
         xtr=xtr,
+        index=index_cfg,
         embeddings=embeddings,
         vllm=vllm,
         search=search,

@@ -7,32 +7,26 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
-import msgspec
 from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
     AppConfig,
     BM25Settings,
+    DuckDBSettings,
     EmbeddingsSettings,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
+    PathsConfig,
     SearchSettings,
     SpladeSettings,
     VLLMSettings,
     XTRSettings,
 )
-from codeintel_rev.config.api import (
-    DuckDBSettings as ApiDuckDBSettings,
-)
-from codeintel_rev.config.api import (
-    PathsConfig as ApiPathsConfig,
-)
-from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.ops.runtime.xtr_open import APP, XtrOpenContext
 from typer.testing import CliRunner
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_settings_for_repo
 
 RUNNER = CliRunner(mix_stderr=False)
 
@@ -53,48 +47,38 @@ def _prepare_repo(repo_root: Path) -> None:
         (repo_root / relative).mkdir(parents=True, exist_ok=True)
 
 
-def _settings_factory(
+def _app_config_loader(
     repo_root: Path,
     *,
-    enabled: bool,
-    xtr_dir_override: Path | None = None,
-) -> Callable[[], Settings]:
-    settings = build_settings_for_repo(repo_root)
-    if xtr_dir_override is not None:
-        paths_cfg = msgspec.structs.replace(settings.paths, xtr_dir=str(xtr_dir_override))
-        settings = msgspec.structs.replace(settings, paths=paths_cfg)
-    xtr_cfg = msgspec.structs.replace(settings.xtr, enable=enabled)
-    configured = msgspec.structs.replace(settings, xtr=xtr_cfg)
-
-    def _factory() -> Settings:
-        return configured
-
-    return _factory
-
-
-def _app_config_loader(repo_root: Path) -> Callable[[], AppConfig]:
+    xtr_enabled: bool,
+    data_dir: Path | None = None,
+) -> Callable[[], AppConfig]:
     """Return loader for AppConfig referencing repo_root.
 
     Parameters
     ----------
     repo_root : Path
         Repository root directory path.
+    xtr_enabled : bool
+        Whether XTR runtime should be enabled.
+    data_dir : Path | None, optional
+        Optional override for data directory.
 
     Returns
     -------
     Callable[[], AppConfig]
         Callable that returns an AppConfig instance.
     """
-    data_dir = repo_root / "data"
+    data_dir = data_dir or (repo_root / "data")
     config = AppConfig(
         version=CONFIG_API_VERSION,
-        paths=ApiPathsConfig(
+        paths=PathsConfig(
             repo_root=repo_root,
             data_dir=data_dir,
             cache_dir=repo_root / ".cache",
             logs_dir=repo_root / "logs",
         ),
-        duckdb=ApiDuckDBSettings(database=data_dir / "catalog.duckdb"),
+        duckdb=DuckDBSettings(database=data_dir / "catalog.duckdb"),
         faiss=FAISSSettings(index_path=repo_root / "indexes" / "code.ivfpq.faiss"),
         bm25=BM25Settings(
             corpus_json_dir=data_dir / "bm25_json",
@@ -126,13 +110,14 @@ def _app_config_loader(repo_root: Path) -> Callable[[], AppConfig]:
             candidate_k=200,
             dim=768,
             dtype="float16",
-            enable=False,
+            enable=xtr_enabled,
             mode="narrow",
         ),
         embeddings=EmbeddingsSettings(),
         vllm=VLLMSettings(),
         search=SearchSettings(),
         logging=LoggingSettings(),
+        index=IndexSettings(),
     )
 
     def _loader() -> AppConfig:
@@ -176,8 +161,7 @@ def test_xtr_open_disabled_feature(
     repo_root = tmp_path / "repo"
     _prepare_repo(repo_root)
     context = xtr_cli_context_builder(
-        settings_factory=_settings_factory(repo_root, enabled=False),
-        app_config_loader=_app_config_loader(repo_root),
+        app_config_loader=_app_config_loader(repo_root, xtr_enabled=False),
     )
     result = RUNNER.invoke(
         APP,
@@ -196,12 +180,14 @@ def test_xtr_open_missing_artifacts(
     """Verify XTR open returns 503 when artifacts are missing."""
     repo_root = tmp_path / "repo"
     _prepare_repo(repo_root)
-    missing_root = repo_root / "missing"
+    missing_parent = repo_root / "missing"
+    missing_parent.mkdir(parents=True, exist_ok=True)
+    missing_root = missing_parent / "xtr"
     context = xtr_cli_context_builder(
-        settings_factory=_settings_factory(
+        app_config_loader=_app_config_loader(
             repo_root,
-            enabled=True,
-            xtr_dir_override=missing_root,
+            xtr_enabled=True,
+            data_dir=missing_parent,
         ),
     )
     result = RUNNER.invoke(
@@ -225,7 +211,7 @@ def test_xtr_open_success(
     root = repo_root / "data" / "xtr"
     root.mkdir(parents=True, exist_ok=True)
     context = xtr_cli_context_builder(
-        settings_factory=_settings_factory(repo_root, enabled=True),
+        app_config_loader=_app_config_loader(repo_root, xtr_enabled=True),
         index_factory=lambda *_args, **_kwargs: cast("XTRIndex", _ReadyIndex()),
     )
     result = RUNNER.invoke(
@@ -250,9 +236,8 @@ def test_xtr_open_reports_corruption(
     root = repo_root / "data" / "xtr"
     root.mkdir(parents=True, exist_ok=True)
     context = xtr_cli_context_builder(
-        settings_factory=_settings_factory(repo_root, enabled=True),
+        app_config_loader=_app_config_loader(repo_root, xtr_enabled=True),
         index_factory=lambda *_args, **_kwargs: cast("XTRIndex", _ExplodingIndex()),
-        app_config_loader=_app_config_loader(repo_root),
     )
     result = RUNNER.invoke(
         APP,

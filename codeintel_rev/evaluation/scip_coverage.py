@@ -10,7 +10,6 @@ from typing import Protocol, TypedDict
 
 import numpy as np
 
-from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
@@ -81,18 +80,16 @@ class SCIPCoverageEvaluator:
     def __init__(
         self,
         *,
-        settings: Settings,
         repo_root: str | Path,
         duckdb_manager: DuckDBManager,
         faiss_manager: SupportsFaissSearch,
         vllm_client: SupportsEmbedSingle,
+        default_output_dir: Path | str,
     ) -> None:
         """Initialize SCIP coverage evaluator.
 
         Parameters
         ----------
-        settings : Settings
-            Application settings.
         repo_root : str | Path
             Repository root directory path.
         duckdb_manager : DuckDBManager
@@ -101,13 +98,15 @@ class SCIPCoverageEvaluator:
             FAISS manager for vector search.
         vllm_client : SupportsEmbedSingle
             VLLM client for query embedding.
+        default_output_dir : Path | str
+            Directory used when ``run`` is invoked without an explicit output path.
         """
-        self._settings = settings
         self._repo_root = Path(repo_root)
         self._duckdb = duckdb_manager
         self._faiss = faiss_manager
         self._vllm = vllm_client
         self._symbol_catalog = SymbolCatalog(duckdb_manager)
+        self._default_output_dir = Path(default_output_dir).expanduser().resolve()
 
     def run(
         self,
@@ -138,7 +137,7 @@ class SCIPCoverageEvaluator:
             all symbols in the catalog. Useful for quick validation runs.
         output_dir : Path | None, optional
             Directory for coverage artifacts (JSON reports). If None, uses
-            `settings.eval.output_dir`.
+            default output directory configured during evaluator construction.
 
         Returns
         -------
@@ -187,7 +186,7 @@ class SCIPCoverageEvaluator:
             "retrieval_coverage": retrieval_hits / total if total else 0.0,
             "k": k,
         }
-        resolved_output = output_dir or self._settings.eval.output_dir
+        resolved_output = Path(output_dir) if output_dir is not None else self._default_output_dir
         self._write_artifacts(per_symbol, summary, resolved_output)
         return summary
 
