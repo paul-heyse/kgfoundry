@@ -85,6 +85,10 @@ class FileOperationError(KgFoundryError):
         path: str,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize file operation error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__(
             message,
             code=ErrorCode.FILE_OPERATION_ERROR,
@@ -197,6 +201,10 @@ class InvalidLineRangeError(FileOperationError):
         path: str,
         line_range: tuple[int | None, int | None] | None = None,
     ) -> None:
+        """Initialize invalid line range error.
+
+        Parameters are documented in the class docstring.
+        """
         context: dict[str, object] = {"path": path}
         if line_range is not None:
             context["start_line"] = line_range[0]
@@ -258,6 +266,10 @@ class PathNotFoundError(KgFoundryError):
         *,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize path not found error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__(
             message,
             code=ErrorCode.PATH_NOT_FOUND,
@@ -287,6 +299,10 @@ class PathNotDirectoryError(KgFoundryError):
         *,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize path not directory error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__(
             message,
             code=ErrorCode.PATH_NOT_DIRECTORY,
@@ -363,6 +379,10 @@ class GitOperationError(KgFoundryError):
         git_command: str | None = None,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize git operation error.
+
+        Parameters are documented in the class docstring.
+        """
         context: dict[str, object] = {}
         if path is not None:
             context["path"] = path
@@ -398,6 +418,10 @@ class RuntimeLifecycleError(KgFoundryError):
         runtime: str,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize runtime lifecycle error.
+
+        Parameters are documented in the class docstring.
+        """
         super().__init__(
             message,
             code=ErrorCode.RUNTIME_ERROR,
@@ -430,6 +454,10 @@ class RuntimeUnavailableError(KgFoundryError):
         detail: str | None = None,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize runtime unavailable error.
+
+        Parameters are documented in the class docstring.
+        """
         context: dict[str, object] = {"runtime": runtime}
         if detail:
             context["detail"] = detail
@@ -481,6 +509,10 @@ class RequestContextError(KgFoundryError):
         method: str,
         cause: Exception | None = None,
     ) -> None:
+        """Initialize request context error.
+
+        Parameters are documented in the class docstring.
+        """
         context = {"path": path, "method": method}
         super().__init__(
             message,

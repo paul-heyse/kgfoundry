@@ -171,6 +171,10 @@ class HybridPoolEvaluator:
         *,
         xtr_index: XTRIndex | None = None,
     ) -> None:
+        """Initialize hybrid pool evaluator.
+
+        Parameters are documented in the class docstring.
+        """
         self._catalog = catalog
         self._manager = manager
         self._xtr_index = xtr_index

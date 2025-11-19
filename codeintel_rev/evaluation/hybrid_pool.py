@@ -126,6 +126,10 @@ class HybridPoolEvaluator:
         norm: str = "minmax",
         sim_threshold: float = 0.0,
     ) -> None:
+        """Initialize hybrid pool evaluator.
+
+        Parameters are documented in the class docstring.
+        """
         self._weights = {k: max(0.0, float(v)) for k, v in weights.items()}
         self._norm_fn = _softmax_norm if norm == "softmax" else _minmax_norm
         self._sim_threshold = sim_threshold
