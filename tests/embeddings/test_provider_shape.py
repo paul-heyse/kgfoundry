@@ -11,6 +11,7 @@ from typing import Any, cast
 
 import numpy as np
 import pytest
+from codeintel_rev.config.api import EmbeddingsSettings
 
 from tests._helpers import assertions
 
@@ -48,18 +49,15 @@ if "codeintel_rev.io.vllm_engine" not in sys.modules:  # pragma: no cover - test
     sys.modules["codeintel_rev.io.vllm_engine"] = stub
 
 embedding_module = importlib.import_module("codeintel_rev.embeddings")
-settings_module = importlib.import_module("codeintel_rev.config.settings")
 EmbeddingProviderBase = embedding_module.EmbeddingProviderBase
 EmbeddingRuntimeError = embedding_module.EmbeddingRuntimeError
-EmbeddingsConfig = settings_module.EmbeddingsConfig
-IndexConfig = settings_module.IndexConfig
 
 
 class _DummyProvider(EmbeddingProviderBase):
     """Deterministic provider returning simple ramp vectors."""
 
     def __init__(self, *, vec_dim: int = 4) -> None:
-        cfg = EmbeddingsConfig(
+        cfg = EmbeddingsSettings(
             provider="hf",
             model_name="dummy",
             device="cpu",
@@ -68,8 +66,7 @@ class _DummyProvider(EmbeddingProviderBase):
             normalize=True,
             max_pending_batches=0,
         )
-        index = IndexConfig(vec_dim=vec_dim)
-        super().__init__(provider_name="dummy", config=cfg, index=index, device_label="cpu")
+        super().__init__(provider_name="dummy", config=cfg, vec_dim=vec_dim, device_label="cpu")
         self.calls = 0
 
     def _run_inference(self, texts: Sequence[str]) -> tuple[np.ndarray, int]:

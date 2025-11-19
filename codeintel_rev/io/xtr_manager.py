@@ -6,7 +6,7 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.config.api import XTRSettings
@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     import numpy as np
 else:
     np = cast("np", LazyModule("numpy", "XTR index operations"))
-
-LegacyXTRConfig = object
 
 
 class XTRMetadata(TypedDict):
@@ -72,34 +70,75 @@ class _XTRIndexRuntime:
         self.test_vectors = None
 
 
-def _coerce_xtr_settings(config: XTRSettings | LegacyXTRConfig) -> XTRSettings:
-    """Return XTRSettings from either dataclass or legacy struct.
+class SupportsXTRSettings(Protocol):
+    """Protocol describing the configuration surface required by ``XTRIndex``."""
+
+    @property
+    def model_id(self) -> str:
+        """Return HuggingFace model identifier."""
+        ...
+
+    @property
+    def device(self) -> str:
+        """Return target device label."""
+        ...
+
+    @property
+    def max_query_tokens(self) -> int:
+        """Return token cap for query encoding."""
+        ...
+
+    @property
+    def candidate_k(self) -> int:
+        """Return number of Stage-0 candidates for rescoring."""
+        ...
+
+    @property
+    def dim(self) -> int:
+        """Return embedding dimension."""
+        ...
+
+    @property
+    def dtype(self) -> str:
+        """Return storage dtype for token memmaps."""
+        ...
+
+    @property
+    def enable(self) -> bool:
+        """Return whether XTR is enabled."""
+        ...
+
+    @property
+    def mode(self) -> str:
+        """Return runtime mode hint ("narrow" or "wide")."""
+        ...
+
+
+def _normalize_xtr_settings(config: SupportsXTRSettings) -> XTRSettings:
+    """Return an :class:`XTRSettings` dataclass from the supplied configuration.
 
     Parameters
     ----------
-    config : XTRSettings | LegacyXTRConfig
-        Candidate configuration object that may already be ``XTRSettings`` or
-        a msgspec struct from :mod:`codeintel_rev.config.settings`.
+    config : SupportsXTRSettings
+        Configuration provider supplying the required XTR attributes.
 
     Returns
     -------
     XTRSettings
-        Normalized dataclass representation of the supplied configuration.
+        Normalized dataclass representation with dtype/mode sanitized.
     """
-    if isinstance(config, XTRSettings):
-        return config
-    dtype_value = str(getattr(config, "dtype", "float16")).lower()
+    dtype_value = str(config.dtype).lower()
     dtype: Literal["float16", "float32"] = "float32" if dtype_value == "float32" else "float16"
-    mode_value = str(getattr(config, "mode", "narrow")).lower()
+    mode_value = str(config.mode).lower()
     mode: Literal["narrow", "wide"] = "wide" if mode_value == "wide" else "narrow"
     return XTRSettings(
-        model_id=getattr(config, "model_id", "nomic-ai/CodeRankEmbed"),
-        device=getattr(config, "device", "cuda"),
-        max_query_tokens=int(getattr(config, "max_query_tokens", 256)),
-        candidate_k=int(getattr(config, "candidate_k", 200)),
-        dim=int(getattr(config, "dim", 768)),
+        model_id=config.model_id,
+        device=config.device,
+        max_query_tokens=int(config.max_query_tokens),
+        candidate_k=int(config.candidate_k),
+        dim=int(config.dim),
         dtype=dtype,
-        enable=bool(getattr(config, "enable", False)),
+        enable=bool(config.enable),
         mode=mode,
     )
 
@@ -113,12 +152,12 @@ class XTRIndex:
     root : Path
         Root directory path containing XTR index files (token embeddings,
         metadata JSON).
-    config : XTRSettings | LegacyXTRConfig
-        XTR configuration settings. Normalized to XTRSettings in __post_init__.
+    config : SupportsXTRSettings
+        XTR configuration settings. Normalized to :class:`XTRSettings` in ``__post_init__``.
     """
 
     root: Path
-    config: XTRSettings | LegacyXTRConfig
+    config: SupportsXTRSettings
     _cell: RuntimeCell[_XTRIndexRuntime] = field(
         default_factory=lambda: RuntimeCell(name="xtr-index"),
         init=False,
@@ -126,8 +165,8 @@ class XTRIndex:
     )
 
     def __post_init__(self) -> None:
-        """Normalize config to AppConfig dataclass."""
-        normalized = _coerce_xtr_settings(self.config)
+        """Normalize configuration to the canonical dataclass."""
+        normalized = _normalize_xtr_settings(self.config)
         object.__setattr__(self, "config", normalized)
 
     def seed_runtime_for_tests(self, encoder_vectors: NDArrayF32 | None = None) -> None:

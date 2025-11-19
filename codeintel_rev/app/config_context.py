@@ -67,6 +67,7 @@ from codeintel_rev.config.api import (
     FAISSSettings,
     IndexSettings,
     LoggingSettings,
+    RedisSettings,
     SearchSettings,
     SpladeSettings,
 )
@@ -82,7 +83,7 @@ from codeintel_rev.io.bm25_engine import (
     BM25Rm3Config,
     PyseriniBM25Backend,
 )
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
@@ -450,9 +451,22 @@ def _build_faiss_manager(
     )
 
 
-def _build_duckdb_catalog_from_app_config(
+def _duckdb_catalog_config_from_app(
     paths: ResolvedPaths,
     app_config: AppConfig,
+) -> DuckDBCatalogConfig:
+    """Return catalog configuration derived from AppConfig and resolved paths."""
+    return DuckDBCatalogConfig(
+        db_path=paths.duckdb_path,
+        vectors_dir=paths.vectors_dir,
+        repo_root=paths.repo_root,
+        idmap_path=paths.faiss_idmap_path,
+        materialize=app_config.index.duckdb_materialize,
+    )
+
+
+def _build_duckdb_catalog_from_app_config(
+    catalog_cfg: DuckDBCatalogConfig,
     manager: DuckDBManager,
     *,
     log_queries: bool,
@@ -461,10 +475,8 @@ def _build_duckdb_catalog_from_app_config(
 
     Parameters
     ----------
-    paths : ResolvedPaths
-        Resolved filesystem paths configuration.
-    app_config : AppConfig
-        Application configuration containing index and DuckDB settings.
+    catalog_cfg : DuckDBCatalogConfig
+        Precomputed catalog configuration derived from AppConfig and paths.
     manager : DuckDBManager
         DuckDB manager instance for database operations.
     log_queries : bool
@@ -476,24 +488,24 @@ def _build_duckdb_catalog_from_app_config(
         Configured DuckDB catalog instance with ID map path set.
     """
     catalog = DuckDBCatalog(
-        paths.duckdb_path,
-        paths.vectors_dir,
-        materialize=app_config.index.duckdb_materialize,
+        catalog_cfg.db_path,
+        catalog_cfg.vectors_dir,
+        materialize=catalog_cfg.materialize,
         manager=manager,
         log_queries=log_queries,
-        repo_root=paths.repo_root,
+        repo_root=catalog_cfg.repo_root,
     )
-    catalog.set_idmap_path(paths.faiss_idmap_path)
+    catalog.set_idmap_path(catalog_cfg.idmap_path)
     return catalog
 
 
-def _build_scope_store(settings: Settings) -> ScopeStore:
+def _build_scope_store(redis_cfg: RedisSettings) -> ScopeStore:
     """Return the session scope store backed by redis.asyncio.
 
     Parameters
     ----------
-    settings : Settings
-        Application settings containing Redis configuration.
+    redis_cfg : RedisSettings
+        Redis configuration containing URL and cache TTL settings.
 
     Returns
     -------
@@ -504,12 +516,12 @@ def _build_scope_store(settings: Settings) -> ScopeStore:
         "ModuleType",
         _call_gate_import("redis.asyncio", "Session scope store requires redis extra"),
     )
-    redis_client = redis_asyncio.from_url(settings.redis.url)
+    redis_client = redis_asyncio.from_url(redis_cfg.url)
     return ScopeStore(
         cast("SupportsAsyncRedis", redis_client),
-        l1_maxsize=settings.redis.scope_l1_size,
-        l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
-        l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
+        l1_maxsize=redis_cfg.scope_l1_size,
+        l1_ttl_seconds=redis_cfg.scope_l1_ttl_seconds,
+        l2_ttl_seconds=redis_cfg.scope_l2_ttl_seconds,
     )
 
 
@@ -1066,7 +1078,7 @@ class ApplicationContext:
     Create context during application startup:
 
     >>> context = ApplicationContext.create()
-    >>> context.settings.paths.repo_root
+    >>> context.paths.repo_root
     '/home/user/kgfoundry'
 
     Use context in adapter functions:
@@ -1091,7 +1103,7 @@ class ApplicationContext:
 
     See Also
     --------
-    resolve_application_paths : Creates ResolvedPaths from Settings
+    resolve_application_paths : Creates ResolvedPaths from AppConfig
     ApplicationContext.create : Factory method for creating context
     """
 
@@ -1219,10 +1231,9 @@ class ApplicationContext:
         effective_overrides = overrides or ApplicationContextOverrides()
         app_config = app_config or load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
         if settings is None:
-            paths = resolve_application_paths(app_config)
             settings = settings_from_app_config(app_config)
-        else:
-            paths = merge_paths_with_app_config(resolve_application_paths(settings), app_config)
+        paths = resolve_application_paths(app_config)
+        catalog_cfg = _duckdb_catalog_config_from_app(paths, app_config)
         try:
             _ensure_filesystem_readiness(paths)
         except fs_readiness.ReadinessError as exc:
@@ -1238,23 +1249,22 @@ class ApplicationContext:
             app_config,
             factory=effective_overrides.faiss_manager_factory,
         )
-        scope_store = effective_overrides.scope_store or _build_scope_store(settings)
+        scope_store = effective_overrides.scope_store or _build_scope_store(app_config.redis)
         duckdb_manager = effective_overrides.duckdb_manager or DuckDBManager(
             app_config.duckdb.database, _duckdb_config_from_app(app_config)
         )
         if effective_overrides.duckdb_catalog_factory is not None:
             duckdb_catalog_factory = effective_overrides.duckdb_catalog_factory
         else:
-            log_queries = settings.duckdb.log_queries
+            log_queries = getattr(app_config.duckdb, "log_queries", False)
 
             def _factory(
-                resolved: ResolvedPaths,
+                _resolved: ResolvedPaths,
                 _settings: Settings,
                 manager: DuckDBManager,
             ) -> DuckDBCatalog:
                 return _build_duckdb_catalog_from_app_config(
-                    resolved,
-                    app_config,
+                    catalog_cfg,
                     manager,
                     log_queries=log_queries,
                 )

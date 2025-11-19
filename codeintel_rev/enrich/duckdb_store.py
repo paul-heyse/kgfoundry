@@ -9,14 +9,14 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypedDict, cast
 
 from codeintel_rev.runtime.imports import gate_import
 
 __all__ = [
     "DuckConn",
-    "DuckDBConfig",
     "DuckDBIngestContext",
+    "DuckDBStoreConfig",
     "ensure_schema",
     "ingest_modules_jsonl",
 ]
@@ -143,23 +143,35 @@ class _DuckDBModule(Protocol):
         ...
 
 
-@dataclass(frozen=True, slots=True)
-class DuckDBConfig:
-    """DuckDB connection options."""
+class ConnectKwargs(TypedDict, total=False):
+    """Connect arguments passed to ``duckdb.connect``."""
 
     database: str
+    read_only: bool
+    config: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class DuckDBStoreConfig:
+    """DuckDB connection options for enrichment ingestion."""
+
+    database: Path
     read_only: bool = False
     pragmas: tuple[PragmaSetting, ...] = ()
 
-    def to_kwargs(self) -> dict[str, object]:
+    def connect_kwargs(self) -> ConnectKwargs:
         """Return keyword arguments compatible with ``duckdb.connect``.
 
         Returns
         -------
-        dict[str, object]
-            Mapping of connection options passed to ``duckdb.connect``.
+        ConnectKwargs
+            Mapping of typed connection arguments safe to splat into
+            :func:`duckdb.connect`.
         """
-        options: dict[str, object] = {"database": self.database, "read_only": self.read_only}
+        options: ConnectKwargs = {
+            "database": str(self.database),
+            "read_only": self.read_only,
+        }
         if self.pragmas:
             options["config"] = {setting.name: setting.value for setting in self.pragmas}
         return options
@@ -241,8 +253,8 @@ def _connect(db_path: Path, ctx: DuckDBIngestContext) -> DuckDBConnection:
     DuckDBConnection
         Configured DuckDB connection with pragma settings applied.
     """
-    config = DuckDBConfig(str(db_path), pragmas=ctx.pragmas)
-    return ctx.duckdb_module.connect(**config.to_kwargs())
+    config = DuckDBStoreConfig(db_path, pragmas=ctx.pragmas)
+    return ctx.duckdb_module.connect(**config.connect_kwargs())
 
 
 def ensure_schema(conn: DuckConn, *, context: DuckDBIngestContext | None = None) -> None:

@@ -70,9 +70,9 @@ def _build_context(repo_root: Path) -> ApplicationContext:
 
     scope_store = ScopeStore(
         _FakeRedis(),
-        l1_maxsize=settings.redis.scope_l1_size,
-        l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
-        l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
+        l1_maxsize=app_config.redis.scope_l1_size,
+        l1_ttl_seconds=app_config.redis.scope_l1_ttl_seconds,
+        l2_ttl_seconds=app_config.redis.scope_l2_ttl_seconds,
     )
 
     duckdb_manager = DuckDBManager(paths.duckdb_path, DuckDBConfig())

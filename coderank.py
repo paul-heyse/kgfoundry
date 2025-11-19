@@ -15,7 +15,6 @@ from codeintel_rev.config import load_app_config
 from codeintel_rev.config.api import AppConfig
 from codeintel_rev.config.helpers import index_settings
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
@@ -27,11 +26,6 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 @lru_cache(maxsize=1)
 def _cached_app_config() -> AppConfig:
     return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
-
-
-@lru_cache(maxsize=1)
-def _legacy_settings() -> object:
-    return settings_from_app_config(_cached_app_config())
 
 
 @lru_cache(maxsize=1)
@@ -49,14 +43,13 @@ def build_index() -> None:
         If the DuckDB catalog does not contain any chunks.
     """
     app_config = _cached_app_config()
-    settings = _legacy_settings()
     paths = _cached_paths()
     index_cfg = index_settings(app_config)
     fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
 
-    embedder = CodeRankEmbedder(settings=settings.coderank)
+    embedder = CodeRankEmbedder(settings=app_config.coderank)
 
-    duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
+    duckdb_manager = DuckDBManager(paths.duckdb_path, app_config.duckdb)
     catalog = DuckDBCatalog(
         db_path=paths.duckdb_path,
         vectors_dir=paths.vectors_dir,

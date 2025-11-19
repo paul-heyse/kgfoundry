@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
+from codeintel_rev.config.api import IndexSettings, SearchSettings, ServerLimits
 from codeintel_rev.io.duckdb_catalog import StructureAnnotations
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.retrieval.mcp_search import (
@@ -158,31 +159,19 @@ class _StubCatalog:
         return annotations
 
 
-class _StubIndexConfig:
-    vec_dim = 4
-    faiss_nprobe = 1
-
-
-class _StubLimits:
-    max_results = 50
-    semantic_overfetch_multiplier = 2
-
-
-class _StubSettings:
-    index = _StubIndexConfig()
-    limits = _StubLimits()
-
-
 def test_run_search_returns_structured_results(tmp_path: Path) -> None:
     """Test that run_search returns structured results with metadata and explainability."""
     catalog = _StubCatalog()
-    settings = _StubSettings()
+    search_settings = SearchSettings()
+    index_cfg = IndexSettings(vec_dim=4, faiss_nprobe=1)
+    limits_cfg = ServerLimits(max_results=50, semantic_overfetch_multiplier=2)
     deps = SearchDependencies(
         faiss=_StubFaiss(),
         embedder=_StubEmbedder(dim=4),
         catalog=catalog,
-        settings=settings,
-        index=settings.index,
+        settings=search_settings,
+        index=index_cfg,
+        limits_cfg=limits_cfg,
         session_id="sess",
         run_id="run",
         limits=[],
@@ -213,7 +202,7 @@ def test_run_fetch_hydrates_content() -> None:
     catalog = _StubCatalog()
     deps = FetchDependencies(
         catalog=catalog,
-        settings=_StubSettings(),
+        settings=SearchSettings(),
     )
     request = FetchRequest(object_ids=(1,), max_tokens=512)
     response: FetchResponse = run_fetch(request=request, deps=deps)

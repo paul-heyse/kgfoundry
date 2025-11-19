@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Literal, cast
+from typing import Annotated, Literal, Protocol, cast
 
 import click
 import duckdb as duckdb_mod
@@ -20,7 +20,8 @@ import numpy as np
 import typer
 
 from codeintel_rev.config import AppConfig, load_app_config
-from codeintel_rev.config.paths import resolve_application_paths
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
+from codeintel_rev.config.settings import Settings
 from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.embeddings import EmbeddingProvider, get_embedding_provider
 from codeintel_rev.errors import RuntimeLifecycleError
@@ -31,8 +32,8 @@ from codeintel_rev.indexing.index_lifecycle import (
     IndexLifecycleManager,
     collect_asset_attrs,
 )
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
-from codeintel_rev.io.duckdb_manager import DuckDBManager
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
+from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import (
     FAISSManager,
     RefineSearchConfig,
@@ -59,7 +60,7 @@ app.add_typer(embeddings_app, name="embeddings")
 
 
 @lru_cache(maxsize=1)
-def _cached_settings() -> object:
+def _cached_settings() -> Settings:
     """Load and cache msgspec Settings derived from AppConfig.
 
     Returns
@@ -83,7 +84,7 @@ def _cached_app_config() -> AppConfig:
 
 
 def _default_faiss_manager_factory(
-    _settings: object,
+    _settings: Settings,
     index_override: Path | None,
 ) -> FAISSManager:
     """Create and load a FAISS manager instance from settings.
@@ -95,7 +96,7 @@ def _default_faiss_manager_factory(
 
     Parameters
     ----------
-    _settings : object
+    _settings : Settings
         Application settings containing FAISS vector dimension and nlist
         configuration. Index path defaults are sourced from :class:`AppConfig`.
         This parameter is unused but kept for API compatibility.
@@ -132,7 +133,7 @@ def _default_faiss_manager_factory(
 
 
 def _default_duckdb_catalog_factory(
-    settings: object,
+    _settings: SupportsPathSettings,
     path_override: Path | None,
 ) -> DuckDBCatalog:
     """Create and configure a DuckDB catalog instance from settings.
@@ -144,10 +145,10 @@ def _default_duckdb_catalog_factory(
 
     Parameters
     ----------
-    settings : object
-        Application settings containing vectors directory, repository root,
-        materialization settings, and FAISS ID map path. The DuckDB catalog path
-        defaults to the value defined in :class:`AppConfig`.
+    _settings : SupportsPathSettings
+        Application settings (unused; retained for compatibility with existing
+        overrides). The DuckDB catalog path defaults to the value defined in
+        :class:`AppConfig`.
     path_override : Path | None
         Optional path override for the DuckDB catalog file. If provided, this
         path is used instead of the settings path. The path is expanded and
@@ -168,17 +169,46 @@ def _default_duckdb_catalog_factory(
     ready-to-use catalog instance with proper ID map and materialization settings.
     """
     app_config = _cached_app_config()
-    default_db = app_config.duckdb.database
-    db_path = (path_override or default_db).expanduser().resolve()
-    vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
-    catalog = DuckDBCatalog(
+    paths = resolve_application_paths(app_config)
+    db_path = (path_override or paths.duckdb_path).expanduser().resolve()
+    catalog_cfg = DuckDBCatalogConfig(
         db_path=db_path,
-        vectors_dir=vectors_dir,
-        repo_root=Path(settings.paths.repo_root).expanduser().resolve(),
+        vectors_dir=paths.vectors_dir,
+        repo_root=paths.repo_root,
+        idmap_path=paths.faiss_idmap_path,
         materialize=app_config.index.duckdb_materialize,
     )
-    catalog.set_idmap_path(Path(settings.paths.faiss_idmap_path).expanduser().resolve())
+    catalog = DuckDBCatalog(
+        catalog_cfg.db_path,
+        catalog_cfg.vectors_dir,
+        materialize=catalog_cfg.materialize,
+        repo_root=catalog_cfg.repo_root,
+    )
+    catalog.set_idmap_path(catalog_cfg.idmap_path)
     return catalog
+
+
+def _duckdb_manager_config(app_config: AppConfig) -> DuckDBConfig:
+    """Translate AppConfig DuckDB settings into DuckDBManager configuration.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing DuckDB settings.
+
+    Returns
+    -------
+    DuckDBConfig
+        DuckDB manager configuration derived from app_config.
+    """
+    defaults = DuckDBConfig()
+    duck_cfg = app_config.duckdb
+    return DuckDBConfig(
+        threads=duck_cfg.threads if duck_cfg.threads is not None else defaults.threads,
+        enable_object_cache=duck_cfg.object_cache,
+        log_queries=defaults.log_queries,
+        pool_size=duck_cfg.pool_size,
+    )
 
 
 def _default_duckdb_embedding_dim(catalog: DuckDBCatalog) -> int:
@@ -264,12 +294,12 @@ def _default_count_idmap_rows(path: Path) -> int:
     return metadata.num_rows if metadata is not None else 0
 
 
-def _default_embedding_provider_factory(_settings: object) -> EmbeddingProvider:
+def _default_embedding_provider_factory(_settings: Settings) -> EmbeddingProvider:
     """Create an embedding provider instance from the active configuration.
 
     Parameters
     ----------
-    _settings : object
+    _settings : Settings
         Legacy settings struct that supplies index configuration (vector
         dimensionality). Embedding/vLLM parameters are sourced from AppConfig.
         This parameter is unused but kept for API compatibility.
@@ -294,13 +324,13 @@ class IndexctlCliContext:
 
     Attributes
     ----------
-    settings_factory : Callable[[], object]
+    settings_factory : Callable[[], Settings]
         Factory function that returns application settings. Typically uses
         caching to avoid repeated file I/O.
-    faiss_manager_factory : Callable[[object, Path | None], FAISSManager]
+    faiss_manager_factory : Callable[[Settings, Path | None], FAISSManager]
         Factory function that creates FAISS manager instances from settings
         and optional index path override.
-    duckdb_catalog_factory : Callable[[object, Path | None], DuckDBCatalog]
+    duckdb_catalog_factory : Callable[[SupportsPathSettings, Path | None], DuckDBCatalog]
         Factory function that creates DuckDB catalog instances from settings
         and optional path override.
     duckdb_dim_resolver : Callable[[DuckDBCatalog], int]
@@ -309,17 +339,17 @@ class IndexctlCliContext:
     idmap_row_counter : Callable[[Path], int]
         Function that counts rows in a FAISS ID map Parquet file without
         loading the entire file.
-    embedding_provider_factory : Callable[[object], EmbeddingProvider]
+    embedding_provider_factory : Callable[[Settings], EmbeddingProvider]
         Factory function that creates embedding provider instances from
         application settings.
     """
 
-    settings_factory: Callable[[], object]
-    faiss_manager_factory: Callable[[object, Path | None], FAISSManager]
-    duckdb_catalog_factory: Callable[[object, Path | None], DuckDBCatalog]
+    settings_factory: Callable[[], Settings]
+    faiss_manager_factory: Callable[[Settings, Path | None], FAISSManager]
+    duckdb_catalog_factory: Callable[[SupportsPathSettings, Path | None], DuckDBCatalog]
     duckdb_dim_resolver: Callable[[DuckDBCatalog], int]
     idmap_row_counter: Callable[[Path], int]
-    embedding_provider_factory: Callable[[object], EmbeddingProvider]
+    embedding_provider_factory: Callable[[Settings], EmbeddingProvider]
 
     @classmethod
     def production(cls) -> IndexctlCliContext:
@@ -387,7 +417,7 @@ def _cli_context(ctx: click.Context | None = None) -> IndexctlCliContext:
     return _DEFAULT_CONTEXT
 
 
-def _get_settings() -> object:
+def _get_settings() -> Settings:
     """Retrieve application settings from CLI context.
 
     This function retrieves application settings by accessing the settings factory
@@ -396,10 +426,10 @@ def _get_settings() -> object:
 
     Returns
     -------
-    object
-        Application settings object containing configuration for paths, index
-        parameters, and embedding providers. The settings are loaded from the
-        CLI context's settings factory.
+    Settings
+        Application settings containing configuration for paths, index parameters,
+        and embedding providers. The settings are loaded from the CLI context's
+        settings factory.
 
     Notes
     -----
@@ -933,15 +963,17 @@ class _EmbeddingBuildContext:
     """Context object for embedding build operations.
 
     This dataclass holds configuration and paths needed for embedding generation
-    operations, including settings, lifecycle manager, version information, and
+    operations, including app_config, lifecycle manager, version information, and
     input/output paths. The context is mutable to allow updates during build
     operations.
 
     Attributes
     ----------
-    settings : object
-        Application settings containing embedding provider configuration and
-        batch size parameters. Used to configure embedding generation.
+    app_config : AppConfig
+        Immutable application configuration containing embedding provider settings,
+        DuckDB parameters, and default paths.
+    paths : ResolvedPaths
+        Canonical filesystem paths derived from :class:`AppConfig`.
     manager : IndexLifecycleManager
         Index lifecycle manager for accessing version directories and staging
         operations. Used to resolve version-specific paths.
@@ -962,7 +994,8 @@ class _EmbeddingBuildContext:
         metadata about generated embeddings.
     """
 
-    settings: object
+    app_config: AppConfig
+    paths: ResolvedPaths
     manager: IndexLifecycleManager
     version: str | None
     version_dir: Path | None
@@ -972,7 +1005,7 @@ class _EmbeddingBuildContext:
 
 
 def _build_context(
-    settings: object,
+    app_config: AppConfig,
     manager: IndexLifecycleManager,
     *,
     version: str | None,
@@ -988,10 +1021,10 @@ def _build_context(
 
     Parameters
     ----------
-    settings : object
-        Application settings containing default paths and configuration. Used to
-        determine default DuckDB catalog and output paths when overrides are not
-        provided.
+    app_config : AppConfig
+        Immutable application configuration providing default paths and settings.
+        Used to determine default DuckDB catalog and output paths when overrides
+        are not provided.
     manager : IndexLifecycleManager
         Index lifecycle manager for resolving version directories. Used to determine
         version-specific paths when version is specified.
@@ -1015,24 +1048,26 @@ def _build_context(
     -----
     Context construction enables embedding generation by providing all necessary
     paths and configuration in a single object. The function handles path resolution
-    with precedence: explicit overrides > version-specific paths > settings defaults.
+    with precedence: explicit overrides > version-specific paths > AppConfig defaults.
     This enables flexible configuration while maintaining sensible defaults.
 
     The function may propagate typer.BadParameter from _resolve_version_dir when
     explicit version doesn't exist, or from resolve_duck_path when DuckDB catalog
     file is not found.
     """
+    paths = resolve_application_paths(app_config)
     version_dir = _resolve_version_dir(manager, version)
-    duck_path = resolve_duck_path(settings, version_dir, duckdb_path)
+    duck_path = resolve_duck_path(paths, version_dir, duckdb_path)
     output_path = _resolve_output_path(
-        settings,
+        paths,
         version_dir,
         output,
         ensure_parent=True,
     )
     manifest_path = _manifest_path_for(output_path)
     return _EmbeddingBuildContext(
-        settings=settings,
+        app_config=app_config,
+        paths=paths,
         manager=manager,
         version=version,
         version_dir=version_dir,
@@ -1043,28 +1078,28 @@ def _build_context(
 
 
 def resolve_duck_path(
-    settings: object,
+    paths: ResolvedPaths,
     version_dir: Path | None,
     override: Path | None,
 ) -> Path:
-    """Resolve DuckDB catalog path from settings, version directory, or override.
+    """Resolve DuckDB catalog path from resolved paths, version directory, or override.
 
     This function determines the DuckDB catalog path to use for embedding operations
-    by checking override parameter, version directory, and settings defaults in order
+    by checking override parameter, version directory, and AppConfig defaults in order
     of precedence. The function validates that the resolved path exists before returning.
 
     Parameters
     ----------
-    settings : object
-        Application settings containing legacy defaults. When neither override nor
-        version_dir is provided, the DuckDB catalog path falls back to
-        :class:`AppConfig`.
+    paths : ResolvedPaths
+        Canonicalized filesystem paths derived from AppConfig. When neither override
+        nor version_dir is provided, the DuckDB catalog path falls back to the
+        resolved default.
     version_dir : Path | None
         Optional version directory path. If provided and override is None, the
         catalog path is resolved as version_dir / "catalog.duckdb".
     override : Path | None
         Optional explicit path override. If provided, this path takes precedence
-        over version directory and settings defaults.
+        over version directory and AppConfig defaults.
 
     Returns
     -------
@@ -1082,25 +1117,16 @@ def resolve_duck_path(
     Notes
     -----
     DuckDB path resolution enables flexible catalog access by supporting multiple
-    path sources: explicit overrides, version-specific catalogs, and default settings.
-    When the AppConfig path is missing but the legacy settings path exists, the
-    latter is used for backwards compatibility. The function validates path existence
-    to prevent errors from missing catalogs, ensuring robust operation even when
-    paths are misconfigured.
+    path sources: explicit overrides, version-specific catalogs, and AppConfig defaults.
+    The function validates path existence to prevent errors from missing catalogs,
+    ensuring robust operation even when paths are misconfigured.
     """
     if override is not None:
         duck_path = override.expanduser().resolve()
     elif version_dir is not None:
         duck_path = (version_dir / "catalog.duckdb").resolve()
     else:
-        config_path = _cached_app_config().duckdb.database.resolve()
-        legacy_path = Path(settings.paths.duckdb_path).expanduser().resolve()
-        if config_path.exists():
-            duck_path = config_path
-        elif legacy_path.exists():
-            duck_path = legacy_path
-        else:
-            duck_path = config_path
+        duck_path = paths.duckdb_path
     if not duck_path.exists():
         msg = f"DuckDB catalog not found: {duck_path}"
         raise typer.BadParameter(msg)
@@ -1108,29 +1134,29 @@ def resolve_duck_path(
 
 
 def _resolve_output_path(
-    settings: object,
+    paths: ResolvedPaths,
     version_dir: Path | None,
     override: Path | None,
     *,
     ensure_parent: bool,
 ) -> Path:
-    """Resolve embeddings output path from settings, version directory, or override.
+    """Resolve embeddings output path from paths, version directory, or override.
 
     This function determines the output path for embeddings Parquet file by checking
-    override parameter, version directory, and settings defaults in order of precedence.
+    override parameter, version directory, and AppConfig defaults in order of precedence.
     The function optionally ensures the parent directory exists before returning.
 
     Parameters
     ----------
-    settings : object
-        Application settings containing default vectors directory. Used when override
+    paths : ResolvedPaths
+        Canonicalized filesystem paths containing the default vectors directory. Used when override
         and version_dir are None. The output path is resolved as vectors_dir / "embeddings.parquet".
     version_dir : Path | None
         Optional version directory path. If provided and override is None, the
         output path is resolved as version_dir / "embeddings.parquet".
     override : Path | None
         Optional explicit path override. If provided, this path takes precedence
-        over version directory and settings defaults.
+        over version directory and AppConfig defaults.
     ensure_parent : bool
         Flag indicating whether to create the parent directory if it doesn't exist.
         When True, parent directories are created using mkdir(parents=True, exist_ok=True).
@@ -1140,12 +1166,12 @@ def _resolve_output_path(
     Path
         Resolved embeddings output path. The path is expanded (handling ~) and
         resolved to absolute form. Path resolution follows precedence: override >
-        version_dir / "embeddings.parquet" > settings.paths.vectors_dir / "embeddings.parquet".
+        version_dir / "embeddings.parquet" > paths.vectors_dir / "embeddings.parquet".
 
     Notes
     -----
     Output path resolution enables flexible embedding storage by supporting multiple
-    path sources: explicit overrides, version-specific outputs, and default settings.
+    path sources: explicit overrides, version-specific outputs, and default paths.
     The function optionally ensures parent directories exist, preventing errors
     from missing directories during file writing. This supports both user-specified
     and default output locations.
@@ -1155,9 +1181,7 @@ def _resolve_output_path(
     elif version_dir is not None:
         output_path = (version_dir / "embeddings.parquet").resolve()
     else:
-        output_path = (
-            Path(settings.paths.vectors_dir).expanduser() / "embeddings.parquet"
-        ).resolve()
+        output_path = (paths.vectors_dir / "embeddings.parquet").resolve()
     if ensure_parent:
         output_path.parent.mkdir(parents=True, exist_ok=True)
     return output_path
@@ -1543,9 +1567,9 @@ def _execute_embeddings_build(
     updates in production. The function writes both Parquet files and manifests,
     enabling downstream tools to access embeddings and metadata.
     """
-    settings = context.settings
-    provider = _embedding_provider(settings)
-    db_manager = DuckDBManager(context.duck_path, settings.duckdb)
+    provider = _embedding_provider(_get_settings())
+    duckdb_cfg = _duckdb_manager_config(context.app_config)
+    db_manager = DuckDBManager(context.duck_path, duckdb_cfg)
     try:
         checksum, row_count = _compute_chunk_checksum(db_manager)
         existing_manifest = _load_manifest(context.manifest_path)
@@ -1604,7 +1628,6 @@ def _run_embedding_validation(
     parquet_path: Path,
     samples: int,
     epsilon: float,
-    settings: object,
 ) -> None:
     """Run embedding validation by sampling and recomputing embeddings.
 
@@ -1625,9 +1648,6 @@ def _run_embedding_validation(
         Maximum allowed drift threshold for validation. Chunks with drift
         exceeding epsilon are reported as failures. Drift is computed as
         1 - cosine_similarity.
-    settings : object
-        Application settings containing embedding provider configuration. Used
-        to instantiate the embedding provider for recomputing embeddings.
 
     Raises
     ------
@@ -1655,7 +1675,7 @@ def _run_embedding_validation(
     contents = cast("list[str]", table.column("content").to_pylist())
     indices = _deterministic_sample(total_rows, sample_size)
 
-    provider = _embedding_provider(settings)
+    provider = _embedding_provider(_get_settings())
     try:
         max_drift, drift_sum, failure_count = _evaluate_drift(
             indices=indices,
@@ -1743,10 +1763,10 @@ def embeddings_build_command(
     chunk_size : ChunkBatchOption, optional
         Batch size for embedding generation. Defaults to 512.
     """
-    settings = _get_settings()
+    app_config = _cached_app_config()
     manager = _manager()
     context = _build_context(
-        settings,
+        app_config,
         manager,
         version=version,
         duckdb_path=duckdb_path,
@@ -1797,11 +1817,12 @@ def embeddings_validate_command(
         Raised when the embeddings Parquet file is missing or cannot be accessed.
         The error includes the expected path for debugging.
     """
-    settings = _get_settings()
+    app_config = _cached_app_config()
+    paths = resolve_application_paths(app_config)
     manager = _manager()
     version_dir = _resolve_version_dir(manager, version)
     parquet_path = _resolve_output_path(
-        settings,
+        paths,
         version_dir,
         parquet,
         ensure_parent=False,
@@ -1814,7 +1835,6 @@ def embeddings_validate_command(
         parquet_path=parquet_path,
         samples=samples,
         epsilon=epsilon,
-        settings=settings,
     )
 
 
@@ -1996,7 +2016,7 @@ def _count_idmap_rows(path: Path) -> int:
     return _cli_context().idmap_row_counter(path)
 
 
-def _embedding_provider(settings: object) -> EmbeddingProvider:
+def _embedding_provider(settings: Settings) -> EmbeddingProvider:
     """Create embedding provider instance using CLI context factory.
 
     This function creates an EmbeddingProvider instance by using the CLI context's
@@ -2005,7 +2025,7 @@ def _embedding_provider(settings: object) -> EmbeddingProvider:
 
     Parameters
     ----------
-    settings : object
+    settings : Settings
         Application settings containing embedding provider configuration (provider
         type, model name, API keys, etc.). Used to instantiate the appropriate
         embedding provider.

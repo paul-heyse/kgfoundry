@@ -20,7 +20,7 @@ from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 
 from tests._helpers import assertions, constants
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_app_config_for_repo
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("RUN_BENCHMARKS"),
@@ -50,8 +50,8 @@ def mock_context(tmp_path: Path) -> Mock:
     for i in range(100):
         (repo_root / "src" / f"file_{i}.py").write_text(f"def func_{i}():\n    pass\n")
 
-    settings = build_settings_for_repo(repo_root)
-    paths = resolve_application_paths(settings)
+    app_config = build_app_config_for_repo(repo_root)
+    paths = resolve_application_paths(app_config)
 
     context = Mock(spec=ApplicationContext)
     context.paths = paths

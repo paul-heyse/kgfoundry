@@ -1961,9 +1961,21 @@ def refresh_faiss_idmap_materialized(
 
 __all__ = [
     "DuckDBCatalog",
+    "DuckDBCatalogConfig",
     "IdMapMeta",
     "StructureAnnotations",
     "ensure_faiss_idmap_view",
     "refresh_faiss_idmap_materialized",
     "relation_exists",
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class DuckDBCatalogConfig:
+    """Configuration bundle for constructing DuckDBCatalog instances."""
+
+    db_path: Path
+    vectors_dir: Path
+    repo_root: Path
+    idmap_path: Path
+    materialize: bool = False

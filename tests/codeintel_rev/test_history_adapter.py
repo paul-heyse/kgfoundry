@@ -17,7 +17,7 @@ from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters.history import blame_range, file_history
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_app_config_for_repo
 
 pytestmark = pytest.mark.asyncio
 
@@ -45,8 +45,9 @@ def mock_context(tmp_path: Path) -> Mock:
     (repo_root / "src" / "main.py").write_text('def main():\n    print("hello")\n')
     (repo_root / "README.md").write_text("# Documentation\n")
 
-    settings = build_settings_for_repo(repo_root)
-    context.paths = resolve_application_paths(settings)
+    app_config = build_app_config_for_repo(repo_root)
+    context.app_config = app_config
+    context.paths = resolve_application_paths(app_config)
 
     # Mock async_git_client
     context.async_git_client = AsyncMock()

@@ -33,11 +33,11 @@ from codeintel_rev.config.api import (
 from codeintel_rev.config.api import (
     PathsConfig as ApiPathsConfig,
 )
+from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.embeddings import EmbeddingProvider
 from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
 from tests._helpers import assertions, cli, constants
-from tests._helpers.settings import build_settings_for_repo
 
 
 class _StubProvider:
@@ -259,7 +259,7 @@ def test_resolve_duck_path_prefers_app_config_default(
     duck_path = repo_root / "custom.duckdb"
     duck_path.touch()
     app_config = _app_config_with_duckdb(repo_root, duck_path)
-    settings = build_settings_for_repo(repo_root)
     monkeypatch.setattr(indexctl_module, "_cached_app_config", lambda: app_config)
-    resolved = indexctl_module.resolve_duck_path(settings, version_dir=None, override=None)
+    paths = resolve_application_paths(app_config)
+    resolved = indexctl_module.resolve_duck_path(paths, version_dir=None, override=None)
     assertions.expect_equal(resolved, duck_path.resolve())

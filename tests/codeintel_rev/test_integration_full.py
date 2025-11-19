@@ -16,13 +16,14 @@ import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import readyz
 from codeintel_rev.app.runtime_readiness import ReadinessProbe
+from codeintel_rev.config.shim import settings_from_app_config
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from kgfoundry_common.errors import ConfigurationError
 from tests._helpers import assertions
 from tests._helpers.http import RepoAppHandle, build_test_app
-from tests._helpers.settings import build_settings_for_repo, scaffold_repo_root
+from tests._helpers.settings import build_app_config_for_repo, scaffold_repo_root
 from tests.conftest import HAS_FAISS_SUPPORT
 
 
@@ -62,8 +63,9 @@ def test_repo(tmp_path: Path) -> RepoHandle:
     handle = RepoHandle(repo_root)
 
     def rebuild(index_overrides: dict[str, object] | None = None) -> None:
-        settings = build_settings_for_repo(repo_root, index_overrides=index_overrides)
-        context = ApplicationContext.create(settings=settings)
+        app_config = build_app_config_for_repo(repo_root, index_overrides=index_overrides)
+        settings = settings_from_app_config(app_config)
+        context = ApplicationContext.create(settings=settings, app_config=app_config)
         readiness = ReadinessProbe(context)
         app = build_test_app(context)
         app.state.readiness = readiness
@@ -120,9 +122,10 @@ def test_app_readyz_endpoint_healthy(test_repo: RepoHandle) -> None:
 def test_app_startup_fails_invalid_repo_root(tmp_path: Path) -> None:
     """Test that FastAPI app fails to start with invalid REPO_ROOT."""
     invalid_path = tmp_path / "nonexistent"
-    settings = build_settings_for_repo(invalid_path)
+    app_config = build_app_config_for_repo(invalid_path)
+    settings = settings_from_app_config(app_config)
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
-        ApplicationContext.create(settings=settings)
+        ApplicationContext.create(settings=settings, app_config=app_config)
 
 
 def test_app_startup_with_preload_disabled(test_repo: RepoHandle) -> None:
@@ -212,19 +215,9 @@ def test_configuration_immutability(test_repo: RepoHandle) -> None:
     with TestClient(test_app):
         context = test_app.state.context
 
-        # Attempt to modify frozen settings should raise FrozenInstanceError
-        # Note: msgspec.Struct uses a different exception mechanism
-        # but the effect is the same - modification is prevented
-
-        # msgspec.Struct raises AttributeError when trying to set attributes
-        # We test each exception type separately to satisfy pyrefly type checking
-        try:
-            context.settings.paths.repo_root = "/new/path"
-            pytest.fail("Expected AttributeError or TypeError")
-        except AttributeError:
-            pass
-        except TypeError:
-            pass
+        # Attempt to modify frozen AppConfig should raise FrozenInstanceError
+        with pytest.raises(FrozenInstanceError):
+            context.app_config.paths = context.app_config.paths
 
         # ResolvedPaths is a frozen dataclass, should raise FrozenInstanceError
         # Use setattr to trigger FrozenInstanceError properly

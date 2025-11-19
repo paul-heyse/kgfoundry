@@ -1,16 +1,16 @@
 {
   "schema": "cst/v1",
-  "built_at": "2025-11-19T03:22:56.610788+00:00",
+  "built_at": "2025-11-19T13:36:54.148813+00:00",
   "root": "/home/paul/kgfoundry/codeintel_rev",
-  "files_indexed": 204,
-  "node_rows": 114122,
+  "files_indexed": 220,
+  "node_rows": 120196,
   "stitched": {
-    "with_module": 92792,
+    "with_module": 90803,
     "with_scip": 0
   },
   "provider_stats": {
-    "qname_hits": 77790,
-    "scope_lookups": 92798
+    "qname_hits": 81888,
+    "scope_lookups": 97559
   },
   "parse_errors": 0
 }

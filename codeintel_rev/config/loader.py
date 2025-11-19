@@ -13,6 +13,8 @@ from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
     AppConfig,
     BM25Settings,
+    CodeRankLLMSettings,
+    CodeRankSettings,
     DuckDBSettings,
     EmbeddingsSettings,
     EvalSettings,
@@ -21,10 +23,14 @@ from codeintel_rev.config.api import (
     LoggingSettings,
     PathsConfig,
     PRFSettings,
+    RedisSettings,
+    RerankSettings,
     SearchSettings,
+    ServerLimits,
     SpladeOnnxQueryConfig,
     SpladeSettings,
     VLLMSettings,
+    WarpSettings,
     XTRSettings,
     validate_config,
 )
@@ -1317,6 +1323,178 @@ def _xtr_settings(get: LookupFn) -> XTRSettings:
     )
 
 
+def _redis_settings(get: LookupFn) -> RedisSettings:
+    """Build RedisSettings from lookup function with defaults.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    RedisSettings
+        Redis connection and L1/L2 cache configuration resolved from env/file data.
+    """
+    defaults = RedisSettings()
+    return RedisSettings(
+        url=_as_str(get("REDIS_URL", defaults.url)),
+        scope_l1_size=_coerce_int(
+            get("REDIS_SCOPE_L1_SIZE", str(defaults.scope_l1_size)),
+            default=defaults.scope_l1_size,
+        ),
+        scope_l1_ttl_seconds=_coerce_float(
+            get("REDIS_SCOPE_L1_TTL_SECONDS", str(defaults.scope_l1_ttl_seconds)),
+            default=defaults.scope_l1_ttl_seconds,
+        ),
+        scope_l2_ttl_seconds=_coerce_int(
+            get("REDIS_SCOPE_L2_TTL_SECONDS", str(defaults.scope_l2_ttl_seconds)),
+            default=defaults.scope_l2_ttl_seconds,
+        ),
+    )
+
+
+def _limits_settings(get: LookupFn) -> ServerLimits:
+    """Build ServerLimits from lookup function.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    ServerLimits
+        Resource limits including max results and rate limiting configuration.
+    """
+    defaults = ServerLimits()
+    return ServerLimits(
+        max_results=_coerce_int(
+            get("MAX_RESULTS", str(defaults.max_results)), default=defaults.max_results
+        ),
+        query_timeout_s=_coerce_float(
+            get("QUERY_TIMEOUT_S", str(defaults.query_timeout_s)),
+            default=defaults.query_timeout_s,
+        ),
+        rate_limit_qps=_coerce_float(
+            get("RATE_LIMIT_QPS", str(defaults.rate_limit_qps)),
+            default=defaults.rate_limit_qps,
+        ),
+        rate_limit_burst=_coerce_int(
+            get("RATE_LIMIT_BURST", str(defaults.rate_limit_burst)),
+            default=defaults.rate_limit_burst,
+        ),
+        semantic_overfetch_multiplier=_coerce_int(
+            get("SEMANTIC_OVERFETCH_MULTIPLIER", str(defaults.semantic_overfetch_multiplier)),
+            default=defaults.semantic_overfetch_multiplier,
+        ),
+    )
+
+
+def _rerank_settings(get: LookupFn) -> RerankSettings:
+    """Build RerankSettings from lookup function.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    RerankSettings
+        Late-interaction reranker configuration resolved from env/file data.
+    """
+    provider_value: Literal["xtr"] = "xtr"
+    return RerankSettings(
+        enabled=_to_bool(_as_optional_str(get("RERANK_ENABLED", "0")), default=False),
+        top_k=_coerce_int(get("RERANK_TOP_K", "50"), default=50),
+        provider=provider_value,
+        explain=_to_bool(_as_optional_str(get("RERANK_EXPLAIN", "0")), default=False),
+    )
+
+
+def _coderank_settings(get: LookupFn) -> CodeRankSettings:
+    """Build CodeRankSettings from lookup function.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    CodeRankSettings
+        Dense retriever configuration for CodeRank operations.
+    """
+    return CodeRankSettings(
+        model_id=_as_str(get("CODERANK_MODEL_ID", "nomic-ai/CodeRankEmbed")),
+        trust_remote_code=_to_bool(
+            _as_optional_str(get("CODERANK_TRUST_REMOTE_CODE", "1")), default=True
+        ),
+        device=_as_str(get("CODERANK_DEVICE", "cpu")),
+        batch_size=_coerce_int(get("CODERANK_BATCH", "128"), default=128),
+        normalize=_to_bool(_as_optional_str(get("CODERANK_NORMALIZE", "1")), default=True),
+        query_prefix=_as_str(
+            get("CODERANK_QUERY_PREFIX", "Represent this query for searching relevant code: "),
+        ),
+        top_k=_coerce_int(get("CODERANK_TOP_K", "200"), default=200),
+        budget_ms=_coerce_int(get("CODERANK_BUDGET_MS", "120"), default=120),
+        min_stage2_margin=_coerce_float(get("CODERANK_MARGIN_THRESHOLD", "0.1"), default=0.1),
+        min_stage2_candidates=_coerce_int(get("CODERANK_MIN_STAGE2", "40"), default=40),
+    )
+
+
+def _coderank_llm_settings(get: LookupFn) -> CodeRankLLMSettings:
+    """Build CodeRankLLMSettings from lookup function.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+
+    Returns
+    -------
+    CodeRankLLMSettings
+        Listwise reranker configuration for CodeRank LLM.
+    """
+    return CodeRankLLMSettings(
+        model_id=_as_str(get("CODERANK_LLM_MODEL_ID", "nomic-ai/CodeRankLLM")),
+        device=_as_str(get("CODERANK_LLM_DEVICE", "cpu")),
+        max_new_tokens=_coerce_int(get("CODERANK_LLM_MAX_NEW_TOKENS", "256"), default=256),
+        temperature=_coerce_float(get("CODERANK_LLM_TEMPERATURE", "0.0"), default=0.0),
+        top_p=_coerce_float(get("CODERANK_LLM_TOP_P", "1.0"), default=1.0),
+        enabled=_to_bool(_as_optional_str(get("CODERANK_LLM_ENABLED", "0")), default=False),
+        budget_ms=_coerce_int(get("CODERANK_LLM_BUDGET_MS", "300"), default=300),
+    )
+
+
+def _warp_settings(get: LookupFn, paths: PathsConfig) -> WarpSettings:
+    """Build WarpSettings from lookup function.
+
+    Parameters
+    ----------
+    get : LookupFn
+        Lookup function that retrieves configuration values by name.
+    paths : PathsConfig
+        Paths configuration used to resolve default index directory.
+
+    Returns
+    -------
+    WarpSettings
+        WARP/XTR reranker configuration with resolved index path.
+    """
+    default_index = paths.repo_root / "indexes" / "warp_xtr"
+    index_dir = _repo_path(paths, get("WARP_INDEX_DIR", default_index), default=default_index)
+    return WarpSettings(
+        index_dir=index_dir,
+        model_id=_as_str(get("WARP_MODEL_ID", "intfloat/e5-multivector-large")),
+        device=_as_str(get("WARP_DEVICE", "cpu")),
+        top_k=_coerce_int(get("WARP_TOP_K", "200"), default=200),
+        enabled=_to_bool(_as_optional_str(get("WARP_ENABLED", "0")), default=False),
+        budget_ms=_coerce_int(get("WARP_BUDGET_MS", "180"), default=180),
+    )
+
+
 def _rrf_weights(get: LookupFn) -> FloatMapping:
     """Return configured RRF weights.
 
@@ -1477,6 +1655,12 @@ def _app_config_from_lookup(get: LookupFn) -> AppConfig:
         embeddings=embeddings,
         vllm=vllm,
         search=_search_settings(get),
+        limits=_limits_settings(get),
+        redis=_redis_settings(get),
+        rerank=_rerank_settings(get),
+        coderank=_coderank_settings(get),
+        coderank_llm=_coderank_llm_settings(get),
+        warp=_warp_settings(get, paths),
         logging=_logging_settings(get),
         eval=_eval_settings(paths, get),
     )

@@ -11,7 +11,7 @@ from codeintel_rev.app import readiness
 from codeintel_rev.config.paths import resolve_application_paths
 
 from tests._helpers.assertions import expect_equal, expect_true
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_app_config_for_repo
 
 
 def _prepare_paths(repo_root: Path) -> None:
@@ -54,8 +54,8 @@ def test_validate_paths_and_raise(tmp_path: Path) -> None:
     """validate_paths returns ok for healthy structures and raises on errors."""
     repo_root = tmp_path / "repo"
     _prepare_paths(repo_root)
-    settings = build_settings_for_repo(repo_root)
-    paths = resolve_application_paths(settings)
+    app_config = build_app_config_for_repo(repo_root)
+    paths = resolve_application_paths(app_config)
 
     results = readiness.validate_paths(paths)
 

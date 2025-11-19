@@ -7,14 +7,9 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
-from codeintel_rev.config.api import AppConfig, PathsConfig
-
-if TYPE_CHECKING:
-    from codeintel_rev.config.settings import Settings
-else:  # pragma: no cover - runtime shim
-    Settings = Any
+from codeintel_rev.config.api import AppConfig
 
 __all__ = ["ResolvedPaths", "resolve_application_paths"]
 
@@ -341,89 +336,6 @@ def _build_from_mapping(settings: Mapping[str, Any]) -> ResolvedPaths:
     )
 
 
-def _build_from_settings(settings: Settings) -> ResolvedPaths:
-    """Build ResolvedPaths from a fully constructed Settings object.
-
-    This function constructs a ResolvedPaths instance from a Settings object by
-    extracting path configuration from the PathsConfig component. All paths are
-    resolved relative to the configured repository root and normalized for consistency.
-    This is the primary path resolution method used in production code.
-
-    Parameters
-    ----------
-    settings : Settings
-        Fully constructed Settings object containing path configuration. The
-        settings.paths attribute must contain a PathsConfig with all required
-        path values.
-
-    Returns
-    -------
-    ResolvedPaths
-        Fully resolved paths instance with all application paths computed from
-        the Settings object. Paths are normalized and resolved relative to the
-        repository root specified in the settings.
-
-    Notes
-    -----
-    This function is the preferred method for path resolution in production code,
-    as it works with the fully typed Settings object and provides better type
-    safety. The function ensures all paths are normalized and resolved, providing
-    consistent path handling regardless of how paths are specified in configuration.
-
-    See Also
-    --------
-    _build_from_mapping : Build ResolvedPaths from a dictionary mapping.
-    resolve_application_paths : Public API that delegates to this function.
-    """
-    cfg: PathsConfig = settings.paths
-    repo_root = _norm(_to_path(cfg.repo_root))
-
-    def _resolve(value: str) -> Path:
-        """Resolve a path string relative to the repository root.
-
-        This nested helper function resolves path strings from the PathsConfig
-        relative to the repository root. Used to convert relative path strings
-        from configuration into absolute, normalized Path objects.
-
-        Parameters
-        ----------
-        value : str
-            Path string from configuration. May be absolute or relative to the
-            repository root.
-
-        Returns
-        -------
-        Path
-            Resolved and normalized path relative to the repository root. The path
-            is normalized for consistency across platforms.
-        """
-        return _resolve_relative(repo_root, value)
-
-    config_dir = _norm(repo_root / "config")
-    config_file_default = _norm(config_dir / "app.yml")
-    return ResolvedPaths(
-        repo_root=repo_root,
-        config_dir=config_dir,
-        config_file=config_file_default,
-        data_dir=_resolve(cfg.data_dir),
-        vectors_dir=_resolve(cfg.vectors_dir),
-        faiss_index=_resolve(cfg.faiss_index),
-        faiss_idmap_path=_resolve(cfg.faiss_idmap_path),
-        lucene_dir=_resolve(cfg.lucene_dir),
-        splade_dir=_resolve(cfg.splade_dir),
-        duckdb_path=_resolve(cfg.duckdb_path),
-        scip_index=_resolve(cfg.scip_index),
-        coderank_vectors_dir=_resolve(cfg.coderank_vectors_dir),
-        coderank_faiss_index=_resolve(cfg.coderank_faiss_index),
-        warp_index_dir=_resolve(cfg.warp_index_dir),
-        xtr_dir=_resolve(cfg.xtr_dir),
-        logs_dir=_norm(repo_root / "logs"),
-        cache_dir=_norm(repo_root / ".cache"),
-        tmp_dir=_norm(repo_root / ".tmp"),
-        plugins_dir=_norm(repo_root / "plugins"),
-    )
-
-
 def _build_from_app_config(app_config: AppConfig) -> ResolvedPaths:
     """Build ResolvedPaths directly from AppConfig values.
 
@@ -463,7 +375,7 @@ def _build_from_app_config(app_config: AppConfig) -> ResolvedPaths:
         scip_index=_norm(repo_root / "index.scip"),
         coderank_vectors_dir=_norm(data_dir / "coderank_vectors"),
         coderank_faiss_index=_norm(faiss_dir / "coderank.ivfpq.faiss"),
-        warp_index_dir=_norm(repo_root / "indexes" / "warp_xtr"),
+        warp_index_dir=_repo_path(app_config.warp.index_dir),
         xtr_dir=_norm(data_dir / "xtr"),
         logs_dir=_repo_path(paths_cfg.logs_dir),
         cache_dir=_repo_path(paths_cfg.cache_dir),
@@ -472,14 +384,14 @@ def _build_from_app_config(app_config: AppConfig) -> ResolvedPaths:
     )
 
 
-def resolve_application_paths(settings: Settings | Mapping[str, Any] | AppConfig) -> ResolvedPaths:
-    """Return canonical filesystem paths derived from ``settings``.
+def resolve_application_paths(config: Mapping[str, Any] | AppConfig) -> ResolvedPaths:
+    """Return canonical filesystem paths derived from AppConfig or mapping inputs.
 
     Parameters
     ----------
-    settings : Settings | Mapping[str, Any] | AppConfig
-        Either a fully constructed :class:`Settings` instance, an AppConfig, or
-        a mapping that mimics the environment layout (useful for tests and tooling).
+    config : Mapping[str, Any] | AppConfig
+        Either a fully constructed :class:`AppConfig` instance or a mapping that
+        mimics the environment layout (useful for tests and tooling).
 
     Returns
     -------
@@ -487,9 +399,15 @@ def resolve_application_paths(settings: Settings | Mapping[str, Any] | AppConfig
         Frozen dataclass capturing all filesystem inputs for the application.
         Paths are fully normalized (expanded, resolved, and case-normalized on
         Windows) so downstream consumers can rely on absolute locations.
+
+    Raises
+    ------
+    TypeError
+        Raised when ``config`` is neither an AppConfig instance nor a mapping.
     """
-    if isinstance(settings, AppConfig):
-        return _build_from_app_config(settings)
-    if isinstance(settings, Mapping):
-        return _build_from_mapping(settings)
-    return _build_from_settings(settings)
+    if isinstance(config, AppConfig):
+        return _build_from_app_config(config)
+    if isinstance(config, Mapping):
+        return _build_from_mapping(config)
+    msg = f"Unsupported configuration type: {type(config)!r}"
+    raise TypeError(msg)

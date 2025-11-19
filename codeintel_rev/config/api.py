@@ -11,6 +11,25 @@ from typing import Final, Literal
 CONFIG_API_VERSION: Final[str] = "1.0"
 
 
+def _require(message: str, *, condition: bool) -> None:
+    """Raise ValueError when ``condition`` is False.
+
+    Parameters
+    ----------
+    message : str
+        Error message to include in the exception.
+    condition : bool
+        Condition to check. If False, ValueError is raised.
+
+    Raises
+    ------
+    ValueError
+        If ``condition`` is False.
+    """
+    if not condition:
+        raise ValueError(message)
+
+
 @dataclass(frozen=True, slots=True)
 class PathsConfig:
     """Filesystem paths used by the application.
@@ -197,6 +216,37 @@ class IndexSettings:
         default_nprobe_value = self.default_nprobe or self.faiss_nprobe
         object.__setattr__(self, "nlist", nlist_value)
         object.__setattr__(self, "default_nprobe", default_nprobe_value)
+
+
+@dataclass(frozen=True, slots=True)
+class ServerLimits:
+    """Server resource and rate limits."""
+
+    max_results: int = 1000
+    query_timeout_s: float = 30.0
+    rate_limit_qps: float = 10.0
+    rate_limit_burst: int = 20
+    semantic_overfetch_multiplier: int = 2
+
+
+@dataclass(frozen=True, slots=True)
+class RedisSettings:
+    """Redis-backed scope cache configuration."""
+
+    url: str = "redis://127.0.0.1:6379/0"
+    scope_l1_size: int = 256
+    scope_l1_ttl_seconds: float = 300.0
+    scope_l2_ttl_seconds: int = 3600
+
+
+@dataclass(frozen=True, slots=True)
+class RerankSettings:
+    """Late-interaction reranker configuration."""
+
+    enabled: bool = False
+    top_k: int = 50
+    provider: Literal["xtr"] = "xtr"
+    explain: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -610,6 +660,47 @@ class VLLMSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class CodeRankSettings:
+    """Dense CodeRank retriever configuration."""
+
+    model_id: str = "nomic-ai/CodeRankEmbed"
+    trust_remote_code: bool = True
+    device: str = "cpu"
+    batch_size: int = 128
+    normalize: bool = True
+    query_prefix: str = "Represent this query for searching relevant code: "
+    top_k: int = 200
+    budget_ms: int = 120
+    min_stage2_margin: float = 0.1
+    min_stage2_candidates: int = 40
+
+
+@dataclass(frozen=True, slots=True)
+class CodeRankLLMSettings:
+    """Configuration for the CodeRank listwise reranker."""
+
+    model_id: str = "nomic-ai/CodeRankLLM"
+    device: str = "cpu"
+    max_new_tokens: int = 256
+    temperature: float = 0.0
+    top_p: float = 1.0
+    enabled: bool = False
+    budget_ms: int = 300
+
+
+@dataclass(frozen=True, slots=True)
+class WarpSettings:
+    """WARP/XTR late-interaction configuration."""
+
+    index_dir: Path = Path("indexes/warp_xtr")
+    model_id: str = "intfloat/e5-multivector-large"
+    device: str = "cpu"
+    top_k: int = 200
+    enabled: bool = False
+    budget_ms: int = 180
+
+
+@dataclass(frozen=True, slots=True)
 class AppConfig:
     """Top-level immutable configuration.
 
@@ -645,6 +736,24 @@ class AppConfig:
     eval : EvalSettings, optional
         Evaluation settings configuration. Defaults to EvalSettings() with default
         values.
+    limits : ServerLimits, optional
+        Server resource limits including max results and rate limiting configuration.
+        Defaults to ServerLimits() with default values.
+    redis : RedisSettings, optional
+        Redis connection and L1/L2 cache configuration. Defaults to RedisSettings()
+        with default values.
+    rerank : RerankSettings, optional
+        Late-interaction reranker configuration. Defaults to RerankSettings() with
+        default values.
+    coderank : CodeRankSettings, optional
+        Dense retriever configuration for CodeRank operations. Defaults to
+        CodeRankSettings() with default values.
+    coderank_llm : CodeRankLLMSettings, optional
+        Listwise reranker configuration for CodeRank LLM. Defaults to
+        CodeRankLLMSettings() with default values.
+    warp : WarpSettings, optional
+        WARP/XTR reranker configuration. Defaults to WarpSettings() with default
+        values.
     extras : Mapping[str, object], optional
         Additional configuration key-value pairs for extensibility. Defaults to
         empty dictionary.
@@ -661,6 +770,12 @@ class AppConfig:
     embeddings: EmbeddingsSettings
     vllm: VLLMSettings
     search: SearchSettings = field(default_factory=SearchSettings)
+    limits: ServerLimits = field(default_factory=ServerLimits)
+    redis: RedisSettings = field(default_factory=RedisSettings)
+    rerank: RerankSettings = field(default_factory=RerankSettings)
+    coderank: CodeRankSettings = field(default_factory=CodeRankSettings)
+    coderank_llm: CodeRankLLMSettings = field(default_factory=CodeRankLLMSettings)
+    warp: WarpSettings = field(default_factory=WarpSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
     eval: EvalSettings = field(default_factory=EvalSettings)
     extras: Mapping[str, object] = field(default_factory=dict)
@@ -690,81 +805,108 @@ def validate_config(cfg: AppConfig) -> None:
     cfg : AppConfig
         Configuration instance to validate.
 
-    Raises
-    ------
-    ValueError
-        If any invariants fail validation.
+    Notes
+    -----
+    This function validates configuration invariants by calling various
+    validation functions. If any validation fails, ValueError is raised
+    via the :func:`_require` helper function.
     """
+    _validate_version(cfg)
+    _validate_faiss_settings(cfg.faiss)
+    _validate_search_settings(cfg.search)
+    _validate_bm25_settings(cfg.bm25)
+    _validate_embeddings_settings(cfg.embeddings)
+    _validate_vllm_settings(cfg.vllm)
+    _validate_xtr_settings(cfg.xtr)
+    _validate_eval_settings(cfg.eval)
+    _validate_index_settings(cfg.index)
 
-    def _require(message: str, *, condition: bool) -> None:
-        if not condition:
-            raise ValueError(message)
 
+def _validate_version(cfg: AppConfig) -> None:
     if not is_compatible_version(cfg.version):
         msg = f"Incompatible config version {cfg.version!r}; expected {CONFIG_API_VERSION}"
         raise ValueError(msg)
 
-    _require("faiss.default_k must be positive", condition=cfg.faiss.default_k > 0)
-    _require("faiss.default_nprobe must be positive", condition=cfg.faiss.default_nprobe > 0)
-    _require(
-        "faiss.refine_k_factor must be positive",
-        condition=cfg.faiss.refine_k_factor > 0,
-    )
-    _require("search.max_results must be positive", condition=cfg.search.max_results > 0)
-    _require("search.per_channel_k must be positive", condition=cfg.search.per_channel_k > 0)
-    _require("search.fusion_k must be positive", condition=cfg.search.fusion_k > 0)
-    _require("search.rrf_base must be positive", condition=cfg.search.rrf_base > 0)
-    _require("bm25.threads must be positive", condition=cfg.bm25.threads > 0)
-    _require("bm25.k1 must be positive", condition=cfg.bm25.k1 > 0)
-    _require("bm25.b must be non-negative", condition=cfg.bm25.b >= 0)
-    _require("bm25.rm3_fb_docs must be positive", condition=cfg.bm25.rm3_fb_docs > 0)
-    _require("bm25.rm3_fb_terms must be positive", condition=cfg.bm25.rm3_fb_terms > 0)
-    _require("embeddings.batch_size must be positive", condition=cfg.embeddings.batch_size > 0)
+
+def _validate_faiss_settings(faiss: FAISSSettings) -> None:
+    _require("faiss.default_k must be positive", condition=faiss.default_k > 0)
+    _require("faiss.default_nprobe must be positive", condition=faiss.default_nprobe > 0)
+    _require("faiss.refine_k_factor must be positive", condition=faiss.refine_k_factor > 0)
+
+
+def _validate_search_settings(search: SearchSettings) -> None:
+    _require("search.max_results must be positive", condition=search.max_results > 0)
+    _require("search.per_channel_k must be positive", condition=search.per_channel_k > 0)
+    _require("search.fusion_k must be positive", condition=search.fusion_k > 0)
+    _require("search.rrf_base must be positive", condition=search.rrf_base > 0)
+
+
+def _validate_bm25_settings(bm25: BM25Settings) -> None:
+    _require("bm25.threads must be positive", condition=bm25.threads > 0)
+    _require("bm25.k1 must be positive", condition=bm25.k1 > 0)
+    _require("bm25.b must be non-negative", condition=bm25.b >= 0)
+    _require("bm25.rm3_fb_docs must be positive", condition=bm25.rm3_fb_docs > 0)
+    _require("bm25.rm3_fb_terms must be positive", condition=bm25.rm3_fb_terms > 0)
+
+
+def _validate_embeddings_settings(embeddings: EmbeddingsSettings) -> None:
+    _require("embeddings.batch_size must be positive", condition=embeddings.batch_size > 0)
     _require(
         "embeddings.micro_batch_size must be positive",
-        condition=cfg.embeddings.micro_batch_size > 0,
+        condition=embeddings.micro_batch_size > 0,
     )
-    _require("embeddings.max_tokens must be positive", condition=cfg.embeddings.max_tokens > 0)
+    _require("embeddings.max_tokens must be positive", condition=embeddings.max_tokens > 0)
     _require(
         "embeddings.max_sequence_chars must be positive",
-        condition=cfg.embeddings.max_sequence_chars > 0,
+        condition=embeddings.max_sequence_chars > 0,
     )
     _require(
         "embeddings.retry_max_attempts must be non-negative",
-        condition=cfg.embeddings.retry_max_attempts >= 0,
+        condition=embeddings.retry_max_attempts >= 0,
     )
     _require(
         "embeddings.retry_backoff_ms must be non-negative",
-        condition=cfg.embeddings.retry_backoff_ms >= 0,
+        condition=embeddings.retry_backoff_ms >= 0,
     )
     _require(
         "embeddings.max_pending_batches must be non-negative",
-        condition=cfg.embeddings.max_pending_batches >= 0,
+        condition=embeddings.max_pending_batches >= 0,
     )
     _require(
         "embeddings.max_wait_ms must be non-negative",
-        condition=cfg.embeddings.max_wait_ms >= 0,
+        condition=embeddings.max_wait_ms >= 0,
     )
-    _require("vllm.batch_size must be positive", condition=cfg.vllm.batch_size > 0)
-    _require("vllm.embedding_dim must be positive", condition=cfg.vllm.embedding_dim > 0)
-    _require("vllm.timeout_s must be positive", condition=cfg.vllm.timeout_s > 0)
+
+
+def _validate_vllm_settings(vllm: VLLMSettings) -> None:
+    _require("vllm.batch_size must be positive", condition=vllm.batch_size > 0)
+    _require("vllm.embedding_dim must be positive", condition=vllm.embedding_dim > 0)
+    _require("vllm.timeout_s must be positive", condition=vllm.timeout_s > 0)
     _require(
         "vllm.max_num_batched_tokens must be positive",
-        condition=cfg.vllm.max_num_batched_tokens > 0,
+        condition=vllm.max_num_batched_tokens > 0,
     )
     _require(
         "vllm.max_concurrent_requests must be positive",
-        condition=cfg.vllm.max_concurrent_requests > 0,
+        condition=vllm.max_concurrent_requests > 0,
     )
-    _require("xtr.dim must be positive", condition=cfg.xtr.dim > 0)
-    _require("xtr.max_query_tokens must be positive", condition=cfg.xtr.max_query_tokens > 0)
-    _require("xtr.candidate_k must be positive", condition=cfg.xtr.candidate_k > 0)
-    _require("eval.oracle_top_k must be positive", condition=cfg.eval.oracle_top_k > 0)
-    if cfg.eval.max_queries is not None:
-        _require("eval.max_queries must be positive", condition=cfg.eval.max_queries > 0)
-    for value in cfg.eval.k_values:
+
+
+def _validate_xtr_settings(xtr: XTRSettings) -> None:
+    _require("xtr.dim must be positive", condition=xtr.dim > 0)
+    _require("xtr.max_query_tokens must be positive", condition=xtr.max_query_tokens > 0)
+    _require("xtr.candidate_k must be positive", condition=xtr.candidate_k > 0)
+
+
+def _validate_eval_settings(eval_cfg: EvalSettings) -> None:
+    _require("eval.oracle_top_k must be positive", condition=eval_cfg.oracle_top_k > 0)
+    if eval_cfg.max_queries is not None:
+        _require("eval.max_queries must be positive", condition=eval_cfg.max_queries > 0)
+    for value in eval_cfg.k_values:
         _require("eval.k_values entries must be positive", condition=value > 0)
-    index_cfg = cfg.index
+
+
+def _validate_index_settings(index_cfg: IndexSettings) -> None:
     _require("index.vec_dim must be positive", condition=index_cfg.vec_dim > 0)
     _require("index.chunk_budget must be positive", condition=index_cfg.chunk_budget > 0)
     _require("index.faiss_nlist must be positive", condition=index_cfg.faiss_nlist > 0)
@@ -795,5 +937,6 @@ def validate_config(cfg: AppConfig) -> None:
         condition=(not index_cfg.recency_enabled or index_cfg.recency_half_life_days > 0),
     )
     _require(
-        "index.recency_max_boost must be non-negative", condition=index_cfg.recency_max_boost >= 0
+        "index.recency_max_boost must be non-negative",
+        condition=index_cfg.recency_max_boost >= 0,
     )

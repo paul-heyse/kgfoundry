@@ -8,15 +8,15 @@ from pathlib import Path
 from codeintel_rev.config.paths import resolve_application_paths
 
 from tests._helpers.assertions import expect_equal, expect_true
-from tests._helpers.settings import build_app_config_from_paths, build_settings_for_repo
+from tests._helpers.settings import build_app_config_for_repo, build_app_config_from_paths
 
 
-def test_resolve_application_paths_from_settings(tmp_path: Path) -> None:
-    """Resolver canonicalizes repo-relative settings without touching the FS."""
+def test_resolve_application_paths_from_app_config_repo_relative(tmp_path: Path) -> None:
+    """Resolver canonicalizes repo-relative AppConfig inputs without touching the FS."""
     repo_root = tmp_path / "repo"
-    settings = build_settings_for_repo(repo_root)
+    app_config = build_app_config_for_repo(repo_root)
 
-    paths = resolve_application_paths(settings)
+    paths = resolve_application_paths(app_config)
 
     expect_equal(paths.repo_root, repo_root.resolve(), reason="repo root normalized")
     expect_equal(paths.vectors_dir.parent, paths.data_dir, reason="vectors parent matches data_dir")
@@ -58,8 +58,8 @@ def test_resolve_application_paths_accepts_mapping(tmp_path: Path) -> None:
 def test_resolved_paths_hashable(tmp_path: Path) -> None:
     """ResolvedPaths instances are hashable for use as cache keys."""
     repo_root = tmp_path / "hashable"
-    settings = build_settings_for_repo(repo_root)
-    paths = resolve_application_paths(settings)
+    app_config = build_app_config_for_repo(repo_root)
+    paths = resolve_application_paths(app_config)
     expect_true(isinstance(hash(paths), int), reason="hashable dataclass")
 
     another_paths = replace(paths)
@@ -67,12 +67,12 @@ def test_resolved_paths_hashable(tmp_path: Path) -> None:
     expect_equal(hash(paths), hash(another_paths), reason="hash remains stable for clones")
 
 
-def test_resolve_application_paths_from_app_config(tmp_path: Path) -> None:
-    """Resolver builds canonical paths from AppConfig inputs."""
+def test_resolve_application_paths_from_exported_app_config(tmp_path: Path) -> None:
+    """Resolver builds canonical paths from AppConfig inputs exported via helper."""
     repo_root = tmp_path / "appcfg"
     repo_root.mkdir(parents=True, exist_ok=True)
-    settings = build_settings_for_repo(repo_root)
-    baseline = resolve_application_paths(settings)
+    baseline_config = build_app_config_for_repo(repo_root)
+    baseline = resolve_application_paths(baseline_config)
     app_config = build_app_config_from_paths(baseline)
 
     resolved = resolve_application_paths(app_config)

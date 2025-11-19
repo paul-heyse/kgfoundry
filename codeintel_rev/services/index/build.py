@@ -71,7 +71,7 @@ def run_index_build(
     cfg : IndexBuildConfig
         Configuration controlling vector dimensions, batch sizes, sampling,
         and materialization options.
-    steps : Iterable[StepName] | None, optional
+    steps : Iterable[StepName | str] | None, optional
         Custom sequence of step names to execute. If None, uses
         DEFAULT_STEPS. Defaults to None.
 

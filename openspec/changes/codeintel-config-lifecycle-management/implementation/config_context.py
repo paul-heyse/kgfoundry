@@ -1,3 +1,4 @@
+# ruff: noqa
 """Application-level configuration context manager.
 
 This module provides centralized configuration lifecycle management for the
@@ -5,7 +6,6 @@ CodeIntel MCP application. Instead of loading settings repeatedly from environme
 variables on each request, configuration is loaded exactly once during FastAPI
 application startup and shared across all request handlers via explicit dependency
 injection.
-
 Key Components
 --------------
 ResolvedPaths : dataclass
@@ -94,8 +94,8 @@ class ResolvedPaths:
     --------
     Paths are created during application startup:
 
-    >>> settings = load_settings()
-    >>> paths = resolve_application_paths(settings)
+    >>> cfg = load_app_config()
+    >>> paths = resolve_application_paths(cfg)
     >>> paths.repo_root
     PosixPath('/home/user/kgfoundry')
     >>> paths.faiss_index
@@ -110,7 +110,7 @@ class ResolvedPaths:
     scip_index: Path
 
 
-def resolve_application_paths(settings: Settings) -> ResolvedPaths:
+def resolve_application_paths(config: AppConfig) -> ResolvedPaths:
     """Resolve all configured paths to absolute paths.
 
     Converts relative paths to absolute paths relative to repo_root, validates
@@ -123,9 +123,9 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
 
     Parameters
     ----------
-    settings : Settings
-        Application settings containing path configuration loaded from
-        environment variables.
+    config : AppConfig
+        Application configuration containing path layout derived from config files
+        and environment variables.
 
     Returns
     -------
@@ -227,7 +227,7 @@ class ApplicationContext:
     Create context during application startup:
 
     >>> context = ApplicationContext.create()
-    >>> context.settings.paths.repo_root
+    >>> context.paths.repo_root
     '/home/user/kgfoundry'
 
     Use context in adapter functions:

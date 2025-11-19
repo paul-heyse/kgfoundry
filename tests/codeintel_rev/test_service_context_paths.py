@@ -179,14 +179,21 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
 
     service_context.reset_service_context()
 
-    def _faiss_factory(cfg: object, resolved: ResolvedPaths) -> FAISSManager:
-        nlist_value = cfg.index.nlist or 1
+    base_index_cfg = app_config.index
+
+    def _faiss_factory(
+        _settings: object,
+        resolved: ResolvedPaths,
+        override_app_cfg: AppConfig | None = None,
+    ) -> FAISSManager:
+        cfg = override_app_cfg.index if override_app_cfg is not None else base_index_cfg
+        nlist_value = cfg.nlist or cfg.faiss_nlist or 1
         return cast(
             "FAISSManager",
             RecordingFAISSManager(
                 index_path=resolved.faiss_index,
-                vec_dim=cfg.index.vec_dim,
-                nlist=nlist_value,
+                vec_dim=cfg.vec_dim,
+                nlist=int(nlist_value),
                 runtime=None,
             ),
         )

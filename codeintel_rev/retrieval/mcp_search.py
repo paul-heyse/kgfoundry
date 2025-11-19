@@ -11,6 +11,8 @@ from uuid import uuid4
 
 import numpy as np
 
+from codeintel_rev.config.api import SearchSettings as SearchConfig
+from codeintel_rev.config.api import ServerLimits
 from codeintel_rev.eval.pool_writer import write_pool
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.retrieval.types import SearchPoolRow
@@ -93,20 +95,6 @@ class LimitsConfigLike(Protocol):
             the search will fetch 30 candidates to ensure enough results survive
             post-filtering.
         """
-        ...
-
-
-class SearchSettings(Protocol):
-    """Protocol for the subset of :class:`~codeintel_rev.config.settings.Settings`."""
-
-    @property
-    def index(self) -> IndexConfigLike:
-        """Return immutable index configuration."""
-        ...
-
-    @property
-    def limits(self) -> LimitsConfigLike:
-        """Return immutable server limit configuration."""
         ...
 
 
@@ -390,8 +378,8 @@ class SearchDependencies:
         Embedding client for query vectorization.
     catalog : CatalogLike
         Catalog for hydrating chunk metadata.
-    settings : SearchSettings
-        Search configuration settings (limits, filtering).
+    settings : SearchConfig
+        Search configuration settings (hybrid fusion knobs).
     index : IndexConfigLike
         Immutable index configuration (vector dimension, FAISS tuning).
     session_id : str | None
@@ -400,6 +388,8 @@ class SearchDependencies:
         Optional run identifier for request tracking. None if not tracked.
     limits : Sequence[str]
         Sequence of limit identifiers applied to this search.
+    limits_cfg : ServerLimits
+        Server resource limits configuration.
     pool_dir : Path | None
         Optional directory path for evaluation pool output. None if pools are
         not recorded.
@@ -408,7 +398,8 @@ class SearchDependencies:
     faiss: VectorIndex
     embedder: EmbeddingClient
     catalog: CatalogLike
-    settings: SearchSettings
+    settings: SearchConfig
+    limits_cfg: ServerLimits
     index: IndexConfigLike
     session_id: str | None
     run_id: str | None
@@ -478,12 +469,12 @@ class FetchDependencies:
     ----------
     catalog : CatalogLike
         Catalog for hydrating chunk metadata and content.
-    settings : SearchSettings
+    settings : SearchConfig
         Search configuration settings.
     """
 
     catalog: CatalogLike
-    settings: SearchSettings
+    settings: SearchConfig
 
 
 def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchResponse:
@@ -513,7 +504,7 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         (original query), top_k (requested results), results (ranked SearchResult objects
         with chunk metadata and scores), and limits (resource limits applied during search).
     """
-    faiss_k = _compute_fanout(request.top_k, request.filters, deps.settings.limits)
+    faiss_k = _compute_fanout(request.top_k, request.filters, deps.limits_cfg)
     durations = _StageDurations()
     query_vector = _embed_with_metrics(request, deps)
     distances, identifiers, durations.ann = _run_ann_search(

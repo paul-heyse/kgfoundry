@@ -242,8 +242,9 @@ async def search(
                 faiss=context.faiss_manager,
                 embedder=context.vllm_client,
                 catalog=catalog,
-                settings=context.settings,
+                settings=context.app_config.search,
                 index=context.app_config.index,
+                limits_cfg=context.app_config.limits,
                 session_id=session_id,
                 run_id=None,
                 limits=limits,
@@ -303,7 +304,7 @@ async def fetch(
         with context.open_catalog() as catalog:
             deps = FetchDependencies(
                 catalog=catalog,
-                settings=context.settings,
+                settings=context.app_config.search,
             )
             response = run_fetch(request=request, deps=deps)
             return _serialize_fetch_response(response)

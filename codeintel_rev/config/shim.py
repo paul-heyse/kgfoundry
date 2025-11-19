@@ -5,37 +5,30 @@ from __future__ import annotations
 from msgspec import structs
 
 from codeintel_rev.config.api import AppConfig
+from codeintel_rev.config.settings import BM25Config as LegacyBM25Config
+from codeintel_rev.config.settings import CodeRankConfig as LegacyCodeRankConfig
 from codeintel_rev.config.settings import (
-    BM25Config as LegacyBM25Config,
+    CodeRankLLMConfig as LegacyCodeRankLLMConfig,
 )
+from codeintel_rev.config.settings import EmbeddingsConfig as LegacyEmbeddingsConfig
+from codeintel_rev.config.settings import PRFConfig as LegacyPRFConfig
+from codeintel_rev.config.settings import RedisConfig as LegacyRedisConfig
+from codeintel_rev.config.settings import RerankConfig as LegacyRerankConfig
 from codeintel_rev.config.settings import (
-    EmbeddingsConfig as LegacyEmbeddingsConfig,
+    ServerLimits as LegacyServerLimits,
 )
-from codeintel_rev.config.settings import (
-    PRFConfig as LegacyPRFConfig,
-)
-from codeintel_rev.config.settings import (
-    Settings,
-    load_settings,
-)
-from codeintel_rev.config.settings import (
-    SpladeConfig as LegacySpladeConfig,
-)
+from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.config.settings import SpladeConfig as LegacySpladeConfig
 from codeintel_rev.config.settings import (
     SpladeOnnxQueryConfig as LegacySpladeOnnxQueryConfig,
 )
-from codeintel_rev.config.settings import (
-    VLLMConfig as LegacyVLLMConfig,
-)
+from codeintel_rev.config.settings import VLLMConfig as LegacyVLLMConfig
 from codeintel_rev.config.settings import (
     VLLMEmbeddingMode as LegacyVLLMEmbeddingMode,
 )
-from codeintel_rev.config.settings import (
-    VLLMRunMode as LegacyVLLMRunMode,
-)
-from codeintel_rev.config.settings import (
-    XTRConfig as LegacyXTRConfig,
-)
+from codeintel_rev.config.settings import VLLMRunMode as LegacyVLLMRunMode
+from codeintel_rev.config.settings import WarpConfig as LegacyWarpConfig
+from codeintel_rev.config.settings import XTRConfig as LegacyXTRConfig
 
 
 def _convert_splade_config(app_config: AppConfig) -> LegacySpladeConfig:
@@ -216,6 +209,78 @@ def _convert_xtr_config(app_config: AppConfig) -> LegacyXTRConfig:
     )
 
 
+def _convert_redis_config(app_config: AppConfig) -> LegacyRedisConfig:
+    redis = app_config.redis
+    return LegacyRedisConfig(
+        url=redis.url,
+        scope_l1_size=redis.scope_l1_size,
+        scope_l1_ttl_seconds=redis.scope_l1_ttl_seconds,
+        scope_l2_ttl_seconds=redis.scope_l2_ttl_seconds,
+    )
+
+
+def _convert_limits_config(app_config: AppConfig) -> LegacyServerLimits:
+    limits = app_config.limits
+    return LegacyServerLimits(
+        max_results=limits.max_results,
+        query_timeout_s=limits.query_timeout_s,
+        rate_limit_qps=limits.rate_limit_qps,
+        rate_limit_burst=limits.rate_limit_burst,
+        semantic_overfetch_multiplier=limits.semantic_overfetch_multiplier,
+    )
+
+
+def _convert_coderank_config(app_config: AppConfig) -> LegacyCodeRankConfig:
+    cfg = app_config.coderank
+    return LegacyCodeRankConfig(
+        model_id=cfg.model_id,
+        trust_remote_code=cfg.trust_remote_code,
+        device=cfg.device,
+        batch_size=cfg.batch_size,
+        normalize=cfg.normalize,
+        query_prefix=cfg.query_prefix,
+        top_k=cfg.top_k,
+        budget_ms=cfg.budget_ms,
+        min_stage2_margin=cfg.min_stage2_margin,
+        min_stage2_candidates=cfg.min_stage2_candidates,
+    )
+
+
+def _convert_warp_config(app_config: AppConfig) -> LegacyWarpConfig:
+    cfg = app_config.warp
+    return LegacyWarpConfig(
+        index_dir=str(cfg.index_dir),
+        model_id=cfg.model_id,
+        device=cfg.device,
+        top_k=cfg.top_k,
+        enabled=cfg.enabled,
+        budget_ms=cfg.budget_ms,
+    )
+
+
+def _convert_rerank_config(app_config: AppConfig) -> LegacyRerankConfig:
+    cfg = app_config.rerank
+    return LegacyRerankConfig(
+        enabled=cfg.enabled,
+        top_k=cfg.top_k,
+        provider=cfg.provider,
+        explain=cfg.explain,
+    )
+
+
+def _convert_coderank_llm_config(app_config: AppConfig) -> LegacyCodeRankLLMConfig:
+    cfg = app_config.coderank_llm
+    return LegacyCodeRankLLMConfig(
+        model_id=cfg.model_id,
+        device=cfg.device,
+        max_new_tokens=cfg.max_new_tokens,
+        temperature=cfg.temperature,
+        top_p=cfg.top_p,
+        enabled=cfg.enabled,
+        budget_ms=cfg.budget_ms,
+    )
+
+
 def settings_from_app_config(app_config: AppConfig, *, base: Settings | None = None) -> Settings:
     """Return msgspec Settings with AppConfig overrides applied.
 
@@ -239,11 +304,6 @@ def settings_from_app_config(app_config: AppConfig, *, base: Settings | None = N
         duckdb_path=str(app_config.duckdb.database),
         faiss_index=str(app_config.faiss.index_path),
     )
-    splade_cfg = _convert_splade_config(app_config)
-    bm25_cfg = _convert_bm25_config(app_config)
-    embeddings_cfg = _convert_embeddings_config(app_config)
-    vllm_cfg = _convert_vllm_config(app_config)
-    xtr_cfg = _convert_xtr_config(app_config)
     index_cfg = app_config.index
     prf_cfg = LegacyPRFConfig(
         enable_auto=index_cfg.prf.enable_auto,
@@ -297,12 +357,18 @@ def settings_from_app_config(app_config: AppConfig, *, base: Settings | None = N
     return structs.replace(
         base_settings,
         paths=patched_paths,
-        bm25=bm25_cfg,
-        splade=splade_cfg,
-        embeddings=embeddings_cfg,
-        vllm=vllm_cfg,
-        xtr=xtr_cfg,
+        bm25=_convert_bm25_config(app_config),
+        splade=_convert_splade_config(app_config),
+        embeddings=_convert_embeddings_config(app_config),
+        vllm=_convert_vllm_config(app_config),
+        xtr=_convert_xtr_config(app_config),
         index=patched_index,
+        redis=_convert_redis_config(app_config),
+        limits=_convert_limits_config(app_config),
+        coderank=_convert_coderank_config(app_config),
+        warp=_convert_warp_config(app_config),
+        rerank=_convert_rerank_config(app_config),
+        coderank_llm=_convert_coderank_llm_config(app_config),
     )
 
 

@@ -116,7 +116,7 @@ def test_application_context_create(tmp_path: Path) -> None:
     context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Assert
-    assertions.expect_true(context.settings is not None)
+    assertions.expect_equal(context.app_config, app_config)
     assertions.expect_equal(context.paths.repo_root, repo_root.resolve())
     assertions.expect_true(context.vllm_client is not None)
     assertions.expect_true(context.faiss_manager is not None)

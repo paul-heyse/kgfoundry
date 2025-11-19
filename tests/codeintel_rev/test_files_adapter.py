@@ -22,7 +22,7 @@ from codeintel_rev.mcp_server.adapters.files import list_paths, open_file
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_app_config_for_repo
 
 
 @pytest.fixture
@@ -52,10 +52,9 @@ def mock_context(tmp_path: Path) -> Mock:
     (repo_root / "tests" / "test_main.py").write_text("def test_main():\n    assert True\n")
     (repo_root / "README.md").write_text("# Documentation\n")
 
-    settings = build_settings_for_repo(repo_root)
-    context.paths = resolve_application_paths(settings)
-    context.settings = Mock()
-    context.settings.paths = settings.paths
+    app_config = build_app_config_for_repo(repo_root)
+    context.app_config = app_config
+    context.paths = resolve_application_paths(app_config)
 
     return context
 

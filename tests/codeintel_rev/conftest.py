@@ -153,9 +153,9 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
     redis_client = _FakeRedis()
     scope_store = ScopeStore(
         redis_client,
-        l1_maxsize=settings.redis.scope_l1_size,
-        l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
-        l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
+        l1_maxsize=app_config.redis.scope_l1_size,
+        l1_ttl_seconds=app_config.redis.scope_l1_ttl_seconds,
+        l2_ttl_seconds=app_config.redis.scope_l2_ttl_seconds,
     )
     duckdb_manager = DuckDBManager(paths.duckdb_path, DuckDBConfig())
 
