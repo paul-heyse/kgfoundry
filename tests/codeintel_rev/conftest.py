@@ -40,6 +40,8 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
 
+from tests._helpers.settings import build_app_config_from_paths
+
 # Import for side effects: ensures FAISS stub is registered
 
 
@@ -194,6 +196,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
     duckdb_manager = DuckDBManager(paths.duckdb_path, DuckDBConfig())
 
     return ApplicationContext(
+        app_config=build_app_config_from_paths(paths),
         settings=settings,
         paths=paths,
         vllm_client=vllm_client,

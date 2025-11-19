@@ -12,9 +12,8 @@ from itertools import product
 from pathlib import Path
 
 from codeintel_rev.config.settings import Settings, load_settings
-from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider
+from codeintel_rev.io.bm25_engine import BM25Engine, BM25Rm3Config, PyseriniBM25Backend
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
-from codeintel_rev.retrieval.types import SearchHit
 
 LOGGER = logging.getLogger(__name__)
 
@@ -153,30 +152,14 @@ def _mrr_at_k(pred: Sequence[str], gold: set[str], k: int) -> float:
     return 0.0
 
 
-def _hits_to_ids(hits: Sequence[SearchHit]) -> list[str]:
-    """Convert channel hits to string doc IDs.
-
-    Parameters
-    ----------
-    hits : Sequence[SearchHit]
-        Sequence of search hit objects to extract IDs from.
-
-    Returns
-    -------
-    list[str]
-        Document identifiers as strings.
-    """
-    return [str(hit.doc_id) for hit in hits]
-
-
-def _build_provider(
+def _build_engine(
     index_path: Path,
     *,
     k1: float,
     b: float,
     rm3: BM25Rm3Config,
-) -> BM25SearchProvider:
-    """Return a configured BM25 search provider.
+) -> BM25Engine:
+    """Return a configured BM25 engine.
 
     Parameters
     ----------
@@ -191,15 +174,16 @@ def _build_provider(
 
     Returns
     -------
-    BM25SearchProvider
-        Configured provider bound to ``index_path``.
+    BM25Engine
+        Configured engine bound to ``index_path``.
     """
-    return BM25SearchProvider(
+    backend = PyseriniBM25Backend(
         index_dir=index_path,
         k1=k1,
         b=b,
         rm3=rm3,
     )
+    return BM25Engine(backend=backend)
 
 
 def _prepare_rm3_config(settings: Settings, rm3_mode: str) -> BM25Rm3Config:
@@ -252,15 +236,15 @@ def sweep_bm25(plan: BM25SweepPlan) -> None:
     max_k = max(plan.k_values)
     rows: list[dict[str, object]] = []
     for k1, b in plan.grid:
-        provider = _build_provider(
+        engine = _build_engine(
             plan.index_path,
             k1=k1,
             b=b,
             rm3=rm3_config,
         )
         for qid, query in plan.queries:
-            hits = provider.search(query, top_k=max_k)
-            doc_ids = _hits_to_ids(hits)
+            pairs = engine.search(query, k=max_k)
+            doc_ids = [str(doc_id) for doc_id, _score in pairs]
             gold = plan.qrels.get(qid, set())
             metrics = _compute_metrics(doc_ids, gold, plan.k_values)
             rows.append(

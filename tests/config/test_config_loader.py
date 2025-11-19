@@ -38,7 +38,9 @@ def test_env_values_override_defaults(tmp_path: Path) -> None:
         cfg.duckdb.temp_directory, Path(env["DUCKDB_TEMP_DIR"]).resolve(strict=False)
     )
     assertions.expect_equal(cfg.duckdb.pool_size, 16)
-    assertions.expect_equal(cfg.faiss.index_path, Path(env["FAISS_INDEX_PATH"]).resolve(strict=False))
+    assertions.expect_equal(
+        cfg.faiss.index_path, Path(env["FAISS_INDEX_PATH"]).resolve(strict=False)
+    )
     assertions.expect_equal(cfg.faiss.default_k, 42)
     assertions.expect_equal(cfg.faiss.default_nprobe, 128)
     assertions.expect_equal(cfg.faiss.refine_k_factor, 2.5)

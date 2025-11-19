@@ -77,6 +77,17 @@ def check_file(
 ) -> ProbeResult:
     """Validate an individual file without mutating the filesystem.
 
+    Parameters
+    ----------
+    path : Path
+        File path to validate.
+    must_exist : bool, optional
+        Whether the file must exist (default: True).
+    readable : bool, optional
+        Whether the file must be readable (default: True).
+    writable : bool, optional
+        Whether the file must be writable (default: False).
+
     Returns
     -------
     ProbeResult
@@ -101,6 +112,19 @@ def check_directory(
     executable_on_posix: bool = True,
 ) -> ProbeResult:
     """Validate directory presence and permissions.
+
+    Parameters
+    ----------
+    path : Path
+        Directory path to validate.
+    must_exist : bool, optional
+        Whether the directory must exist (default: True).
+    readable : bool, optional
+        Whether the directory must be readable (default: True).
+    writable : bool, optional
+        Whether the directory must be writable (default: True).
+    executable_on_posix : bool, optional
+        Whether the directory must be executable on POSIX systems (default: True).
 
     Returns
     -------
@@ -129,6 +153,11 @@ def check_directory(
 def validate_paths(paths: ResolvedPaths) -> list[ProbeResult]:
     """Run the canonical path probes for an application deployment.
 
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved filesystem paths to validate.
+
     Returns
     -------
     list[ProbeResult]
@@ -152,6 +181,11 @@ class ReadinessError(RuntimeError):
 
 def raise_on_errors(results: Iterable[ProbeResult]) -> None:
     r"""Raise a single aggregated error when any probe returned ``error``.
+
+    Parameters
+    ----------
+    results : Iterable[ProbeResult]
+        Iterable of probe results to check for errors.
 
     Raises
     ------

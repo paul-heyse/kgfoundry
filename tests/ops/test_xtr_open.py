@@ -8,6 +8,19 @@ from pathlib import Path
 from typing import cast
 
 import msgspec
+from codeintel_rev.config.api import (
+    CONFIG_API_VERSION,
+    AppConfig,
+    FAISSSettings,
+    LoggingSettings,
+    SearchSettings,
+)
+from codeintel_rev.config.api import (
+    DuckDBSettings as ApiDuckDBSettings,
+)
+from codeintel_rev.config.api import (
+    PathsConfig as ApiPathsConfig,
+)
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.ops.runtime.xtr_open import APP, XtrOpenContext
@@ -54,6 +67,40 @@ def _settings_factory(
     return _factory
 
 
+def _app_config_loader(repo_root: Path) -> Callable[[], AppConfig]:
+    """Return loader for AppConfig referencing repo_root.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory path.
+
+    Returns
+    -------
+    Callable[[], AppConfig]
+        Callable that returns an AppConfig instance.
+    """
+    data_dir = repo_root / "data"
+    config = AppConfig(
+        version=CONFIG_API_VERSION,
+        paths=ApiPathsConfig(
+            repo_root=repo_root,
+            data_dir=data_dir,
+            cache_dir=repo_root / ".cache",
+            logs_dir=repo_root / "logs",
+        ),
+        duckdb=ApiDuckDBSettings(database=data_dir / "catalog.duckdb"),
+        faiss=FAISSSettings(index_path=repo_root / "indexes" / "code.ivfpq.faiss"),
+        search=SearchSettings(),
+        logging=LoggingSettings(),
+    )
+
+    def _loader() -> AppConfig:
+        return config
+
+    return _loader
+
+
 class _ReadyIndex:
     def __init__(self, *_: object, **__: object) -> None:
         self.ready = True
@@ -90,6 +137,7 @@ def test_xtr_open_disabled_feature(
     _prepare_repo(repo_root)
     context = xtr_cli_context_builder(
         settings_factory=_settings_factory(repo_root, enabled=False),
+        app_config_loader=_app_config_loader(repo_root),
     )
     result = RUNNER.invoke(
         APP,
@@ -164,6 +212,7 @@ def test_xtr_open_reports_corruption(
     context = xtr_cli_context_builder(
         settings_factory=_settings_factory(repo_root, enabled=True),
         index_factory=lambda *_args, **_kwargs: cast("XTRIndex", _ExplodingIndex()),
+        app_config_loader=_app_config_loader(repo_root),
     )
     result = RUNNER.invoke(
         APP,

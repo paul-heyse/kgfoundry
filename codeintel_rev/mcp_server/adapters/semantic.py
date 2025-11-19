@@ -92,20 +92,23 @@ def _semantic_search_sync(
     limit: int,
     hooks: SemanticRuntimeHooks | None,
 ) -> AnswerEnvelope:
-    runtime_hooks = hooks or SemanticRuntimeHooks.default()
-    text = (query or "").strip()
-    if not text:
+    hooks = hooks or SemanticRuntimeHooks.default()
+    query = (query or "").strip()
+    if not query:
         return _error_envelope("missing query text")
 
-    ready, readiness_limits, _ = context.ensure_faiss_ready()
+    limit = context.clamp_hybrid_limit(limit)
+    _, readiness_limits, _ = context.ensure_faiss_ready()
+    base_weights = context.hybrid_fusion_weights()
+    stage0_options = context.build_stage0_options(weights=base_weights)
     with _faiss_guard(context) as fallback_tracker:
         try:
-            stage0 = runtime_hooks.run_stage0(
+            stage0 = hooks.run_stage0(
                 context.get_hybrid_engine(),
-                query=text,
+                query=query,
                 semantic_hits=[],
-                limit=int(limit),
-                options=Stage0Options(weights=None, faiss_ready=ready),
+                limit=limit,
+                options=stage0_options,
             )
         except RuntimeError as exc:
             stage0 = Stage0Result(
@@ -116,9 +119,9 @@ def _semantic_search_sync(
             )
 
     with context.open_catalog() as catalog:
-        findings = runtime_hooks.hydrate_findings(catalog, stage0.ids, stage0.scores)
+        findings = hooks.hydrate_findings(catalog, stage0.ids, stage0.scores)
 
-    decision = runtime_hooks.decide_secondary_stage(
+    decision = hooks.decide_secondary_stage(
         {
             "candidate_count": len(stage0.ids),
             "top_score": stage0.scores[0] if stage0.scores else 0.0,

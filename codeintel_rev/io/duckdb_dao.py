@@ -45,6 +45,11 @@ else:
 def _quote_literal(value: str) -> str:
     """Return a DuckDB-safe string literal.
 
+    Parameters
+    ----------
+    value : str
+        String value to quote and escape for SQL embedding.
+
     Returns
     -------
     str
@@ -56,6 +61,13 @@ def _quote_literal(value: str) -> str:
 
 def relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
     """Return True when a relation with ``name`` exists.
+
+    Parameters
+    ----------
+    conn : duckdb.DuckDBPyConnection
+        DuckDB connection to query for relation existence.
+    name : str
+        Name of the relation (table or view) to check.
 
     Returns
     -------

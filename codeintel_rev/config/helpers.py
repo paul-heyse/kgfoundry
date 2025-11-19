@@ -16,6 +16,11 @@ __all__: Final = [
 def faiss_settings(cfg: AppConfig) -> FAISSSettings:
     """Return FAISS settings from the supplied config.
 
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
+
     Returns
     -------
     FAISSSettings
@@ -27,6 +32,11 @@ def faiss_settings(cfg: AppConfig) -> FAISSSettings:
 def duckdb_settings(cfg: AppConfig) -> DuckDBSettings:
     """Return DuckDB settings from the supplied config.
 
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
+
     Returns
     -------
     DuckDBSettings
@@ -37,6 +47,11 @@ def duckdb_settings(cfg: AppConfig) -> DuckDBSettings:
 
 def search_settings(cfg: AppConfig) -> SearchSettings:
     """Return hybrid search settings from the supplied config.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration object.
 
     Returns
     -------

@@ -15,12 +15,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, TextIO, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Any, TextIO, TypedDict, Unpack, cast
 
 import msgspec
+import numpy as np
 
+from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.path_utils import resolve_within_repo
 from codeintel_rev.io.splade_engine import SPLADEEngine
+from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.subprocess_utils import run_subprocess
 
 if TYPE_CHECKING:
@@ -312,6 +315,164 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover - handled at runtime
     _export_dynamic_quantized_onnx_model = None
     _export_optimized_onnx_model = None
+
+
+_lucene_search = LazyModule("pyserini.search.lucene", "splade impact runtime")
+
+
+@dataclass(frozen=True, slots=True)
+class SpladeQueryOptions:
+    """Runtime knobs for SPLADE impact search."""
+
+    top_k: int = 50
+
+
+@dataclass(frozen=True, slots=True)
+class SpladeHit:
+    """Typed SPLADE hit row."""
+
+    doc_id: int
+    score: float
+
+
+class SpladeQueryEngine:
+    """Thin Pyserini LuceneImpactSearcher wrapper."""
+
+    def __init__(
+        self,
+        index_dir: Path,
+        *,
+        encoder: str | object | None = None,
+        device: str | None = None,
+    ) -> None:
+        """Initialize SPLADE query engine.
+
+        Parameters
+        ----------
+        index_dir : Path
+            Path to the Lucene impact index directory.
+        encoder : str | object | None, optional
+            Pyserini encoder identifier or object to use for query encoding.
+        device : str | None, optional
+            Preferred device for the encoder, if applicable.
+        """
+        self._index_dir = Path(index_dir).resolve()
+        self._encoder = encoder
+        self._device = device
+        self._searcher: Any | None = None
+
+    def search(self, query: str, *, options: SpladeQueryOptions | None = None) -> list[SpladeHit]:
+        """Execute SPLADE search and return typed hits.
+
+        Parameters
+        ----------
+        query : str
+            Query text to search for.
+        options : SpladeQueryOptions | None, optional
+            Optional SPLADE search configuration (top_k, etc.).
+
+        Returns
+        -------
+        list[SpladeHit]
+            List of SPLADE search hits sorted by score descending.
+        """
+        opts = options or SpladeQueryOptions()
+        searcher = self._ensure_searcher()
+        hits = searcher.search(query, k=int(opts.top_k))
+        return [SpladeHit(doc_id=_docid_to_int(hit.docid), score=float(hit.score)) for hit in hits]
+
+    def search_batch(
+        self,
+        queries: Sequence[str],
+        *,
+        options: SpladeQueryOptions | None = None,
+    ) -> list[list[SpladeHit]]:
+        """Execute SPLADE searches sequentially for ``queries``.
+
+        Parameters
+        ----------
+        queries : Sequence[str]
+            Sequence of query texts to search for.
+        options : SpladeQueryOptions | None, optional
+            Optional SPLADE search configuration applied to all queries.
+
+        Returns
+        -------
+        list[list[SpladeHit]]
+            Batched results mirroring the ``queries`` order.
+        """
+        return [self.search(query, options=options) for query in queries]
+
+    def encode_query(self, text: str) -> NDArrayF32:
+        """Return encoder output as a NumPy array when available.
+
+        Parameters
+        ----------
+        text : str
+            Query text to encode.
+
+        Returns
+        -------
+        NDArrayF32
+            Encoded SPLADE sparse vector representation.
+
+        Raises
+        ------
+        NotImplementedError
+            If the encoder does not support encoding.
+        """
+        searcher = self._ensure_searcher()
+        encoder = getattr(searcher, "encoder", None)
+        if encoder is None or not hasattr(encoder, "encode"):
+            msg = "Underlying encoder does not expose encode()."
+            raise NotImplementedError(msg)
+
+        vector = encoder.encode(text)
+        arr = np.asarray(vector, dtype=np.float32, order="C")
+        if arr.ndim == 1:
+            arr = arr.reshape(1, -1)
+        return cast("NDArrayF32", arr)
+
+    def _ensure_searcher(self) -> Any:
+        searcher = self._searcher
+        if searcher is not None:
+            return searcher
+        module = _lucene_search.module()
+        searcher = module.LuceneImpactSearcher(str(self._index_dir), self._encoder)
+        _maybe_move_encoder_device(searcher, self._device)
+        self._searcher = searcher
+        return searcher
+
+
+def _docid_to_int(docid: str | int) -> int:
+    text = str(docid).strip()
+    if text.startswith("chunk:"):
+        text = text.split(":", 1)[1]
+    try:
+        return int(text)
+    except ValueError:
+        digits = ""
+        for char in reversed(text):
+            if char.isdigit():
+                digits = char + digits
+            else:
+                break
+        try:
+            return int(digits) if digits else -1
+        except ValueError:
+            return -1
+
+
+def _maybe_move_encoder_device(searcher: object, device: str | None) -> None:
+    if device is None:
+        return
+    encoder = getattr(searcher, "encoder", None)
+    if encoder is None or not hasattr(encoder, "to"):
+        return
+    try:
+        encoder.to(device)  # type: ignore[call-arg]
+    except (AttributeError, RuntimeError, TypeError, ValueError):  # pragma: no cover - defensive
+        return
 
 
 GENERATOR_NAME = "codeintel_rev.io.splade_manager"
@@ -1749,6 +1910,9 @@ __all__ = [
     "SpladeEncodingSummary",
     "SpladeExportOptions",
     "SpladeExportSummary",
+    "SpladeHit",
     "SpladeIndexManager",
     "SpladeIndexMetadata",
+    "SpladeQueryEngine",
+    "SpladeQueryOptions",
 ]

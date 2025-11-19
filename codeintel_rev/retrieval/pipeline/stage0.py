@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from codeintel_rev.io.hybrid_search import HybridSearchEngine, HybridSearchOptions
 from codeintel_rev.retrieval.types import HybridSearchResult
@@ -14,7 +14,9 @@ class Stage0Options:
     """Optional knobs passed to the hybrid search engine."""
 
     weights: Mapping[str, float] | None = None
-    faiss_ready: bool = True
+    per_channel_k: int | None = None
+    fusion_k: int | None = None
+    rrf_base: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,14 +45,26 @@ def run_stage0(
         Normalized identifiers, scores, warnings, and method metadata.
     """
     opts = options or Stage0Options()
-    hybrid_options = HybridSearchOptions(
-        weights=opts.weights,  # type: ignore[arg-type]
-        faiss_ready=opts.faiss_ready,
-    )
+    hybrid_options = HybridSearchOptions()
+    if opts.weights is not None:
+        hybrid_options = replace(hybrid_options, weights=opts.weights)
+    if opts.per_channel_k is not None:
+        hybrid_options = replace(hybrid_options, per_channel_k=opts.per_channel_k)
+    if opts.fusion_k is not None:
+        hybrid_options = replace(hybrid_options, fusion_k=opts.fusion_k)
+    if opts.rrf_base is not None:
+        hybrid_options = replace(hybrid_options, rrf_base=opts.rrf_base)
+    clamped_limit = max(1, int(limit))
+    fusion_k = min(int(hybrid_options.fusion_k), clamped_limit)
+    if fusion_k != hybrid_options.fusion_k:
+        hybrid_options = replace(hybrid_options, fusion_k=fusion_k)
+    per_channel_k = max(int(hybrid_options.per_channel_k), fusion_k)
+    if per_channel_k != hybrid_options.per_channel_k:
+        hybrid_options = replace(hybrid_options, per_channel_k=per_channel_k)
     fused: HybridSearchResult = engine.search(
         query=query,
         semantic_hits=list(semantic_hits or []),
-        limit=int(limit),
+        limit=clamped_limit,
         options=hybrid_options,
     )
     ids = [int(doc.doc_id) for doc in fused.docs]

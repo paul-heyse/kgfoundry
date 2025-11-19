@@ -9,6 +9,8 @@ from unittest.mock import MagicMock
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 
+from tests._helpers.settings import build_app_config_from_paths
+
 if TYPE_CHECKING:
     from codeintel_rev.config.settings import Settings
 
@@ -202,6 +204,7 @@ def build_application_context(
 
     typed_settings = cast("Settings", settings)
     return ApplicationContext(
+        app_config=build_app_config_from_paths(paths),
         settings=typed_settings,
         paths=paths,
         vllm_client=MagicMock(),

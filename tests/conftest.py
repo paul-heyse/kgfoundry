@@ -57,8 +57,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from _pytest.logging import LogCaptureFixture
+    from codeintel_rev.config.api import AppConfig
 
     from kgfoundry_common.problem_details import JsonValue
+else:
+    AppConfig = Any
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -490,11 +493,15 @@ def fixture_xtr_cli_context_builder() -> Callable[..., XtrOpenContext]:
         settings_factory: Callable[[], Settings] | None = None,
         paths_resolver: Callable[[Settings], ResolvedPaths] | None = None,
         index_factory: Callable[[Path, Settings], XTRIndex] | None = None,
+        app_config_loader: Callable[[], AppConfig] | None = None,
+        path_merger: Callable[[ResolvedPaths, AppConfig], ResolvedPaths] | None = None,
     ) -> XtrOpenContext:
         return XtrOpenContext(
             settings_factory=settings_factory or base.settings_factory,
             paths_resolver=paths_resolver or base.paths_resolver,
             index_factory=index_factory or base.index_factory,
+            app_config_loader=app_config_loader or base.app_config_loader,
+            path_merger=path_merger or base.path_merger,
         )
 
     return build

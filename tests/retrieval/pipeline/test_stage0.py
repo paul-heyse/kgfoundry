@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import cast
 
 import pytest
@@ -14,13 +13,13 @@ from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 from tests._helpers import assertions
 
 
-@dataclass
-class _StubHybridEngine(HybridSearchEngine):
-    result: HybridSearchResult
-    last_query: str | None = None
-    last_semantic_hits: list[tuple[int, float]] | None = None
-    last_limit: int | None = None
-    last_options: HybridSearchOptions | None = None
+class _StubHybridEngine:
+    def __init__(self, result: HybridSearchResult) -> None:
+        self.result = result
+        self.last_query: str | None = None
+        self.last_semantic_hits: list[tuple[int, float]] | None = None
+        self.last_limit: int | None = None
+        self.last_options: HybridSearchOptions | None = None
 
     def search(
         self,
@@ -86,3 +85,33 @@ def test_run_stage0_handles_empty_options() -> None:
     assertions.expect_sequence_equal(result.ids, [5])
     if engine.last_options is None:
         pytest.fail("Stage-0 should construct default options")
+
+
+def test_run_stage0_clamps_options_to_limit() -> None:
+    """Stage-0 clamps fusion/per-channel budgets to the requested limit."""
+    hybrid_result = HybridSearchResult(
+        docs=[HybridResultDoc(doc_id="7", score=0.7)],
+        contributions={},
+        channels=["semantic"],
+        warnings=[],
+        method={},
+    )
+    engine = _StubHybridEngine(result=hybrid_result)
+
+    custom_options = Stage0Options(
+        weights={"semantic": 1.0},
+        per_channel_k=2,
+        fusion_k=10,
+        rrf_base=70,
+    )
+    _ = run_stage0(
+        cast("HybridSearchEngine", engine),
+        query="clamp",
+        semantic_hits=[],
+        limit=3,
+        options=custom_options,
+    )
+    if engine.last_options is None:
+        pytest.fail("Stage-0 should pass options to the engine")
+    assertions.expect_equal(engine.last_options.fusion_k, 3)
+    assertions.expect_equal(engine.last_options.per_channel_k, 3)

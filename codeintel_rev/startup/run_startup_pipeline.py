@@ -9,12 +9,17 @@ are already exported (e.g., ``REPO_ROOT``, ``SCIP_INDEX``, ``VLLM_URL``).
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from codeintel_rev.app import readiness as fs_readiness
-from codeintel_rev.app.config_context import resolve_application_paths
+from codeintel_rev.app.config_context import (
+    merge_paths_with_app_config,
+    resolve_application_paths,
+)
+from codeintel_rev.config.loader import load_app_config
 from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
@@ -145,7 +150,8 @@ def main() -> None:
         forwarded.extend(["--phase", cli_args.phase])
 
     settings = load_settings()
-    paths = resolve_application_paths(settings)
+    app_config = load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+    paths = merge_paths_with_app_config(resolve_application_paths(settings), app_config)
     fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     _run_index_pipeline(forwarded)
 

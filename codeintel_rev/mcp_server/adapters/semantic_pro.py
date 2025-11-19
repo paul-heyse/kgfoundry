@@ -157,22 +157,27 @@ def _semantic_search_pro_sync(
     options: SemanticProOptions | None,
     hooks: SemanticProHooks | None,
 ) -> AnswerEnvelope:
-    runtime_hooks = hooks or SemanticProHooks.default()
-    opts = options or SemanticProOptions()
+    hooks = hooks or SemanticProHooks.default()
+    options = options or SemanticProOptions()
     query = (query or "").strip()
     if not query:
         return _error_envelope("missing query text")
 
-    stage0 = runtime_hooks.run_stage0(
+    default_weights = context.hybrid_fusion_weights()
+    stage_weights = (
+        dict(options.stage_weights) if options.stage_weights is not None else default_weights
+    )
+    limit = context.clamp_hybrid_limit(limit)
+    stage0 = hooks.run_stage0(
         context.get_hybrid_engine(),
         query=query,
         semantic_hits=[],
-        limit=int(limit),
-        options=Stage0Options(weights=opts.stage_weights),
+        limit=limit,
+        options=context.build_stage0_options(weights=stage_weights),
     )
     ids, scores = stage0.ids, stage0.scores
 
-    decision = runtime_hooks.decide_secondary_stage(
+    decision = hooks.decide_secondary_stage(
         {
             "candidate_count": len(ids),
             "top_score": scores[0] if scores else 0.0,
@@ -182,16 +187,13 @@ def _semantic_search_pro_sync(
         StageGateConfig(),
     )
 
-    notes: list[str] = list(stage0.warnings)
-    stage_records: list[StageInfo] = []
-
     stage_ctx = _StageContext(
         context=context,
-        options=opts,
+        options=options,
         decision=decision,
-        stage_records=stage_records,
-        notes=notes,
-        hooks=runtime_hooks,
+        stage_records=[],
+        notes=list(stage0.warnings),
+        hooks=hooks,
     )
 
     ids, scores = _run_late_interaction_stage(
@@ -209,13 +211,13 @@ def _semantic_search_pro_sync(
     )
 
     with context.open_catalog() as catalog:
-        findings = runtime_hooks.hydrate_ids(catalog, ids, scores)
+        findings = hooks.hydrate_ids(catalog, ids, scores)
 
     method = _build_method(
         stage0=stage0,
         decision=decision,
-        notes=notes,
-        stages=stage_records,
+        notes=stage_ctx.notes,
+        stages=stage_ctx.stage_records,
         reranker_summary=reranker_summary,
     )
     confidence = float(scores[0]) if scores else 0.0

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Protocol, Sequence
+from typing import Protocol
 
 from codeintel_rev.retrieval.fusion.weighted_rrf import fuse_weighted_rrf
 from codeintel_rev.retrieval.types import SearchHit
@@ -36,10 +37,17 @@ class FusionProtocol(Protocol):
         options: FusionOptions,
     ) -> list[tuple[int, float]]:
         """Return fused ``(doc_id, score)`` pairs for the supplied channels."""
+        ...
 
 
 class RRFWeighter:
     """Adapter over :func:`fuse_weighted_rrf` operating on primitive tuples."""
+
+    __slots__ = ("_invocations",)
+
+    def __init__(self) -> None:
+        """Initialize RRF weighter with zero invocation count."""
+        self._invocations = 0
 
     def fuse(
         self,
@@ -47,6 +55,21 @@ class RRFWeighter:
         *,
         options: FusionOptions,
     ) -> list[tuple[int, float]]:
+        """Fuse multiple search channel results using weighted RRF.
+
+        Parameters
+        ----------
+        inputs : Iterable[FusionInput]
+            Search results from multiple channels to fuse.
+        options : FusionOptions
+            Fusion configuration (weights, k, etc.).
+
+        Returns
+        -------
+        list[tuple[int, float]]
+            Fused (doc_id, score) pairs, sorted by score descending.
+        """
+        self._invocations += 1
         converted: dict[str, list[SearchHit]] = {}
         for fusion_input in inputs:
             hits: list[SearchHit] = []

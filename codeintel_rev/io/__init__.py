@@ -6,15 +6,21 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 __all__ = [
-    "BM25Engine",
     "BM25CorpusMetadata",
     "BM25CorpusSummary",
+    "BM25Engine",
+    "BM25Hit",
     "BM25IndexManager",
     "BM25IndexMetadata",
-    "SPLADEEngine",
+    "BM25QueryEngine",
+    "BM25QueryOptions",
     "HybridResultDoc",
     "HybridSearchEngine",
     "HybridSearchResult",
+    "OnnxSpladeConfig",
+    "OnnxSpladeMapEncoder",
+    "OnnxSpladeQueryEncoder",
+    "SPLADEEngine",
     "SpladeArtifactMetadata",
     "SpladeArtifactsManager",
     "SpladeBenchmarkOptions",
@@ -25,8 +31,11 @@ __all__ = [
     "SpladeEncodingSummary",
     "SpladeExportOptions",
     "SpladeExportSummary",
+    "SpladeHit",
     "SpladeIndexManager",
     "SpladeIndexMetadata",
+    "SpladeQueryEngine",
+    "SpladeQueryOptions",
 ]
 
 if TYPE_CHECKING:  # pragma: no cover - import-time heavy modules avoided at runtime
@@ -34,8 +43,11 @@ if TYPE_CHECKING:  # pragma: no cover - import-time heavy modules avoided at run
     from codeintel_rev.io.bm25_manager import (
         BM25CorpusMetadata,
         BM25CorpusSummary,
+        BM25Hit,
         BM25IndexManager,
         BM25IndexMetadata,
+        BM25QueryEngine,
+        BM25QueryOptions,
     )
     from codeintel_rev.io.hybrid_search import (
         HybridResultDoc,
@@ -54,8 +66,16 @@ if TYPE_CHECKING:  # pragma: no cover - import-time heavy modules avoided at run
         SpladeEncodingSummary,
         SpladeExportOptions,
         SpladeExportSummary,
+        SpladeHit,
         SpladeIndexManager,
         SpladeIndexMetadata,
+        SpladeQueryEngine,
+        SpladeQueryOptions,
+    )
+    from codeintel_rev.io.splade_onnx_encoder import (
+        OnnxSpladeConfig,
+        OnnxSpladeMapEncoder,
+        OnnxSpladeQueryEncoder,
     )
 
 _EXPORTS: dict[str, tuple[str, str]] = {
@@ -64,10 +84,23 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "BM25CorpusSummary": ("codeintel_rev.io.bm25_manager", "BM25CorpusSummary"),
     "BM25IndexManager": ("codeintel_rev.io.bm25_manager", "BM25IndexManager"),
     "BM25IndexMetadata": ("codeintel_rev.io.bm25_manager", "BM25IndexMetadata"),
+    "BM25Hit": ("codeintel_rev.io.bm25_manager", "BM25Hit"),
+    "BM25QueryEngine": ("codeintel_rev.io.bm25_manager", "BM25QueryEngine"),
+    "BM25QueryOptions": ("codeintel_rev.io.bm25_manager", "BM25QueryOptions"),
     "HybridResultDoc": ("codeintel_rev.io.hybrid_search", "HybridResultDoc"),
     "HybridSearchEngine": ("codeintel_rev.io.hybrid_search", "HybridSearchEngine"),
     "HybridSearchResult": ("codeintel_rev.io.hybrid_search", "HybridSearchResult"),
+    "OnnxSpladeConfig": ("codeintel_rev.io.splade_onnx_encoder", "OnnxSpladeConfig"),
+    "OnnxSpladeMapEncoder": (
+        "codeintel_rev.io.splade_onnx_encoder",
+        "OnnxSpladeMapEncoder",
+    ),
+    "OnnxSpladeQueryEncoder": (
+        "codeintel_rev.io.splade_onnx_encoder",
+        "OnnxSpladeQueryEncoder",
+    ),
     "SPLADEEngine": ("codeintel_rev.io.splade_engine", "SPLADEEngine"),
+    "SpladeHit": ("codeintel_rev.io.splade_manager", "SpladeHit"),
     "SpladeArtifactMetadata": ("codeintel_rev.io.splade_manager", "SpladeArtifactMetadata"),
     "SpladeArtifactsManager": ("codeintel_rev.io.splade_manager", "SpladeArtifactsManager"),
     "SpladeBenchmarkOptions": ("codeintel_rev.io.splade_manager", "SpladeBenchmarkOptions"),
@@ -80,6 +113,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "SpladeExportSummary": ("codeintel_rev.io.splade_manager", "SpladeExportSummary"),
     "SpladeIndexManager": ("codeintel_rev.io.splade_manager", "SpladeIndexManager"),
     "SpladeIndexMetadata": ("codeintel_rev.io.splade_manager", "SpladeIndexMetadata"),
+    "SpladeQueryEngine": ("codeintel_rev.io.splade_manager", "SpladeQueryEngine"),
+    "SpladeQueryOptions": ("codeintel_rev.io.splade_manager", "SpladeQueryOptions"),
 }
 
 

@@ -7,6 +7,20 @@ from pathlib import Path
 from typing import Any
 
 import msgspec
+from codeintel_rev.config.api import (
+    CONFIG_API_VERSION,
+    AppConfig,
+    FAISSSettings,
+    LoggingSettings,
+    SearchSettings,
+)
+from codeintel_rev.config.api import (
+    DuckDBSettings as ApiDuckDBSettings,
+)
+from codeintel_rev.config.api import (
+    PathsConfig as ApiPathsConfig,
+)
+from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings, load_settings
 
 
@@ -87,8 +101,45 @@ def build_settings_for_repo(
     return msgspec.structs.replace(base, paths=paths, bm25=bm25, splade=splade, index=index_cfg)
 
 
+def build_app_config_from_paths(paths: ResolvedPaths) -> AppConfig:
+    """Produce a minimal AppConfig derived from resolved application paths.
+
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved filesystem paths used to populate AppConfig.
+
+    Returns
+    -------
+    AppConfig
+        Application configuration whose path and DuckDB entries mirror ``paths``.
+    """
+    paths_cfg = ApiPathsConfig(
+        repo_root=paths.repo_root,
+        data_dir=paths.data_dir,
+        cache_dir=paths.cache_dir,
+        logs_dir=paths.logs_dir,
+    )
+    duck_cfg = ApiDuckDBSettings(database=paths.duckdb_path)
+    faiss_cfg = FAISSSettings(index_path=paths.faiss_index)
+    return AppConfig(
+        version=CONFIG_API_VERSION,
+        paths=paths_cfg,
+        duckdb=duck_cfg,
+        faiss=faiss_cfg,
+        search=SearchSettings(),
+        logging=LoggingSettings(),
+    )
+
+
 def scaffold_repo_root(repo_root: Path) -> None:
-    """Create the minimum filesystem layout expected by readiness checks."""
+    """Create the minimum filesystem layout expected by readiness checks.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Root directory path to scaffold.
+    """
     repo_root.mkdir(parents=True, exist_ok=True)
     for relative in (
         "config",
@@ -105,4 +156,4 @@ def scaffold_repo_root(repo_root: Path) -> None:
         config_file.write_text("tests: true", encoding="utf-8")
 
 
-__all__ = ["build_settings_for_repo", "scaffold_repo_root"]
+__all__ = ["build_app_config_from_paths", "build_settings_for_repo", "scaffold_repo_root"]

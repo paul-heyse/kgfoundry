@@ -37,6 +37,7 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import merge_scope_filters
 
 from tests._helpers import assertions
+from tests._helpers.settings import build_app_config_from_paths
 
 
 class _FakeRedis:
@@ -129,6 +130,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
     async_git_client = AsyncMock(spec=AsyncGitClient)
 
     return ApplicationContext(
+        app_config=build_app_config_from_paths(paths),
         settings=settings,
         paths=paths,
         vllm_client=vllm_client,

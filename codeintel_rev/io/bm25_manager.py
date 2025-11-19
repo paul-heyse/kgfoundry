@@ -7,17 +7,19 @@ import json
 import logging
 import shutil
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from collections.abc import Sequence as TypingSequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import msgspec
 
-from codeintel_rev.io.path_utils import resolve_within_repo
+from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.bm25_engine import BM25Engine
+from codeintel_rev.io.path_utils import resolve_within_repo
 from kgfoundry_common.subprocess_utils import run_subprocess
 
 if TYPE_CHECKING:
@@ -28,6 +30,35 @@ CORPUS_METADATA_FILENAME = "metadata.json"
 INDEX_METADATA_FILENAME = "metadata.json"
 
 logger = logging.getLogger(__name__)
+
+_lucene_search = LazyModule("pyserini.search.lucene", "bm25 search runtime")
+
+
+class _LuceneHit(Protocol):
+    docid: str | int
+    score: float
+
+
+class _LuceneSearcher(Protocol):
+    def search(self, query: str, k: int) -> TypingSequence[_LuceneHit]: ...
+
+    def set_bm25(self, k1: float, b: float) -> None: ...
+
+    def set_rm3(self, fb_docs: int, fb_terms: int, original_query_weight: float) -> None: ...
+
+    def set_analyzer(self, analyzer: str) -> None: ...
+
+
+class _LuceneMultiFieldSearcher(Protocol):
+    def search_fields(
+        self,
+        query: str,
+        fields: Sequence[str],
+        boosts: Sequence[float],
+        k: int,
+    ) -> TypingSequence[_LuceneHit]: ...
+
+    def set_analyzer(self, analyzer: str) -> None: ...
 
 
 class BM25CorpusMetadata(msgspec.Struct, frozen=True):
@@ -516,11 +547,207 @@ def _directory_size(path: Path) -> int:
     return total
 
 
+@dataclass(frozen=True, slots=True)
+class BM25QueryOptions:
+    """Runtime BM25 search parameters."""
+
+    top_k: int = 50
+    k1: float | None = None
+    b: float | None = None
+    rm3: bool | None = None
+    rm3_fb_terms: int | None = None
+    rm3_fb_docs: int | None = None
+    rm3_original_weight: float | None = None
+    field_weights: dict[str, float] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BM25Hit:
+    """Typed BM25 hit row."""
+
+    doc_id: int
+    score: float
+
+
+class BM25QueryEngine:
+    """Thin BM25 query surface backed by Pyserini searchers."""
+
+    def __init__(self, index_dir: Path, *, analyzer: str | None = None) -> None:
+        """Initialize BM25 query engine.
+
+        Parameters
+        ----------
+        index_dir : Path
+            Path to the Lucene BM25 index directory.
+        analyzer : str | None, optional
+            Optional analyzer name for query processing.
+        """
+        self._index_dir = Path(index_dir).resolve()
+        self._analyzer = analyzer
+        self._searcher: _LuceneSearcher | None = None
+        self._mf_searcher: _LuceneMultiFieldSearcher | None = None
+
+    def search(
+        self,
+        query: str,
+        *,
+        options: BM25QueryOptions | None = None,
+    ) -> list[BM25Hit]:
+        """Return BM25 hits for ``query``.
+
+        Parameters
+        ----------
+        query : str
+            Query text to search for.
+        options : BM25QueryOptions | None, optional
+            Optional BM25 search configuration (k1, b, rm3, etc.).
+
+        Returns
+        -------
+        list[BM25Hit]
+            List of BM25 search hits sorted by score descending.
+        """
+        opts = options or BM25QueryOptions()
+        module = _lucene_search.module()
+        searcher = self._ensure_searcher(module)
+
+        if opts.k1 is not None or opts.b is not None:
+            k1 = float(opts.k1 if opts.k1 is not None else 0.9)
+            b = float(opts.b if opts.b is not None else 0.4)
+            searcher.set_bm25(k1=k1, b=b)
+
+        if opts.rm3:
+            fb_terms = int(opts.rm3_fb_terms or 10)
+            fb_docs = int(opts.rm3_fb_docs or 10)
+            orig_w = float(opts.rm3_original_weight or 0.5)
+            searcher.set_rm3(fb_terms=fb_terms, fb_docs=fb_docs, original_query_weight=orig_w)
+
+        hits_raw = None
+        if opts.field_weights:
+            hits_raw = self._search_multi_field(
+                module,
+                query,
+                opts.field_weights,
+                searcher,
+                int(opts.top_k),
+            )
+
+        if hits_raw is None:
+            qtext = self._compose_fielded_query(query, opts.field_weights)
+            hits_raw = searcher.search(qtext, k=int(opts.top_k))
+
+        return [
+            BM25Hit(doc_id=_bm25_docid_to_int(hit.docid), score=float(hit.score))
+            for hit in hits_raw
+        ]
+
+    def search_batch(
+        self,
+        queries: Sequence[str],
+        *,
+        options: BM25QueryOptions | None = None,
+    ) -> list[list[BM25Hit]]:
+        """Execute BM25 search sequentially for ``queries``.
+
+        Parameters
+        ----------
+        queries : Sequence[str]
+            Sequence of query texts to search for.
+        options : BM25QueryOptions | None, optional
+            Optional BM25 search configuration applied to all queries.
+
+        Returns
+        -------
+        list[list[BM25Hit]]
+            List of search result lists, one per query.
+        """
+        return [self.search(query, options=options) for query in queries]
+
+    def _ensure_searcher(self, module: object) -> _LuceneSearcher:
+        searcher = self._searcher
+        if searcher is not None:
+            return searcher
+        lucene_module = cast("Any", module)
+        searcher = cast("_LuceneSearcher", lucene_module.LuceneSearcher(str(self._index_dir)))
+        if self._analyzer:
+            searcher.set_analyzer(self._analyzer)
+        self._searcher = searcher
+        return searcher
+
+    def _search_multi_field(
+        self,
+        module: object,
+        query: str,
+        weights: dict[str, float],
+        default_searcher: _LuceneSearcher,
+        limit: int,
+    ) -> TypingSequence[_LuceneHit] | None:
+        if self._mf_searcher is None:
+            mf_cls = getattr(module, "LuceneMultiFieldSearcher", None)
+            if mf_cls is not None:
+                self._mf_searcher = cast("_LuceneMultiFieldSearcher", mf_cls(str(self._index_dir)))
+                if self._analyzer and hasattr(self._mf_searcher, "set_analyzer"):
+                    self._mf_searcher.set_analyzer(self._analyzer)
+        if self._mf_searcher is not None and hasattr(self._mf_searcher, "search_fields"):
+            fields = list(weights.keys())
+            boosts = [float(value) for value in weights.values()]
+            return self._mf_searcher.search_fields(query, fields, boosts, k=limit)
+        if hasattr(default_searcher, "search_fields"):
+            fields = list(weights.keys())
+            boosts = [float(value) for value in weights.values()]
+            mf_default = cast("_LuceneMultiFieldSearcher", default_searcher)
+            return mf_default.search_fields(query, fields, boosts, k=limit)
+        return None
+
+    @staticmethod
+    def _compose_fielded_query(query: str, weights: dict[str, float] | None) -> str:
+        if not weights:
+            return query
+        parts = [f"({query})"]
+        for field, weight in weights.items():
+            parts.append(f"({field}:({query}))^{float(weight)}")
+        return " ".join(parts)
+
+
+def _bm25_docid_to_int(docid: str | int) -> int:
+    """Best-effort conversion from Lucene docid to integer chunk id.
+
+    Parameters
+    ----------
+    docid : str | int
+        Lucene document ID string or integer (may include "chunk:" prefix).
+
+    Returns
+    -------
+    int
+        Extracted integer chunk ID.
+    """
+    text = str(docid).strip()
+    if text.startswith("chunk:"):
+        text = text.split(":", 1)[1]
+    try:
+        return int(text)
+    except ValueError:
+        digits = ""
+        for char in reversed(text):
+            if char.isdigit():
+                digits = char + digits
+            else:
+                break
+        try:
+            return int(digits) if digits else -1
+        except ValueError:
+            return -1
+
+
 __all__ = [
-    "BM25Engine",
     "BM25BuildOptions",
     "BM25CorpusMetadata",
     "BM25CorpusSummary",
+    "BM25Engine",
+    "BM25Hit",
     "BM25IndexManager",
     "BM25IndexMetadata",
+    "BM25QueryEngine",
+    "BM25QueryOptions",
 ]

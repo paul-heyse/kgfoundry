@@ -46,9 +46,10 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 from __future__ import annotations
 
 import importlib
+import logging
 import os
 import warnings
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -60,19 +61,34 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 import numpy as np
 
 from codeintel_rev.app import readiness as fs_readiness
-from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
+from codeintel_rev.config.api import AppConfig, FAISSSettings, LoggingSettings, SearchSettings
+from codeintel_rev.config.loader import load_app_config
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
 from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.indexing.index_lifecycle import IndexLifecycleManager
+from codeintel_rev.io.bm25_engine import (
+    BM25Backend,
+    BM25Engine,
+    BM25Rm3Config,
+    PyseriniBM25Backend,
+)
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
-from codeintel_rev.io.duckdb_manager import DuckDBManager
+from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
-from codeintel_rev.io.hybrid_search import HybridSearchContext
+from codeintel_rev.io.splade_engine import (
+    SpladeBackend,
+    SPLADEEngine,
+    SpladeImpactBackend,
+    SpladeImpactBackendConfig,
+    SpladeQueryRepresentation,
+)
 from codeintel_rev.io.vllm_client import VLLMClient, build_vllm_client
+from codeintel_rev.retrieval.pipeline.stage0 import Stage0Options
+from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.runtime import (
     NullRuntimeCellObserver,
     RuntimeCell,
@@ -86,7 +102,9 @@ from codeintel_rev.runtime.factory_adjustment import (
 )
 from codeintel_rev.runtime.imports import gate_import
 from codeintel_rev.runtime.multiprocessing import ensure_spawn_start_method
+from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.errors import ConfigurationError
+from kgfoundry_common.logging import setup_logging
 
 ensure_spawn_start_method()
 
@@ -95,10 +113,25 @@ if TYPE_CHECKING:
 
     from codeintel_rev.app.scope_store import SupportsAsyncRedis
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
+    from codeintel_rev.io.splade_onnx_encoder import (
+        OnnxSpladeConfig,
+        OnnxSpladeMapEncoder,
+        OnnxSpladeQueryEncoder,
+    )
     from codeintel_rev.io.xtr_manager import XTRIndex
 else:  # pragma: no cover - runtime only; annotations are postponed
     HybridSearchEngine = Any
     XTRIndex = Any
+    try:
+        from codeintel_rev.io.splade_onnx_encoder import (
+            OnnxSpladeConfig,
+            OnnxSpladeMapEncoder,
+            OnnxSpladeQueryEncoder,
+        )
+    except ImportError:
+        OnnxSpladeConfig = None
+        OnnxSpladeMapEncoder = None
+        OnnxSpladeQueryEncoder = None
 
 _RUNTIME_FAILURE_TTL_S = 15.0
 _AUTOTUNE_SAMPLE_LIMIT = 128
@@ -110,6 +143,7 @@ __all__ = [
     "ApplicationContextOverrides",
     "GateConfig",
     "ResolvedPaths",  # re-export during transition to codeintel_rev.config.paths
+    "merge_paths_with_app_config",
     "override_gate_config",
     "paths",
     "resolve_application_paths",
@@ -146,9 +180,11 @@ class ApplicationContextOverrides:
         a GitPython-backed client rooted at ``settings.paths.repo_root``.
     async_git_client : AsyncGitClient | None
         Async Git client override that wraps the synchronous client.
-    faiss_manager_factory : Callable[[Settings, ResolvedPaths], FAISSManager] | None
+    faiss_manager_factory : Callable[..., FAISSManager] | None
         Factory for constructing the FAISS manager. When provided, overrides the
-        default import/path resolution.
+        default import/path resolution. Factories may accept either two arguments
+        ``(settings, resolved_paths)`` or three arguments
+        ``(settings, resolved_paths, app_config)``; the latter is preferred.
     duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] | None
         Factory for creating DuckDB catalog instances inside :meth:`open_catalog`.
     """
@@ -161,7 +197,7 @@ class ApplicationContextOverrides:
     duckdb_manager: DuckDBManager | None = None
     git_client: GitClient | None = None
     async_git_client: AsyncGitClient | None = None
-    faiss_manager_factory: Callable[[Settings, ResolvedPaths], FAISSManager] | None = None
+    faiss_manager_factory: Callable[..., FAISSManager] | None = None
     duckdb_catalog_factory: (
         Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] | None
     ) = None
@@ -175,6 +211,22 @@ class GateConfig:
 
 
 _GATE_CONFIG_STACK: list[GateConfig] = [GateConfig()]
+
+def _configure_logging_from_app(logging_cfg: LoggingSettings) -> None:
+    """Configure root logging handlers from AppConfig logging settings."""
+    if getattr(_configure_logging_from_app, "configured", False):
+        return
+    level_name = (logging_cfg.level or "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+    if logging_cfg.json:
+        setup_logging(level=level)
+    else:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+            force=True,
+        )
+    _configure_logging_from_app.configured = True  # type: ignore[attr-defined]
 
 
 @contextmanager
@@ -329,8 +381,9 @@ def _build_factory_adjuster(settings: Settings) -> FactoryAdjuster:
 def _build_faiss_manager(
     settings: Settings,
     paths: ResolvedPaths,
+    app_config: AppConfig,
     *,
-    factory: Callable[[Settings, ResolvedPaths], FAISSManager] | None = None,
+    factory: Callable[..., FAISSManager] | None = None,
 ) -> FAISSManager:
     """Construct and log the FAISS manager for the main index.
 
@@ -340,7 +393,10 @@ def _build_faiss_manager(
         Application settings containing index configuration.
     paths : ResolvedPaths
         Resolved filesystem paths including FAISS index path.
-    factory : Callable[[Settings, ResolvedPaths], FAISSManager] | None, optional
+    app_config : AppConfig
+        Immutable configuration containing FAISS-specific defaults (paths,
+        runtime tuning values).
+    factory : Callable[..., FAISSManager] | None, optional
         Optional override factory. When provided, takes precedence over the default
         FAISS manager construction logic.
 
@@ -355,15 +411,18 @@ def _build_faiss_manager(
         If IndexConfig.nlist is None during context creation.
     """
     if factory is not None:
-        return factory(settings, paths)
+        try:
+            return factory(settings, paths, app_config)
+        except TypeError:
+            return factory(settings, paths)
     faiss_manager_cls = _import_faiss_manager_cls()
-    runtime_opts = _faiss_runtime_options_from_index(settings.index)
+    runtime_opts = _faiss_runtime_options_from_config(settings.index, app_config.faiss)
     nlist_value = settings.index.nlist
     if nlist_value is None:
         msg = "IndexConfig.nlist cannot be None during context creation"
         raise ConfigurationError(msg)
     return faiss_manager_cls(
-        index_path=paths.faiss_index,
+        index_path=app_config.faiss.index_path,
         vec_dim=settings.index.vec_dim,
         nlist=nlist_value,
         runtime=runtime_opts,
@@ -445,6 +504,34 @@ def _build_git_clients(paths: ResolvedPaths) -> tuple[GitClient, AsyncGitClient]
     git_client = GitClient(repo_path=paths.repo_root)
     async_git_client = AsyncGitClient(git_client)
     return git_client, async_git_client
+
+
+def _select_git_clients(
+    paths: ResolvedPaths,
+    overrides: ApplicationContextOverrides,
+) -> tuple[GitClient, AsyncGitClient]:
+    """Return Git clients, applying overrides when provided.
+
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved path configuration.
+    overrides : ApplicationContextOverrides
+        Optional client overrides.
+
+    Returns
+    -------
+    tuple[GitClient, AsyncGitClient]
+        Tuple of (sync, async) Git clients.
+    """
+    if overrides.git_client and overrides.async_git_client:
+        return overrides.git_client, overrides.async_git_client
+    if overrides.git_client:
+        return overrides.git_client, AsyncGitClient(overrides.git_client)
+    primary_git_client, primary_async_client = _build_git_clients(paths)
+    if overrides.async_git_client:
+        return primary_git_client, overrides.async_git_client
+    return primary_git_client, primary_async_client
 
 
 _FROZEN_SETATTR = object.__setattr__
@@ -533,6 +620,78 @@ def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOpt
         enable_range_search=index_cfg.enable_range_search,
         semantic_min_score=index_cfg.semantic_min_score,
     )
+
+
+def _faiss_runtime_options_from_config(
+    index_cfg: IndexConfig,
+    faiss_cfg: FAISSSettings,
+) -> FAISSRuntimeOptions:
+    """Return runtime options merged from Settings and AppConfig.
+
+    Parameters
+    ----------
+    index_cfg : IndexConfig
+        Index configuration from Settings.
+    faiss_cfg : FAISSSettings
+        FAISS-specific settings from AppConfig.
+
+    Returns
+    -------
+    FAISSRuntimeOptions
+        Runtime configuration with AppConfig overrides applied.
+    """
+    opts = _faiss_runtime_options_from_index(index_cfg)
+    return replace(
+        opts,
+        default_k=int(faiss_cfg.default_k),
+        default_nprobe=faiss_cfg.default_nprobe or opts.default_nprobe,
+        refine_k_factor=float(faiss_cfg.refine_k_factor),
+    )
+
+
+def _duckdb_config_from_app(app_config: AppConfig) -> DuckDBConfig:
+    """Convert structured DuckDB settings to manager configuration.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Immutable application configuration produced by :func:`load_app_config`.
+
+    Returns
+    -------
+    DuckDBConfig
+        Manager configuration mirroring the DuckDB settings contained in
+        :class:`AppConfig`.
+    """
+    duckdb_settings = app_config.duckdb
+    defaults = DuckDBConfig()
+    threads = duckdb_settings.threads if duckdb_settings.threads is not None else defaults.threads
+    pool_size = duckdb_settings.pool_size if duckdb_settings.pool_size else None
+    return DuckDBConfig(
+        threads=threads,
+        enable_object_cache=duckdb_settings.object_cache,
+        log_queries=defaults.log_queries,
+        pool_size=pool_size,
+    )
+
+
+def _parse_head_terms(csv_value: str | None) -> list[str]:
+    """Return normalized head terms parsed from an optional CSV string.
+
+    Parameters
+    ----------
+    csv_value : str | None
+        Optional comma-separated string of head terms.
+
+    Returns
+    -------
+    list[str]
+        Ordered list of normalized head terms (empty when ``csv_value`` is falsy).
+    """
+    if not csv_value:
+        return []
+    terms = [part.strip() for part in csv_value.split(",")]
+    return [term for term in terms if term]
 
 
 def _import_hybrid_engine_cls() -> type[HybridSearchEngine]:
@@ -687,20 +846,79 @@ def _ensure_path_exists(path: Path, *, runtime: str, description: str) -> None:
     )
 
 
+class _DisabledBM25Backend(BM25Backend):
+    """No-op BM25 backend used when the BM25 channel is disabled."""
+
+    def search(self, query_text: str, k: int) -> list[tuple[int, float]]:
+        """Return an empty result set regardless of inputs.
+
+        Parameters
+        ----------
+        query_text : str
+            Query text (ignored).
+        k : int
+            Maximum results (ignored).
+
+        Returns
+        -------
+        list[tuple[int, float]]
+            Empty list.
+        """
+        _ = self, query_text, k
+        return []
+
+
+class _DisabledSpladeBackend(SpladeBackend):  # type: ignore[misc]
+    """No-op SPLADE backend used when the SPLADE channel is disabled."""
+
+    def encode_query(self, text: str) -> SpladeQueryRepresentation:
+        """Return a zero vector to satisfy the SPLADE contract.
+
+        Parameters
+        ----------
+        text : str
+            Query text (ignored).
+
+        Returns
+        -------
+        NDArrayF32
+            Zero vector of shape (1,).
+        """
+        _ = self, text
+        return cast("NDArrayF32", np.zeros((1,), dtype=np.float32))
+
+    def search(self, query_vec: SpladeQueryRepresentation, k: int) -> list[tuple[int, float]]:
+        """Return an empty result set regardless of inputs.
+
+        Parameters
+        ----------
+        query_vec : SpladeQueryRepresentation
+            Query vector (ignored).
+        k : int
+            Maximum results (ignored).
+
+        Returns
+        -------
+        list[tuple[int, float]]
+            Empty list.
+        """
+        _ = self, query_vec, k
+        return []
+
+
 T = TypeVar("T")
 
 
 class _FaissRuntimeState:
-    """Runtime bookkeeping for FAISS initialization."""
+    """Runtime bookkeeping for FAISS initialization.
+
+    Creates a new state tracker with a lock for thread-safe initialization
+    tracking and a loaded flag indicating whether FAISS has been initialized.
+    """
 
     __slots__ = ("loaded", "lock")
 
     def __init__(self) -> None:
-        """Initialize FAISS runtime state tracking.
-
-        Creates a new state tracker with a lock for thread-safe initialization
-        tracking and a loaded flag indicating whether FAISS has been initialized.
-        """
         self.lock = Lock()
         self.loaded = False
 
@@ -759,6 +977,10 @@ class ApplicationContext:
 
     Attributes
     ----------
+    app_config : AppConfig
+        Immutable configuration loaded via :func:`load_app_config` that captures
+        path, DuckDB, FAISS, search, and logging settings external to the legacy
+        ``Settings`` model.
     settings : Settings
         Immutable application settings loaded from environment variables. Frozen
         after creation to ensure thread-safe access.
@@ -782,6 +1004,8 @@ class ApplicationContext:
     async_git_client : AsyncGitClient
         Async wrapper around git_client for non-blocking Git operations. Runs
         synchronous GitPython operations in threadpool via asyncio.to_thread.
+    duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog]
+        Factory used to construct catalog instances when :meth:`open_catalog` is invoked.
     runtime_observer : RuntimeCellObserver
         Observer instance that receives lifecycle callbacks from runtime cells
         (hybrid engine, FAISS manager, XTR index). Defaults to NullRuntimeCellObserver
@@ -794,8 +1018,6 @@ class ApplicationContext:
         Manager for versioned index lifecycle operations (stage, publish, rollback).
         Initialized during context setup with index root inferred from paths.
         Provides APIs for managing index versions and manifests.
-    duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog]
-        Factory used to construct catalog instances when :meth:`open_catalog` is invoked.
 
     Examples
     --------
@@ -831,6 +1053,7 @@ class ApplicationContext:
     ApplicationContext.create : Factory method for creating context
     """
 
+    app_config: AppConfig
     settings: Settings
     paths: ResolvedPaths
     vllm_client: VLLMClient
@@ -866,6 +1089,7 @@ class ApplicationContext:
         *,
         settings: Settings | None = None,
         overrides: ApplicationContextOverrides | None = None,
+        app_config: AppConfig | None = None,
     ) -> ApplicationContext:
         """Create application context from environment variables.
 
@@ -890,6 +1114,11 @@ class ApplicationContext:
             or for swapping runtime observers, factory adjusters, and storage
             adapters. When ``None`` (default) the method constructs all components
             using production builders.
+        app_config : AppConfig | None, optional
+            Immutable configuration loaded from environment variables and optional
+            configuration files. When ``None`` (default), this method loads the
+            config via :func:`load_app_config`, honoring the
+            ``CODEINTEL_CONFIG_FILE`` environment variable.
 
         Returns
         -------
@@ -939,35 +1168,37 @@ class ApplicationContext:
         """
         settings = settings or load_settings()
         effective_overrides = overrides or ApplicationContextOverrides()
-        paths = resolve_application_paths(settings)
+        app_config = app_config or load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+        paths = merge_paths_with_app_config(resolve_application_paths(settings), app_config)
         try:
             _ensure_filesystem_readiness(paths)
         except fs_readiness.ReadinessError as exc:
             message = f"Repository root does not exist or failed readiness checks; details: {exc}"
             raise ConfigurationError(message) from exc
         set_paths(paths)
+        _configure_logging_from_app(app_config.logging)
 
         vllm_client = effective_overrides.vllm_client or build_vllm_client(settings.vllm)
         faiss_manager = effective_overrides.faiss_manager or _build_faiss_manager(
             settings,
             paths,
+            app_config,
             factory=effective_overrides.faiss_manager_factory,
         )
         scope_store = effective_overrides.scope_store or _build_scope_store(settings)
         duckdb_manager = effective_overrides.duckdb_manager or DuckDBManager(
-            paths.duckdb_path, settings.duckdb
+            app_config.duckdb.database, _duckdb_config_from_app(app_config)
         )
         duckdb_catalog_factory = (
             effective_overrides.duckdb_catalog_factory or _default_duckdb_catalog_factory
         )
-        primary_git_client, primary_async_client = _build_git_clients(paths)
-        git_client = effective_overrides.git_client or primary_git_client
-        async_git_client = effective_overrides.async_git_client or primary_async_client
+        git_client, async_git_client = _select_git_clients(paths, effective_overrides)
 
         observer = effective_overrides.runtime_observer or NullRuntimeCellObserver()
 
         adjuster = effective_overrides.factory_adjuster or _build_factory_adjuster(settings)
         return cls(
+            app_config=app_config,
             settings=settings,
             paths=paths,
             vllm_client=vllm_client,
@@ -1073,6 +1304,68 @@ class ApplicationContext:
             msg = "HybridSearchEngine failed to initialize"
             raise RuntimeError(msg)
         return engine
+
+    def hybrid_fusion_weights(self) -> dict[str, float]:
+        """Return per-channel weights used during hybrid fusion.
+
+        Returns
+        -------
+        dict[str, float]
+            Mapping from channel name to fusion weight derived from AppConfig.
+        """
+        search_cfg = self.hybrid_search_settings()
+        return {
+            "bm25": float(search_cfg.bm25_weight),
+            "splade": float(search_cfg.splade_weight),
+            "semantic": float(search_cfg.faiss_weight),
+        }
+
+    def hybrid_search_settings(self) -> SearchSettings:
+        """Return immutable hybrid search settings sourced from AppConfig.
+
+        Returns
+        -------
+        SearchSettings
+            Hybrid search configuration defined in AppConfig.
+        """
+        return self.app_config.search
+
+    def clamp_hybrid_limit(self, requested: int) -> int:
+        """Clamp requested Stage-0 limit to the configured bounds.
+
+        Parameters
+        ----------
+        requested : int
+            Caller-supplied limit value.
+
+        Returns
+        -------
+        int
+            Value clamped to ``[1, search.max_results]``.
+        """
+        max_results = int(self.app_config.search.max_results)
+        return max(1, min(int(requested), max_results))
+
+    def build_stage0_options(self, *, weights: Mapping[str, float]) -> Stage0Options:
+        """Return Stage-0 options derived from AppConfig search settings.
+
+        Parameters
+        ----------
+        weights : Mapping[str, float]
+            Channel weights applied during fusion.
+
+        Returns
+        -------
+        Stage0Options
+            Options configured with AppConfig search tunables.
+        """
+        search_cfg = self.hybrid_search_settings()
+        return Stage0Options(
+            weights=dict(weights),
+            per_channel_k=int(search_cfg.per_channel_k),
+            fusion_k=int(search_cfg.fusion_k),
+            rrf_base=int(search_cfg.rrf_base),
+        )
 
     def get_offline_recall_evaluator(self) -> OfflineRecallEvaluator:
         """Return the offline recall evaluator for diagnostic runs.
@@ -1307,7 +1600,7 @@ class ApplicationContext:
         return index
 
     def _build_hybrid_engine(self) -> HybridSearchEngine:
-        """Construct the hybrid search engine with dependency gates per channel.
+        """Construct the hybrid search engine using narrow BM25/SPLADE engines.
 
         Returns
         -------
@@ -1318,20 +1611,142 @@ class ApplicationContext:
         if factories and factories.hybrid_engine_factory is not None:
             return factories.hybrid_engine_factory()
         engine_cls = _import_hybrid_engine_cls()
-        capabilities = None
+        bm25_engine = self._build_bm25_engine()
+        splade_engine = self._build_splade_engine()
+        return engine_cls(bm25=bm25_engine, splade=splade_engine)
+
+    def _build_bm25_engine(self) -> BM25Engine:
+        """Return configured BM25 engine or a disabled stub.
+
+        Returns
+        -------
+        BM25Engine
+            Configured BM25 engine instance or disabled stub.
+        """
+        settings = self.settings
+        if not (settings.bm25.enabled and settings.index.enable_bm25_channel):
+            return BM25Engine(_DisabledBM25Backend())
+        index_dir = self._resolve_repo_path(settings.bm25.index_dir)
+        rm3_params = RM3Params(
+            fb_docs=settings.bm25.rm3_fb_docs,
+            fb_terms=settings.bm25.rm3_fb_terms,
+            orig_weight=settings.bm25.rm3_original_query_weight,
+        )
+        heuristics: RM3Heuristics | None = None
+        prf_cfg = settings.index.prf
+        if prf_cfg.enable_auto:
+            heuristics = RM3Heuristics(
+                short_query_max_terms=prf_cfg.short_query_max_terms,
+                symbol_like_regex=prf_cfg.symbol_like_regex,
+                head_terms=_parse_head_terms(prf_cfg.head_terms_csv),
+                default_params=rm3_params,
+            )
+        rm3_cfg = BM25Rm3Config(
+            params=rm3_params,
+            heuristics=heuristics,
+            enable_rm3=settings.bm25.rm3_enabled,
+            auto_rm3=prf_cfg.enable_auto,
+        )
         try:
-            capabilities = Capabilities.from_context(self)
-        except RuntimeLifecycleError:  # pragma: no cover - defensive logging
-            capabilities = None
-        context = HybridSearchContext(
-            capabilities=capabilities,
-            duckdb_manager=self.duckdb_manager,
+            backend = PyseriniBM25Backend(
+                index_dir=index_dir,
+                k1=settings.bm25.k1,
+                b=settings.bm25.b,
+                rm3=rm3_cfg,
+            )
+        except FileNotFoundError:
+            warnings.warn(
+                f"BM25 index not found at {index_dir}, falling back to disabled backend.",
+                stacklevel=2,
+            )
+            return BM25Engine(_DisabledBM25Backend())
+        return BM25Engine(backend=backend)
+
+    def _build_splade_engine(self) -> SPLADEEngine:
+        """Return configured SPLADE engine or a disabled stub.
+
+        Returns
+        -------
+        SPLADEEngine
+            Configured SPLADE engine instance or disabled stub.
+        """
+        settings = self.settings
+        if not (settings.splade.enabled and settings.index.enable_splade_channel):
+            return SPLADEEngine(_DisabledSpladeBackend())
+        backend_config = SpladeImpactBackendConfig(
+            model_dir=self._resolve_repo_path(settings.splade.model_dir),
+            onnx_dir=self._resolve_repo_path(settings.splade.onnx_dir),
+            onnx_file=settings.splade.onnx_file,
+            provider=settings.splade.provider,
+            index_dir=self._resolve_repo_path(settings.splade.index_dir),
+            quantization=settings.splade.quantization,
+            max_terms=settings.splade.max_terms,
+            max_query_terms=settings.splade.max_query_terms,
+            prune_below=settings.splade.prune_below,
+            static_prune_pct=settings.splade.static_prune_pct,
         )
-        return engine_cls(
-            self.settings,
-            self.paths,
-            context=context,
-        )
+        onnx_encoder = self._build_splade_query_encoder()
+        try:
+            backend = SpladeImpactBackend(backend_config, onnx_encoder=onnx_encoder)
+        except FileNotFoundError:
+            warnings.warn(
+                f"SPLADE impact index not found at {backend_config.index_dir},"
+                " falling back to disabled backend.",
+                stacklevel=2,
+            )
+            return SPLADEEngine(_DisabledSpladeBackend())
+        return SPLADEEngine(backend=backend)
+
+    def _build_splade_query_encoder(self) -> object | None:
+        cfg = getattr(self.settings.splade, "onnx_query", None)
+        if cfg is None or not cfg.enabled:
+            return None
+        if OnnxSpladeConfig is None or OnnxSpladeQueryEncoder is None:
+            warnings.warn(
+                "SPLADE ONNX encoder unavailable; missing optional dependency",
+                stacklevel=2,
+            )
+            return None
+        model_rel = cfg.model_path or self.settings.splade.onnx_file
+        model_dir = self._resolve_repo_path(self.settings.splade.onnx_dir)
+        model_path = Path(model_rel)
+        if not model_path.is_absolute():
+            model_path = model_dir / model_rel
+        model_path = model_path.resolve()
+        if not model_path.exists():
+            warnings.warn(
+                f"SPLADE ONNX model not found: {model_path}",
+                stacklevel=2,
+            )
+            return None
+        tokenizer_name = cfg.tokenizer_name or self.settings.splade.model_id
+        try:
+            onnx_cfg = OnnxSpladeConfig(
+                model_path=model_path,
+                tokenizer_name=tokenizer_name,
+                output_name=cfg.output_name,
+                input_ids_name=cfg.input_ids_name,
+                attention_mask_name=cfg.attention_mask_name,
+                providers=cfg.providers,
+                topn=cfg.topn,
+                min_weight=cfg.min_weight,
+                normalize=cfg.normalize,
+            )
+            encoder_cls = OnnxSpladeMapEncoder if cfg.format == "map" else OnnxSpladeQueryEncoder
+            return encoder_cls(onnx_cfg)
+        except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive
+            warnings.warn(
+                f"SPLADE ONNX encoder initialization failed: {exc}",
+                stacklevel=2,
+            )
+            return None
+
+    def _resolve_repo_path(self, value: str | Path) -> Path:
+        base = Path(self.paths.repo_root).expanduser()
+        candidate = Path(value).expanduser()
+        if candidate.is_absolute():
+            return candidate
+        return (base / candidate).resolve()
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Load FAISS index (once) in a thread-safe manner.
@@ -1521,6 +1936,7 @@ class ApplicationContext:
             return cast("TOverride", components.get(name, default))
 
         return ApplicationContext(
+            app_config=self.app_config,
             settings=settings or self.settings,
             paths=paths or self.paths,
             vllm_client=_component_value("vllm_client", self.vllm_client),
@@ -1593,3 +2009,25 @@ class ApplicationContext:
                 self._runtime.xtr.seed(xtr_index)
         if hybrid_engine_factory is not None:
             self.set_runtime_factories_for_tests(hybrid_engine_factory=hybrid_engine_factory)
+
+
+def merge_paths_with_app_config(paths: ResolvedPaths, app_config: AppConfig) -> ResolvedPaths:
+    """Return paths updated with AppConfig overrides for storage locations.
+
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Canonical filesystem paths derived from :func:`resolve_application_paths`.
+    app_config : AppConfig
+        Immutable configuration containing DuckDB and FAISS paths.
+
+    Returns
+    -------
+    ResolvedPaths
+        Resolved paths with DuckDB and FAISS entries overridden by AppConfig.
+    """
+    return replace(
+        paths,
+        duckdb_path=app_config.duckdb.database,
+        faiss_index=app_config.faiss.index_path,
+    )

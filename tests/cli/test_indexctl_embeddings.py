@@ -11,13 +11,28 @@ import duckdb
 import numpy as np
 import pyarrow.parquet as pq
 import pytest
+from codeintel_rev.cli import indexctl as indexctl_module
 from codeintel_rev.cli.indexctl import IndexctlCliContext
 from codeintel_rev.cli.indexctl import app as indexctl_app
+from codeintel_rev.config.api import (
+    CONFIG_API_VERSION,
+    AppConfig,
+    FAISSSettings,
+    LoggingSettings,
+    SearchSettings,
+)
+from codeintel_rev.config.api import (
+    DuckDBSettings as ApiDuckDBSettings,
+)
+from codeintel_rev.config.api import (
+    PathsConfig as ApiPathsConfig,
+)
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.embeddings import EmbeddingProvider
 from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
 from tests._helpers import assertions, cli, constants
+from tests._helpers.settings import build_settings_for_repo
 
 
 class _StubProvider:
@@ -166,3 +181,43 @@ def test_embeddings_validate_passes_with_stub(
         obj={"cli_context": indexctl_context},
     )
     assertions.expect_equal(validate_result.exit_code, 0, reason=validate_result.output)
+
+
+def _app_config_with_duckdb(repo_root: Path, duckdb_path: Path) -> AppConfig:
+    """Return minimal AppConfig whose DuckDB path points at ``duckdb_path``.
+
+    Returns
+    -------
+    AppConfig
+        Configuration object with deterministic paths for testing helpers.
+    """
+    data_dir = repo_root / "data"
+    paths_cfg = ApiPathsConfig(
+        repo_root=repo_root,
+        data_dir=data_dir,
+        cache_dir=repo_root / ".cache",
+        logs_dir=repo_root / "logs",
+    )
+    return AppConfig(
+        version=CONFIG_API_VERSION,
+        paths=paths_cfg,
+        duckdb=ApiDuckDBSettings(database=duckdb_path),
+        faiss=FAISSSettings(index_path=repo_root / "faiss.index"),
+        search=SearchSettings(),
+        logging=LoggingSettings(),
+    )
+
+
+def test_resolve_duck_path_prefers_app_config_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Default DuckDB catalog path honors AppConfig when no override is provided."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    duck_path = repo_root / "custom.duckdb"
+    duck_path.touch()
+    app_config = _app_config_with_duckdb(repo_root, duck_path)
+    settings = build_settings_for_repo(repo_root)
+    monkeypatch.setattr(indexctl_module, "_cached_app_config", lambda: app_config)
+    resolved = indexctl_module.resolve_duck_path(settings, version_dir=None, override=None)
+    assertions.expect_equal(resolved, duck_path.resolve())

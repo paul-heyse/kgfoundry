@@ -19,6 +19,7 @@ import duckdb as duckdb_mod
 import numpy as np
 import typer
 
+from codeintel_rev.config import AppConfig, load_app_config
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.embeddings import EmbeddingProvider, get_embedding_provider
 from codeintel_rev.errors import RuntimeLifecycleError
@@ -81,6 +82,18 @@ def _cached_settings() -> Settings:
     return load_settings()
 
 
+@lru_cache(maxsize=1)
+def _cached_app_config() -> AppConfig:
+    """Load and cache immutable application configuration.
+
+    Returns
+    -------
+    AppConfig
+        Cached immutable configuration derived from env/file sources.
+    """
+    return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+
+
 def _default_faiss_manager_factory(
     settings: Settings,
     index_override: Path | None,
@@ -95,9 +108,8 @@ def _default_faiss_manager_factory(
     Parameters
     ----------
     settings : Settings
-        Application settings containing FAISS index path, vector dimension,
-        and nlist configuration. Used to configure the manager and determine
-        default index path.
+        Application settings containing FAISS vector dimension and nlist
+        configuration. Index path defaults are sourced from :class:`AppConfig`.
     index_override : Path | None
         Optional path override for the FAISS index file. If provided, this
         path is used instead of the settings path. The path is expanded and
@@ -116,7 +128,9 @@ def _default_faiss_manager_factory(
     index loading, providing a ready-to-use manager instance. The CPU index
     is loaded immediately to ensure it's available for operations.
     """
-    index_path = (index_override or Path(settings.paths.faiss_index)).expanduser().resolve()
+    app_config = _cached_app_config()
+    default_index = app_config.faiss.index_path
+    index_path = (index_override or default_index).expanduser().resolve()
     nlist = int(settings.index.nlist or settings.index.faiss_nlist)
     manager = FAISSManager(
         index_path=index_path,
@@ -141,9 +155,9 @@ def _default_duckdb_catalog_factory(
     Parameters
     ----------
     settings : Settings
-        Application settings containing DuckDB catalog path, vectors directory,
-        repository root, materialization settings, and FAISS ID map path. Used
-        to configure the catalog instance.
+        Application settings containing vectors directory, repository root,
+        materialization settings, and FAISS ID map path. The DuckDB catalog path
+        defaults to the value defined in :class:`AppConfig`.
     path_override : Path | None
         Optional path override for the DuckDB catalog file. If provided, this
         path is used instead of the settings path. The path is expanded and
@@ -163,7 +177,8 @@ def _default_duckdb_catalog_factory(
     The function handles path resolution and catalog configuration, providing a
     ready-to-use catalog instance with proper ID map and materialization settings.
     """
-    db_path = (path_override or Path(settings.paths.duckdb_path)).expanduser().resolve()
+    default_db = _cached_app_config().duckdb.database
+    db_path = (path_override or default_db).expanduser().resolve()
     vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
     catalog = DuckDBCatalog(
         db_path=db_path,
@@ -970,11 +985,11 @@ def _build_context(
     This enables flexible configuration while maintaining sensible defaults.
 
     The function may propagate typer.BadParameter from _resolve_version_dir when
-    explicit version doesn't exist, or from _resolve_duck_path when DuckDB catalog
+    explicit version doesn't exist, or from resolve_duck_path when DuckDB catalog
     file is not found.
     """
     version_dir = _resolve_version_dir(manager, version)
-    duck_path = _resolve_duck_path(settings, version_dir, duckdb_path)
+    duck_path = resolve_duck_path(settings, version_dir, duckdb_path)
     output_path = _resolve_output_path(
         settings,
         version_dir,
@@ -993,7 +1008,7 @@ def _build_context(
     )
 
 
-def _resolve_duck_path(
+def resolve_duck_path(
     settings: Settings,
     version_dir: Path | None,
     override: Path | None,
@@ -1007,8 +1022,9 @@ def _resolve_duck_path(
     Parameters
     ----------
     settings : Settings
-        Application settings containing default DuckDB catalog path. Used when
-        override and version_dir are None.
+        Application settings containing legacy defaults. When neither override nor
+        version_dir is provided, the DuckDB catalog path falls back to
+        :class:`AppConfig`.
     version_dir : Path | None
         Optional version directory path. If provided and override is None, the
         catalog path is resolved as version_dir / "catalog.duckdb".
@@ -1021,7 +1037,7 @@ def _resolve_duck_path(
     Path
         Resolved DuckDB catalog path. The path is expanded (handling ~) and
         resolved to absolute form. Path resolution follows precedence: override >
-        version_dir / "catalog.duckdb" > settings.paths.duckdb_path.
+        version_dir / "catalog.duckdb" > AppConfig.duckdb.database.
 
     Raises
     ------
@@ -1033,15 +1049,24 @@ def _resolve_duck_path(
     -----
     DuckDB path resolution enables flexible catalog access by supporting multiple
     path sources: explicit overrides, version-specific catalogs, and default settings.
-    The function validates path existence to prevent errors from missing catalogs,
-    ensuring robust operation even when paths are misconfigured.
+    When the AppConfig path is missing but the legacy settings path exists, the
+    latter is used for backwards compatibility. The function validates path existence
+    to prevent errors from missing catalogs, ensuring robust operation even when
+    paths are misconfigured.
     """
     if override is not None:
         duck_path = override.expanduser().resolve()
     elif version_dir is not None:
         duck_path = (version_dir / "catalog.duckdb").resolve()
     else:
-        duck_path = Path(settings.paths.duckdb_path).expanduser().resolve()
+        config_path = _cached_app_config().duckdb.database.resolve()
+        legacy_path = Path(settings.paths.duckdb_path).expanduser().resolve()
+        if config_path.exists():
+            duck_path = config_path
+        elif legacy_path.exists():
+            duck_path = legacy_path
+        else:
+            duck_path = config_path
     if not duck_path.exists():
         msg = f"DuckDB catalog not found: {duck_path}"
         raise typer.BadParameter(msg)

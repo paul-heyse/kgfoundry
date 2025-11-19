@@ -524,6 +524,12 @@ class VLLMEmbeddingMode(StrEnum):
     def from_value(cls, value: str | VLLMEmbeddingMode | None) -> VLLMEmbeddingMode:
         """Return an embedding mode parsed from user configuration.
 
+        Parameters
+        ----------
+        value : str | VLLMEmbeddingMode | None
+            User-provided embedding mode value. Can be a string (case-insensitive),
+            an existing VLLMEmbeddingMode enum, or None (defaults to LAST).
+
         Returns
         -------
         VLLMEmbeddingMode
@@ -548,6 +554,12 @@ class VLLMEmbeddingMode(StrEnum):
     @classmethod
     def from_env(cls, value: str | None) -> VLLMEmbeddingMode:
         """Return embedding mode parsed from environment variables.
+
+        Parameters
+        ----------
+        value : str | None
+            Environment variable value containing the embedding mode string, or None
+            to use the default (LAST).
 
         Returns
         -------
@@ -810,6 +822,10 @@ class SpladeConfig(msgspec.Struct, frozen=True):
     static_prune_pct : float
         Static pruning percentage applied during query expansion. Defaults to ``0.0``
         (no static pruning).
+    onnx_query : SpladeOnnxQueryConfig | None
+        Optional ONNX query encoder configuration. When provided, enables ONNX-based
+        query encoding instead of the default SentenceTransformers encoder. Defaults to
+        ``None`` (disabled).
     """
 
     model_id: str = "naver/splade-v3"
@@ -829,6 +845,23 @@ class SpladeConfig(msgspec.Struct, frozen=True):
     prune_below: float = 0.0
     analyzer: Literal["wordpiece", "code"] = "wordpiece"
     static_prune_pct: float = 0.0
+    onnx_query: SpladeOnnxQueryConfig | None = None
+
+
+class SpladeOnnxQueryConfig(msgspec.Struct, frozen=True):
+    """Optional SPLADE ONNX query encoder configuration."""
+
+    enabled: bool = False
+    model_path: str | None = None
+    tokenizer_name: str | None = None
+    output_name: str = "logits"
+    input_ids_name: str = "input_ids"
+    attention_mask_name: str = "attention_mask"
+    providers: tuple[str, ...] = ("CPUExecutionProvider",)
+    topn: int = 64
+    min_weight: float = 1e-6
+    normalize: bool = False
+    format: Literal["string", "map"] = "string"
 
 
 class PathsConfig(msgspec.Struct, frozen=True):
@@ -1969,14 +2002,48 @@ def _build_splade_config(*, enabled: bool) -> SpladeConfig:
     control how many terms are retained and pruned during query processing.
     """
     analyzer_value = _resolve_splade_analyzer(os.environ.get("SPLADE_ANALYZER", "wordpiece"))
+    model_id = os.environ.get("SPLADE_MODEL_ID", "naver/splade-v3")
+    model_dir = os.environ.get("SPLADE_MODEL_DIR", "models/splade-v3")
+    onnx_dir = os.environ.get("SPLADE_ONNX_DIR", "models/splade-v3/onnx")
+    onnx_file = os.environ.get("SPLADE_ONNX_FILE", "model_qint8.onnx")
+    provider = os.environ.get("SPLADE_PROVIDER", "CPUExecutionProvider")
+    use_onnx_query = _env_bool("SPLADE_USE_ONNX_QUERY_ENCODER", default=False)
+    onnx_query_cfg: SpladeOnnxQueryConfig | None = None
+    if use_onnx_query:
+        provider_csv = os.environ.get("SPLADE_ONNX_QUERY_PROVIDERS")
+        providers = tuple(part.strip() for part in (provider_csv or "").split(",") if part.strip())
+        if not providers:
+            providers = (provider,)
+        format_value = os.environ.get("SPLADE_ONNX_QUERY_FORMAT", "string").strip().lower()
+        if format_value not in {"string", "map"}:
+            format_value = "string"
+        onnx_query_cfg = SpladeOnnxQueryConfig(
+            enabled=True,
+            model_path=os.environ.get("SPLADE_ONNX_QUERY_MODEL"),
+            tokenizer_name=os.environ.get("SPLADE_ONNX_QUERY_TOKENIZER"),
+            output_name=os.environ.get("SPLADE_ONNX_QUERY_OUTPUT", "logits"),
+            input_ids_name=os.environ.get("SPLADE_ONNX_QUERY_INPUT_IDS", "input_ids"),
+            attention_mask_name=os.environ.get(
+                "SPLADE_ONNX_QUERY_ATTENTION_MASK", "attention_mask"
+            ),
+            providers=providers,
+            topn=int(
+                os.environ.get(
+                    "SPLADE_ONNX_QUERY_TOPN", os.environ.get("SPLADE_MAX_QUERY_TERMS", "64")
+                )
+            ),
+            min_weight=float(os.environ.get("SPLADE_ONNX_QUERY_MIN_WEIGHT", "1e-6")),
+            normalize=_env_bool("SPLADE_ONNX_QUERY_NORMALIZE", default=False),
+            format="map" if format_value == "map" else "string",
+        )
     return SpladeConfig(
-        model_id=os.environ.get("SPLADE_MODEL_ID", "naver/splade-v3"),
-        model_dir=os.environ.get("SPLADE_MODEL_DIR", "models/splade-v3"),
-        onnx_dir=os.environ.get("SPLADE_ONNX_DIR", "models/splade-v3/onnx"),
-        onnx_file=os.environ.get("SPLADE_ONNX_FILE", "model_qint8.onnx"),
+        model_id=model_id,
+        model_dir=model_dir,
+        onnx_dir=onnx_dir,
+        onnx_file=onnx_file,
         vectors_dir=os.environ.get("SPLADE_VECTORS_DIR", "data/splade_vectors"),
         index_dir=os.environ.get("SPLADE_INDEX_DIR", "indexes/splade_v3_impact"),
-        provider=os.environ.get("SPLADE_PROVIDER", "CPUExecutionProvider"),
+        provider=provider,
         quantization=int(os.environ.get("SPLADE_QUANTIZATION", "100")),
         max_terms=int(os.environ.get("SPLADE_MAX_TERMS", "3000")),
         max_clause_count=int(os.environ.get("SPLADE_MAX_CLAUSE", "4096")),
@@ -1987,6 +2054,7 @@ def _build_splade_config(*, enabled: bool) -> SpladeConfig:
         prune_below=float(os.environ.get("SPLADE_PRUNE_BELOW", "0.0")),
         analyzer=analyzer_value,
         static_prune_pct=float(os.environ.get("SPLADE_STATIC_PRUNE_PCT", "0.0")),
+        onnx_query=onnx_query_cfg,
     )
 
 

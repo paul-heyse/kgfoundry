@@ -43,11 +43,14 @@ class FAISSSettings:
 
 @dataclass(frozen=True, slots=True)
 class SearchSettings:
-    """Settings for hybrid search weighting."""
+    """Settings for hybrid search weighting and Stage-0 tuning."""
 
     bm25_weight: float = 0.2
     splade_weight: float = 0.3
     faiss_weight: float = 0.5
+    per_channel_k: int = 100
+    fusion_k: int = 50
+    rrf_base: int = 60
     max_results: int = 50
 
 
@@ -115,4 +118,13 @@ def validate_config(cfg: AppConfig) -> None:
         raise ValueError(message)
     if cfg.search.max_results <= 0:
         message = "search.max_results must be positive"
+        raise ValueError(message)
+    if cfg.search.per_channel_k <= 0:
+        message = "search.per_channel_k must be positive"
+        raise ValueError(message)
+    if cfg.search.fusion_k <= 0:
+        message = "search.fusion_k must be positive"
+        raise ValueError(message)
+    if cfg.search.rrf_base <= 0:
+        message = "search.rrf_base must be positive"
         raise ValueError(message)

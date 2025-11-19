@@ -397,6 +397,11 @@ class HybridPoolEvaluator:
     def _reconstruct_candidates(self, cand_ids: Sequence[int]) -> np.ndarray:
         """Return candidate vectors using store helpers or manager fallbacks.
 
+        Parameters
+        ----------
+        cand_ids : Sequence[int]
+            Sequence of candidate chunk IDs to reconstruct vectors for.
+
         Returns
         -------
         np.ndarray

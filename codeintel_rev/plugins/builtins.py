@@ -2,16 +2,30 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from pathlib import Path
 from threading import Lock
 
-from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider, SpladeSearchProvider
+from codeintel_rev.config.settings import SpladeConfig
+from codeintel_rev.io.bm25_engine import BM25Engine, BM25Rm3Config, PyseriniBM25Backend
+from codeintel_rev.io.splade_engine import (
+    SPLADEEngine,
+    SpladeImpactBackend,
+    SpladeImpactBackendConfig,
+)
+from codeintel_rev.io.splade_onnx_encoder import (
+    OnnxSpladeConfig,
+    OnnxSpladeMapEncoder,
+    OnnxSpladeQueryEncoder,
+)
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import SearchHit
 
 __all__ = ["bm25_factory", "splade_factory"]
+
+logger = logging.getLogger(__name__)
 
 
 def bm25_factory(context: ChannelContext) -> Channel:
@@ -105,8 +119,7 @@ class _BM25Channel(Channel):
     def __init__(self, context: ChannelContext) -> None:
         self._settings = context.settings
         self._paths = context.paths
-        self._provider_cls = BM25SearchProvider
-        self._provider: BM25SearchProvider | None = None
+        self._engine: BM25Engine | None = None
         self._provider_error: str | None = None
         self._skip_reason: str | None = None
         self._lock = Lock()
@@ -154,25 +167,26 @@ class _BM25Channel(Channel):
         initialization is protected by lock). The method lazily initializes the provider
         on first search call. Returns empty sequence if limit <= 0.
         """
-        provider = self._ensure_provider()
-        if provider is None:
+        engine = self._ensure_engine()
+        if engine is None:
             raise ChannelError(
                 self._provider_error or "BM25 channel unavailable",
                 reason=self._skip_reason or "provider_error",
             )
         try:
-            return provider.search(query, limit)
-        except Exception as exc:  # pragma: no cover - defensive logging
+            hits = engine.search(query, k=max(limit, 0))
+        except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
             message = f"BM25 search failed: {exc}"
             raise ChannelError(message, reason="provider_error") from exc
+        return _to_search_hits("bm25", hits)
 
-    def _ensure_provider(self) -> BM25SearchProvider | None:
-        """Ensure BM25 provider is initialized, returning it if available.
+    def _ensure_engine(self) -> BM25Engine | None:
+        """Ensure BM25 engine is initialized, returning it if available.
 
         Returns
         -------
-        BM25SearchProvider | None
-            Initialized BM25 provider if available, None if disabled or
+        BM25Engine | None
+            Initialized BM25 engine if available, None if disabled or
             initialization failed. Sets _provider_error and _skip_reason
             on failure.
 
@@ -182,8 +196,8 @@ class _BM25Channel(Channel):
         provider with RM3 settings if enabled, and handles initialization
         errors. Provider is cached after successful initialization.
         """
-        if self._provider is not None:
-            return self._provider
+        if self._engine is not None:
+            return self._engine
         if self._provider_error is not None:
             return None
         if not self._settings.bm25.enabled:
@@ -191,8 +205,8 @@ class _BM25Channel(Channel):
             self._skip_reason = "disabled"
             return None
         with self._lock:
-            if self._provider is not None:
-                return self._provider
+            if self._engine is not None:
+                return self._engine
             try:
                 bm25_settings = self._settings.bm25
                 prf_settings = self._settings.index.prf
@@ -216,7 +230,7 @@ class _BM25Channel(Channel):
                         head_terms=head_terms,
                         default_params=rm3_params,
                     )
-                provider = self._provider_cls(
+                backend = PyseriniBM25Backend(
                     index_dir=_resolve_path(self._paths.repo_root, self._settings.bm25.index_dir),
                     k1=self._settings.index.bm25_k1,
                     b=self._settings.index.bm25_b,
@@ -227,14 +241,15 @@ class _BM25Channel(Channel):
                         auto_rm3=prf_settings.enable_auto,
                     ),
                 )
+                engine = BM25Engine(backend=backend)
             except (OSError, RuntimeError, ValueError, ImportError) as exc:
                 self._provider_error = f"BM25 initialization failed: {exc}"
                 self._skip_reason = _classify_skip_reason(exc)
                 return None
-            self._provider = provider
+            self._engine = engine
             self._provider_error = None
             self._skip_reason = None
-            return provider
+            return engine
 
 
 class _SpladeChannel(Channel):
@@ -264,8 +279,7 @@ class _SpladeChannel(Channel):
     def __init__(self, context: ChannelContext) -> None:
         self._settings = context.settings
         self._paths = context.paths
-        self._provider_cls = SpladeSearchProvider
-        self._provider: SpladeSearchProvider | None = None
+        self._engine: SPLADEEngine | None = None
         self._provider_error: str | None = None
         self._skip_reason: str | None = None
         self._lock = Lock()
@@ -315,25 +329,26 @@ class _SpladeChannel(Channel):
         lazily initializes the provider on first search call. Returns empty sequence if
         limit <= 0.
         """
-        provider = self._ensure_provider()
-        if provider is None:
+        engine = self._ensure_engine()
+        if engine is None:
             raise ChannelError(
                 self._provider_error or "SPLADE channel unavailable",
                 reason=self._skip_reason or "provider_error",
             )
         try:
-            return provider.search(query, limit)
-        except Exception as exc:  # pragma: no cover - defensive logging
+            hits = engine.search(query, k=max(limit, 0))
+        except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
             message = f"SPLADE search failed: {exc}"
             raise ChannelError(message, reason="provider_error") from exc
+        return _to_search_hits("splade", hits)
 
-    def _ensure_provider(self) -> SpladeSearchProvider | None:
-        """Ensure SPLADE provider is initialized, returning it if available.
+    def _ensure_engine(self) -> SPLADEEngine | None:
+        """Ensure SPLADE engine is initialized, returning it if available.
 
         Returns
         -------
-        SpladeSearchProvider | None
-            Initialized SPLADE provider if available, None if disabled or
+        SPLADEEngine | None
+            Initialized SPLADE engine if available, None if disabled or
             initialization failed. Sets _provider_error and _skip_reason
             on failure.
 
@@ -343,8 +358,8 @@ class _SpladeChannel(Channel):
         provider with model/ONNX/index directories, and handles initialization
         errors. Provider is cached after successful initialization.
         """
-        if self._provider is not None:
-            return self._provider
+        if self._engine is not None:
+            return self._engine
         if self._provider_error is not None:
             return None
         if not self._settings.splade.enabled:
@@ -352,24 +367,32 @@ class _SpladeChannel(Channel):
             self._skip_reason = "disabled"
             return None
         with self._lock:
-            if self._provider is not None:
-                return self._provider
+            if self._engine is not None:
+                return self._engine
             try:
                 splade = self._settings.splade
-                provider = self._provider_cls(
-                    splade,
+                config = SpladeImpactBackendConfig(
                     model_dir=_resolve_path(self._paths.repo_root, splade.model_dir),
                     onnx_dir=_resolve_path(self._paths.repo_root, splade.onnx_dir),
+                    onnx_file=splade.onnx_file,
+                    provider=splade.provider,
                     index_dir=_resolve_path(self._paths.repo_root, splade.index_dir),
+                    quantization=splade.quantization,
+                    max_terms=splade.max_terms,
+                    max_query_terms=splade.max_query_terms,
+                    prune_below=splade.prune_below,
+                    static_prune_pct=splade.static_prune_pct,
                 )
+                encoder = _build_onnx_encoder(splade, self._paths.repo_root, logger)
+                engine = SPLADEEngine(SpladeImpactBackend(config, onnx_encoder=encoder))
             except (OSError, RuntimeError, ValueError, ImportError) as exc:
                 self._provider_error = f"SPLADE initialization failed: {exc}"
                 self._skip_reason = _classify_skip_reason(exc)
                 return None
-            self._provider = provider
+            self._engine = engine
             self._provider_error = None
             self._skip_reason = None
-            return provider
+            return engine
 
 
 def _resolve_path(repo_root: Path, value: str) -> Path:
@@ -394,6 +417,43 @@ def _resolve_path(repo_root: Path, value: str) -> Path:
     return (repo_root / candidate).resolve()
 
 
+def _build_onnx_encoder(
+    splade_settings: SpladeConfig,
+    repo_root: Path,
+    logger: logging.Logger,
+) -> object | None:
+    cfg = getattr(splade_settings, "onnx_query", None)
+    if cfg is None or not cfg.enabled:
+        return None
+    model_rel = cfg.model_path or splade_settings.onnx_file
+    base_dir = _resolve_path(repo_root, splade_settings.onnx_dir)
+    model_path = Path(model_rel)
+    if not model_path.is_absolute():
+        model_path = base_dir / model_path
+    model_path = model_path.resolve()
+    if not model_path.exists():
+        logger.warning("SPLADE ONNX model not found: %s", model_path)
+        return None
+    tokenizer_name = cfg.tokenizer_name or splade_settings.model_id
+    try:
+        onnx_cfg = OnnxSpladeConfig(
+            model_path=model_path,
+            tokenizer_name=tokenizer_name,
+            output_name=cfg.output_name,
+            input_ids_name=cfg.input_ids_name,
+            attention_mask_name=cfg.attention_mask_name,
+            providers=cfg.providers,
+            topn=cfg.topn,
+            min_weight=cfg.min_weight,
+            normalize=cfg.normalize,
+        )
+        encoder_cls = OnnxSpladeMapEncoder if cfg.format == "map" else OnnxSpladeQueryEncoder
+        return encoder_cls(onnx_cfg)
+    except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive guard
+        logger.warning("Failed to initialize SPLADE ONNX encoder: %s", exc)
+        return None
+
+
 def _classify_skip_reason(exc: Exception) -> str:
     """Classify exception into a skip reason code.
 
@@ -415,3 +475,24 @@ def _classify_skip_reason(exc: Exception) -> str:
     if "capability" in message or "disabled" in message:
         return "capability_off"
     return "provider_error"
+
+
+def _to_search_hits(channel: str, pairs: Sequence[tuple[int, float]]) -> list[SearchHit]:
+    """Convert engine tuples into SearchHit records.
+
+    Returns
+    -------
+    list[SearchHit]
+        Ranked hits annotated with channel metadata.
+    """
+    hits: list[SearchHit] = []
+    for rank, (doc_id, score) in enumerate(pairs):
+        hits.append(
+            SearchHit(
+                doc_id=str(int(doc_id)),
+                rank=rank,
+                score=float(score),
+                source=channel,
+            )
+        )
+    return hits

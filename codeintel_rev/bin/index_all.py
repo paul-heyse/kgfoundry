@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -25,6 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.config import AppConfig, load_app_config
 from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
 from codeintel_rev.embeddings import get_embedding_provider
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
@@ -115,7 +117,8 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = load_settings()
-    paths = _resolve_paths(settings)
+    app_config = load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
+    paths = resolve_pipeline_paths(settings, app_config)
     phase = args.phase
     if args.incremental and phase != "full":
         parser.error("--incremental is only supported with --phase=full")
@@ -194,34 +197,47 @@ def main() -> None:
         _run_offline_evaluation(settings, paths, args.eval_queries)
 
 
-def _resolve_paths(settings: Settings) -> PipelinePaths:
+def resolve_pipeline_paths(
+    settings: Settings,
+    app_config: AppConfig | None = None,
+) -> PipelinePaths:
     """Resolve and normalize key filesystem paths.
 
     Parameters
     ----------
     settings : Settings
         Application settings containing path configuration.
+    app_config : AppConfig | None, optional
+        Immutable configuration providing overrides for critical paths.
 
     Returns
     -------
     PipelinePaths
         Absolute paths for all filesystem locations used by the pipeline.
     """
-    repo_root = Path(settings.paths.repo_root).expanduser().resolve()
+    repo_root = (
+        app_config.paths.repo_root
+        if app_config is not None
+        else Path(settings.paths.repo_root).expanduser().resolve()
+    )
 
-    def _resolve(path_str: str) -> Path:
+    def _resolve(path_str: str, override: Path | None = None) -> Path:
         """Resolve a path string relative to repo_root or as absolute.
 
         Parameters
         ----------
         path_str : str
             Path string to resolve.
+        override : Path | None
+            Optional AppConfig-provided absolute path taking precedence.
 
         Returns
         -------
         Path
             Resolved absolute path.
         """
+        if override is not None:
+            return override
         path = Path(path_str)
         if path.is_absolute():
             return path.expanduser().resolve()
@@ -231,8 +247,14 @@ def _resolve_paths(settings: Settings) -> PipelinePaths:
         repo_root=repo_root,
         scip_index=_resolve(settings.paths.scip_index),
         vectors_dir=_resolve(settings.paths.vectors_dir),
-        faiss_index=_resolve(settings.paths.faiss_index),
-        duckdb_path=_resolve(settings.paths.duckdb_path),
+        faiss_index=_resolve(
+            settings.paths.faiss_index,
+            override=app_config.faiss.index_path if app_config is not None else None,
+        ),
+        duckdb_path=_resolve(
+            settings.paths.duckdb_path,
+            override=app_config.duckdb.database if app_config is not None else None,
+        ),
     )
 
 

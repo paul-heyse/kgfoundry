@@ -5,7 +5,24 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from codeintel_rev.app.config_context import ApplicationContext, ApplicationContextOverrides
+from codeintel_rev.app.config_context import (
+    ApplicationContext,
+    ApplicationContextOverrides,
+    merge_paths_with_app_config,
+)
+from codeintel_rev.config.api import (
+    CONFIG_API_VERSION,
+    AppConfig,
+    FAISSSettings,
+    LoggingSettings,
+    SearchSettings,
+)
+from codeintel_rev.config.api import (
+    DuckDBSettings as ApiDuckDBSettings,
+)
+from codeintel_rev.config.api import (
+    PathsConfig as ApiPathsConfig,
+)
 from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
@@ -146,6 +163,19 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
             "vectors_dir": vectors_rel,
         },
     )
+    app_config = AppConfig(
+        version=CONFIG_API_VERSION,
+        paths=ApiPathsConfig(
+            repo_root=repo_root,
+            data_dir=repo_root / "data",
+            cache_dir=repo_root / ".cache",
+            logs_dir=repo_root / "logs",
+        ),
+        duckdb=ApiDuckDBSettings(database=expected_duckdb_path),
+        faiss=FAISSSettings(index_path=expected_faiss_path),
+        search=SearchSettings(),
+        logging=LoggingSettings(),
+    )
 
     service_context.reset_service_context()
 
@@ -176,7 +206,11 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
         faiss_manager_factory=_faiss_factory,
         duckdb_catalog_factory=_catalog_factory,
     )
-    custom_context = ApplicationContext.create(settings=settings, overrides=overrides)
+    custom_context = ApplicationContext.create(
+        settings=settings,
+        overrides=overrides,
+        app_config=app_config,
+    )
     service_context.set_service_context(custom_context)
     context = service_context.get_service_context()
 
@@ -190,6 +224,67 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
     assertions.expect_true(catalog.closed, reason="catalog should be closed")
 
     service_context.reset_service_context()
+
+
+def test_merge_paths_with_app_config_overrides_duckdb_and_faiss(tmp_path: Path) -> None:
+    """merge_paths_with_app_config should reflect AppConfig overrides."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    base_paths = _stub_paths(repo_root)
+    custom_duckdb = tmp_path / "custom.duckdb"
+    custom_faiss = tmp_path / "custom.index"
+    app_config = AppConfig(
+        version=CONFIG_API_VERSION,
+        paths=ApiPathsConfig(
+            repo_root=repo_root,
+            data_dir=repo_root / "data",
+            cache_dir=repo_root / ".cache",
+            logs_dir=repo_root / "logs",
+        ),
+        duckdb=ApiDuckDBSettings(database=custom_duckdb),
+        faiss=FAISSSettings(index_path=custom_faiss),
+        search=SearchSettings(),
+        logging=LoggingSettings(),
+    )
+    merged = merge_paths_with_app_config(base_paths, app_config)
+    assertions.expect_equal(merged.duckdb_path, custom_duckdb)
+    assertions.expect_equal(merged.faiss_index, custom_faiss)
+
+
+def _stub_paths(repo_root: Path) -> ResolvedPaths:
+    """Return ResolvedPaths populated with deterministic locations for tests.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Base path used to derive deterministic locations.
+
+    Returns
+    -------
+    ResolvedPaths
+        Stubbed resolved paths instance referencing ``repo_root``.
+    """
+    return ResolvedPaths(
+        repo_root=repo_root,
+        config_dir=repo_root / "config",
+        config_file=repo_root / "config" / "app.yml",
+        data_dir=repo_root / "data",
+        vectors_dir=repo_root / "data" / "vectors",
+        faiss_index=repo_root / "indexes" / "code.ivfpq.faiss",
+        faiss_idmap_path=repo_root / "indexes" / "faiss_idmap.parquet",
+        lucene_dir=repo_root / "indexes" / "lucene",
+        splade_dir=repo_root / "indexes" / "splade",
+        duckdb_path=repo_root / "data" / "catalog.duckdb",
+        scip_index=repo_root / "index.scip",
+        coderank_vectors_dir=repo_root / "coderank" / "vectors",
+        coderank_faiss_index=repo_root / "coderank" / "coderank.faiss",
+        warp_index_dir=repo_root / "indexes" / "warp",
+        xtr_dir=repo_root / "indexes" / "xtr",
+        logs_dir=repo_root / "logs",
+        cache_dir=repo_root / ".cache",
+        tmp_dir=repo_root / ".tmp",
+        plugins_dir=repo_root / "plugins",
+    )
 
 
 def _assert_faiss_manager(manager: object, expected_path: Path) -> None:

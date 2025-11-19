@@ -118,7 +118,9 @@ def _paths_config(get: LookupFn) -> PathsConfig:
     data_dir = _as_path(_as_str(get("DATA_DIR", repo_root / "data")))
     cache_dir = _as_path(_as_str(get("CACHE_DIR", repo_root / ".cache")))
     logs_dir = _as_path(_as_str(get("LOGS_DIR", repo_root / "logs")))
-    return PathsConfig(repo_root=repo_root, data_dir=data_dir, cache_dir=cache_dir, logs_dir=logs_dir)
+    return PathsConfig(
+        repo_root=repo_root, data_dir=data_dir, cache_dir=cache_dir, logs_dir=logs_dir
+    )
 
 
 def _duckdb_settings(get: LookupFn, data_dir: Path) -> DuckDBSettings:
@@ -153,11 +155,17 @@ def _search_settings(get: LookupFn) -> SearchSettings:
     bm25_weight = _coerce_float(get("SEARCH_BM25_WEIGHT", "0.2"), default=0.2)
     splade_weight = _coerce_float(get("SEARCH_SPLADE_WEIGHT", "0.3"), default=0.3)
     faiss_weight = _coerce_float(get("SEARCH_FAISS_WEIGHT", "0.5"), default=0.5)
+    per_channel_k = _coerce_int(get("SEARCH_PER_CHANNEL_K", "100"), default=100)
+    fusion_k = _coerce_int(get("SEARCH_FUSION_K", "50"), default=50)
+    rrf_base = _coerce_int(get("SEARCH_RRF_BASE", "60"), default=60)
     max_results = _coerce_int(get("SEARCH_MAX_RESULTS", "50"), default=50)
     return SearchSettings(
         bm25_weight=bm25_weight,
         splade_weight=splade_weight,
         faiss_weight=faiss_weight,
+        per_channel_k=per_channel_k,
+        fusion_k=fusion_k,
+        rrf_base=rrf_base,
         max_results=max_results,
     )
 

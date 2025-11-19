@@ -15,6 +15,7 @@ Example failure payload::
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +25,12 @@ import click
 import typer
 
 from codeintel_rev.app import readiness as fs_readiness
-from codeintel_rev.app.config_context import resolve_application_paths
+from codeintel_rev.app.config_context import (
+    merge_paths_with_app_config,
+    resolve_application_paths,
+)
+from codeintel_rev.config.api import AppConfig
+from codeintel_rev.config.loader import load_app_config
 from codeintel_rev.config.paths import ResolvedPaths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.errors import RuntimeUnavailableError
@@ -60,6 +66,8 @@ class XtrOpenContext:
     settings_factory: Callable[[], Settings]
     paths_resolver: Callable[[Settings], ResolvedPaths]
     index_factory: Callable[[Path, Settings], XTRIndex]
+    app_config_loader: Callable[[], AppConfig]
+    path_merger: Callable[[ResolvedPaths, AppConfig], ResolvedPaths]
 
     @classmethod
     def production(cls) -> XtrOpenContext:
@@ -74,6 +82,10 @@ class XtrOpenContext:
             settings_factory=load_settings,
             paths_resolver=resolve_application_paths,
             index_factory=lambda root, settings: XTRIndex(root, settings.xtr),
+            app_config_loader=lambda: load_app_config(
+                file=os.environ.get("CODEINTEL_CONFIG_FILE"),
+            ),
+            path_merger=merge_paths_with_app_config,
         )
 
 
@@ -170,7 +182,8 @@ def xtr_open(
     """
     context = _cli_context()
     settings = context.settings_factory()
-    paths = context.paths_resolver(settings)
+    app_config = context.app_config_loader()
+    paths = context.path_merger(context.paths_resolver(settings), app_config)
     try:
         fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
     except ConfigurationError as exc:
