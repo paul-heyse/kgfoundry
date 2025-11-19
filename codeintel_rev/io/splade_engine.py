@@ -131,7 +131,21 @@ class SpladeImpactBackendConfig:
 
 
 class SpladeImpactBackend(SpladeBackend):
-    """SentenceTransformers + Pyserini impact backend used in production."""
+    """SentenceTransformers + Pyserini impact backend used in production.
+
+    Parameters
+    ----------
+    config : SpladeImpactBackendConfig
+        Configuration bundle containing model paths, index directory,
+        and encoding parameters.
+    onnx_encoder : object | None, optional
+        Optional ONNX encoder implementing ``encode`` or ``encode_to_impact``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the impact index directory does not exist.
+    """
 
     def __init__(
         self,
@@ -139,21 +153,6 @@ class SpladeImpactBackend(SpladeBackend):
         *,
         onnx_encoder: object | None = None,
     ) -> None:
-        """Initialize SPLADE impact backend.
-
-        Parameters
-        ----------
-        config : SpladeImpactBackendConfig
-            Configuration bundle containing model paths, index directory,
-            and encoding parameters.
-        onnx_encoder : object | None, optional
-            Optional ONNX encoder implementing ``encode`` or ``encode_to_impact``.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the impact index directory does not exist.
-        """
         if not config.index_dir.exists():
             msg = f"SPLADE impact index not found: {config.index_dir}"
             raise FileNotFoundError(msg)

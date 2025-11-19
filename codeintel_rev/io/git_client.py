@@ -546,13 +546,6 @@ class AsyncGitClient:
     """
 
     def __init__(self, git_client: GitClient) -> None:
-        """Initialize async Git client wrapper.
-
-        Parameters
-        ----------
-        git_client : GitClient
-            Synchronous GitClient instance to wrap.
-        """
         self._sync_client = git_client
 
     async def blame_range(

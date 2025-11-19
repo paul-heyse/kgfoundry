@@ -32,7 +32,19 @@ class RM3Params:
 
 
 class RM3Heuristics:
-    """Lightweight heuristics to decide when RM3 should be enabled for a query."""
+    """Lightweight heuristics to decide when RM3 should be enabled for a query.
+
+    Parameters
+    ----------
+    short_query_max_terms : int, optional
+        Maximum terms for a query to be considered "short" (default: 3).
+    symbol_like_regex : str | None, optional
+        Custom regex for detecting symbol-like queries. If None, uses default pattern.
+    head_terms : Iterable[str] | None, optional
+        Terms that should trigger RM3 (e.g., ["build", "test"]).
+    default_params : RM3Params | None, optional
+        Default RM3 parameters when enabled.
+    """
 
     _DEFAULT_SYMBOL_RE = (
         r"(?:\w+::\w+)|"  # namespaces / scopes
@@ -83,19 +95,6 @@ class RM3Heuristics:
         head_terms: Iterable[str] | None = None,
         default_params: RM3Params | None = None,
     ) -> None:
-        """Initialize RM3 heuristics.
-
-        Parameters
-        ----------
-        short_query_max_terms : int, optional
-            Maximum terms for a query to be considered "short" (default: 3).
-        symbol_like_regex : str | None, optional
-            Custom regex for detecting symbol-like queries. If None, uses default pattern.
-        head_terms : Iterable[str] | None, optional
-            Terms that should trigger RM3 (e.g., ["build", "test"]).
-        default_params : RM3Params | None, optional
-            Default RM3 parameters when enabled.
-        """
         self._short_query_max_terms = max(1, short_query_max_terms)
         pattern = symbol_like_regex or self._DEFAULT_SYMBOL_RE
         self._symbol_regex = re.compile(pattern)

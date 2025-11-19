@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from codeintel_rev.typing import FaissIndex
 
@@ -14,6 +14,7 @@ __all__ = [
     "IndexBuildConfig",
     "IndexPaths",
     "StepName",
+    "StepRegistry",
     "StepRunner",
 ]
 
@@ -29,6 +30,8 @@ StepName = Literal[
     "register_duckdb",
     "materialize_join",
 ]
+
+StepFunc = Callable[["BuildState", "IndexPaths", "IndexBuildConfig"], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,32 +130,89 @@ class BuildState:
     idmap_rows: int = 0
 
 
-class StepRunner:
-    """Executor that runs registered steps in order."""
+@dataclass(frozen=True, slots=True)
+class StepRegistry:
+    """Immutable registry mapping step names to implementations."""
 
-    def __init__(
-        self,
-        registry: Mapping[StepName, Callable[[BuildState, IndexPaths, IndexBuildConfig], None]],
-    ) -> None:
-        """Initialize step runner with a registry of step implementations.
+    mapping: Mapping[StepName, StepFunc]
+
+    def resolve(self, name: StepName) -> StepFunc:
+        """Return the callable registered for ``name``.
 
         Parameters
         ----------
-        registry : Mapping[StepName, Callable[[BuildState, IndexPaths, IndexBuildConfig], None]]
-            Dictionary mapping step names to their corresponding step functions.
-            Each step function receives the current build state, index paths,
-            and build configuration, and modifies the state in place.
+        name : StepName
+            Step name identifier to resolve.
+
+        Returns
+        -------
+        StepFunc
+            Callable step function registered for the given name.
+
+        Raises
+        ------
+        KeyError
+            If the step name is not registered in the mapping.
         """
-        self._registry = dict(registry)
+        step = self.mapping.get(name)
+        if step is None:
+            msg = f"Unknown index build step: {name}"
+            raise KeyError(msg)
+        return step
+
+    def validate_steps(self, steps: Iterable[StepName | str]) -> tuple[StepName, ...]:
+        """Normalize an iterable of steps into a tuple of StepName.
+
+        Parameters
+        ----------
+        steps : Iterable[StepName | str]
+            Iterable of step names to validate and normalize.
+
+        Returns
+        -------
+        tuple[StepName, ...]
+            Tuple of validated StepName values.
+
+        Raises
+        ------
+        KeyError
+            If any step name is not registered in the mapping.
+        """
+        normalized: list[StepName] = []
+        for raw in steps:
+            candidate = cast("StepName", str(raw))
+            if candidate not in self.mapping:
+                msg = f"Unknown index build step: {raw}"
+                raise KeyError(msg)
+            normalized.append(candidate)
+        return tuple(normalized)
+
+
+class StepRunner:
+    """Executor that runs registered steps in order.
+
+    Parameters
+    ----------
+    registry : StepRegistry
+        Registry mapping step names to their corresponding step functions.
+        Each step function receives the current build state, index paths,
+        and build configuration, and modifies the state in place.
+    """
+
+    def __init__(
+        self,
+        registry: StepRegistry,
+    ) -> None:
+        self.registry: StepRegistry = registry
 
     def run(
-        self, steps: Iterable[StepName], *, paths: IndexPaths, cfg: IndexBuildConfig
+        self, steps: tuple[StepName, ...], *, paths: IndexPaths, cfg: IndexBuildConfig
     ) -> BuildState:
         """Execute ``steps`` sequentially using the provided paths/config.
 
         Parameters
         ----------
-        steps : Iterable[StepName]
+        steps : tuple[StepName, ...]
             Sequence of step names to execute in order. Each step name must
             exist in the registry. Steps are executed sequentially, with
             each step modifying the build state in place.
@@ -173,14 +233,14 @@ class StepRunner:
         Raises
         ------
         KeyError
-            Raised when a requested step name is missing from the registry.
-            The error message includes the unknown step name.
+            Propagated from :meth:`StepRegistry.resolve` when a requested step
+            name is missing from the registry.
         """
         state = BuildState()
         for name in steps:
-            step = self._registry.get(name)
-            if step is None:
-                msg = f"Unknown index build step: {name}"
-                raise KeyError(msg)
+            try:
+                step = self.registry.resolve(name)
+            except KeyError as exc:  # pragma: no cover - defensive
+                raise KeyError(str(exc)) from exc
             step(state, paths, cfg)
         return state

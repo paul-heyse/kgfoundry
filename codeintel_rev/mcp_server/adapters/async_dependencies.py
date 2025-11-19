@@ -67,7 +67,7 @@ def build_async_dependencies(
         Coroutine returning the effective scope for a request.
     session_provider : Callable[[], str | None]
         Callable that returns the current session identifier, if any.
-    to_thread : ToThreadCallable
+    to_thread : ToThreadCallable[Any]
         Awaitable helper used to dispatch sync helpers via a threadpool.
 
     Returns

@@ -72,7 +72,7 @@ from codeintel_rev.config.api import (
 )
 from codeintel_rev.config.loader import load_app_config
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.indexing.index_lifecycle import IndexLifecycleManager
@@ -119,6 +119,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from codeintel_rev.app.scope_store import SupportsAsyncRedis
+    from codeintel_rev.config.settings import Settings
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
     from codeintel_rev.io.splade_onnx_encoder import (
         OnnxSpladeConfig,
@@ -139,6 +140,7 @@ else:  # pragma: no cover - runtime only; annotations are postponed
         OnnxSpladeConfig = None
         OnnxSpladeMapEncoder = None
         OnnxSpladeQueryEncoder = None
+    Settings = Any
 
 _RUNTIME_FAILURE_TTL_S = 15.0
 _AUTOTUNE_SAMPLE_LIMIT = 128
@@ -194,6 +196,7 @@ class ApplicationContextOverrides:
         ``(settings, resolved_paths, app_config)``; the latter is preferred.
     duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] | None
         Factory for creating DuckDB catalog instances inside :meth:`open_catalog`.
+        When omitted, :func:`_build_duckdb_catalog_from_app_config` is used.
     """
 
     runtime_observer: RuntimeCellObserver | None = None
@@ -454,8 +457,24 @@ def _build_duckdb_catalog_from_app_config(
     *,
     log_queries: bool,
 ) -> DuckDBCatalog:
-    """Return a DuckDB catalog configured from AppConfig data."""
+    """Return a DuckDB catalog configured from AppConfig data.
 
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved filesystem paths configuration.
+    app_config : AppConfig
+        Application configuration containing index and DuckDB settings.
+    manager : DuckDBManager
+        DuckDB manager instance for database operations.
+    log_queries : bool
+        Whether to enable query logging for the catalog.
+
+    Returns
+    -------
+    DuckDBCatalog
+        Configured DuckDB catalog instance with ID map path set.
+    """
     catalog = DuckDBCatalog(
         paths.duckdb_path,
         paths.vectors_dir,
@@ -593,7 +612,7 @@ def _faiss_runtime_options_from_index(index_cfg: IndexSettings) -> FAISSRuntimeO
 
     Parameters
     ----------
-    index_cfg : IndexConfig
+    index_cfg : IndexSettings
         Structured index configuration containing FAISS parameters (family, PQ
         settings, and HNSW parameters).
 
@@ -925,11 +944,6 @@ class _FaissRuntimeState:
     __slots__ = ("loaded", "lock")
 
     def __init__(self) -> None:
-        """Initialize FAISS runtime state tracker.
-
-        Creates a new state tracker with a lock for thread-safe initialization
-        tracking and a loaded flag indicating whether FAISS has been initialized.
-        """
         self.lock = Lock()
         self.loaded = False
 
@@ -1033,6 +1047,7 @@ class ApplicationContext:
         synchronous GitPython operations in threadpool via asyncio.to_thread.
     duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog]
         Factory used to construct catalog instances when :meth:`open_catalog` is invoked.
+        Cannot be None.
     runtime_observer : RuntimeCellObserver
         Observer instance that receives lifecycle callbacks from runtime cells
         (hybrid engine, FAISS manager, XTR index). Defaults to NullRuntimeCellObserver
@@ -1089,9 +1104,9 @@ class ApplicationContext:
     duckdb_manager: DuckDBManager
     git_client: GitClient
     async_git_client: AsyncGitClient
-    duckdb_catalog_factory: Callable[
-        [ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog
-    ] | None = field(default=None, repr=False)
+    duckdb_catalog_factory: Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] = (
+        field(repr=False)
+    )
     runtime_observer: RuntimeCellObserver = field(
         default_factory=NullRuntimeCellObserver, repr=False
     )
@@ -1104,27 +1119,20 @@ class ApplicationContext:
     _runtime_factories: RuntimeFactoryOverrides | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
-        """Attach the configured observer to all runtime cells."""
+        """Attach the configured observer to all runtime cells.
+
+        Raises
+        ------
+        ConfigurationError
+            If ``duckdb_catalog_factory`` is None.
+        """
         self._runtime.attach_observer(self.runtime_observer)
         self._runtime.attach_adjuster(self.factory_adjuster)
         index_root = _infer_index_root(self.paths)
         _assign_frozen(self, "index_manager", IndexLifecycleManager(index_root))
         if self.duckdb_catalog_factory is None:
-            log_queries = getattr(self.settings.duckdb, "log_queries", False)
-
-            def _factory(
-                resolved: ResolvedPaths,
-                _legacy_settings: Settings,
-                manager: DuckDBManager,
-            ) -> DuckDBCatalog:
-                return _build_duckdb_catalog_from_app_config(
-                    resolved,
-                    self.app_config,
-                    manager,
-                    log_queries=log_queries,
-                )
-
-            _assign_frozen(self, "duckdb_catalog_factory", _factory)
+            message = "duckdb_catalog_factory cannot be None"
+            raise ConfigurationError(message)
 
     @classmethod
     def create(
@@ -1206,14 +1214,13 @@ class ApplicationContext:
 
         See Also
         --------
-        load_settings : Loads Settings from environment variables
         resolve_application_paths : Validates and resolves paths
         """
         effective_overrides = overrides or ApplicationContextOverrides()
         app_config = app_config or load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
         if settings is None:
-            settings = load_settings()
             paths = resolve_application_paths(app_config)
+            settings = settings_from_app_config(app_config)
         else:
             paths = merge_paths_with_app_config(resolve_application_paths(settings), app_config)
         try:
@@ -1242,7 +1249,7 @@ class ApplicationContext:
 
             def _factory(
                 resolved: ResolvedPaths,
-                legacy_settings: Settings,
+                _settings: Settings,
                 manager: DuckDBManager,
             ) -> DuckDBCatalog:
                 return _build_duckdb_catalog_from_app_config(
@@ -1321,7 +1328,7 @@ class ApplicationContext:
             self.faiss_manager.autotune(
                 queries,
                 vectors,
-            k=min(self.app_config.index.default_k, queries.shape[0]),
+                k=min(self.app_config.index.default_k, queries.shape[0]),
             )
         except (RuntimeError, ValueError):  # pragma: no cover - defensive logging
             return
@@ -1953,7 +1960,6 @@ class ApplicationContext:
     def with_overrides(
         self,
         *,
-        settings: Settings | None = None,
         paths: ResolvedPaths | None = None,
         app_config: AppConfig | None = None,
         **components: object,
@@ -1972,9 +1978,6 @@ class ApplicationContext:
 
         Parameters
         ----------
-        settings : Settings | None, optional
-            Application settings to override. If None, uses the current context's
-            settings. Defaults to None.
         paths : ResolvedPaths | None, optional
             Resolved file system paths to override. If None, uses the current context's
             paths. Defaults to None.
@@ -2040,10 +2043,18 @@ class ApplicationContext:
             """
             return cast("TOverride", components.get(name, default))
 
+        new_app_config = app_config or self.app_config
+        new_paths = paths or self.paths
+        new_settings = (
+            self.settings
+            if new_app_config is self.app_config
+            else settings_from_app_config(new_app_config)
+        )
+
         return ApplicationContext(
-            app_config=app_config or self.app_config,
-            settings=settings or self.settings,
-            paths=paths or self.paths,
+            app_config=new_app_config,
+            settings=new_settings,
+            paths=new_paths,
             vllm_client=_component_value("vllm_client", self.vllm_client),
             faiss_manager=_component_value("faiss_manager", self.faiss_manager),
             scope_store=_component_value("scope_store", self.scope_store),

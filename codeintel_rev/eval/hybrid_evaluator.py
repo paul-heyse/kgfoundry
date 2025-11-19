@@ -152,7 +152,17 @@ class _EvalState:
 
 
 class HybridPoolEvaluator:
-    """Compare ANN retrieval against Flat and optional XTR oracles, persisting pools."""
+    """Compare ANN retrieval against Flat and optional XTR oracles, persisting pools.
+
+    Parameters
+    ----------
+    catalog : DuckDBCatalog
+        DuckDB catalog for querying symbol metadata.
+    manager : FAISSManager
+        FAISS manager for dense vector search.
+    xtr_index : XTRIndex | None, optional
+        Optional XTR index for sparse retrieval oracle.
+    """
 
     def __init__(
         self,
@@ -161,17 +171,6 @@ class HybridPoolEvaluator:
         *,
         xtr_index: XTRIndex | None = None,
     ) -> None:
-        """Initialize hybrid pool evaluator.
-
-        Parameters
-        ----------
-        catalog : DuckDBCatalog
-            DuckDB catalog for querying symbol metadata.
-        manager : FAISSManager
-            FAISS manager for dense vector search.
-        xtr_index : XTRIndex | None, optional
-            Optional XTR index for sparse retrieval oracle.
-        """
         self._catalog = catalog
         self._manager = manager
         self._xtr_index = xtr_index

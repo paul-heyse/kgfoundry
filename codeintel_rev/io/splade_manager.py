@@ -375,7 +375,17 @@ class SpladeHit:
 
 
 class SpladeQueryEngine:
-    """Thin Pyserini LuceneImpactSearcher wrapper."""
+    """Thin Pyserini LuceneImpactSearcher wrapper.
+
+    Parameters
+    ----------
+    index_dir : Path
+        Path to the Lucene impact index directory.
+    encoder : str | object | None, optional
+        Pyserini encoder identifier or object to use for query encoding.
+    device : str | None, optional
+        Preferred device for the encoder, if applicable.
+    """
 
     def __init__(
         self,
@@ -384,17 +394,6 @@ class SpladeQueryEngine:
         encoder: str | object | None = None,
         device: str | None = None,
     ) -> None:
-        """Initialize SPLADE query engine.
-
-        Parameters
-        ----------
-        index_dir : Path
-            Path to the Lucene impact index directory.
-        encoder : str | object | None, optional
-            Pyserini encoder identifier or object to use for query encoding.
-        device : str | None, optional
-            Preferred device for the encoder, if applicable.
-        """
         self._index_dir = Path(index_dir).resolve()
         self._encoder = encoder
         self._device = device
@@ -534,7 +533,7 @@ def _maybe_move_encoder_device(searcher: _LuceneImpactSearcherProtocol, device: 
 
     Parameters
     ----------
-    searcher : object
+    searcher : _LuceneImpactSearcherProtocol
         Pyserini searcher instance that may have an encoder attribute.
     device : str | None
         Target device name (e.g., "cuda", "cpu"). If None, no operation
@@ -1479,7 +1478,17 @@ def _persist_export_metadata(
 
 
 class SpladeArtifactsManager:
-    """Manage SPLADE model exports and ONNX artifacts."""
+    """Manage SPLADE model exports and ONNX artifacts.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing SPLADE settings and paths.
+    logger_ : logging.Logger | None, optional
+        Custom logger instance. If None, uses module logger.
+    artifacts_context : SpladeArtifactsContext | None, optional
+        Context for artifact management. If None, uses production context.
+    """
 
     def __init__(
         self,
@@ -1488,17 +1497,6 @@ class SpladeArtifactsManager:
         logger_: logging.Logger | None = None,
         artifacts_context: SpladeArtifactsContext | None = None,
     ) -> None:
-        """Initialize SPLADE artifacts manager.
-
-        Parameters
-        ----------
-        app_config : AppConfig
-            Application configuration containing SPLADE settings and paths.
-        logger_ : logging.Logger | None, optional
-            Custom logger instance. If None, uses module logger.
-        artifacts_context : SpladeArtifactsContext | None, optional
-            Context for artifact management. If None, uses production context.
-        """
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(app_config.paths.repo_root).expanduser().resolve()
         self._config: SpladeSettings = app_config.splade
@@ -1592,7 +1590,21 @@ class SpladeArtifactsManager:
 
 
 class SpladeEncoderService:
-    """Encode corpora into SPLADE JsonVectorCollection shards."""
+    """Encode corpora into SPLADE JsonVectorCollection shards.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing SPLADE settings and paths.
+    logger_ : logging.Logger | None, optional
+        Custom logger instance. If None, uses module logger.
+    encoder_context : SpladeEncoderContext | None, optional
+        Encoder context for dependency injection. If None, uses production
+        context.
+    timer : Callable[[], float] | None, optional
+        Timer function for performance measurement. If None, uses
+        time.perf_counter.
+    """
 
     def __init__(
         self,
@@ -1602,21 +1614,6 @@ class SpladeEncoderService:
         encoder_context: SpladeEncoderContext | None = None,
         timer: Callable[[], float] | None = None,
     ) -> None:
-        """Initialize SPLADE encoder service.
-
-        Parameters
-        ----------
-        app_config : AppConfig
-            Application configuration containing SPLADE settings and paths.
-        logger_ : logging.Logger | None, optional
-            Custom logger instance. If None, uses module logger.
-        encoder_context : SpladeEncoderContext | None, optional
-            Encoder context for dependency injection. If None, uses production
-            context.
-        timer : Callable[[], float] | None, optional
-            Timer function for performance measurement. If None, uses
-            time.perf_counter.
-        """
         self._logger = logger_ or logging.getLogger(__name__)
         self._encoder_context = encoder_context or SpladeEncoderContext.production()
         self._timer = timer or perf_counter
@@ -1910,7 +1907,17 @@ class SpladeEncoderService:
 
 
 class SpladeIndexManager:
-    """Build SPLADE Lucene impact indexes from vector collections."""
+    """Build SPLADE Lucene impact indexes from vector collections.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Application configuration containing SPLADE settings.
+    logger_ : logging.Logger | None, optional
+        Custom logger instance. If None, uses module logger.
+    index_context : SpladeIndexContext | None, optional
+        Context for index management. If None, uses production context.
+    """
 
     def __init__(
         self,
@@ -1919,17 +1926,6 @@ class SpladeIndexManager:
         logger_: logging.Logger | None = None,
         index_context: SpladeIndexContext | None = None,
     ) -> None:
-        """Initialize SPLADE index manager.
-
-        Parameters
-        ----------
-        app_config : AppConfig
-            Application configuration containing SPLADE settings.
-        logger_ : logging.Logger | None, optional
-            Custom logger instance. If None, uses module logger.
-        index_context : SpladeIndexContext | None, optional
-            Context for index management. If None, uses production context.
-        """
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(app_config.paths.repo_root).expanduser().resolve()
         self._config: SpladeSettings = app_config.splade

@@ -432,7 +432,9 @@ def should_mark_overlay(row: Mapping[str, Any]) -> bool:
     exports = export_names_from_meta(row)
     reexports = row.get("reexports") or {}
     tags = row.get("tags") or []
-    is_public = bool(exports) or bool(reexports) or (isinstance(tags, list) and "public-api" in tags)
+    is_public = (
+        bool(exports) or bool(reexports) or (isinstance(tags, list) and "public-api" in tags)
+    )
     needs_annotations = (
         (params_ratio < OVERLAY_PARAM_THRESHOLD)
         or (returns_ratio < OVERLAY_PARAM_THRESHOLD)

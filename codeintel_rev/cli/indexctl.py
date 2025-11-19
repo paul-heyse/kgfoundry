@@ -21,7 +21,6 @@ import typer
 
 from codeintel_rev.config import AppConfig, load_app_config
 from codeintel_rev.config.paths import resolve_application_paths
-from codeintel_rev.config.settings import Settings
 from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.embeddings import EmbeddingProvider, get_embedding_provider
 from codeintel_rev.errors import RuntimeLifecycleError
@@ -60,12 +59,12 @@ app.add_typer(embeddings_app, name="embeddings")
 
 
 @lru_cache(maxsize=1)
-def _cached_settings() -> Settings:
+def _cached_settings() -> object:
     """Load and cache msgspec Settings derived from AppConfig.
 
     Returns
     -------
-    Settings
+    object
         Legacy settings struct populated from :func:`load_app_config`.
     """
     return settings_from_app_config(_cached_app_config())
@@ -84,7 +83,7 @@ def _cached_app_config() -> AppConfig:
 
 
 def _default_faiss_manager_factory(
-    _settings: Settings,
+    _settings: object,
     index_override: Path | None,
 ) -> FAISSManager:
     """Create and load a FAISS manager instance from settings.
@@ -96,7 +95,7 @@ def _default_faiss_manager_factory(
 
     Parameters
     ----------
-    _settings : Settings
+    _settings : object
         Application settings containing FAISS vector dimension and nlist
         configuration. Index path defaults are sourced from :class:`AppConfig`.
         This parameter is unused but kept for API compatibility.
@@ -133,7 +132,7 @@ def _default_faiss_manager_factory(
 
 
 def _default_duckdb_catalog_factory(
-    settings: Settings,
+    settings: object,
     path_override: Path | None,
 ) -> DuckDBCatalog:
     """Create and configure a DuckDB catalog instance from settings.
@@ -145,7 +144,7 @@ def _default_duckdb_catalog_factory(
 
     Parameters
     ----------
-    settings : Settings
+    settings : object
         Application settings containing vectors directory, repository root,
         materialization settings, and FAISS ID map path. The DuckDB catalog path
         defaults to the value defined in :class:`AppConfig`.
@@ -265,12 +264,12 @@ def _default_count_idmap_rows(path: Path) -> int:
     return metadata.num_rows if metadata is not None else 0
 
 
-def _default_embedding_provider_factory(_settings: Settings) -> EmbeddingProvider:
+def _default_embedding_provider_factory(_settings: object) -> EmbeddingProvider:
     """Create an embedding provider instance from the active configuration.
 
     Parameters
     ----------
-    _settings : Settings
+    _settings : object
         Legacy settings struct that supplies index configuration (vector
         dimensionality). Embedding/vLLM parameters are sourced from AppConfig.
         This parameter is unused but kept for API compatibility.
@@ -295,13 +294,13 @@ class IndexctlCliContext:
 
     Attributes
     ----------
-    settings_factory : Callable[[], Settings]
+    settings_factory : Callable[[], object]
         Factory function that returns application settings. Typically uses
         caching to avoid repeated file I/O.
-    faiss_manager_factory : Callable[[Settings, Path | None], FAISSManager]
+    faiss_manager_factory : Callable[[object, Path | None], FAISSManager]
         Factory function that creates FAISS manager instances from settings
         and optional index path override.
-    duckdb_catalog_factory : Callable[[Settings, Path | None], DuckDBCatalog]
+    duckdb_catalog_factory : Callable[[object, Path | None], DuckDBCatalog]
         Factory function that creates DuckDB catalog instances from settings
         and optional path override.
     duckdb_dim_resolver : Callable[[DuckDBCatalog], int]
@@ -310,17 +309,17 @@ class IndexctlCliContext:
     idmap_row_counter : Callable[[Path], int]
         Function that counts rows in a FAISS ID map Parquet file without
         loading the entire file.
-    embedding_provider_factory : Callable[[Settings], EmbeddingProvider]
+    embedding_provider_factory : Callable[[object], EmbeddingProvider]
         Factory function that creates embedding provider instances from
         application settings.
     """
 
-    settings_factory: Callable[[], Settings]
-    faiss_manager_factory: Callable[[Settings, Path | None], FAISSManager]
-    duckdb_catalog_factory: Callable[[Settings, Path | None], DuckDBCatalog]
+    settings_factory: Callable[[], object]
+    faiss_manager_factory: Callable[[object, Path | None], FAISSManager]
+    duckdb_catalog_factory: Callable[[object, Path | None], DuckDBCatalog]
     duckdb_dim_resolver: Callable[[DuckDBCatalog], int]
     idmap_row_counter: Callable[[Path], int]
-    embedding_provider_factory: Callable[[Settings], EmbeddingProvider]
+    embedding_provider_factory: Callable[[object], EmbeddingProvider]
 
     @classmethod
     def production(cls) -> IndexctlCliContext:
@@ -388,7 +387,7 @@ def _cli_context(ctx: click.Context | None = None) -> IndexctlCliContext:
     return _DEFAULT_CONTEXT
 
 
-def _get_settings() -> Settings:
+def _get_settings() -> object:
     """Retrieve application settings from CLI context.
 
     This function retrieves application settings by accessing the settings factory
@@ -397,7 +396,7 @@ def _get_settings() -> Settings:
 
     Returns
     -------
-    Settings
+    object
         Application settings object containing configuration for paths, index
         parameters, and embedding providers. The settings are loaded from the
         CLI context's settings factory.
@@ -940,7 +939,7 @@ class _EmbeddingBuildContext:
 
     Attributes
     ----------
-    settings : Settings
+    settings : object
         Application settings containing embedding provider configuration and
         batch size parameters. Used to configure embedding generation.
     manager : IndexLifecycleManager
@@ -963,7 +962,7 @@ class _EmbeddingBuildContext:
         metadata about generated embeddings.
     """
 
-    settings: Settings
+    settings: object
     manager: IndexLifecycleManager
     version: str | None
     version_dir: Path | None
@@ -973,7 +972,7 @@ class _EmbeddingBuildContext:
 
 
 def _build_context(
-    settings: Settings,
+    settings: object,
     manager: IndexLifecycleManager,
     *,
     version: str | None,
@@ -989,7 +988,7 @@ def _build_context(
 
     Parameters
     ----------
-    settings : Settings
+    settings : object
         Application settings containing default paths and configuration. Used to
         determine default DuckDB catalog and output paths when overrides are not
         provided.
@@ -1044,7 +1043,7 @@ def _build_context(
 
 
 def resolve_duck_path(
-    settings: Settings,
+    settings: object,
     version_dir: Path | None,
     override: Path | None,
 ) -> Path:
@@ -1056,7 +1055,7 @@ def resolve_duck_path(
 
     Parameters
     ----------
-    settings : Settings
+    settings : object
         Application settings containing legacy defaults. When neither override nor
         version_dir is provided, the DuckDB catalog path falls back to
         :class:`AppConfig`.
@@ -1109,7 +1108,7 @@ def resolve_duck_path(
 
 
 def _resolve_output_path(
-    settings: Settings,
+    settings: object,
     version_dir: Path | None,
     override: Path | None,
     *,
@@ -1123,7 +1122,7 @@ def _resolve_output_path(
 
     Parameters
     ----------
-    settings : Settings
+    settings : object
         Application settings containing default vectors directory. Used when override
         and version_dir are None. The output path is resolved as vectors_dir / "embeddings.parquet".
     version_dir : Path | None
@@ -1605,7 +1604,7 @@ def _run_embedding_validation(
     parquet_path: Path,
     samples: int,
     epsilon: float,
-    settings: Settings,
+    settings: object,
 ) -> None:
     """Run embedding validation by sampling and recomputing embeddings.
 
@@ -1626,7 +1625,7 @@ def _run_embedding_validation(
         Maximum allowed drift threshold for validation. Chunks with drift
         exceeding epsilon are reported as failures. Drift is computed as
         1 - cosine_similarity.
-    settings : Settings
+    settings : object
         Application settings containing embedding provider configuration. Used
         to instantiate the embedding provider for recomputing embeddings.
 
@@ -1997,7 +1996,7 @@ def _count_idmap_rows(path: Path) -> int:
     return _cli_context().idmap_row_counter(path)
 
 
-def _embedding_provider(settings: Settings) -> EmbeddingProvider:
+def _embedding_provider(settings: object) -> EmbeddingProvider:
     """Create embedding provider instance using CLI context factory.
 
     This function creates an EmbeddingProvider instance by using the CLI context's
@@ -2006,7 +2005,7 @@ def _embedding_provider(settings: Settings) -> EmbeddingProvider:
 
     Parameters
     ----------
-    settings : Settings
+    settings : object
         Application settings containing embedding provider configuration (provider
         type, model name, API keys, etc.). Used to instantiate the appropriate
         embedding provider.
@@ -2075,6 +2074,12 @@ def _eval_paths(base_dir: Path) -> tuple[Path, Path]:
     This function creates evaluation output paths by combining base directory,
     timestamp, and random run ID. The function creates the output directory
     if it doesn't exist and returns paths for Parquet and JSON output files.
+
+    Parameters
+    ----------
+    base_dir : Path
+        Base directory for evaluation output. Timestamped subdirectories will
+        be created within this directory.
 
     Returns
     -------
@@ -2544,7 +2549,6 @@ def _run_autotune(manager: FAISSManager, mode: SweepMode) -> None:
     with quick mode using fewer values for faster execution and full mode using
     more values for comprehensive tuning.
     """
-    settings = _get_settings()
     catalog = _duckdb_catalog()
     try:
         samples = catalog.sample_query_vectors(limit=_AUTOTUNE_SAMPLE_LIMITS[mode])
@@ -2577,7 +2581,6 @@ def eval_command(
     xtr_oracle: EvalXtrOracleOption = DEFAULT_XTR_ORACLE,
 ) -> None:
     """Run ANN vs Flat evaluation and optionally rescore with XTR."""
-    settings = _get_settings()
     app_config = _cached_app_config()
     eval_settings = app_config.eval
     manager = _faiss_manager()

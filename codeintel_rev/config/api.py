@@ -794,4 +794,6 @@ def validate_config(cfg: AppConfig) -> None:
         "index.recency_half_life_days must be positive",
         condition=(not index_cfg.recency_enabled or index_cfg.recency_half_life_days > 0),
     )
-    _require("index.recency_max_boost must be non-negative", condition=index_cfg.recency_max_boost >= 0)
+    _require(
+        "index.recency_max_boost must be non-negative", condition=index_cfg.recency_max_boost >= 0
+    )

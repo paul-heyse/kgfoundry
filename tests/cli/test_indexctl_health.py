@@ -6,11 +6,10 @@ import json
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 
 from codeintel_rev.cli.indexctl import IndexctlCliContext
 from codeintel_rev.cli.indexctl import app as indexctl_app
-from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.faiss_manager import FAISSManager
 
@@ -102,7 +101,7 @@ def test_health_command_reports_ok(tmp_path: Path) -> None:
     base_context = IndexctlCliContext.production()
     context = replace(
         base_context,
-        settings_factory=lambda: cast("Settings", _Settings(tmp_path)),
+        settings_factory=lambda: cast("Any", _Settings(tmp_path)),
         faiss_manager_factory=lambda *_: cast("FAISSManager", manager),
         duckdb_catalog_factory=lambda *_: cast("DuckDBCatalog", catalog),
         duckdb_dim_resolver=lambda _catalog: vector_dim,

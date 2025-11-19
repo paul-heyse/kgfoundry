@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Literal, TypeVar, cast
+from typing import Any, Final, Literal, Protocol, TypeVar, cast
 
 from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
@@ -31,7 +31,7 @@ from codeintel_rev.config.api import (
 from codeintel_rev.runtime.imports import gate_import
 
 LookupFn = Callable[[str, object], object]
-_MappingValue = TypeVar("_MappingValue", int, float)
+_MappingValue_co = TypeVar("_MappingValue_co", int, float, covariant=True)
 _DEFAULT_RRF_WEIGHTS: Final[dict[str, float]] = {
     "semantic": 1.0,
     "bm25": 1.0,
@@ -39,6 +39,74 @@ _DEFAULT_RRF_WEIGHTS: Final[dict[str, float]] = {
     "warp": 1.1,
 }
 _DEFAULT_PREFETCH: Final[dict[str, int]] = {"semantic": 200, "bm25": 200, "splade": 200}
+
+
+class ValueCoercer(Protocol[_MappingValue_co]):
+    """Protocol describing numeric coercion helpers."""
+
+    def __call__(self, value: object) -> _MappingValue_co:
+        """Convert ``value`` into a numeric mapping payload."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class TypedMapping(Mapping[str, _MappingValue_co]):
+    """Small mapping wrapper preserving numeric configuration payloads."""
+
+    _data: dict[str, _MappingValue_co]
+
+    def __getitem__(self, key: str) -> _MappingValue_co:
+        """Return the stored value for ``key``.
+
+        Parameters
+        ----------
+        key : str
+            Mapping key to look up.
+
+        Returns
+        -------
+        _MappingValue_co
+            Stored numeric value.
+        """
+        return self._data[key]
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over mapping keys.
+
+        Returns
+        -------
+        Iterator[str]
+            Iterator across stored keys.
+        """
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        """Return the number of stored entries.
+
+        Returns
+        -------
+        int
+            Number of items stored in the mapping.
+        """
+        return len(self._data)
+
+    def to_dict(self) -> dict[str, _MappingValue_co]:
+        """Return a shallow dictionary copy.
+
+        Returns
+        -------
+        dict[str, _MappingValue_co]
+            Snapshot of stored items in a plain dictionary.
+        """
+        return dict(self._data)
+
+
+class FloatMapping(TypedMapping[float]):
+    """Mapping of channels to float weights."""
+
+
+class IntMapping(TypedMapping[int]):
+    """Mapping of channels to integer weights."""
 
 
 def _to_bool(value: str | None, *, default: bool = False) -> bool:
@@ -99,6 +167,12 @@ def _coerce_int(value: object, *, default: int) -> int:
 def _optional_int(value: object | None) -> int | None:
     """Return integer for value or None if parsing fails/absent.
 
+    Parameters
+    ----------
+    value : object | None
+        Value to parse as integer. Can be None, empty string, or any object
+        that can be converted to an integer.
+
     Returns
     -------
     int | None
@@ -150,55 +224,61 @@ def _parse_int_list(value: object, default: tuple[int, ...]) -> tuple[int, ...]:
     return tuple(parsed) if parsed else default
 
 
+_TypedMappingT = TypeVar("_TypedMappingT", bound="TypedMapping[Any]")
+
+
 def _parse_mapping(
     value: object,
     *,
-    default: Mapping[str, _MappingValue],
-    coerce: Callable[[object], _MappingValue],
-) -> dict[str, _MappingValue]:
+    default: Mapping[str, _MappingValue_co],
+    coerce: ValueCoercer[_MappingValue_co],
+    mapping_cls: type[_TypedMappingT],
+) -> _TypedMappingT:
     """Parse a JSON or mapping value into a ``str -> number`` dictionary.
 
     Parameters
     ----------
     value : object
         Value to parse. Can be a Mapping, JSON string, or other object.
-    default : Mapping[str, _MappingValue]
+    default : Mapping[str, _MappingValue_co]
         Default mapping to return if parsing fails or value is empty.
-    coerce : Callable[[object], _MappingValue]
+    coerce : ValueCoercer[_MappingValue_co]
         Function to coerce individual values to the target type.
+    mapping_cls : type[_TypedMappingT]
+        Typed mapping class to instantiate with parsed values.
 
     Returns
     -------
-    dict[str, _MappingValue]
-        Dictionary mapping string keys to coerced values, or default if parsing fails.
+    _TypedMappingT
+        Typed mapping containing the coerced values, or default if parsing fails.
     """
     if isinstance(value, Mapping):
-        parsed: dict[str, _MappingValue] = {}
+        parsed: dict[str, _MappingValue_co] = {}
         for key, mapping_value in value.items():
             try:
                 parsed[str(key)] = coerce(mapping_value)
             except (TypeError, ValueError):
                 continue
-        return parsed or dict(default)
+        return mapping_cls(parsed or dict(default))
     text = _as_optional_str(value)
     if not text:
-        return dict(default)
+        return mapping_cls(dict(default))
     try:
         payload = json.loads(text)
     except (json.JSONDecodeError, TypeError, ValueError):
-        return dict(default)
+        return mapping_cls(dict(default))
     if isinstance(payload, Mapping):
-        parsed_payload: dict[str, _MappingValue] = {}
+        parsed_payload: dict[str, _MappingValue_co] = {}
         for key, mapping_value in payload.items():
             try:
                 parsed_payload[str(key)] = coerce(mapping_value)
             except (TypeError, ValueError):
                 continue
-        return parsed_payload or dict(default)
-    return dict(default)
+        return mapping_cls(parsed_payload or dict(default))
+    return mapping_cls(dict(default))
 
 
-def _parse_float_mapping(value: object, *, default: Mapping[str, float]) -> dict[str, float]:
+def _parse_float_mapping(value: object, *, default: Mapping[str, float]) -> FloatMapping:
     """Return mapping of floats using :func:`_parse_mapping`.
 
     Parameters
@@ -210,13 +290,18 @@ def _parse_float_mapping(value: object, *, default: Mapping[str, float]) -> dict
 
     Returns
     -------
-    dict[str, float]
-        Dictionary mapping string keys to float values, or default if parsing fails.
+    FloatMapping
+        Typed mapping of string keys to float values, or default if parsing fails.
     """
-    return _parse_mapping(value, default=default, coerce=lambda raw: float(raw))
+    return _parse_mapping(
+        value,
+        default=default,
+        coerce=_coerce_float_value,
+        mapping_cls=FloatMapping,
+    )
 
 
-def _parse_int_mapping(value: object, *, default: Mapping[str, int]) -> dict[str, int]:
+def _parse_int_mapping(value: object, *, default: Mapping[str, int]) -> IntMapping:
     """Return mapping of ints using :func:`_parse_mapping`.
 
     Parameters
@@ -228,10 +313,89 @@ def _parse_int_mapping(value: object, *, default: Mapping[str, int]) -> dict[str
 
     Returns
     -------
-    dict[str, int]
-        Dictionary mapping string keys to int values, or default if parsing fails.
+    IntMapping
+        Typed mapping of string keys to int values, or default if parsing fails.
     """
-    return _parse_mapping(value, default=default, coerce=lambda raw: int(raw))
+    return _parse_mapping(
+        value,
+        default=default,
+        coerce=_coerce_int_value,
+        mapping_cls=IntMapping,
+    )
+
+
+def _coerce_float_value(value: object) -> float:
+    """Return ``value`` as float or raise ``TypeError`` if invalid.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce to float.
+
+    Returns
+    -------
+    float
+        Parsed float value.
+
+    Raises
+    ------
+    TypeError
+        If the value cannot be interpreted as a float literal.
+    """
+    if value is None or isinstance(value, bool):
+        message = "Float value cannot be None or bool"
+        raise TypeError(message)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            message = "Empty string cannot be converted to float"
+            raise TypeError(message)
+        try:
+            return float(text)
+        except ValueError as exc:
+            message = f"Invalid float literal: {value!r}"
+            raise TypeError(message) from exc
+    message = f"Unsupported float value type: {type(value)!r}"
+    raise TypeError(message)
+
+
+def _coerce_int_value(value: object) -> int:
+    """Return ``value`` as int or raise ``TypeError`` if invalid.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce to int.
+
+    Returns
+    -------
+    int
+        Parsed integer value.
+
+    Raises
+    ------
+    TypeError
+        If the value cannot be interpreted as an integer literal.
+    """
+    if value is None or isinstance(value, bool):
+        message = "Int value cannot be None or bool"
+        raise TypeError(message)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            message = "Empty string cannot be converted to int"
+            raise TypeError(message)
+        try:
+            return int(text, 10)
+        except ValueError as exc:
+            message = f"Invalid int literal: {value!r}"
+            raise TypeError(message) from exc
+    message = f"Unsupported int value type: {type(value)!r}"
+    raise TypeError(message)
 
 
 def _coerce_float(value: object, *, default: float) -> float:
@@ -1153,7 +1317,7 @@ def _xtr_settings(get: LookupFn) -> XTRSettings:
     )
 
 
-def _rrf_weights(get: LookupFn) -> dict[str, float]:
+def _rrf_weights(get: LookupFn) -> FloatMapping:
     """Return configured RRF weights.
 
     Parameters
@@ -1163,13 +1327,13 @@ def _rrf_weights(get: LookupFn) -> dict[str, float]:
 
     Returns
     -------
-    dict[str, float]
-        Dictionary mapping channel names to RRF weight values.
+    FloatMapping
+        Mapping of channel names to RRF weight values.
     """
     return _parse_float_mapping(get("RRF_WEIGHTS_JSON", ""), default=_DEFAULT_RRF_WEIGHTS)
 
 
-def _hybrid_prefetch_config(get: LookupFn) -> dict[str, int]:
+def _hybrid_prefetch_config(get: LookupFn) -> IntMapping:
     """Return hybrid prefetch limits.
 
     Parameters
@@ -1179,13 +1343,13 @@ def _hybrid_prefetch_config(get: LookupFn) -> dict[str, int]:
 
     Returns
     -------
-    dict[str, int]
-        Dictionary mapping channel names to prefetch limit values.
+    IntMapping
+        Mapping of channel names to prefetch limit values.
     """
     return _parse_int_mapping(get("HYBRID_PREFETCH_JSON", ""), default=_DEFAULT_PREFETCH)
 
 
-def _hybrid_weight_overrides(get: LookupFn) -> dict[str, float]:
+def _hybrid_weight_overrides(get: LookupFn) -> FloatMapping:
     """Return hybrid weight overrides.
 
     Parameters
@@ -1195,8 +1359,8 @@ def _hybrid_weight_overrides(get: LookupFn) -> dict[str, float]:
 
     Returns
     -------
-    dict[str, float]
-        Dictionary mapping channel names to weight override values.
+    FloatMapping
+        Mapping of channel names to weight override values.
     """
     return _parse_float_mapping(get("HYBRID_WEIGHTS_OVERRIDE_JSON", ""), default={})
 

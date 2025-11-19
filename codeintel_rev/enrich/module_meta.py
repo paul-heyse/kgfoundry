@@ -21,6 +21,11 @@ __all__ = ["module_analysis_to_meta"]
 def module_analysis_to_meta(analysis: ModuleAnalysis) -> dict[str, Any]:
     """Return a JSON-serializable mapping for ``analysis``.
 
+    Parameters
+    ----------
+    analysis : ModuleAnalysis
+        Module analysis result to serialize.
+
     Returns
     -------
     dict[str, Any]

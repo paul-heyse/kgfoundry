@@ -58,7 +58,7 @@ def get_idmap_array(index: FaissIndex) -> NDArrayI64:
 
     Parameters
     ----------
-    index : object
+    index : FaissIndex
         ID-mapped FAISS index.
 
     Returns
@@ -107,7 +107,7 @@ def export_idmap_parquet(
 
     Parameters
     ----------
-    index : object
+    index : FaissIndex
         FAISS index to export from.
     out_path : Path
         Destination Parquet file.
@@ -178,7 +178,7 @@ def refresh_duckdb_materialization(
 
     Parameters
     ----------
-    conn : DuckDBPyConnection
+    conn : duckdb.DuckDBPyConnection
         DuckDB connection handle.
     idmap_parquet : Path
         Path to the ID map Parquet.

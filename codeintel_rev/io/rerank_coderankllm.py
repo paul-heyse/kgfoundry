@@ -138,7 +138,19 @@ class CodeRankGenerationSettings:
 
 
 class CodeRankListwiseReranker:
-    """Listwise reranking helper built on CodeRankLLM."""
+    """Listwise reranking helper built on CodeRankLLM.
+
+    Parameters
+    ----------
+    model_id : str
+        Hugging Face model identifier.
+    device : str
+        Device to run model on (e.g., "cuda", "cpu").
+    settings : CodeRankGenerationSettings
+        Generation settings (temperature, top_p, max_new_tokens).
+    context : CoderankLLMRerankerContext | None, optional
+        Optional context for dependency injection. If None, uses production context.
+    """
 
     _CACHE_LOCK: ClassVar[threading.Lock] = threading.Lock()
     _CACHE: ClassVar[
@@ -153,19 +165,6 @@ class CodeRankListwiseReranker:
         settings: CodeRankGenerationSettings,
         context: CoderankLLMRerankerContext | None = None,
     ) -> None:
-        """Initialize CodeRank LLM reranker.
-
-        Parameters
-        ----------
-        model_id : str
-            Hugging Face model identifier.
-        device : str
-            Device to run model on (e.g., "cuda", "cpu").
-        settings : CodeRankGenerationSettings
-            Generation settings (temperature, top_p, max_new_tokens).
-        context : CoderankLLMRerankerContext | None, optional
-            Optional context for dependency injection. If None, uses production context.
-        """
         self.model_id = model_id
         self.device = device
         self.max_new_tokens = settings.max_new_tokens

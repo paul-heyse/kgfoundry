@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from codeintel_rev.config.settings import XTRConfig
+from codeintel_rev.config.api import XTRSettings
 from codeintel_rev.io.xtr_manager import XTRIndex
 
 from tests._helpers import assertions, constants
@@ -44,7 +44,7 @@ def _write_token_artifacts(root: Path) -> None:
 def test_xtr_index_open_and_metadata(tmp_path: Path) -> None:
     """Index loads token artifacts and exposes metadata."""
     _write_token_artifacts(tmp_path)
-    index = XTRIndex(tmp_path, XTRConfig(enable=True, dim=2, dtype="float16"))
+    index = XTRIndex(tmp_path, XTRSettings(enable=True, dim=2, dtype="float16"))
     index.open()
     assertions.expect_true(index.ready)
     meta = index.metadata()
@@ -57,7 +57,7 @@ def test_xtr_index_open_and_metadata(tmp_path: Path) -> None:
 
 def test_xtr_index_not_ready_without_artifacts(tmp_path: Path) -> None:
     """Index stays unready when artifacts are missing."""
-    index = XTRIndex(tmp_path, XTRConfig(enable=True))
+    index = XTRIndex(tmp_path, XTRSettings(enable=True))
     index.open()
     assertions.expect_false(index.ready)
 
@@ -65,7 +65,7 @@ def test_xtr_index_not_ready_without_artifacts(tmp_path: Path) -> None:
 def test_xtr_search_and_rescore(tmp_path: Path) -> None:
     """Search returns k hits and rescoring narrows the result set."""
     _write_token_artifacts(tmp_path)
-    config = XTRConfig(enable=True, dim=2, dtype="float16")
+    config = XTRSettings(enable=True, dim=2, dtype="float16")
     index = XTRIndex(tmp_path, config)
     index.open()
     assertions.expect_true(index.ready)

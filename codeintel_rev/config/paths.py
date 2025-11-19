@@ -7,10 +7,14 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.settings import PathsConfig, Settings
+from codeintel_rev.config.api import AppConfig, PathsConfig
+
+if TYPE_CHECKING:
+    from codeintel_rev.config.settings import Settings
+else:  # pragma: no cover - runtime shim
+    Settings = Any
 
 __all__ = ["ResolvedPaths", "resolve_application_paths"]
 

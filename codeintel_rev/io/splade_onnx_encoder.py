@@ -159,7 +159,23 @@ class OnnxSpladeConfig:
 
 
 class _OnnxEncoderBase:
-    """Shared helpers for SPLADE ONNX encoders."""
+    """Shared helpers for SPLADE ONNX encoders.
+
+    Parameters
+    ----------
+    cfg : OnnxSpladeConfig
+        Configuration describing the ONNX model, tokenizer, and execution
+        parameters.
+    session_factory : SessionFactory | None, optional
+        Factory function for creating ONNX Runtime sessions. If None,
+        uses the default ONNX Runtime InferenceSession constructor.
+    tokenizer_factory : TokenizerFactory | None, optional
+        Factory function for creating tokenizers. If None, uses HuggingFace
+        AutoTokenizer.from_pretrained.
+    numpy_module : ModuleType | None, optional
+        NumPy module to use for array operations. If None, uses the lazy-loaded
+        numpy module. Useful for testing with mock numpy implementations.
+    """
 
     __slots__ = (
         "_cfg",
@@ -178,23 +194,6 @@ class _OnnxEncoderBase:
         tokenizer_factory: TokenizerFactory | None = None,
         numpy_module: ModuleType | None = None,
     ) -> None:
-        """Initialize the base ONNX encoder with configuration and factories.
-
-        Parameters
-        ----------
-        cfg : OnnxSpladeConfig
-            Configuration describing the ONNX model, tokenizer, and execution
-            parameters.
-        session_factory : SessionFactory | None, optional
-            Factory function for creating ONNX Runtime sessions. If None,
-            uses the default ONNX Runtime InferenceSession constructor.
-        tokenizer_factory : TokenizerFactory | None, optional
-            Factory function for creating tokenizers. If None, uses HuggingFace
-            AutoTokenizer.from_pretrained.
-        numpy_module : ModuleType | None, optional
-            NumPy module to use for array operations. If None, uses the lazy-loaded
-            numpy module. Useful for testing with mock numpy implementations.
-        """
         self._cfg = cfg
         self._session_factory = session_factory
         self._tokenizer_factory = tokenizer_factory

@@ -74,14 +74,11 @@ def resolve_exports(
 
     imports = import_entries(row)
     for imp in imports:
-        if not imp.get("is_star"):
+        if not imp.is_star:
             continue
-        module = imp.get("module")
-        level = int(imp.get("level") or 0)
-        names = imp.get("names") or []
-        if not isinstance(names, list):
-            names = []
-        for target in import_targets_for_entry(current_module, module, [], level):
+        module = imp.module
+        level = imp.level
+        for target in import_targets_for_entry(current_module, module, list(imp.names), level):
             origin_row = modules_by_name.get(target)
             if not origin_row and package_prefix:
                 prefixed = f"{package_prefix}.{target}" if target else package_prefix
@@ -92,7 +89,7 @@ def resolve_exports(
             if not export_names:
                 continue
             resolved[target] = sorted(export_names)
-            local_defs = {definition.get("name") for definition in definition_entries(row)}
+            local_defs = {definition.name for definition in definition_entries(row)}
             for name in export_names:
                 if name in local_defs:
                     continue
@@ -115,7 +112,7 @@ def is_reexport_hub(row: Mapping[str, Any]) -> bool:
     """
     exports = export_names_from_meta(row)
     imports = import_entries(row)
-    has_star = any(entry.get("is_star") for entry in imports)
+    has_star = any(entry.is_star for entry in imports)
     return bool(has_star or len(exports) >= EXPORT_HUB_THRESHOLD)
 
 
@@ -136,12 +133,8 @@ def _public_names(row: Mapping[str, Any]) -> list[str]:
     exports = export_names_from_meta(row)
     if exports:
         return exports
-    names: list[str] = []
-    for definition in definition_entries(row):
-        kind = definition.get("kind")
-        name = definition.get("name")
-        if isinstance(name, str) and isinstance(kind, str) and kind in {"function", "class"}:
-            if name.startswith("_"):
-                continue
-            names.append(name)
-    return names
+    return [
+        definition.name
+        for definition in definition_entries(row)
+        if definition.kind in {"function", "class"} and not definition.name.startswith("_")
+    ]

@@ -375,7 +375,8 @@ def _faiss_guard(context: ApplicationContext) -> Iterator[dict[str, bool]]:
         tracks any exceptions that occur. If an exception is raised by the
         original search method, it sets tracker["raised"] = True before
         re-raising the exception. The exception is propagated to the caller.
-        Any exception raised by the original search method is re-raised.
+        Any exception raised by the original search method is re-raised after
+        tracking.
         """
         try:
             return original_search(*args, **kwargs)

@@ -90,7 +90,24 @@ class BM25Rm3Config:
 
 
 class PyseriniBM25Backend(BM25Backend):
-    """Pyserini-backed BM25 implementation with optional RM3 heuristics."""
+    """Pyserini-backed BM25 implementation with optional RM3 heuristics.
+
+    Parameters
+    ----------
+    index_dir : Path
+        Path to the Lucene BM25 index directory.
+    k1 : float
+        BM25 k1 parameter (term frequency saturation).
+    b : float
+        BM25 b parameter (length normalization).
+    rm3 : BM25Rm3Config | None, optional
+        Optional RM3 query expansion configuration.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the index directory does not exist.
+    """
 
     def __init__(
         self,
@@ -100,24 +117,6 @@ class PyseriniBM25Backend(BM25Backend):
         b: float,
         rm3: BM25Rm3Config | None = None,
     ) -> None:
-        """Initialize Pyserini BM25 backend.
-
-        Parameters
-        ----------
-        index_dir : Path
-            Path to the Lucene BM25 index directory.
-        k1 : float
-            BM25 k1 parameter (term frequency saturation).
-        b : float
-            BM25 b parameter (length normalization).
-        rm3 : BM25Rm3Config | None, optional
-            Optional RM3 query expansion configuration.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the index directory does not exist.
-        """
         if not index_dir.exists():
             msg = f"BM25 index not found: {index_dir}"
             raise FileNotFoundError(msg)

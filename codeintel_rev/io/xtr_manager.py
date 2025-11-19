@@ -16,11 +16,10 @@ from codeintel_rev.typing import NDArrayF32, TorchModule
 
 if TYPE_CHECKING:
     import numpy as np
-
-    from codeintel_rev.config.settings import XTRConfig as LegacyXTRConfig
 else:
     np = cast("np", LazyModule("numpy", "XTR index operations"))
-    LegacyXTRConfig = object
+
+LegacyXTRConfig = object
 
 
 class XTRMetadata(TypedDict):
@@ -36,7 +35,12 @@ class XTRMetadata(TypedDict):
 
 
 class _XTRIndexRuntime:
-    """Mutable runtime artifacts for XTRIndex."""
+    """Mutable runtime artifacts for XTRIndex.
+
+    Creates a new runtime state tracker with all fields set to None.
+    Fields are populated during index loading and must be cleaned up
+    via the close() method to release resources.
+    """
 
     __slots__ = (
         "chunk_lookup",
@@ -49,12 +53,6 @@ class _XTRIndexRuntime:
     )
 
     def __init__(self) -> None:
-        """Initialize XTR index runtime state.
-
-        Creates a new runtime state tracker with all fields set to None.
-        Fields are populated during index loading and must be cleaned up
-        via the close() method to release resources.
-        """
         self.meta: XTRMetadata | None = None
         self.tokens: np.memmap | None = None
         self.tokenizer: Any | None = None
@@ -79,7 +77,7 @@ def _coerce_xtr_settings(config: XTRSettings | LegacyXTRConfig) -> XTRSettings:
 
     Parameters
     ----------
-    config : XTRSettings | object
+    config : XTRSettings | LegacyXTRConfig
         Candidate configuration object that may already be ``XTRSettings`` or
         a msgspec struct from :mod:`codeintel_rev.config.settings`.
 

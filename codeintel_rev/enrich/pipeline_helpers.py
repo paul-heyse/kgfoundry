@@ -492,7 +492,7 @@ def _traits_from_row(row: Mapping[str, Any]) -> ModuleTraits:
     imports_field = import_entries(row)
     exports = export_names_from_meta(row)
     has_all = has_dunder_all(row)
-    has_star = any(entry.get("is_star") for entry in imports_field if isinstance(entry, Mapping))
+    has_star = any(entry.is_star for entry in imports_field)
     is_reexport_hub = has_star or len(exports) >= EXPORT_HUB_THRESHOLD
 
     coverage_value = row.get("covered_lines_ratio")

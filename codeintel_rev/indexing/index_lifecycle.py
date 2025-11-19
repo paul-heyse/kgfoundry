@@ -363,17 +363,16 @@ class VersionMeta:
 
 
 class IndexLifecycleManager:
-    """Manage staged/published index versions under a base directory."""
+    """Manage staged/published index versions under a base directory.
+
+    Parameters
+    ----------
+    base_dir : Path
+        Base directory for index version management. Creates "versions"
+        subdirectory and "CURRENT" pointer file.
+    """
 
     def __init__(self, base_dir: Path) -> None:
-        """Initialize index lifecycle manager.
-
-        Parameters
-        ----------
-        base_dir : Path
-            Base directory for index version management. Creates "versions"
-            subdirectory and "CURRENT" pointer file.
-        """
         self.base_dir = base_dir
         self.versions_dir = self.base_dir / "versions"
         self.current_file = self.base_dir / "CURRENT"

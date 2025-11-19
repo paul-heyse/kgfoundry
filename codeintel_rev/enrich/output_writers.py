@@ -12,7 +12,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from codeintel_rev.enrich.meta_compat import definition_entries, import_entries
+from codeintel_rev.enrich.meta_compat import (
+    DefinitionRecord,
+    ImportRecord,
+    definition_entries,
+    import_entries,
+)
 
 try:  # pragma: no cover - optional dependency
     import orjson
@@ -23,12 +28,14 @@ try:  # pragma: no cover - optional dependency
     import pyarrow as pa
     import pyarrow.dataset as ds
     import pyarrow.parquet as pq
-    from pyarrow.lib import ArrowException
+    from pyarrow.lib import ArrowException as _ArrowException
 except ImportError:  # pragma: no cover - optional dependency
     pa = None
     ds = None
     pq = None
-    ArrowException = ()
+    _ArrowException = RuntimeError
+
+ArrowExceptionType = _ArrowException if pa is not None else RuntimeError
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import pyarrow as pa_typing
@@ -393,7 +400,7 @@ def write_parquet_or_jsonl(
             target.parent.mkdir(parents=True, exist_ok=True)
             pq.write_table(table, str(target))
             return target, len(materialized)
-        except (ArrowException, OSError) as exc:  # pragma: no cover - fallback safety
+        except (ArrowExceptionType, OSError) as exc:  # pragma: no cover - fallback safety
             LOGGER.warning("Parquet write failed for %s: %s", target, exc)
     count = write_jsonl(fallback, materialized, writer_version=_JSONL_V2)
     return fallback, count
@@ -432,6 +439,53 @@ def _append_section(sections: list[str], title: str, lines: list[str]) -> None:
     sections.append("")
 
 
+def _coerce_import_records(record: Mapping[str, object]) -> list[ImportRecord]:
+    imports_field = record.get("imports")
+    if not isinstance(imports_field, list):
+        return []
+    coerced: list[ImportRecord] = []
+    for entry in imports_field:
+        if not isinstance(entry, Mapping):
+            continue
+        module = entry.get("module")
+        names = entry.get("names") or []
+        aliases_obj = entry.get("aliases")
+        alias_items = aliases_obj.items() if isinstance(aliases_obj, Mapping) else []
+        normalized_names = tuple(str(name) for name in names if isinstance(name, str))
+        normalized_aliases = {
+            str(k): str(v) for k, v in alias_items if isinstance(k, str) and isinstance(v, str)
+        }
+        normalized_module = module if isinstance(module, str) or module is None else str(module)
+        coerced.append(
+            ImportRecord(
+                module=normalized_module,
+                names=normalized_names,
+                aliases=normalized_aliases,
+                is_star=bool(entry.get("is_star")),
+                level=int(entry.get("level") or 0),
+            )
+        )
+    return coerced
+
+
+def _coerce_definition_records(record: Mapping[str, object]) -> list[DefinitionRecord]:
+    defs_field = record.get("defs")
+    if not isinstance(defs_field, list):
+        return []
+    coerced: list[DefinitionRecord] = []
+    for entry in defs_field:
+        if not isinstance(entry, Mapping):
+            continue
+        name = entry.get("name")
+        kind = entry.get("kind")
+        lineno = entry.get("lineno")
+        if not isinstance(name, str) or not isinstance(kind, str):
+            continue
+        normalized_lineno = lineno if isinstance(lineno, int) else None
+        coerced.append(DefinitionRecord(name=name, kind=kind, lineno=normalized_lineno))
+    return coerced
+
+
 def _format_imports(record: dict[str, object]) -> list[str]:
     """Format import statements from module record for Markdown output.
 
@@ -460,21 +514,13 @@ def _format_imports(record: dict[str, object]) -> list[str]:
     and module information from the record structure.
     """
     formatted: list[str] = []
-    imports_obj = record.get("imports")
-    if not isinstance(imports_obj, list):
-        imports_obj = import_entries(record)
-    if not isinstance(imports_obj, list):
-        return formatted
-    for entry in imports_obj:
-        if not isinstance(entry, Mapping):
-            continue
-        names = entry.get("names") or []
-        if not isinstance(names, list):
-            names = [str(names)]
+    entries = _coerce_import_records(record) or import_entries(record)
+    for entry in entries:
+        names = list(entry.names)
         formatted.append(
-            f"- from **{entry.get('module') or '(absolute)'}** import "
+            f"- from **{entry.module or '(absolute)'}** import "
             f"{', '.join(names) or '(module import)'}"
-            f"{' *' if entry.get('is_star') else ''}"
+            f"{' *' if entry.is_star else ''}"
         )
     return formatted
 
@@ -507,19 +553,12 @@ def _format_definitions(record: dict[str, object]) -> list[str]:
     and their locations in the source code.
     """
     formatted: list[str] = []
-    defs_obj = record.get("defs")
-    if not isinstance(defs_obj, list):
-        defs_obj = definition_entries(record)
-    if not isinstance(defs_obj, list):
-        return formatted
-    for definition in defs_obj:
-        if not isinstance(definition, Mapping):
-            continue
-        kind = definition.get("kind")
-        name = definition.get("name")
-        lineno = definition.get("lineno")
-        if isinstance(kind, str) and isinstance(name, str) and isinstance(lineno, int):
-            formatted.append(f"- {kind}: `{name}` (line {lineno})")
+    records = _coerce_definition_records(record) or definition_entries(record)
+    for definition in records:
+        if definition.lineno is None:
+            formatted.append(f"- {definition.kind}: `{definition.name}`")
+        else:
+            formatted.append(f"- {definition.kind}: `{definition.name}` (line {definition.lineno})")
     return formatted
 
 

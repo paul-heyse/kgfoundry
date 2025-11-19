@@ -63,12 +63,14 @@ class FusionProtocol(Protocol):
 
 
 class RRFWeighter:
-    """Adapter over :func:`fuse_weighted_rrf` operating on primitive tuples."""
+    """Adapter over :func:`fuse_weighted_rrf` operating on primitive tuples.
+
+    Creates a new weighter with zero invocation count.
+    """
 
     __slots__ = ("_invocations",)
 
     def __init__(self) -> None:
-        """Initialize RRF weighter with zero invocation count."""
         self._invocations = 0
 
     def fuse(

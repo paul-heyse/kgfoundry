@@ -16,16 +16,15 @@ _ENTRY_POINT_PROVIDER_STACK: list[Callable[[], Iterable[EntryPoint]]] = []
 
 
 class ChannelRegistry:
-    """Registry that discovers channel plugins via Python entry points."""
+    """Registry that discovers channel plugins via Python entry points.
+
+    Parameters
+    ----------
+    channels : Sequence[Channel]
+        Sequence of channel instances to register.
+    """
 
     def __init__(self, channels: Sequence[Channel]) -> None:
-        """Initialize channel registry.
-
-        Parameters
-        ----------
-        channels : Sequence[Channel]
-            Sequence of channel instances to register.
-        """
         self._channels = list(channels)
 
     @classmethod

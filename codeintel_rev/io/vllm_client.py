@@ -309,6 +309,9 @@ class VLLMClient:
     ----------
     config : VLLMSettings
         vLLM configuration including base URL, timeout, and model name.
+    transport_context : VLLMTransportContext | None, optional
+        Optional transport context for custom HTTP client configuration.
+        If None, uses default transport settings. Defaults to None.
 
     Examples
     --------
@@ -350,15 +353,6 @@ class VLLMClient:
         *,
         transport_context: VLLMTransportContext | None = None,
     ) -> None:
-        """Initialize VLLM client.
-
-        Parameters
-        ----------
-        config : VLLMSettings
-            VLLM configuration (model, host, port, etc.).
-        transport_context : VLLMTransportContext | None, optional
-            Optional transport context for HTTP client customization.
-        """
         self.config = config
         self._encoder = msgspec.json.Encoder()
         self._decoder = msgspec.json.Decoder(EmbeddingResponse)
@@ -697,17 +691,16 @@ class VLLMClient:
 
 
 class _StubVLLMClient:
-    """Minimal stand-in for :class:`VLLMClient` used in test environments."""
+    """Minimal stand-in for :class:`VLLMClient` used in test environments.
+
+    Parameters
+    ----------
+    config : VLLMSettings
+        VLLM configuration. Used to determine embedding dimensions
+        but not for actual network requests.
+    """
 
     def __init__(self, config: VLLMSettings) -> None:
-        """Initialize stub VLLM client for testing.
-
-        Parameters
-        ----------
-        config : VLLMSettings
-            VLLM configuration. Used to determine embedding dimensions
-            but not for actual network requests.
-        """
         self.config = config
 
     def _zeros(self, count: int) -> NDArrayF32:

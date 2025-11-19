@@ -176,11 +176,13 @@ class _StubSettings:
 def test_run_search_returns_structured_results(tmp_path: Path) -> None:
     """Test that run_search returns structured results with metadata and explainability."""
     catalog = _StubCatalog()
+    settings = _StubSettings()
     deps = SearchDependencies(
         faiss=_StubFaiss(),
         embedder=_StubEmbedder(dim=4),
         catalog=catalog,
-        settings=_StubSettings(),
+        settings=settings,
+        index=settings.index,
         session_id="sess",
         run_id="run",
         limits=[],

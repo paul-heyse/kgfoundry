@@ -182,7 +182,6 @@ def test_xtr_open_missing_artifacts(
     _prepare_repo(repo_root)
     missing_parent = repo_root / "missing"
     missing_parent.mkdir(parents=True, exist_ok=True)
-    missing_root = missing_parent / "xtr"
     context = xtr_cli_context_builder(
         app_config_loader=_app_config_loader(
             repo_root,

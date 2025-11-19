@@ -45,6 +45,18 @@ def _full_name(expr: cst.BaseExpression | None) -> str | None:
     return name if name is not None else getattr(expr, "value", None)
 
 
+def _assign_target_name(target: cst.BaseAssignTargetExpression | None) -> str | None:
+    if target is None:
+        return None
+    if isinstance(target, cst.Name):
+        return target.value
+    if isinstance(target, cst.Attribute):
+        full = get_full_name_for_node(target)
+        if full is not None:
+            return full
+    return None
+
+
 class ImportsVisitor(cst.CSTVisitor):
     """Collect import edges for graph construction and legacy metadata."""
 
@@ -53,33 +65,23 @@ class ImportsVisitor(cst.CSTVisitor):
         self.edges: list[ImportEdge] = []
         self.legacy_imports: list[LegacyImportRecord] = []
 
-    def on_visit(self, node: cst.CSTNode) -> bool:
-        """Dispatch to specialized handlers based on ``node`` type.
+    def visit_Import(self, node: cst.Import) -> None:  # noqa: N802
+        """Handle absolute import statements."""
+        self._handle_import(node)
 
-        Parameters
-        ----------
-        node : cst.CSTNode
-            The current CST node being visited.
-
-        Returns
-        -------
-        bool
-            Always returns True to continue traversal of the AST.
-        """
-        if isinstance(node, cst.Import):
-            self._handle_import(node)
-        elif isinstance(node, cst.ImportFrom):
-            self._handle_import_from(node)
-        return True
+    def visit_ImportFrom(self, node: cst.ImportFrom) -> None:  # noqa: N802
+        """Handle from-import statements."""
+        self._handle_import_from(node)
 
     def _handle_import(self, node: cst.Import) -> None:
         entry = _LegacyImportMutable(module=None, names=[], aliases={}, is_star=False, level=0)
         for alias in node.names:
-            name = _full_name(alias.name)
+            alias_node = cst.ensure_type(alias, cst.ImportAlias)
+            name = _full_name(alias_node.name)
             if not name:
                 continue
             entry.names.append(name)
-            alias_name = alias.asname.name.value if alias.asname is not None else None
+            alias_name = _assign_target_name(alias_node.asname.name) if alias_node.asname else None
             if alias_name:
                 entry.aliases[name] = alias_name
             self.edges.append(ImportEdge(self.module_name, name, alias_name, 0))
@@ -89,29 +91,32 @@ class ImportsVisitor(cst.CSTVisitor):
         level = len(node.relative or ())
         base = _full_name(node.module)
         entry = _LegacyImportMutable(module=base, names=[], aliases={}, is_star=False, level=level)
-        if node.names is None:
+        names = node.names
+        if names is None:
             return
-        for alias in node.names:
-            if isinstance(alias, cst.ImportStar):
-                entry.is_star = True
-                target = base or ""
-                if level == 0:
-                    resolved = target
-                else:
-                    resolved = _resolve_relative(self.module_name, level, target)
-                self.edges.append(ImportEdge(self.module_name, resolved, None, level))
-                continue
-            name = _full_name(alias.name)
+        if isinstance(names, cst.ImportStar):
+            entry.is_star = True
+            target = base or ""
+            resolved = target if level == 0 else _resolve_relative(self.module_name, level, target)
+            self.edges.append(ImportEdge(self.module_name, resolved, None, level))
+            self.legacy_imports.append(entry.to_record())
+            return
+        for alias in names:
+            alias_node = cst.ensure_type(alias, cst.ImportAlias)
+            name = _full_name(alias_node.name)
             if not name:
                 continue
             entry.names.append(name)
-            alias_name = alias.asname.name.value if alias.asname is not None else None
+            alias_name = (
+                _assign_target_name(alias_node.asname.name)
+                if alias_node.asname is not None
+                else None
+            )
             if alias_name:
                 entry.aliases[name] = alias_name
             target = ".".join(segment for segment in (base, name) if segment)
-            if level == 0:
-                resolved = target or name
-            else:
-                resolved = _resolve_relative(self.module_name, level, target)
+            resolved = (
+                target or name if level == 0 else _resolve_relative(self.module_name, level, target)
+            )
             self.edges.append(ImportEdge(self.module_name, resolved, alias_name, level))
         self.legacy_imports.append(entry.to_record())

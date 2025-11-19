@@ -13,7 +13,13 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from codeintel_rev.runtime.imports import gate_import
 
-__all__ = ["DuckConn", "DuckDBIngestContext", "ensure_schema", "ingest_modules_jsonl"]
+__all__ = [
+    "DuckConn",
+    "DuckDBConfig",
+    "DuckDBIngestContext",
+    "ensure_schema",
+    "ingest_modules_jsonl",
+]
 
 _USE_NATIVE_JSON = os.getenv("USE_DUCKDB_JSON", "1") not in {"0", "false", "False"}
 _DUCKDB_PRAGMAS = os.getenv("DUCKDB_PRAGMAS", "")
@@ -59,7 +65,15 @@ _INSERT_SQL = (
 _MODULE_COLUMN_NAMES: Sequence[str] = tuple(name for name, _ in _MODULE_COLUMNS)
 
 
-def _parse_pragmas(spec: str) -> tuple[tuple[str, object], ...]:
+@dataclass(frozen=True, slots=True)
+class PragmaSetting:
+    """Normalized DuckDB pragma entry."""
+
+    name: str
+    value: str
+
+
+def _parse_pragmas(spec: str) -> tuple[PragmaSetting, ...]:
     """Parse DuckDB pragma settings from a comma-separated string.
 
     Parameters
@@ -70,9 +84,9 @@ def _parse_pragmas(spec: str) -> tuple[tuple[str, object], ...]:
 
     Returns
     -------
-    tuple[tuple[str, str], ...]
-        Tuple of (key, literal_value) pairs where literal_value is either a numeric
-        string or a quoted string. Keys must match the pattern `^[A-Za-z_][A-Za-z0-9_]*$`.
+    tuple[PragmaSetting, ...]
+        Tuple of normalized pragma settings. Keys must match the pattern
+        `^[A-Za-z_][A-Za-z0-9_]*$`. Returns an empty tuple if spec is empty or invalid.
         Returns an empty tuple if spec is empty or no valid entries are found.
 
     Notes
@@ -81,7 +95,7 @@ def _parse_pragmas(spec: str) -> tuple[tuple[str, object], ...]:
     Non-numeric values are wrapped in single quotes. Invalid entries (missing "=",
     empty key/value, or invalid key pattern) are silently skipped.
     """
-    settings: list[tuple[str, str]] = []
+    settings: list[PragmaSetting] = []
     if not spec:
         return ()
     for entry in spec.split(","):
@@ -90,12 +104,7 @@ def _parse_pragmas(spec: str) -> tuple[tuple[str, object], ...]:
         key, value = (token.strip() for token in entry.split("=", 1))
         if not key or not value or not _PRAGMA_KEY_PATTERN.fullmatch(key):
             continue
-        literal: object
-        if value.replace(".", "", 1).isdigit():
-            literal = float(value) if "." in value else int(value)
-        else:
-            literal = value
-        settings.append((key, literal))
+        settings.append(PragmaSetting(name=key, value=value))
     return tuple(settings)
 
 
@@ -134,6 +143,28 @@ class _DuckDBModule(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class DuckDBConfig:
+    """DuckDB connection options."""
+
+    database: str
+    read_only: bool = False
+    pragmas: tuple[PragmaSetting, ...] = ()
+
+    def to_kwargs(self) -> dict[str, object]:
+        """Return keyword arguments compatible with ``duckdb.connect``.
+
+        Returns
+        -------
+        dict[str, object]
+            Mapping of connection options passed to ``duckdb.connect``.
+        """
+        options: dict[str, object] = {"database": self.database, "read_only": self.read_only}
+        if self.pragmas:
+            options["config"] = {setting.name: setting.value for setting in self.pragmas}
+        return options
+
+
 @dataclass(slots=True, frozen=True)
 class DuckConn:
     """Connection metadata for enrichment DuckDB ingestion.
@@ -158,14 +189,14 @@ class DuckDBIngestContext:
     use_native_json : bool, optional
         Whether to use DuckDB's native JSON functions. If False, uses
         string-based JSON handling. Defaults to True.
-    pragmas : tuple[tuple[str, object], ...], optional
-        Tuple of (pragma_name, value) pairs applied via DuckDB connection
-        configuration. Empty tuple means no pragmas are set. Defaults to empty tuple.
+    pragmas : tuple[PragmaSetting, ...], optional
+        Tuple of DuckDB pragma settings applied via connection configuration.
+        Empty tuple means no pragmas are set. Defaults to empty tuple.
     """
 
     duckdb_module: _DuckDBModule
     use_native_json: bool = True
-    pragmas: tuple[tuple[str, object], ...] = ()
+    pragmas: tuple[PragmaSetting, ...] = ()
 
     @classmethod
     def from_env(cls) -> DuckDBIngestContext:
@@ -210,13 +241,8 @@ def _connect(db_path: Path, ctx: DuckDBIngestContext) -> DuckDBConnection:
     DuckDBConnection
         Configured DuckDB connection with pragma settings applied.
     """
-    config: dict[str, object] | None = None
-    if ctx.pragmas:
-        config = dict(ctx.pragmas)
-    kwargs = {"database": str(db_path)}
-    if config:
-        kwargs["config"] = config
-    return ctx.duckdb_module.connect(**kwargs)
+    config = DuckDBConfig(str(db_path), pragmas=ctx.pragmas)
+    return ctx.duckdb_module.connect(**config.to_kwargs())
 
 
 def ensure_schema(conn: DuckConn, *, context: DuckDBIngestContext | None = None) -> None:

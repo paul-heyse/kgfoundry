@@ -146,13 +146,6 @@ class ReadinessProbe:
     """
 
     def __init__(self, context: ApplicationContext) -> None:
-        """Initialize readiness probe with application context.
-
-        Parameters
-        ----------
-        context : ApplicationContext
-            Application context containing configuration and paths for readiness checks.
-        """
         self._context = context
         self._lock = asyncio.Lock()
         self._last_checks: dict[str, CheckResult] = {}
@@ -433,7 +426,7 @@ class ReadinessProbe:
         if not file_result.healthy:
             return file_result
 
-        if not self._context.settings.index.duckdb_materialize:
+        if not self._context.app_config.index.duckdb_materialize:
             return file_result
 
         try:

@@ -243,6 +243,7 @@ async def search(
                 embedder=context.vllm_client,
                 catalog=catalog,
                 settings=context.settings,
+                index=context.app_config.index,
                 session_id=session_id,
                 run_id=None,
                 limits=limits,

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import libcst as cst
 from libcst import metadata as cst_metadata
+from libcst.helpers import get_full_name_for_node
+from libcst.metadata import CodeRange
 
 from codeintel_rev.enrich.types import DefinitionInfo, ExportItem
 
@@ -15,13 +17,25 @@ def _string_literals(expr: cst.BaseExpression) -> list[str]:
     if isinstance(expr, (cst.List, cst.Tuple, cst.Set)):
         values: list[str] = []
         for element in expr.elements:
-            literal = getattr(element, "value", None)
+            literal = element.value if isinstance(element, cst.Element) else None
             if isinstance(literal, cst.SimpleString):
                 evaluated = literal.evaluated_value
                 if isinstance(evaluated, str):
                     values.append(evaluated)
         return values
     return []
+
+
+def _assign_target_name(target: cst.BaseAssignTargetExpression | None) -> str | None:
+    if target is None:
+        return None
+    if isinstance(target, cst.Name):
+        return target.value
+    if isinstance(target, cst.Attribute):
+        full = get_full_name_for_node(target)
+        if full is not None:
+            return full
+    return None
 
 
 class ExportsVisitor(cst.CSTVisitor):
@@ -37,30 +51,21 @@ class ExportsVisitor(cst.CSTVisitor):
         self.function_nodes: list[cst.FunctionDef] = []
         self._scope_depth = 0
 
-    def on_visit(self, node: cst.CSTNode) -> bool:
-        """Dispatch to handlers for assignments, classes, and functions.
+    def visit_Assign(self, node: cst.Assign) -> None:  # noqa: N802
+        """Handle assignments to capture __all__ lists."""
+        self._handle_assign(node)
 
-        Parameters
-        ----------
-        node : cst.CSTNode
-            The current CST node being visited.
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:  # noqa: N802
+        """Handle function definitions for export tracking."""
+        self._handle_function(node)
 
-        Returns
-        -------
-        bool
-            Always returns True to continue traversal of the AST.
-        """
-        if isinstance(node, cst.Assign):
-            self._handle_assign(node)
-        elif isinstance(node, cst.FunctionDef):
-            self._handle_function(node)
-        elif isinstance(node, cst.ClassDef):
-            self._handle_class(node)
-        return True
+    def visit_ClassDef(self, node: cst.ClassDef) -> None:  # noqa: N802
+        """Handle class definitions for export tracking."""
+        self._handle_class(node)
 
-    def on_leave(self, node: cst.CSTNode) -> None:
+    def on_leave(self, original_node: cst.CSTNode) -> None:
         """Decrease scope depth when leaving classes or functions."""
-        if isinstance(node, (cst.FunctionDef, cst.ClassDef)):
+        if isinstance(original_node, (cst.FunctionDef, cst.ClassDef)):
             self._scope_depth = max(0, self._scope_depth - 1)
 
     def finalize_items(self) -> None:
@@ -82,7 +87,7 @@ class ExportsVisitor(cst.CSTVisitor):
         if self._scope_depth > 0:
             return
         for target in node.targets:
-            name = getattr(target.target, "value", None)
+            name = _assign_target_name(target.target)
             if name != "__all__":
                 continue
             values = _string_literals(node.value)
@@ -122,8 +127,12 @@ class ExportsVisitor(cst.CSTVisitor):
         kind: str,
         node: cst.CSTNode,
     ) -> None:
-        position = self.get_metadata(cst_metadata.PositionProvider, node, None)
-        lineno = position.start.line if position is not None else None
+        position = self.get_metadata(
+            cst_metadata.PositionProvider,
+            node,
+            CodeRange((0, 0), (0, 0)),
+        )
+        lineno = position.start.line
         self.definitions.append(
             DefinitionInfo(
                 module=self.module_name,

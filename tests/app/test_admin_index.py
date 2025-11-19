@@ -58,7 +58,7 @@ def test_admin_faiss_runtime_status_endpoint(tmp_path: Path) -> None:
     manager = MagicMock()
     manager.runtime = MagicMock()
     manager.runtime.get_runtime_tuning.return_value = {"active": {"nprobe": 32}}
-    manager.vec_dim = ctx.settings.index.vec_dim
+    manager.vec_dim = ctx.app_config.index.vec_dim
 
     ctx.seed_runtime_cells_for_tests(coderank_faiss=cast("FAISSManager", manager))
     app = build_test_app(ctx)

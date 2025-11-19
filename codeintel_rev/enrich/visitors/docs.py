@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import libcst as cst
+from libcst import Module
 
 from codeintel_rev.enrich.types import DocInfo
 
@@ -19,26 +20,17 @@ class DocVisitor(cst.CSTVisitor):
         self.functions_total = 0
         self.functions_with_doc = 0
 
-    def on_visit(self, node: cst.CSTNode) -> bool:
-        """Inspect nodes and update docstring statistics.
+    def visit_Module(self, node: cst.Module) -> None:  # noqa: N802
+        """Track module docstring metadata."""
+        self._record_module_doc(node)
 
-        Parameters
-        ----------
-        node : cst.CSTNode
-            The current CST node being visited.
+    def visit_ClassDef(self, node: cst.ClassDef) -> None:  # noqa: N802
+        """Track class docstring metadata."""
+        self._record_class_doc(node)
 
-        Returns
-        -------
-        bool
-            Always returns True to continue traversal of the AST.
-        """
-        if isinstance(node, cst.Module):
-            self._record_module_doc(node)
-        elif isinstance(node, cst.ClassDef):
-            self._record_class_doc(node)
-        elif isinstance(node, cst.FunctionDef):
-            self._record_function_doc(node)
-        return True
+    def visit_FunctionDef(self, node: cst.FunctionDef) -> None:  # noqa: N802
+        """Track function docstring metadata."""
+        self._record_function_doc(node)
 
     def build_info(self) -> DocInfo:
         """Return the aggregated docstring snapshot.
@@ -73,7 +65,7 @@ class DocVisitor(cst.CSTVisitor):
         self.functions_with_doc += int(bool(_safe_docstring(node)))
 
 
-def _safe_docstring(node: cst.CSTNode) -> str | None:
+def _safe_docstring(node: Module | cst.ClassDef | cst.FunctionDef) -> str | None:
     try:
         return node.get_docstring()
     except (ValueError, TypeError):  # pragma: no cover - defensive

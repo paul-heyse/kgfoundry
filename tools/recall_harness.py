@@ -15,8 +15,6 @@ from pathlib import Path
 
 from codeintel_rev.config import load_app_config
 from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.settings import Settings
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.io.bm25_engine import BM25Engine, BM25Rm3Config, PyseriniBM25Backend
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 
@@ -41,11 +39,6 @@ class BM25SweepPlan:
 @lru_cache(maxsize=1)
 def _cached_app_config() -> AppConfig:
     return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
-
-
-@lru_cache(maxsize=1)
-def _legacy_settings() -> Settings:
-    return settings_from_app_config(_cached_app_config())
 
 
 def _read_queries(path: Path) -> list[tuple[str, str]]:
@@ -201,13 +194,13 @@ def _build_engine(
     return BM25Engine(backend=backend)
 
 
-def _prepare_rm3_config(settings: Settings, rm3_mode: str) -> BM25Rm3Config:
+def _prepare_rm3_config(app_config: AppConfig, rm3_mode: str) -> BM25Rm3Config:
     """Return RM3 configuration based on settings and sweep mode.
 
     Parameters
     ----------
-    settings : Settings
-        Application settings containing BM25 and PRF configuration.
+    app_config : AppConfig
+        Application configuration containing BM25 and PRF settings.
     rm3_mode : str
         RM3 mode: "off", "on", or "auto".
 
@@ -216,8 +209,8 @@ def _prepare_rm3_config(settings: Settings, rm3_mode: str) -> BM25Rm3Config:
     BM25Rm3Config
         RM3 configuration capturing params, heuristics, and enablement flags.
     """
-    bm25_settings = settings.bm25
-    prf_settings = settings.index.prf
+    bm25_settings = app_config.bm25
+    prf_settings = app_config.index.prf
     rm3_params = RM3Params(
         fb_docs=bm25_settings.rm3_fb_docs,
         fb_terms=bm25_settings.rm3_fb_terms,
@@ -246,8 +239,8 @@ def _prepare_rm3_config(settings: Settings, rm3_mode: str) -> BM25Rm3Config:
 
 def sweep_bm25(plan: BM25SweepPlan) -> None:
     """Run the sweep described by ``plan`` and emit CSV + recall metrics."""
-    settings = _legacy_settings()
-    rm3_config = _prepare_rm3_config(settings, plan.rm3_mode)
+    app_config = _cached_app_config()
+    rm3_config = _prepare_rm3_config(app_config, plan.rm3_mode)
     max_k = max(plan.k_values)
     rows: list[dict[str, object]] = []
     for k1, b in plan.grid:

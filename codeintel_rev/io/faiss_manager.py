@@ -92,7 +92,19 @@ _IVFFLAT_BALANCE_DIVISOR = 39
 
 
 class _RuntimeFacade:
-    """Runtime tuning adapter exposed via :class:`FAISSManager.runtime`."""
+    """Runtime tuning adapter exposed via :class:`FAISSManager.runtime`.
+
+    Parameters
+    ----------
+    describe : Callable[[], dict[str, object]]
+        Function that returns current runtime tuning state and metadata.
+    apply : Callable[[dict[str, object]], dict[str, object]]
+        Function that applies runtime tuning parameters and returns updated state.
+    reset : Callable[[], dict[str, object]]
+        Function that resets runtime tuning to defaults and returns state.
+    set_params : Callable[[str], dict[str, object]]
+        Function that sets runtime parameters from a JSON string and returns state.
+    """
 
     def __init__(
         self,
@@ -102,19 +114,6 @@ class _RuntimeFacade:
         reset: Callable[[], dict[str, object]],
         set_params: Callable[[str], dict[str, object]],
     ) -> None:
-        """Initialize runtime facade with dependency injection callables.
-
-        Parameters
-        ----------
-        describe : Callable[[], dict[str, object]]
-            Function that returns current runtime tuning state and metadata.
-        apply : Callable[[dict[str, object]], dict[str, object]]
-            Function that applies runtime tuning parameters and returns updated state.
-        reset : Callable[[], dict[str, object]]
-            Function that resets runtime tuning to defaults and returns state.
-        set_params : Callable[[str], dict[str, object]]
-            Function that sets runtime parameters from a JSON string and returns state.
-        """
         self._describe = describe
         self._apply = apply
         self._reset = reset
@@ -198,7 +197,20 @@ class _RuntimeFacade:
 
 
 class FAISSManager:
-    """FAISS index manager with adaptive indexing and incremental updates."""
+    """FAISS index manager with adaptive indexing and incremental updates.
+
+    Parameters
+    ----------
+    index_path : Path
+        Path to CPU index file.
+    vec_dim : int, optional
+        Vector dimension. Defaults to 3584.
+    nlist : int, optional
+        Number of IVF centroids. Defaults to 8192.
+    runtime : FAISSRuntimeOptions | None, optional
+        Runtime configuration options. If None, uses default options.
+        Defaults to None.
+    """
 
     _PARAMETER_ALIASES: ClassVar[dict[str, str]] = {
         "nprobe": "nprobe",
@@ -221,7 +233,6 @@ class FAISSManager:
         *,
         runtime: FAISSRuntimeOptions | None = None,
     ) -> None:
-        """Initialize FAISS manager state and runtime configuration."""
         self.index_path = Path(index_path)
         self.vec_dim = vec_dim
         self.nlist = nlist
@@ -267,8 +278,8 @@ class FAISSManager:
         vectors : NDArrayF32
             Vector array to build the index from. Shape should be (n_vectors, vec_dim).
         family : str | None, optional
-            Index family identifier ("ivf", "hnsw", "adaptive"). None means use
-            "adaptive". Defaults to None.
+            Index family identifier ("flat", "ivfflat", "ivfpq", "adaptive").
+            None means use "adaptive". Defaults to None.
 
         Raises
         ------

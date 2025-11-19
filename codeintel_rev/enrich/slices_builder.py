@@ -152,8 +152,8 @@ def build_slice_record(module_row: Mapping[str, Any]) -> SliceRecord:
         "exports_resolved": module_row.get("exports_resolved"),
     }
     exports = export_names_from_meta(module_row)
-    imports = import_entries(module_row)
-    defs = definition_entries(module_row)
+    imports = [entry.to_dict() for entry in import_entries(module_row)]
+    defs = [entry.to_dict() for entry in definition_entries(module_row)]
     return SliceRecord(
         slice_id=slice_id,
         path=path,

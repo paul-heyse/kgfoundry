@@ -15,30 +15,25 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import readyz
 from codeintel_rev.app.runtime_readiness import CheckResult, ReadinessProbe
 from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, VLLMRunMode
-from codeintel_rev.config.utils import replace_settings, replace_struct
+from codeintel_rev.config.shim import settings_from_app_config
 from fastapi import FastAPI
 
 from tests._helpers import assertions
 from tests._helpers.http import build_test_app
 
 
-def _materialized_index_config(index: IndexConfig, *, enabled: bool) -> IndexConfig:
-    """Return a copy of IndexConfig with duckdb_materialize toggled.
-
-    Parameters
-    ----------
-    index : IndexConfig
-        Baseline index configuration to copy.
-    enabled : bool
-        Flag indicating whether duckdb materialization should be enabled.
+def _materialized_app_config(app_config: AppConfig, *, enabled: bool) -> AppConfig:
+    """Return AppConfig copy with duckdb materialization toggle applied.
 
     Returns
     -------
-    IndexConfig
-        New configuration with identical fields and updated duckdb_materialize flag.
+    AppConfig
+        Copy of the input AppConfig with duckdb materialization setting updated.
     """
-    return replace_struct(index, duckdb_materialize=enabled)
+    return dc_replace(
+        app_config,
+        index=dc_replace(app_config.index, duckdb_materialize=enabled),
+    )
 
 
 def _reset_duckdb_catalog(db_path: Path) -> None:
@@ -49,12 +44,22 @@ def _reset_duckdb_catalog(db_path: Path) -> None:
         pass
 
 
-def _context_with_settings(
+def _context_with_app_config(
     context: ApplicationContext,
-    settings: Settings,
-    app_config: AppConfig | None = None,
+    *,
+    app_config: AppConfig,
 ) -> ApplicationContext:
-    return context.with_overrides(settings=settings, app_config=app_config)
+    """Return a context clone with a new AppConfig.
+
+    Returns
+    -------
+    ApplicationContext
+        New application context with the specified AppConfig applied.
+    """
+    return context.with_overrides(
+        settings=settings_from_app_config(app_config),
+        app_config=app_config,
+    )
 
 
 def _http_vllm_app_config(context: ApplicationContext, base_url: str) -> AppConfig:
@@ -171,13 +176,17 @@ async def test_readiness_probe_materialize_reports_missing_table(
     mock_application_context: ApplicationContext,
 ) -> None:
     """Readiness should fail when materialization enabled but table missing."""
-    existing_settings = mock_application_context.settings
     _reset_duckdb_catalog(mock_application_context.paths.duckdb_path)
-    new_settings = replace_settings(
-        existing_settings,
-        index=_materialized_index_config(existing_settings.index, enabled=True),
+    new_app_config = _materialized_app_config(
+        mock_application_context.app_config,
+        enabled=True,
     )
-    probe = ReadinessProbe(_context_with_settings(mock_application_context, new_settings))
+    probe = ReadinessProbe(
+        _context_with_app_config(
+            mock_application_context,
+            app_config=new_app_config,
+        )
+    )
 
     results = await probe.refresh()
     duckdb_result = results["duckdb_catalog"]
@@ -195,13 +204,12 @@ async def test_readiness_probe_materialize_validates_index(
     mock_application_context: ApplicationContext,
 ) -> None:
     """Readiness passes when materialized table and index exist."""
-    existing_settings = mock_application_context.settings
     _reset_duckdb_catalog(mock_application_context.paths.duckdb_path)
-    new_settings = replace_settings(
-        existing_settings,
-        index=_materialized_index_config(existing_settings.index, enabled=True),
+    new_app_config = _materialized_app_config(
+        mock_application_context.app_config,
+        enabled=True,
     )
-    context = _context_with_settings(mock_application_context, new_settings)
+    context = _context_with_app_config(mock_application_context, app_config=new_app_config)
 
     with duckdb.connect(str(context.paths.duckdb_path)) as connection:
         connection.execute("DROP VIEW IF EXISTS chunks")
@@ -258,10 +266,8 @@ async def test_readiness_probe_vllm_unreachable(
 ) -> None:
     """Test ReadinessProbe when vLLM service is unreachable."""
     # Arrange
-    http_vllm = VLLMConfig(base_url="http://localhost:8001/v1", run=VLLMRunMode(mode="http"))
-    context = _context_with_settings(
+    context = _context_with_app_config(
         mock_application_context,
-        replace_settings(mock_application_context.settings, vllm=http_vllm),
         app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
     )
     probe = ReadinessProbe(context)
@@ -406,11 +412,8 @@ def test_readiness_probe_check_vllm_invalid_url(
 ) -> None:
     """Test _check_vllm_connection() with invalid URL."""
     # Arrange - create new settings with invalid URL
-    invalid_vllm = VLLMConfig(base_url="not-a-valid-url", run=VLLMRunMode(mode="http"))
-    new_settings = replace_settings(mock_application_context.settings, vllm=invalid_vllm)
-    context = _context_with_settings(
+    context = _context_with_app_config(
         mock_application_context,
-        new_settings,
         app_config=_http_vllm_app_config(mock_application_context, "not-a-valid-url"),
     )
     probe = ReadinessProbe(context)
@@ -428,11 +431,8 @@ def test_readiness_probe_check_vllm_invalid_url(
 def test_readiness_probe_check_vllm_success(mock_application_context: ApplicationContext) -> None:
     """Test _check_vllm_connection() with successful health check."""
     # Arrange - create new settings with valid URL
-    valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1", run=VLLMRunMode(mode="http"))
-    new_settings = replace_settings(mock_application_context.settings, vllm=valid_vllm)
-    context = _context_with_settings(
+    context = _context_with_app_config(
         mock_application_context,
-        new_settings,
         app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
     )
     probe = ReadinessProbe(context)
@@ -456,11 +456,8 @@ def test_readiness_probe_check_vllm_http_error(
 ) -> None:
     """Test _check_vllm_connection() with HTTP error."""
     # Arrange - create new settings with valid URL
-    valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1", run=VLLMRunMode(mode="http"))
-    new_settings = replace_settings(mock_application_context.settings, vllm=valid_vllm)
-    context = _context_with_settings(
+    context = _context_with_app_config(
         mock_application_context,
-        new_settings,
         app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
     )
     probe = ReadinessProbe(context)

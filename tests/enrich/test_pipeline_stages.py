@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from codeintel_rev.cli.enrich_pipeline import ScanInputs
@@ -61,8 +61,7 @@ def test_build_module_row_captures_docstring_and_types(
     assertions.expect_equal(record["docstring"], "Alpha.")
     assertions.expect_equal(record["type_error_count"], 3)
     assertions.expect_sequence_equal(edges, [])
-    meta = record["meta"]
-    assertions.expect_true(isinstance(meta, dict), reason="meta payload should be dict")
+    meta = cast("Mapping[str, Any]", record["meta"])
     assertions.expect_true(meta["docs"]["module_has_doc"])
     assertions.expect_in("imports", meta)
     assertions.expect_true(meta["metrics"]["defs_total"] >= 0)

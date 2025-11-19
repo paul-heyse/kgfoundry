@@ -101,10 +101,10 @@ def xtr_open(
 
     Parameters
     ----------
-    root : Path | None, optional
+    root : _RootOption, optional
         Override the configured XTR artifact directory. If None, uses the configured
         directory from app config. Defaults to None.
-    verbose : bool, optional
+    verbose : _VerboseOption, optional
         Pretty-print success payloads. Defaults to False.
 
     Raises

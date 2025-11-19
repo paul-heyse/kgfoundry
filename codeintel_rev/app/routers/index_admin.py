@@ -532,7 +532,7 @@ async def faiss_runtime_status(
     Time complexity: O(1) for tuning state retrieval.
     """
     ctx = _context(request)
-    manager = ctx.get_coderank_faiss_manager(ctx.settings.index.vec_dim)
+    manager = ctx.get_coderank_faiss_manager(ctx.app_config.index.vec_dim)
     return JSONResponse(manager.runtime.get_runtime_tuning())
 
 
@@ -602,7 +602,7 @@ async def faiss_runtime_tuning_endpoint(
         tuning = await _persist_session_tuning(ctx, session_id, payload)
         return JSONResponse({"session_id": session_id, "faiss_tuning": tuning})
 
-    manager = ctx.get_coderank_faiss_manager(ctx.settings.index.vec_dim)
+    manager = ctx.get_coderank_faiss_manager(ctx.app_config.index.vec_dim)
     try:
         result = manager.runtime.apply_runtime_tuning(
             nprobe=body.get("nprobe"),
@@ -661,7 +661,7 @@ async def faiss_runtime_reset_endpoint(
             updated.pop("faiss_tuning", None)
             await ctx.scope_store.set(session_id, updated)
         return JSONResponse({"session_id": session_id, "faiss_tuning": None})
-    manager = ctx.get_coderank_faiss_manager(ctx.settings.index.vec_dim)
+    manager = ctx.get_coderank_faiss_manager(ctx.app_config.index.vec_dim)
     return JSONResponse(manager.runtime.reset_runtime_tuning())
 
 

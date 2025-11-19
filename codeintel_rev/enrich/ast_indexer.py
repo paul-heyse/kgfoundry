@@ -617,7 +617,11 @@ def _table_from_rows(rows: Sequence[RowType], schema: pa.Schema) -> pa.Table:
 
 
 class _MetricsVisitor(ast.NodeVisitor):
-    """Collects aggregate counts for AST metrics."""
+    """Collects aggregate counts for AST metrics.
+
+    Creates a new visitor instance with all metric counters initialized to zero.
+    Counters are incremented during AST traversal via visit methods.
+    """
 
     BRANCH_NODES = (
         ast.If,
@@ -630,11 +634,6 @@ class _MetricsVisitor(ast.NodeVisitor):
     )
 
     def __init__(self) -> None:
-        """Initialize metrics visitor with zero counters.
-
-        Creates a new visitor instance with all metric counters initialized to zero.
-        Counters are incremented during AST traversal via visit methods.
-        """
         self.func_count = 0
         self.class_count = 0
         self.assign_count = 0

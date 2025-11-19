@@ -165,7 +165,7 @@ def normalize_global_cli_args(argv: Sequence[str]) -> list[str]:
 
     Parameters
     ----------
-    argv :
+    argv : Sequence[str]
         Raw argv forwarded by Typer.
 
     Returns
@@ -247,7 +247,7 @@ def ensure_state(ctx: typer.Context) -> CLIContextState:
 
     Parameters
     ----------
-    ctx :
+    ctx : typer.Context
         Typer context carrying the shared object slot.
 
     Returns
@@ -267,7 +267,7 @@ def execute_pipeline(state: CLIContextState) -> PipelineResult:
 
     Parameters
     ----------
-    state :
+    state : CLIContextState
         Shared CLI state carrying pipeline options.
 
     Returns
@@ -283,7 +283,7 @@ def handle_stage_error(exc: StageError) -> NoReturn:
 
     Parameters
     ----------
-    exc :
+    exc : StageError
         Exception raised by the pipeline orchestration.
 
     Raises

@@ -33,7 +33,6 @@ from codeintel_rev.config.api import (
 from codeintel_rev.config.api import (
     PathsConfig as ApiPathsConfig,
 )
-from codeintel_rev.config.settings import Settings
 from codeintel_rev.embeddings import EmbeddingProvider
 from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
@@ -77,7 +76,7 @@ def _indexctl_context() -> IndexctlCliContext:
     """
     base = IndexctlCliContext.production()
 
-    def _provider_factory(_settings: Settings) -> EmbeddingProvider:
+    def _provider_factory(_settings: object) -> EmbeddingProvider:
         return cast("EmbeddingProvider", _StubProvider())
 
     return replace(base, embedding_provider_factory=_provider_factory)

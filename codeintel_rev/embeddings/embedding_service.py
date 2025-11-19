@@ -168,16 +168,15 @@ class _ExecutorJob:
 
 
 class _FailureCounter:
-    """Increment error counters when an exception bubbles out of a context."""
+    """Increment error counters when an exception bubbles out of a context.
+
+    Parameters
+    ----------
+    provider_name : str
+        Name of the provider being tracked.
+    """
 
     def __init__(self, provider_name: str) -> None:
-        """Initialize failure counter for a provider.
-
-        Parameters
-        ----------
-        provider_name : str
-            Name of the provider being tracked.
-        """
         self._provider_name = provider_name
 
     def __enter__(self) -> Self:
@@ -193,16 +192,15 @@ class _FailureCounter:
 
 
 class _BatchResultHandler:
-    """Resolve futures when a fused batch completes or fails."""
+    """Resolve futures when a fused batch completes or fails.
+
+    Parameters
+    ----------
+    jobs : Sequence[_ExecutorJob]
+        Sequence of executor jobs to handle results for.
+    """
 
     def __init__(self, jobs: Sequence[_ExecutorJob]) -> None:
-        """Initialize batch result handler with executor jobs.
-
-        Parameters
-        ----------
-        jobs : Sequence[_ExecutorJob]
-            Sequence of executor jobs to handle results for.
-        """
         self._jobs = list(jobs)
 
     def __enter__(self) -> Self:
@@ -260,7 +258,24 @@ class _QueueSentinel:
 
 
 class _BoundedBatchExecutor:
-    """Opportunistically coalesces pending embedding jobs into micro-batches."""
+    """Opportunistically coalesces pending embedding jobs into micro-batches.
+
+    Parameters
+    ----------
+    micro_batch : int
+        Target batch size for coalesced embeddings.
+    max_pending : int
+        Maximum number of pending jobs in queue.
+    max_wait_ms : int
+        Maximum wait time in milliseconds before emitting a partial batch.
+    emit : Callable[[Sequence[str]], NDArrayF32]
+        Function to call with coalesced text batches.
+
+    Raises
+    ------
+    EmbeddingConfigError
+        If micro_batch is not positive.
+    """
 
     _SENTINEL = _QueueSentinel()
 
@@ -272,24 +287,6 @@ class _BoundedBatchExecutor:
         max_wait_ms: int,
         emit: Callable[[Sequence[str]], NDArrayF32],
     ) -> None:
-        """Initialize bounded batch executor for embedding coalescing.
-
-        Parameters
-        ----------
-        micro_batch : int
-            Target batch size for coalesced embeddings.
-        max_pending : int
-            Maximum number of pending jobs in queue.
-        max_wait_ms : int
-            Maximum wait time in milliseconds before emitting a partial batch.
-        emit : Callable[[Sequence[str]], NDArrayF32]
-            Function to call with coalesced text batches.
-
-        Raises
-        ------
-        EmbeddingConfigError
-            If micro_batch is not positive.
-        """
         if micro_batch <= 0:
             msg = "micro_batch must be positive"
             raise EmbeddingConfigError(msg)
@@ -465,7 +462,19 @@ class _ProviderState:
 
 
 class _ProviderBase(EmbeddingProvider):
-    """Shared batching/metrics logic used by concrete providers."""
+    """Shared batching/metrics logic used by concrete providers.
+
+    Parameters
+    ----------
+    provider_name : str
+        Name identifier for this provider (e.g., "vllm", "hf").
+    config : EmbeddingsSettings
+        Embedding service configuration.
+    vec_dim : int
+        Embedding vector dimension derived from the index configuration.
+    device_label : str
+        Device identifier (e.g., "cuda", "cpu").
+    """
 
     def __init__(
         self,
@@ -475,19 +484,6 @@ class _ProviderBase(EmbeddingProvider):
         vec_dim: int,
         device_label: str,
     ) -> None:
-        """Initialize base provider with shared batching and metrics.
-
-        Parameters
-        ----------
-        provider_name : str
-            Name identifier for this provider (e.g., "vllm", "hf").
-        config : EmbeddingsSettings
-            Embedding service configuration.
-        vec_dim : int
-            Embedding vector dimension derived from the index configuration.
-        device_label : str
-            Device identifier (e.g., "cuda", "cpu").
-        """
         self._state = _ProviderState(
             config=config,
             vec_dim=vec_dim,
@@ -815,7 +811,17 @@ class _ProviderBase(EmbeddingProvider):
 
 
 class VLLMProvider(_ProviderBase):
-    """Embedding provider backed by the in-process vLLM engine."""
+    """Embedding provider backed by the in-process vLLM engine.
+
+    Parameters
+    ----------
+    embeddings : EmbeddingsSettings
+        Embedding service configuration.
+    vec_dim : int
+        Embedding vector dimension derived from the index configuration.
+    vllm_config : VLLMSettings
+        vLLM-specific configuration (model, host, port, etc.).
+    """
 
     def __init__(
         self,
@@ -824,17 +830,6 @@ class VLLMProvider(_ProviderBase):
         vec_dim: int,
         vllm_config: VLLMSettings,
     ) -> None:
-        """Initialize vLLM embedding provider.
-
-        Parameters
-        ----------
-        embeddings : EmbeddingsSettings
-            Embedding service configuration.
-        vec_dim : int
-            Embedding vector dimension derived from the index configuration.
-        vllm_config : VLLMSettings
-            vLLM-specific configuration (model, host, port, etc.).
-        """
         super().__init__(
             provider_name="vllm",
             config=embeddings,
@@ -957,23 +952,22 @@ def get_embedding_provider(
 
 
 class HFEmbeddingProvider(_ProviderBase):
-    """Hugging Face transformers fallback provider."""
+    """Hugging Face transformers fallback provider.
+
+    Parameters
+    ----------
+    embeddings : EmbeddingsSettings
+        Embedding service configuration.
+    vec_dim : int
+        Embedding vector dimension derived from the index configuration.
+
+    Raises
+    ------
+    EmbeddingRuntimeError
+        If a CUDA device is requested but unavailable.
+    """
 
     def __init__(self, *, embeddings: EmbeddingsSettings, vec_dim: int) -> None:
-        """Initialize Hugging Face transformers embedding provider.
-
-        Parameters
-        ----------
-        embeddings : EmbeddingsSettings
-            Embedding service configuration.
-        vec_dim : int
-            Embedding vector dimension derived from the index configuration.
-
-        Raises
-        ------
-        EmbeddingRuntimeError
-            If a CUDA device is requested but unavailable.
-        """
         torch_mod = cast("Any", gate_import("torch", "Hugging Face embedding provider"))
         transformers_mod = cast(
             "Any", gate_import("transformers", "Hugging Face embedding provider")
@@ -987,7 +981,9 @@ class HFEmbeddingProvider(_ProviderBase):
             msg = "CUDA device requested but torch.cuda.is_unavailable()"
             raise EmbeddingRuntimeError(msg)
         self._device = torch_mod.device(device)
-        super().__init__(provider_name="hf", config=embeddings, vec_dim=vec_dim, device_label=device)
+        super().__init__(
+            provider_name="hf", config=embeddings, vec_dim=vec_dim, device_label=device
+        )
         self._tokenizer = transformers_mod.AutoTokenizer.from_pretrained(
             embeddings.model_name,
             trust_remote_code=True,

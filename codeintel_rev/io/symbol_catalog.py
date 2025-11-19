@@ -97,16 +97,15 @@ class SymbolOccurrenceRow:
 
 
 class SymbolCatalog:
-    """Writer for symbol metadata tables alongside `chunks`."""
+    """Writer for symbol metadata tables alongside `chunks`.
+
+    Parameters
+    ----------
+    manager : DuckDBManager
+        DuckDB manager for database connections.
+    """
 
     def __init__(self, manager: DuckDBManager) -> None:
-        """Initialize symbol catalog.
-
-        Parameters
-        ----------
-        manager : DuckDBManager
-            DuckDB manager for database connections.
-        """
         self._manager = manager
 
     def ensure_schema(self) -> None:

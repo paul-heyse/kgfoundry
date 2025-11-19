@@ -66,9 +66,7 @@ def report_completeness(repo_root: Path, modules_jsonl: Path) -> CompletenessRep
                 unresolved_locals.append((module, edge.dst_module, "dangling_local_import"))
                 impacts.setdefault(module, _downstream_impact(edges, module))
 
-    missing_inits = sorted(
-        str(path.relative_to(repo_root)) for path in _missing_inits(repo_root)
-    )
+    missing_inits = sorted(str(path.relative_to(repo_root)) for path in _missing_inits(repo_root))
 
     return CompletenessReport(
         missing_modules=missing_modules,

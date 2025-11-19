@@ -357,7 +357,9 @@ def scan_modules(
             row_dict, edges = build_module_row(fp, ctx.root, scan_inputs)
             ModuleRecordModel.model_validate(row_dict)
             if not row_dict.get("meta"):
-                LOGGER.warning("Module record missing meta payload", extra={"path": row_dict.get("path")})
+                LOGGER.warning(
+                    "Module record missing meta payload", extra={"path": row_dict.get("path")}
+                )
             module_rows.append(row_dict)
             symbol_edges.extend(edges)
         meta["modules"] = len(module_rows)

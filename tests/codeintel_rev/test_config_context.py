@@ -9,11 +9,12 @@ import duckdb
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext, resolve_application_paths
 from codeintel_rev.config.paths import ResolvedPaths
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 
 from kgfoundry_common.errors import ConfigurationError
 from tests._helpers import assertions
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_app_config_for_repo
 
 
 def _noop_load_cpu_index(*_: object, **__: object) -> None:
@@ -41,10 +42,10 @@ def test_resolve_application_paths_success(tmp_path: Path) -> None:
     repo_root.mkdir()
     (repo_root / "data").mkdir()
 
-    settings = build_settings_for_repo(repo_root)
+    app_config = build_app_config_for_repo(repo_root)
 
     # Act
-    paths = resolve_application_paths(settings)
+    paths = resolve_application_paths(app_config)
 
     # Assert
     assertions.expect_equal(paths.repo_root, repo_root.resolve())
@@ -57,9 +58,9 @@ def test_resolve_application_paths_success(tmp_path: Path) -> None:
 
 def test_resolve_application_paths_missing_repo_root() -> None:
     """Missing repo roots are tolerated during pure resolution."""
-    settings = build_settings_for_repo(Path("/nonexistent/path"))
+    app_config = build_app_config_for_repo(Path("/nonexistent/path"))
 
-    paths = resolve_application_paths(settings)
+    paths = resolve_application_paths(app_config)
 
     assertions.expect_equal(paths.repo_root, Path("/nonexistent/path").resolve())
 
@@ -69,9 +70,9 @@ def test_resolve_application_paths_not_directory(tmp_path: Path) -> None:
     repo_file = tmp_path / "not_a_dir"
     repo_file.touch()
 
-    settings = build_settings_for_repo(repo_file)
+    app_config = build_app_config_for_repo(repo_file)
 
-    paths = resolve_application_paths(settings)
+    paths = resolve_application_paths(app_config)
 
     assertions.expect_equal(paths.repo_root, repo_file.resolve())
 
@@ -83,10 +84,10 @@ def test_resolve_application_paths_relative_conversion(tmp_path: Path) -> None:
     repo_root.mkdir()
     (repo_root / "data").mkdir()
 
-    settings = build_settings_for_repo(repo_root)
+    app_config = build_app_config_for_repo(repo_root)
 
     # Act
-    paths = resolve_application_paths(settings)
+    paths = resolve_application_paths(app_config)
 
     # Assert
     assertions.expect_true(paths.faiss_index.is_absolute())
@@ -107,10 +108,11 @@ def test_application_context_create(tmp_path: Path) -> None:
     (repo_root / "data" / "faiss" / "code.ivfpq.faiss").touch()
     (repo_root / "data" / "catalog.duckdb").touch()
 
-    settings = build_settings_for_repo(repo_root)
+    app_config = build_app_config_for_repo(repo_root)
+    settings = settings_from_app_config(app_config)
 
     # Act
-    context = ApplicationContext.create(settings=settings)
+    context = ApplicationContext.create(settings=settings, app_config=app_config)
     context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Assert
@@ -124,11 +126,14 @@ def test_application_context_create(tmp_path: Path) -> None:
 def test_application_context_create_invalid_config() -> None:
     """Test that ApplicationContext.create() raises ConfigurationError for invalid config."""
     # Arrange
-    settings = build_settings_for_repo(Path("/nonexistent/path"))
+    app_config = build_app_config_for_repo(Path("/nonexistent/path"))
 
     # Act & Assert
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
-        ApplicationContext.create(settings=settings)
+        ApplicationContext.create(
+            settings=settings_from_app_config(app_config),
+            app_config=app_config,
+        )
 
 
 def test_application_context_ensure_faiss_ready(
@@ -146,9 +151,10 @@ def test_application_context_ensure_faiss_ready(
     faiss_index.touch()
     (repo_root / "data" / "catalog.duckdb").touch()
 
-    settings = build_settings_for_repo(repo_root)
+    app_config = build_app_config_for_repo(repo_root)
+    settings = settings_from_app_config(app_config)
 
-    context = ApplicationContext.create(settings=settings)
+    context = ApplicationContext.create(settings=settings, app_config=app_config)
     context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Act - ensure_faiss_ready should handle missing index gracefully
@@ -176,9 +182,10 @@ def test_application_context_ensure_faiss_ready_cached(
     faiss_index.touch()
     (repo_root / "data" / "catalog.duckdb").touch()
 
-    settings = build_settings_for_repo(repo_root)
+    app_config = build_app_config_for_repo(repo_root)
+    settings = settings_from_app_config(app_config)
 
-    context = ApplicationContext.create(settings=settings)
+    context = ApplicationContext.create(settings=settings, app_config=app_config)
     context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Act - call twice
@@ -205,8 +212,9 @@ def test_application_context_open_catalog(tmp_path: Path) -> None:
     conn = duckdb.connect(str(duckdb_path))
     conn.close()
 
-    settings = build_settings_for_repo(repo_root)
-    context = ApplicationContext.create(settings=settings)
+    app_config = build_app_config_for_repo(repo_root)
+    settings = settings_from_app_config(app_config)
+    context = ApplicationContext.create(settings=settings, app_config=app_config)
 
     # Act
     with context.open_catalog() as catalog:
@@ -231,9 +239,10 @@ def test_build_factory_adjuster_from_settings(
     faiss_dir.mkdir(exist_ok=True)
     (faiss_dir / "code.ivfpq.faiss").touch()
     (data_dir / "catalog.duckdb").touch()
-    settings = build_settings_for_repo(repo_root)
-    context = ApplicationContext.create(settings=settings)
+    app_config = build_app_config_for_repo(repo_root)
+    settings = settings_from_app_config(app_config)
+    context = ApplicationContext.create(settings=settings, app_config=app_config)
     assertions.expect_true(isinstance(context.factory_adjuster, DefaultFactoryAdjuster))
-    expected = getattr(context.settings.index, "faiss_nprobe", None)
+    expected = getattr(context.app_config.index, "faiss_nprobe", None)
     adjuster = cast("DefaultFactoryAdjuster", context.factory_adjuster)
     assertions.expect_equal(adjuster.faiss_nprobe, expected)

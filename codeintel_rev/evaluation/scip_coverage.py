@@ -75,7 +75,21 @@ class CoverageSummary(TypedDict):
 
 
 class SCIPCoverageEvaluator:
-    """Evaluate chunk/index/retrieval coverage across SCIP function definitions."""
+    """Evaluate chunk/index/retrieval coverage across SCIP function definitions.
+
+    Parameters
+    ----------
+    repo_root : str | Path
+        Repository root directory path.
+    duckdb_manager : DuckDBManager
+        DuckDB manager for catalog queries.
+    faiss_manager : SupportsFaissSearch
+        FAISS manager for vector search.
+    vllm_client : SupportsEmbedSingle
+        VLLM client for query embedding.
+    default_output_dir : Path | str
+        Directory used when ``run`` is invoked without an explicit output path.
+    """
 
     def __init__(
         self,
@@ -86,21 +100,6 @@ class SCIPCoverageEvaluator:
         vllm_client: SupportsEmbedSingle,
         default_output_dir: Path | str,
     ) -> None:
-        """Initialize SCIP coverage evaluator.
-
-        Parameters
-        ----------
-        repo_root : str | Path
-            Repository root directory path.
-        duckdb_manager : DuckDBManager
-            DuckDB manager for catalog queries.
-        faiss_manager : SupportsFaissSearch
-            FAISS manager for vector search.
-        vllm_client : SupportsEmbedSingle
-            VLLM client for query embedding.
-        default_output_dir : Path | str
-            Directory used when ``run`` is invoked without an explicit output path.
-        """
         self._repo_root = Path(repo_root)
         self._duckdb = duckdb_manager
         self._faiss = faiss_manager

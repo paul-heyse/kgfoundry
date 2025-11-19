@@ -230,7 +230,6 @@ class SemanticProHooks:
             """
 
             def __init__(self) -> None:
-                """Initialize the no-op reranker adapter."""
                 self._inner = NoopReranker()
 
             def rerank(

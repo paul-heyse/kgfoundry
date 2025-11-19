@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace as dc_replace
 from pathlib import Path
 from typing import Any
 
-import msgspec
 from codeintel_rev.config.api import (
     CONFIG_API_VERSION,
     AppConfig,
@@ -27,7 +27,9 @@ from codeintel_rev.config.api import (
     PathsConfig as ApiPathsConfig,
 )
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.config.shim import settings_from_app_config
+
+SettingsType = Any
 
 DEFAULT_XTR_SETTINGS = XTRSettings(
     model_id="nomic-ai/CodeRankEmbed",
@@ -44,19 +46,16 @@ DEFAULT_XTR_SETTINGS = XTRSettings(
 def build_settings_for_repo(
     repo_root: Path,
     *,
-    paths_overrides: Mapping[str, Any] | None = None,
     bm25_overrides: Mapping[str, Any] | None = None,
     splade_overrides: Mapping[str, Any] | None = None,
     index_overrides: Mapping[str, Any] | None = None,
-) -> Settings:
+) -> SettingsType:
     """Return Settings configured to point at ``repo_root``.
 
     Parameters
     ----------
     repo_root : Path
         Synthetic repository root used for the test scenario.
-    paths_overrides : Mapping[str, Any] | None, optional
-        Optional dictionary overriding computed defaults for the ``paths`` section.
     bm25_overrides : Mapping[str, Any] | None, optional
         Optional overrides applied to the BM25 settings subsection.
     splade_overrides : Mapping[str, Any] | None, optional
@@ -70,52 +69,13 @@ def build_settings_for_repo(
     Settings
         New Settings instance whose paths/bm25/splade configs reference ``repo_root``.
     """
-    base = load_settings()
-    repo_root = repo_root.resolve()
-    data_dir = repo_root / "data"
-    default_paths = {
-        "repo_root": str(repo_root),
-        "data_dir": str(data_dir),
-        "vectors_dir": str(data_dir / "vectors"),
-        "faiss_index": str(data_dir / "faiss" / "code.ivfpq.faiss"),
-        "faiss_idmap_path": str(data_dir / "faiss" / "faiss_idmap.parquet"),
-        "lucene_dir": str(repo_root / "indexes"),
-        "duckdb_path": str(data_dir / "catalog.duckdb"),
-        "scip_index": str(repo_root / "index.scip"),
-        "splade_dir": str(repo_root / "indexes" / "splade"),
-        "coderank_vectors_dir": str(data_dir / "coderank_vectors"),
-        "coderank_faiss_index": str(data_dir / "faiss" / "coderank.ivfpq.faiss"),
-        "warp_index_dir": str(repo_root / "indexes" / "warp_xtr"),
-        "xtr_dir": str(data_dir / "xtr"),
-    }
-    if paths_overrides:
-        default_paths.update(paths_overrides)
-    paths = msgspec.structs.replace(base.paths, **default_paths)
-
-    default_bm25 = {
-        "corpus_json_dir": str(data_dir / "bm25_json"),
-        "index_dir": str(repo_root / "indexes" / "bm25"),
-    }
-    if bm25_overrides:
-        default_bm25.update(bm25_overrides)
-    bm25 = msgspec.structs.replace(base.bm25, **default_bm25)
-
-    default_splade = {
-        "model_dir": str(repo_root / "models" / "splade-v3"),
-        "onnx_dir": str(repo_root / "models" / "splade-v3" / "onnx"),
-        "onnx_file": "model_qint8.onnx",
-        "vectors_dir": str(data_dir / "splade_vectors"),
-        "index_dir": str(repo_root / "indexes" / "splade_v3_impact"),
-    }
-    if splade_overrides:
-        default_splade.update(splade_overrides)
-    splade = msgspec.structs.replace(base.splade, **default_splade)
-
-    index_cfg = base.index
-    if index_overrides:
-        index_cfg = msgspec.structs.replace(index_cfg, **index_overrides)
-
-    return msgspec.structs.replace(base, paths=paths, bm25=bm25, splade=splade, index=index_cfg)
+    app_config = build_app_config_for_repo(
+        repo_root,
+        bm25_overrides=bm25_overrides,
+        splade_overrides=splade_overrides,
+        index_overrides=index_overrides,
+    )
+    return settings_from_app_config(app_config)
 
 
 def build_app_config_from_paths(paths: ResolvedPaths) -> AppConfig:
@@ -182,6 +142,77 @@ def build_app_config_from_paths(paths: ResolvedPaths) -> AppConfig:
     )
 
 
+def build_app_config_for_repo(
+    repo_root: Path,
+    *,
+    bm25_overrides: Mapping[str, Any] | None = None,
+    splade_overrides: Mapping[str, Any] | None = None,
+    index_overrides: Mapping[str, Any] | None = None,
+) -> AppConfig:
+    """Return AppConfig configured to point at ``repo_root``.
+
+    Returns
+    -------
+    AppConfig
+        Application configuration with paths and settings configured for the
+        specified repository root.
+    """
+    repo_root = repo_root.resolve()
+    data_dir = repo_root / "data"
+    paths_cfg = ApiPathsConfig(
+        repo_root=repo_root,
+        data_dir=data_dir,
+        cache_dir=repo_root / ".cache",
+        logs_dir=repo_root / "logs",
+    )
+    duck_cfg = ApiDuckDBSettings(database=data_dir / "catalog.duckdb")
+    faiss_cfg = FAISSSettings(index_path=data_dir / "faiss" / "code.ivfpq.faiss")
+    bm25_cfg = BM25Settings(
+        corpus_json_dir=data_dir / "bm25_json",
+        index_dir=repo_root / "indexes" / "bm25",
+    )
+    if bm25_overrides:
+        bm25_cfg = dc_replace(bm25_cfg, **bm25_overrides)
+    splade_cfg = SpladeSettings(
+        model_id="naver/splade-v3",
+        model_dir=repo_root / "models" / "splade-v3",
+        onnx_dir=repo_root / "models" / "splade-v3" / "onnx",
+        onnx_file="model_qint8.onnx",
+        vectors_dir=data_dir / "splade_vectors",
+        index_dir=repo_root / "indexes" / "splade_v3_impact",
+        provider="CPUExecutionProvider",
+        quantization=100,
+        max_terms=3000,
+        max_clause_count=4096,
+        batch_size=32,
+        threads=8,
+        enabled=True,
+        max_query_terms=64,
+        prune_below=0.0,
+        analyzer="wordpiece",
+        static_prune_pct=0.0,
+    )
+    if splade_overrides:
+        splade_cfg = dc_replace(splade_cfg, **splade_overrides)
+    index_cfg = IndexSettings()
+    if index_overrides:
+        index_cfg = dc_replace(index_cfg, **index_overrides)
+    return AppConfig(
+        version=CONFIG_API_VERSION,
+        paths=paths_cfg,
+        duckdb=duck_cfg,
+        faiss=faiss_cfg,
+        bm25=bm25_cfg,
+        splade=splade_cfg,
+        xtr=DEFAULT_XTR_SETTINGS,
+        index=index_cfg,
+        embeddings=EmbeddingsSettings(),
+        vllm=VLLMSettings(),
+        search=SearchSettings(),
+        logging=LoggingSettings(),
+    )
+
+
 def scaffold_repo_root(repo_root: Path) -> None:
     """Create the minimum filesystem layout expected by readiness checks.
 
@@ -208,6 +239,7 @@ def scaffold_repo_root(repo_root: Path) -> None:
 
 __all__ = [
     "DEFAULT_XTR_SETTINGS",
+    "build_app_config_for_repo",
     "build_app_config_from_paths",
     "build_settings_for_repo",
     "scaffold_repo_root",

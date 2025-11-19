@@ -75,7 +75,7 @@ def verify() -> None:
     index.open()
     if not index.ready:
         typer.echo(
-        f"XTR artifacts missing or unreadable at {paths.xtr_dir}.",
+            f"XTR artifacts missing or unreadable at {paths.xtr_dir}.",
             err=True,
         )
         raise typer.Exit(code=1)

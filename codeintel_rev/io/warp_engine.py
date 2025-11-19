@@ -36,23 +36,22 @@ class WarpUnavailableError(RuntimeError):
 
 
 class WarpEngine:
-    """Encapsulates interactions with the optional ``xtr-warp`` executor."""
+    """Encapsulates interactions with the optional ``xtr-warp`` executor.
+
+    Parameters
+    ----------
+    index_dir : Path
+        Path to WARP index directory.
+    device : str
+        Device to run WARP executor on (e.g., "cuda", "cpu").
+
+    Raises
+    ------
+    WarpUnavailableError
+        If the WARP index directory does not exist.
+    """
 
     def __init__(self, *, index_dir: Path, device: str) -> None:
-        """Initialize WARP engine.
-
-        Parameters
-        ----------
-        index_dir : Path
-            Path to WARP index directory.
-        device : str
-            Device to run WARP executor on (e.g., "cuda", "cpu").
-
-        Raises
-        ------
-        WarpUnavailableError
-            If the WARP index directory does not exist.
-        """
         self.index_dir = Path(index_dir)
         if not self.index_dir.exists():
             msg = f"WARP index directory not found: {self.index_dir}"

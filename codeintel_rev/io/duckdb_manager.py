@@ -109,21 +109,20 @@ class DuckDBManagerContext:
 
 
 class _InstrumentedDuckDBConnection:
-    """Proxy connection that instruments DuckDB execute calls."""
+    """Proxy connection that instruments DuckDB execute calls.
+
+    Parameters
+    ----------
+    conn : duckdb.DuckDBPyConnection
+        Underlying DuckDB connection to wrap and instrument.
+    config : DuckDBConfig
+        Configuration for instrumentation behavior, including logging
+        and query tracking settings.
+    """
 
     __slots__ = ("_config", "_conn")
 
     def __init__(self, conn: duckdb.DuckDBPyConnection, config: DuckDBConfig) -> None:
-        """Initialize instrumented DuckDB connection wrapper.
-
-        Parameters
-        ----------
-        conn : duckdb.DuckDBPyConnection
-            Underlying DuckDB connection to wrap and instrument.
-        config : DuckDBConfig
-            Configuration for instrumentation behavior, including logging
-            and query tracking settings.
-        """
         self._conn = conn
         self._config = config
 
@@ -218,17 +217,6 @@ class DuckDBManager:
         *,
         context: DuckDBManagerContext | None = None,
     ) -> None:
-        """Initialize DuckDB manager.
-
-        Parameters
-        ----------
-        db_path : Path
-            Path to DuckDB database file.
-        config : DuckDBConfig | None, optional
-            DuckDB configuration. If None, uses default config.
-        context : DuckDBManagerContext | None, optional
-            Dependency overrides for connection creation. If None, uses production context.
-        """
         self._db_path = db_path
         self._config = config or DuckDBConfig()
         self._context = context or DuckDBManagerContext.production()

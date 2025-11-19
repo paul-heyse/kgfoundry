@@ -132,6 +132,13 @@ class CodeRankEmbedder:
     This wrapper enforces the instruction prefix required by the CodeRankEmbed
     model card and caches the loaded ``SentenceTransformer`` per ``(model_id,
     device)`` tuple to avoid repeated initialization overhead.
+
+    Parameters
+    ----------
+    settings : SupportsCodeRankSettings
+        Settings containing model ID, device, and embedding configuration.
+    context : CodeRankEmbedderContext | None, optional
+        Optional context for dependency injection. If None, uses production context.
     """
 
     _MODEL_CACHE: ClassVar[dict[tuple[str, str], SentenceEncoderProtocol]] = {}
@@ -143,15 +150,6 @@ class CodeRankEmbedder:
         settings: SupportsCodeRankSettings,
         context: CodeRankEmbedderContext | None = None,
     ) -> None:
-        """Initialize CodeRank embedder.
-
-        Parameters
-        ----------
-        settings : SupportsCodeRankSettings
-            Settings containing model ID, device, and embedding configuration.
-        context : CodeRankEmbedderContext | None, optional
-            Optional context for dependency injection. If None, uses production context.
-        """
         self.model_id = settings.model_id
         self.device = settings.device
         self.trust_remote_code = settings.trust_remote_code

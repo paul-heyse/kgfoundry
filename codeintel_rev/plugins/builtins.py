@@ -102,6 +102,11 @@ class _BM25Channel(Channel):
     lazily initializes the provider on first search call and handles provider
     errors gracefully.
 
+    Parameters
+    ----------
+    context : ChannelContext
+        Channel context containing app config, paths, and settings.
+
     Attributes
     ----------
     name
@@ -117,16 +122,8 @@ class _BM25Channel(Channel):
     requires = frozenset({"warp_index_present", "lucene_importable"})
 
     def __init__(self, context: ChannelContext) -> None:
-        """Initialize BM25 channel with application context.
-
-        Parameters
-        ----------
-        context : ChannelContext
-            Channel context containing app config, paths, and settings.
-        """
         self._app_config = context.app_config
         self._paths = context.paths
-        self._legacy_settings = context.settings
         self._engine: BM25Engine | None = None
         self._provider_error: str | None = None
         self._skip_reason: str | None = None
@@ -217,7 +214,7 @@ class _BM25Channel(Channel):
                 return self._engine
             try:
                 bm25_settings = self._app_config.bm25
-                prf_settings = self._legacy_settings.index.prf
+                prf_settings = self._app_config.index.prf
                 rm3_params = RM3Params(
                     fb_docs=bm25_settings.rm3_fb_docs,
                     fb_terms=bm25_settings.rm3_fb_terms,
@@ -269,6 +266,11 @@ class _SpladeChannel(Channel):
     sparse retrieval efficiency. The channel lazily initializes the provider
     on first search call and handles provider errors gracefully.
 
+    Parameters
+    ----------
+    context : ChannelContext
+        Channel context containing app config, paths, and settings.
+
     Attributes
     ----------
     name
@@ -285,13 +287,6 @@ class _SpladeChannel(Channel):
     requires = frozenset({"lucene_importable", "onnxruntime_importable"})
 
     def __init__(self, context: ChannelContext) -> None:
-        """Initialize SPLADE channel with application context.
-
-        Parameters
-        ----------
-        context : ChannelContext
-            Channel context containing app config, paths, and settings.
-        """
         self._config = context.app_config.splade
         self._paths = context.paths
         self._engine: SPLADEEngine | None = None

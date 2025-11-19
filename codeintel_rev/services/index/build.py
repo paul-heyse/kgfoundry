@@ -10,10 +10,11 @@ from codeintel_rev.services.index.plan import (
     IndexBuildConfig,
     IndexPaths,
     StepName,
+    StepRegistry,
     StepRunner,
 )
 
-DEFAULT_STEPS: list[StepName] = [
+DEFAULT_STEPS: tuple[StepName, ...] = (
     "scan_shards",
     "sample_training",
     "train_primary",
@@ -24,7 +25,7 @@ DEFAULT_STEPS: list[StepName] = [
     "export_idmap",
     "register_duckdb",
     "materialize_join",
-]
+)
 
 
 def runner() -> StepRunner:
@@ -37,18 +38,20 @@ def runner() -> StepRunner:
         implementations, mapping step names to their corresponding step functions.
     """
     return StepRunner(
-        {
-            "scan_shards": idx_steps.step_scan_shards,
-            "sample_training": idx_steps.step_sample_training,
-            "train_primary": idx_steps.step_train_primary,
-            "add_all_vectors": idx_steps.step_add_all_vectors,
-            "persist_primary": idx_steps.step_persist_primary,
-            "build_secondary": idx_steps.step_build_secondary,
-            "persist_secondary": idx_steps.step_persist_secondary,
-            "export_idmap": idx_steps.step_export_idmap,
-            "register_duckdb": idx_steps.step_register_duckdb,
-            "materialize_join": idx_steps.step_materialize_join,
-        }
+        StepRegistry(
+            {
+                "scan_shards": idx_steps.step_scan_shards,
+                "sample_training": idx_steps.step_sample_training,
+                "train_primary": idx_steps.step_train_primary,
+                "add_all_vectors": idx_steps.step_add_all_vectors,
+                "persist_primary": idx_steps.step_persist_primary,
+                "build_secondary": idx_steps.step_build_secondary,
+                "persist_secondary": idx_steps.step_persist_secondary,
+                "export_idmap": idx_steps.step_export_idmap,
+                "register_duckdb": idx_steps.step_register_duckdb,
+                "materialize_join": idx_steps.step_materialize_join,
+            }
+        )
     )
 
 
@@ -56,7 +59,7 @@ def run_index_build(
     paths: IndexPaths,
     cfg: IndexBuildConfig,
     *,
-    steps: Iterable[StepName] | None = None,
+    steps: Iterable[StepName | str] | None = None,
 ) -> BuildState:
     """Execute the index build plan.
 
@@ -78,5 +81,8 @@ def run_index_build(
         Final build state containing trained indexes, shard paths, row counts,
         and all intermediate artifacts produced during the build pipeline.
     """
-    plan_steps = list(steps) if steps is not None else DEFAULT_STEPS
-    return runner().run(plan_steps, paths=paths, cfg=cfg)
+    step_runner = runner()
+    plan_steps: tuple[StepName, ...] = (
+        DEFAULT_STEPS if steps is None else step_runner.registry.validate_steps(steps)
+    )
+    return step_runner.run(plan_steps, paths=paths, cfg=cfg)

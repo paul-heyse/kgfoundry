@@ -242,7 +242,17 @@ class BM25BuildContext:
 
 
 class BM25IndexManager:
-    """Manage BM25 corpus preparation and Lucene index builds."""
+    """Manage BM25 corpus preparation and Lucene index builds.
+
+    Parameters
+    ----------
+    app_config : AppConfig
+        Immutable application configuration containing BM25 settings.
+    logger_ : logging.Logger | None, optional
+        Custom logger instance. If None, uses module logger.
+    build_context : BM25BuildContext | None, optional
+        Build context for index construction. If None, uses production context.
+    """
 
     def __init__(
         self,
@@ -251,17 +261,6 @@ class BM25IndexManager:
         logger_: logging.Logger | None = None,
         build_context: BM25BuildContext | None = None,
     ) -> None:
-        """Initialize BM25 index manager.
-
-        Parameters
-        ----------
-        app_config : AppConfig
-            Immutable application configuration containing BM25 settings.
-        logger_ : logging.Logger | None, optional
-            Custom logger instance. If None, uses module logger.
-        build_context : BM25BuildContext | None, optional
-            Build context for index construction. If None, uses production context.
-        """
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(app_config.paths.repo_root).expanduser().resolve()
         self._config = app_config.bm25
@@ -713,18 +712,17 @@ class BM25Hit:
 
 
 class BM25QueryEngine:
-    """Thin BM25 query surface backed by Pyserini searchers."""
+    """Thin BM25 query surface backed by Pyserini searchers.
+
+    Parameters
+    ----------
+    index_dir : Path
+        Path to the Lucene BM25 index directory.
+    analyzer : str | None, optional
+        Optional analyzer name for query processing.
+    """
 
     def __init__(self, index_dir: Path, *, analyzer: str | None = None) -> None:
-        """Initialize BM25 query engine.
-
-        Parameters
-        ----------
-        index_dir : Path
-            Path to the Lucene BM25 index directory.
-        analyzer : str | None, optional
-            Optional analyzer name for query processing.
-        """
         self._index_dir = Path(index_dir).resolve()
         self._analyzer = analyzer
         self._searcher: _LuceneSearcher | None = None

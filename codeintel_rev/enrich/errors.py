@@ -79,7 +79,19 @@ class StageError(Exception):
 
 
 class DiscoveryError(StageError):
-    """Raised when repository discovery/globbing fails."""
+    """Raised when repository discovery/globbing fails.
+
+    Parameters
+    ----------
+    reason : str
+        Human-readable error reason.
+    path : str | None, optional
+        File or directory path where error occurred.
+    detail : str | None, optional
+        Additional error details.
+    data : Mapping[str, Any] | None, optional
+        Additional structured error data.
+    """
 
     def __init__(
         self,
@@ -89,24 +101,23 @@ class DiscoveryError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize discovery error.
-
-        Parameters
-        ----------
-        reason : str
-            Human-readable error reason.
-        path : str | None, optional
-            File or directory path where error occurred.
-        detail : str | None, optional
-            Additional error details.
-        data : Mapping[str, Any] | None, optional
-            Additional structured error data.
-        """
         super().__init__("discover", reason, path=path, detail=detail, data=data or {})
 
 
 class IngestError(StageError):
-    """Raised when ingestion of SCIP/FS artifacts fails."""
+    """Raised when ingestion of SCIP/FS artifacts fails.
+
+    Parameters
+    ----------
+    reason : str
+        Human-readable error reason.
+    path : str | None, optional
+        File path where ingestion failed.
+    detail : str | None, optional
+        Additional error details.
+    data : Mapping[str, Any] | None, optional
+        Additional structured error data.
+    """
 
     def __init__(
         self,
@@ -116,24 +127,23 @@ class IngestError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize ingest error.
-
-        Parameters
-        ----------
-        reason : str
-            Human-readable error reason.
-        path : str | None, optional
-            File path where ingestion failed.
-        detail : str | None, optional
-            Additional error details.
-        data : Mapping[str, Any] | None, optional
-            Additional structured error data.
-        """
         super().__init__("ingest", reason, path=path, detail=detail, data=data or {})
 
 
 class IndexingError(StageError):
-    """Raised when LibCST/Tree-sitter indexing fails for a module."""
+    """Raised when LibCST/Tree-sitter indexing fails for a module.
+
+    Parameters
+    ----------
+    reason : str
+        Human-readable error reason.
+    path : str | None, optional
+        File path where indexing failed.
+    detail : str | None, optional
+        Additional error details.
+    data : Mapping[str, Any] | None, optional
+        Additional structured error data.
+    """
 
     def __init__(
         self,
@@ -143,24 +153,23 @@ class IndexingError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize indexing error.
-
-        Parameters
-        ----------
-        reason : str
-            Human-readable error reason.
-        path : str | None, optional
-            File path where indexing failed.
-        detail : str | None, optional
-            Additional error details.
-        data : Mapping[str, Any] | None, optional
-            Additional structured error data.
-        """
         super().__init__("index", reason, path=path, detail=detail, data=data or {})
 
 
 class TypeSignalError(StageError):
-    """Raised when collecting type checker summaries fails."""
+    """Raised when collecting type checker summaries fails.
+
+    Parameters
+    ----------
+    reason : str
+        Human-readable error reason.
+    path : str | None, optional
+        File path where type signal collection failed.
+    detail : str | None, optional
+        Additional error details.
+    data : Mapping[str, Any] | None, optional
+        Additional structured error data.
+    """
 
     def __init__(
         self,
@@ -170,24 +179,23 @@ class TypeSignalError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize type signal error.
-
-        Parameters
-        ----------
-        reason : str
-            Human-readable error reason.
-        path : str | None, optional
-            File path where type signal collection failed.
-        detail : str | None, optional
-            Additional error details.
-        data : Mapping[str, Any] | None, optional
-            Additional structured error data.
-        """
         super().__init__("type-signals", reason, path=path, detail=detail, data=data or {})
 
 
 class TaggingError(StageError):
-    """Raised when tagging rules fail to evaluate."""
+    """Raised when tagging rules fail to evaluate.
+
+    Parameters
+    ----------
+    reason : str
+        Human-readable error reason.
+    path : str | None, optional
+        File path where tagging failed.
+    detail : str | None, optional
+        Additional error details.
+    data : Mapping[str, Any] | None, optional
+        Additional structured error data.
+    """
 
     def __init__(
         self,
@@ -197,24 +205,23 @@ class TaggingError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize tagging error.
-
-        Parameters
-        ----------
-        reason : str
-            Human-readable error reason.
-        path : str | None, optional
-            File path where tagging failed.
-        detail : str | None, optional
-            Additional error details.
-        data : Mapping[str, Any] | None, optional
-            Additional structured error data.
-        """
         super().__init__("tagging", reason, path=path, detail=detail, data=data or {})
 
 
 class AnalyticsError(StageError):
-    """Raised when analytics or derived metrics fail to compute."""
+    """Raised when analytics or derived metrics fail to compute.
+
+    Parameters
+    ----------
+    reason : str
+        Human-readable error reason.
+    path : str | None, optional
+        File path where analytics computation failed.
+    detail : str | None, optional
+        Additional error details.
+    data : Mapping[str, Any] | None, optional
+        Additional structured error data.
+    """
 
     def __init__(
         self,
@@ -224,24 +231,23 @@ class AnalyticsError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize analytics error.
-
-        Parameters
-        ----------
-        reason : str
-            Human-readable error reason.
-        path : str | None, optional
-            File path where analytics computation failed.
-        detail : str | None, optional
-            Additional error details.
-        data : Mapping[str, Any] | None, optional
-            Additional structured error data.
-        """
         super().__init__("analytics", reason, path=path, detail=detail, data=data or {})
 
 
 class OutputError(StageError):
-    """Raised when serializing enrichment outputs fails."""
+    """Raised when serializing enrichment outputs fails.
+
+    Parameters
+    ----------
+    reason : str
+        Human-readable error reason.
+    path : str | None, optional
+        Output file path where serialization failed.
+    detail : str | None, optional
+        Additional error details.
+    data : Mapping[str, Any] | None, optional
+        Additional structured error data.
+    """
 
     def __init__(
         self,
@@ -251,17 +257,4 @@ class OutputError(StageError):
         detail: str | None = None,
         data: Mapping[str, Any] | None = None,
     ) -> None:
-        """Initialize output error.
-
-        Parameters
-        ----------
-        reason : str
-            Human-readable error reason.
-        path : str | None, optional
-            Output file path where serialization failed.
-        detail : str | None, optional
-            Additional error details.
-        data : Mapping[str, Any] | None, optional
-            Additional structured error data.
-        """
         super().__init__("write", reason, path=path, detail=detail, data=data or {})

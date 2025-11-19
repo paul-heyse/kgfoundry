@@ -10,6 +10,7 @@ from pathlib import Path
 
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext, ApplicationContextOverrides
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.mcp_server.server import (
     app_context as mcp_context,
 )
@@ -20,7 +21,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
-from tests._helpers.settings import build_settings_for_repo, scaffold_repo_root
+from tests._helpers.settings import build_app_config_for_repo, scaffold_repo_root
 
 
 def build_test_context(
@@ -45,8 +46,13 @@ def build_test_context(
     """
     repo_root = Path(repo_root)
     scaffold_repo_root(repo_root)
-    settings = build_settings_for_repo(repo_root)
-    return ApplicationContext.create(settings=settings, overrides=context_overrides)
+    app_config = build_app_config_for_repo(repo_root)
+    settings = settings_from_app_config(app_config)
+    return ApplicationContext.create(
+        settings=settings,
+        app_config=app_config,
+        overrides=context_overrides,
+    )
 
 
 def build_test_app(

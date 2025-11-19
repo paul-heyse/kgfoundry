@@ -107,7 +107,17 @@ def _softmax_norm(scores: Sequence[float]) -> list[float]:
 
 
 class HybridPoolEvaluator:
-    """Blend multi-channel hits with configurable normalization and weights."""
+    """Blend multi-channel hits with configurable normalization and weights.
+
+    Parameters
+    ----------
+    weights : Mapping[str, float]
+        Channel name to weight mapping for score blending.
+    norm : str, optional
+        Normalization method: "minmax" or "softmax" (default: "minmax").
+    sim_threshold : float, optional
+        Minimum similarity threshold for hits (default: 0.0).
+    """
 
     def __init__(
         self,
@@ -116,17 +126,6 @@ class HybridPoolEvaluator:
         norm: str = "minmax",
         sim_threshold: float = 0.0,
     ) -> None:
-        """Initialize hybrid pool evaluator with normalization and weights.
-
-        Parameters
-        ----------
-        weights : Mapping[str, float]
-            Channel name to weight mapping for score blending.
-        norm : str, optional
-            Normalization method: "minmax" or "softmax" (default: "minmax").
-        sim_threshold : float, optional
-            Minimum similarity threshold for hits (default: 0.0).
-        """
         self._weights = {k: max(0.0, float(v)) for k, v in weights.items()}
         self._norm_fn = _softmax_norm if norm == "softmax" else _minmax_norm
         self._sim_threshold = sim_threshold

@@ -10,18 +10,15 @@ from __future__ import annotations
 import os
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from unittest.mock import MagicMock
 
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.config.shim import settings_from_app_config
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 
 from tests._helpers.settings import build_app_config_from_paths
-
-if TYPE_CHECKING:
-    from codeintel_rev.config.settings import Settings
-
 
 _REAL_DATA_ENV = os.getenv("KGFOUNDRY_TEST_USE_REAL_DATA")
 if _REAL_DATA_ENV is None:
@@ -29,6 +26,19 @@ if _REAL_DATA_ENV is None:
 else:
     _USE_REAL_DATA = _REAL_DATA_ENV.strip().lower() not in {"0", "false", "no"}
 _REPO_ROOT_OVERRIDE = os.getenv("KGFOUNDRY_TEST_REPO_ROOT")
+
+
+def _duckdb_catalog_factory_stub(
+    *_: object,
+) -> DuckDBCatalog:
+    """Return a stub DuckDB catalog for tests.
+
+    Returns
+    -------
+    DuckDBCatalog
+        Mock DuckDB catalog instance for testing.
+    """
+    return cast("DuckDBCatalog", MagicMock(spec=DuckDBCatalog))
 
 
 def _real_paths(repo_root: Path) -> ResolvedPaths:
@@ -240,16 +250,15 @@ def build_application_context(
     )
     xtr_cfg = replace(app_config.xtr, enable=xtr_enabled)
     app_config = replace(app_config, bm25=bm25_cfg, splade=splade_cfg, xtr=xtr_cfg)
-    typed_settings = cast("Settings", settings_from_app_config(app_config))
-
     return ApplicationContext(
         app_config=app_config,
-        settings=typed_settings,
+        settings=settings_from_app_config(app_config),
         paths=paths,
         vllm_client=MagicMock(),
         faiss_manager=MagicMock(),
         scope_store=MagicMock(),
         duckdb_manager=MagicMock(),
+        duckdb_catalog_factory=_duckdb_catalog_factory_stub,
         git_client=MagicMock(),
         async_git_client=MagicMock(),
     )

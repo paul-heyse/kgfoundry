@@ -342,7 +342,7 @@ async def _preload_faiss_if_configured(context: ApplicationContext) -> None:
         Application context containing FAISS manager and settings. The function
         checks settings.index.faiss_preload to determine if preloading should occur.
     """
-    if not context.settings.index.faiss_preload:
+    if not context.app_config.index.faiss_preload:
         return
     preload_success = await asyncio.to_thread(_preload_faiss_index, context)
     if not preload_success:

@@ -11,19 +11,25 @@ __all__ = ["XTRReranker"]
 
 
 class XTRReranker(Reranker):
-    """Rerank hits using the XTR MaxSim scorer."""
+    """Rerank hits using the XTR MaxSim scorer.
+
+    Parameters
+    ----------
+    index : XTRIndex
+        XTR index for MaxSim scoring.
+
+    Attributes
+    ----------
+    name : str
+        Reranker name identifier ("xtr").
+    requires : frozenset[str]
+        Set of capability requirements: "xtr_index_present", "torch_importable".
+    """
 
     name = "xtr"
     requires = frozenset({"xtr_index_present", "torch_importable"})
 
     def __init__(self, index: XTRIndex) -> None:
-        """Initialize XTR reranker.
-
-        Parameters
-        ----------
-        index : XTRIndex
-            XTR index for MaxSim scoring.
-        """
         self._index = index
 
     def rescore(self, request: RerankRequest) -> Sequence[RerankResult]:

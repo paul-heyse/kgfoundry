@@ -224,8 +224,6 @@ def step_sample_training(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig
     ----------
     state : BuildState
         Build state to update with sample row count.
-    _ : IndexPaths
-        Index paths (unused in this step).
     cfg : IndexBuildConfig
         Build configuration specifying sample size and column names.
 
@@ -253,8 +251,6 @@ def step_train_primary(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig) 
     ----------
     state : BuildState
         Build state to update with trained primary index.
-    _ : IndexPaths
-        Index paths (unused in this step).
     cfg : IndexBuildConfig
         Build configuration specifying vector dimensions and sample size.
 
@@ -279,6 +275,13 @@ def step_train_primary(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig) 
 
 def step_add_all_vectors(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig) -> None:
     """Add every vector from every shard to the trained index.
+
+    Parameters
+    ----------
+    state : BuildState
+        Build state containing shards and primary index to update.
+    cfg : IndexBuildConfig
+        Build configuration specifying batch size and column names.
 
     Raises
     ------
@@ -305,6 +308,13 @@ def step_add_all_vectors(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig
 def step_persist_primary(state: BuildState, paths: IndexPaths, _: IndexBuildConfig) -> None:
     """Serialize the trained primary FAISS index.
 
+    Parameters
+    ----------
+    state : BuildState
+        Build state containing the primary index to persist.
+    paths : IndexPaths
+        Index paths configuration specifying output file location.
+
     Raises
     ------
     RuntimeError
@@ -325,6 +335,13 @@ def step_build_secondary(state: BuildState, _: IndexPaths, cfg: IndexBuildConfig
 def step_persist_secondary(state: BuildState, paths: IndexPaths, _: IndexBuildConfig) -> None:
     """Persist the secondary index as ``.secondary`` artifact.
 
+    Parameters
+    ----------
+    state : BuildState
+        Build state containing the secondary index to persist.
+    paths : IndexPaths
+        Index paths configuration specifying output file location.
+
     Raises
     ------
     RuntimeError
@@ -338,7 +355,14 @@ def step_persist_secondary(state: BuildState, paths: IndexPaths, _: IndexBuildCo
 
 
 def step_export_idmap(state: BuildState, paths: IndexPaths, _: IndexBuildConfig) -> None:
-    """Export ``{faiss_row -> external_id}`` Parquet sidecar.
+    """Export FAISS ID map to Parquet file.
+
+    Parameters
+    ----------
+    state : BuildState
+        Build state containing the ID map to export.
+    paths : IndexPaths
+        Index paths configuration specifying output file location.
 
     Raises
     ------

@@ -320,7 +320,15 @@ class _ChunkAccumulator:
 
 
 class _ChunkBuilder:
-    """Mutable helper that performs chunk assembly for a fixed configuration."""
+    """Mutable helper that performs chunk assembly for a fixed configuration.
+
+    Parameters
+    ----------
+    config : _ChunkAccumulator
+        Immutable accumulator configuration containing file URI, text content,
+        encoded bytes, line index, character budget, and language. The builder
+        uses this configuration to create chunks with consistent settings.
+    """
 
     __slots__ = (
         "_chunks",
@@ -331,15 +339,6 @@ class _ChunkBuilder:
     )
 
     def __init__(self, config: _ChunkAccumulator) -> None:
-        """Initialize chunk builder with accumulator configuration.
-
-        Parameters
-        ----------
-        config : _ChunkAccumulator
-            Immutable accumulator configuration containing file URI, text content,
-            encoded bytes, line index, character budget, and language. The builder
-            uses this configuration to create chunks with consistent settings.
-        """
         self._config = config
         self._chunks: list[Chunk] = []
         self._current_start_char: int | None = None

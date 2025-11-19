@@ -708,26 +708,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         options: DuckDBCatalogOptions | None = None,
         **legacy_kwargs: Unpack[_LegacyOptions],
     ) -> None:
-        """Initialize DuckDB catalog.
-
-        Parameters
-        ----------
-        db_path : Path
-            Path to DuckDB database file.
-        vectors_dir : Path
-            Directory containing Parquet files with chunk embeddings.
-        options : DuckDBCatalogOptions | None, optional
-            Configuration options dataclass. Cannot be mixed with legacy_kwargs.
-        **legacy_kwargs : Unpack[_LegacyOptions]
-            Legacy keyword arguments for backward compatibility.
-
-        Raises
-        ------
-        ValueError
-            If both options and legacy_kwargs are provided.
-        TypeError
-            If legacy_kwargs contains unsupported keyword arguments.
-        """
         if options is not None and legacy_kwargs:
             msg = "Cannot mix DuckDBCatalog options dataclass with keyword overrides."
             raise ValueError(msg)

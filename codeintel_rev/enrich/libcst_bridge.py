@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import libcst as cst
+from libcst import MaybeSentinel
 
 from codeintel_rev.enrich.aggregators.metrics import (
     finalize_annotation_ratio,
@@ -268,26 +269,44 @@ def _count_annotated_defs(functions: list[cst.FunctionDef]) -> tuple[int, int]:
 
 
 def _function_is_annotated(node: cst.FunctionDef) -> bool:
-    params = [
-        *node.params.posonly_params,
-        *node.params.params,
-        *(node.params.kwonly_params or []),
-    ]
-    if node.params.star_arg is not None:
-        params.append(node.params.star_arg)
-    if node.params.star_kwarg is not None:
-        params.append(node.params.star_kwarg)
+    params = _collect_params(node.params)
     annotated_params = 0
     total_params = 0
     for param in params:
-        name = getattr(param.name, "value", "")
+        name = param.name.value
         if name in {"self", "cls"}:
             continue
         total_params += 1
-        if getattr(param, "annotation", None) is not None:
+        if param.annotation is not None:
             annotated_params += 1
     params_ok = total_params == annotated_params if total_params else True
     return params_ok and node.returns is not None
+
+
+def _collect_params(params: cst.Parameters) -> list[cst.Param]:
+    collected: list[cst.Param] = [
+        *params.posonly_params,
+        *params.params,
+        *params.kwonly_params,
+    ]
+    star_arg = _extract_param(params.star_arg)
+    if star_arg is not None:
+        collected.append(star_arg)
+    star_kwarg = _extract_param(params.star_kwarg)
+    if star_kwarg is not None:
+        collected.append(star_kwarg)
+    return collected
+
+
+def _extract_param(candidate: object) -> cst.Param | None:
+    if candidate is None or candidate is MaybeSentinel.DEFAULT:
+        return None
+    if isinstance(candidate, cst.Param):
+        return candidate
+    param_attr = getattr(candidate, "param", None)
+    if isinstance(param_attr, cst.Param):
+        return param_attr
+    return None
 
 
 def _has_top_level_side_effects(module: cst.Module) -> bool:

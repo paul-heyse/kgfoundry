@@ -41,7 +41,21 @@ class EvalQuery:
 
 
 class OfflineRecallEvaluator:
-    """Compute recall@K for FAISS retrieval using curated or synthesized queries."""
+    """Compute recall@K for FAISS retrieval using curated or synthesized queries.
+
+    Parameters
+    ----------
+    eval_settings : EvalSettings
+        Evaluation configuration.
+    repo_root : str | Path
+        Repository root used to resolve relative output paths.
+    faiss_manager : FAISSManager
+        FAISS manager for vector search.
+    vllm_client : VLLMClient
+        VLLM client for query embedding.
+    duckdb_manager : DuckDBManager
+        DuckDB manager for catalog access.
+    """
 
     def __init__(
         self,
@@ -52,21 +66,6 @@ class OfflineRecallEvaluator:
         vllm_client: VLLMClient,
         duckdb_manager: DuckDBManager,
     ) -> None:
-        """Initialize offline recall evaluator.
-
-        Parameters
-        ----------
-        eval_settings : EvalSettings
-            Evaluation configuration.
-        repo_root : str | Path
-            Repository root used to resolve relative output paths.
-        faiss_manager : FAISSManager
-            FAISS manager for vector search.
-        vllm_client : VLLMClient
-            VLLM client for query embedding.
-        duckdb_manager : DuckDBManager
-            DuckDB manager for catalog access.
-        """
         self._eval_settings = eval_settings
         self._repo_root = Path(repo_root)
         self._faiss = faiss_manager

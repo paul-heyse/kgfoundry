@@ -8,21 +8,20 @@ from codeintel_rev.runtime.imports import gate_import
 
 
 class LazyModule:
-    """Proxy object that imports a module only when accessed."""
+    """Proxy object that imports a module only when accessed.
+
+    Parameters
+    ----------
+    module_name : str
+        Name of the module to import lazily (e.g., "numpy", "fastapi").
+    purpose : str
+        Human-readable description of why this module is needed, used in
+        error messages if import fails.
+    """
 
     __slots__ = ("_module", "_module_name", "_purpose")
 
     def __init__(self, module_name: str, purpose: str) -> None:
-        """Initialize a lazy module proxy.
-
-        Parameters
-        ----------
-        module_name : str
-            Name of the module to import lazily (e.g., "numpy", "fastapi").
-        purpose : str
-            Human-readable description of why this module is needed, used in
-            error messages if import fails.
-        """
         self._module_name = module_name
         self._purpose = purpose
         self._module: ModuleType | None = None
@@ -40,6 +39,18 @@ class LazyModule:
         return self._module
 
     def __getattr__(self, name: str) -> object:
+        """Return attribute from the proxied module.
+
+        Parameters
+        ----------
+        name : str
+            Attribute name to retrieve from the proxied module.
+
+        Returns
+        -------
+        object
+            Attribute value from the proxied module.
+        """
         return getattr(self.module(), name)
 
     def __setattr__(self, name: str, value: object) -> None:

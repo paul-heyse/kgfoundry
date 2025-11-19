@@ -10,24 +10,9 @@ import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.app.scope_store import ScopeStore
-from codeintel_rev.config.paths import resolve_application_paths
-from codeintel_rev.config.settings import (
-    BM25Config,
-    CodeRankConfig,
-    CodeRankLLMConfig,
-    EmbeddingsConfig,
-    EvalConfig,
-    IndexConfig,
-    PathsConfig,
-    RedisConfig,
-    RerankConfig,
-    ServerLimits,
-    Settings,
-    SpladeConfig,
-    VLLMConfig,
-    WarpConfig,
-    XTRConfig,
-)
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
+from codeintel_rev.config.shim import settings_from_app_config
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
@@ -37,7 +22,7 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import merge_scope_filters
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_app_config_from_paths
+from tests._helpers.settings import build_app_config_for_repo
 
 
 class _FakeRedis:
@@ -70,41 +55,9 @@ class _FakeRedis:
 
 
 def _build_context(repo_root: Path) -> ApplicationContext:
-    settings = Settings(
-        vllm=VLLMConfig(base_url="http://localhost:8001/v1", batch_size=32),
-        embeddings=EmbeddingsConfig(provider="vllm", model_name="nomic-ai/nomic-embed-code"),
-        paths=PathsConfig(
-            repo_root=str(repo_root),
-            data_dir="data",
-            vectors_dir="data/vectors",
-            faiss_index="data/faiss/index.faiss",
-            duckdb_path="data/catalog.duckdb",
-            scip_index="index.scip.json",
-            coderank_vectors_dir="data/coderank_vectors",
-            coderank_faiss_index="data/faiss/coderank.faiss",
-            warp_index_dir="indexes/warp_xtr",
-            xtr_dir="data/xtr",
-        ),
-        index=IndexConfig(vec_dim=3584, chunk_budget=2200, faiss_nlist=8192),
-        limits=ServerLimits(),
-        eval=EvalConfig(),
-        redis=RedisConfig(
-            url="redis://127.0.0.1:6379/0",
-            scope_l1_size=64,
-            scope_l1_ttl_seconds=300,
-            scope_l2_ttl_seconds=3600,
-        ),
-        duckdb=DuckDBConfig(),
-        bm25=BM25Config(),
-        splade=SpladeConfig(),
-        coderank=CodeRankConfig(),
-        warp=WarpConfig(),
-        xtr=XTRConfig(),
-        rerank=RerankConfig(),
-        coderank_llm=CodeRankLLMConfig(),
-    )
-
-    paths = resolve_application_paths(settings)
+    app_config = build_app_config_for_repo(repo_root)
+    paths = resolve_application_paths(app_config)
+    settings = settings_from_app_config(app_config)
 
     paths.data_dir.mkdir(parents=True, exist_ok=True)
     paths.vectors_dir.mkdir(parents=True, exist_ok=True)
@@ -129,14 +82,31 @@ def _build_context(repo_root: Path) -> ApplicationContext:
     git_client = MagicMock(spec=GitClient)
     async_git_client = AsyncMock(spec=AsyncGitClient)
 
+    def _duckdb_catalog_factory(
+        resolved: ResolvedPaths,
+        _cfg: object,
+        manager: DuckDBManager,
+    ) -> DuckDBCatalog:
+        catalog = DuckDBCatalog(
+            resolved.duckdb_path,
+            resolved.vectors_dir,
+            materialize=False,
+            manager=manager,
+            log_queries=False,
+            repo_root=resolved.repo_root,
+        )
+        catalog.set_idmap_path(resolved.faiss_idmap_path)
+        return catalog
+
     return ApplicationContext(
-        app_config=build_app_config_from_paths(paths),
+        app_config=app_config,
         settings=settings,
         paths=paths,
         vllm_client=vllm_client,
         faiss_manager=faiss_manager,
         scope_store=scope_store,
         duckdb_manager=duckdb_manager,
+        duckdb_catalog_factory=_duckdb_catalog_factory,
         git_client=git_client,
         async_git_client=async_git_client,
     )

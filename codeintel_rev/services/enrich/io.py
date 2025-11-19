@@ -71,6 +71,11 @@ class _YamlDumpFn(Protocol):
 def _row_payload(row: ModuleRecord | Mapping[str, Any]) -> dict[str, Any]:
     """Return a JSON-ready mapping for ``row``.
 
+    Parameters
+    ----------
+    row : ModuleRecord | Mapping[str, Any]
+        Module record or dictionary to serialize.
+
     Returns
     -------
     dict[str, Any]

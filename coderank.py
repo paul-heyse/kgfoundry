@@ -15,7 +15,6 @@ from codeintel_rev.config import load_app_config
 from codeintel_rev.config.api import AppConfig
 from codeintel_rev.config.helpers import index_settings
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.settings import Settings
 from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
@@ -31,7 +30,7 @@ def _cached_app_config() -> AppConfig:
 
 
 @lru_cache(maxsize=1)
-def _legacy_settings() -> Settings:
+def _legacy_settings() -> object:
     return settings_from_app_config(_cached_app_config())
 
 
@@ -54,9 +53,8 @@ def build_index() -> None:
     paths = _cached_paths()
     index_cfg = index_settings(app_config)
     fs_readiness.raise_on_errors(fs_readiness.validate_paths(paths))
-    cfg = settings.coderank
 
-    embedder = CodeRankEmbedder(settings=cfg)
+    embedder = CodeRankEmbedder(settings=settings.coderank)
 
     duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
     catalog = DuckDBCatalog(
@@ -104,11 +102,10 @@ def build_index() -> None:
         enable_range_search=index_cfg.enable_range_search,
         semantic_min_score=index_cfg.semantic_min_score,
     )
-    nlist_value = index_cfg.nlist or index_cfg.faiss_nlist
     manager = FAISSManager(
         index_path=index_path,
         vec_dim=vectors.shape[1],
-        nlist=int(nlist_value),
+        nlist=int(index_cfg.nlist or index_cfg.faiss_nlist),
         runtime=runtime_opts,
     )
     manager.build_index(vectors.copy(), family=index_cfg.faiss_family)

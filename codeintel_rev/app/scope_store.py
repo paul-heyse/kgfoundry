@@ -84,23 +84,6 @@ class LRUCache[KeyT: Hashable, ValueT]:
         *,
         now_fn: Callable[[], float] = time.monotonic,
     ) -> None:
-        """Initialize LRU cache with optional TTL.
-
-        Parameters
-        ----------
-        maxsize : int, optional
-            Maximum number of entries to cache (default: 256).
-        ttl_seconds : float | None, optional
-            Time-to-live in seconds for cache entries. None disables TTL (default: 300.0).
-        now_fn : Callable[[], float], optional
-            Function returning current monotonic time (default: time.monotonic).
-
-        Raises
-        ------
-        ValueError
-            If ``maxsize`` is not positive or if ``ttl_seconds`` is provided but
-            not positive (when not ``None``).
-        """
         if maxsize <= 0:
             msg = f"maxsize must be positive, got {maxsize}"
             raise ValueError(msg)
@@ -287,13 +270,12 @@ class LRUCache[KeyT: Hashable, ValueT]:
 
 
 class AsyncSingleFlight[KeyT: Hashable, ValueT]:
-    """Deduplicate concurrent coroutine execution keyed by ``KeyT``."""
+    """Deduplicate concurrent coroutine execution keyed by ``KeyT``.
+
+    Creates a new deduplicator with no in-flight operations.
+    """
 
     def __init__(self) -> None:
-        """Initialize an empty single-flight deduplicator.
-
-        Creates a new deduplicator with no in-flight operations.
-        """
         self._lock = asyncio.Lock()
         self._inflight: dict[KeyT, asyncio.Future[ValueT]] = {}
 
@@ -462,7 +444,26 @@ class ScopeStoreMetrics:
 
 
 class ScopeStore:
-    """Redis-backed scope store with L1/L2 caching and single-flight coalescing."""
+    """Redis-backed scope store with L1/L2 caching and single-flight coalescing.
+
+    Parameters
+    ----------
+    redis_client : SupportsAsyncRedis
+        Async Redis client for L2 cache persistence.
+    l1_maxsize : int, optional
+        Maximum size of in-memory L1 cache (default: 256).
+    l1_ttl_seconds : float | None, optional
+        TTL for L1 cache entries in seconds. None disables TTL (default: 300.0).
+    l2_ttl_seconds : int | None, optional
+        TTL for L2 Redis cache entries in seconds. None disables TTL (default: 3600).
+    key_prefix : str, optional
+        Prefix for Redis keys (default: "scope").
+
+    Raises
+    ------
+    ValueError
+        If ``key_prefix`` is empty.
+    """
 
     def __init__(
         self,
@@ -473,26 +474,6 @@ class ScopeStore:
         l2_ttl_seconds: int | None = 3600,
         key_prefix: str = "scope",
     ) -> None:
-        """Initialize scope store with Redis backend and caching layers.
-
-        Parameters
-        ----------
-        redis_client : SupportsAsyncRedis
-            Async Redis client for L2 cache persistence.
-        l1_maxsize : int, optional
-            Maximum size of in-memory L1 cache (default: 256).
-        l1_ttl_seconds : float | None, optional
-            TTL for L1 cache entries in seconds. None disables TTL (default: 300.0).
-        l2_ttl_seconds : int | None, optional
-            TTL for L2 Redis cache entries in seconds. None disables TTL (default: 3600).
-        key_prefix : str, optional
-            Prefix for Redis keys (default: "scope").
-
-        Raises
-        ------
-        ValueError
-            If ``key_prefix`` is empty.
-        """
         if not key_prefix:
             msg = "key_prefix must be non-empty"
             raise ValueError(msg)

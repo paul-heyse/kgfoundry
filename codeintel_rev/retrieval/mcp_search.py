@@ -391,7 +391,9 @@ class SearchDependencies:
     catalog : CatalogLike
         Catalog for hydrating chunk metadata.
     settings : SearchSettings
-        Search configuration settings.
+        Search configuration settings (limits, filtering).
+    index : IndexConfigLike
+        Immutable index configuration (vector dimension, FAISS tuning).
     session_id : str | None
         Optional session identifier for request tracking. None if not tracked.
     run_id : str | None
@@ -407,6 +409,7 @@ class SearchDependencies:
     embedder: EmbeddingClient
     catalog: CatalogLike
     settings: SearchSettings
+    index: IndexConfigLike
     session_id: str | None
     run_id: str | None
     limits: Sequence[str]
@@ -642,7 +645,7 @@ def _embed_with_metrics(request: SearchRequest, deps: SearchDependencies) -> NDA
     NDArrayF32
         Normalized query embedding reshaped to ``(1, vec_dim)``.
     """
-    return _embed_query(deps.embedder, request.query, deps.settings.index.vec_dim)
+    return _embed_query(deps.embedder, request.query, deps.index.vec_dim)
 
 
 def _run_ann_search(
@@ -673,7 +676,7 @@ def _run_ann_search(
     distances, identifiers = deps.faiss.search(
         query_vector,
         k=faiss_k,
-        nprobe=deps.settings.index.faiss_nprobe,
+        nprobe=deps.index.faiss_nprobe,
         runtime=_build_runtime_overrides(rerank=request.rerank),
         catalog=deps.catalog if request.rerank else None,
     )

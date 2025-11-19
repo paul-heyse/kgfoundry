@@ -59,7 +59,7 @@ def __getattr__(name: str) -> ModuleType:
 
     Parameters
     ----------
-    name :
+    name : str
         Export requested via attribute access or ``from codeintel_rev.cli import``.
 
     Returns

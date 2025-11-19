@@ -173,7 +173,7 @@ class InprocessVLLMContext:
 
             Parameters
             ----------
-            cfg : VLLMConfig
+            cfg : VLLMSettings
                 vLLM configuration for model initialization.
 
             Returns
@@ -242,8 +242,8 @@ class InprocessVLLMEmbedder:
 
     Examples
     --------
-    >>> from codeintel_rev.config.settings import VLLMConfig, VLLMRunMode
-    >>> cfg = VLLMConfig(run=VLLMRunMode(mode="inprocess"))
+    >>> from codeintel_rev.config.api import VLLMSettings
+    >>> cfg = VLLMSettings(run_mode="inprocess")
     >>> embedder = InprocessVLLMEmbedder(cfg)
     >>> vecs = embedder.embed_batch(["hello world"])
     >>> vecs.shape[0]

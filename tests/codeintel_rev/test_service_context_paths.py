@@ -16,6 +16,7 @@ from codeintel_rev.config.api import (
     BM25Settings,
     EmbeddingsSettings,
     FAISSSettings,
+    IndexSettings,
     LoggingSettings,
     SearchSettings,
     SpladeSettings,
@@ -29,7 +30,7 @@ from codeintel_rev.config.api import (
     PathsConfig as ApiPathsConfig,
 )
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.settings import Settings
+from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
@@ -37,7 +38,7 @@ from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server import service_context
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_settings_for_repo
+from tests._helpers.settings import build_app_config_for_repo
 
 
 class RecordingFAISSManager:
@@ -140,87 +141,45 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
     """Relative configuration paths resolve against ``REPO_ROOT``."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    config_dir = repo_root / "config"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    (config_dir / "app.yml").write_text("tests: true")
+    (repo_root / "config").mkdir(parents=True, exist_ok=True)
+    (repo_root / "config" / "app.yml").write_text("tests: true")
     for relative in ("logs", ".cache", ".tmp", "plugins"):
         (repo_root / relative).mkdir(parents=True, exist_ok=True)
-    default_data_dir = repo_root / "data"
-    default_data_dir.mkdir(parents=True, exist_ok=True)
-    (default_data_dir / "vectors").mkdir(parents=True, exist_ok=True)
-    faiss_rel = "indexes/code.ivfpq.faiss"
-    duckdb_rel = "catalog/catalog.duckdb"
-    vectors_rel = "artifacts/vectors"
+    (repo_root / "data").mkdir(parents=True, exist_ok=True)
+    (repo_root / "data" / "vectors").mkdir(parents=True, exist_ok=True)
 
-    expected_faiss_path = (repo_root / faiss_rel).resolve()
-    expected_duckdb_path = (repo_root / duckdb_rel).resolve()
-    expected_vectors_dir = (repo_root / vectors_rel).resolve()
-
+    expected_faiss_path = (repo_root / "indexes/code.ivfpq.faiss").resolve()
+    expected_duckdb_path = (repo_root / "catalog/catalog.duckdb").resolve()
+    expected_vectors_dir = (repo_root / "artifacts/vectors").resolve()
     expected_faiss_path.parent.mkdir(parents=True, exist_ok=True)
     expected_faiss_path.touch()
     expected_vectors_dir.mkdir(parents=True, exist_ok=True)
 
-    settings = build_settings_for_repo(
-        repo_root,
-        paths_overrides={
-            "faiss_index": faiss_rel,
-            "duckdb_path": duckdb_rel,
-            "vectors_dir": vectors_rel,
-        },
-    )
+    base_app_config = build_app_config_for_repo(repo_root)
     app_config = AppConfig(
         version=CONFIG_API_VERSION,
         paths=ApiPathsConfig(
             repo_root=repo_root,
-            data_dir=repo_root / "data",
+            data_dir=repo_root / "artifacts",
             cache_dir=repo_root / ".cache",
             logs_dir=repo_root / "logs",
         ),
         duckdb=ApiDuckDBSettings(database=expected_duckdb_path),
         faiss=FAISSSettings(index_path=expected_faiss_path),
-        bm25=BM25Settings(
-            corpus_json_dir=repo_root / "data" / "bm25_json",
-            index_dir=repo_root / "indexes" / "bm25",
-        ),
-        splade=SpladeSettings(
-            model_id="naver/splade-v3",
-            model_dir=repo_root / "models" / "splade",
-            onnx_dir=repo_root / "models" / "splade" / "onnx",
-            onnx_file="model.onnx",
-            vectors_dir=repo_root / "vectors",
-            index_dir=repo_root / "indexes" / "splade",
-            provider="CPUExecutionProvider",
-            quantization=100,
-            max_terms=1000,
-            max_clause_count=4096,
-            batch_size=16,
-            threads=4,
-            enabled=False,
-            max_query_terms=32,
-            prune_below=0.0,
-            analyzer="wordpiece",
-            static_prune_pct=0.0,
-        ),
-        xtr=XTRSettings(
-            model_id="nomic-ai/CodeRankEmbed",
-            device="cuda",
-            max_query_tokens=256,
-            candidate_k=200,
-            dim=768,
-            dtype="float16",
-            enable=False,
-            mode="narrow",
-        ),
-        embeddings=EmbeddingsSettings(),
-        vllm=VLLMSettings(),
-        search=SearchSettings(),
-        logging=LoggingSettings(),
-        index=IndexSettings(),
+        bm25=base_app_config.bm25,
+        splade=base_app_config.splade,
+        xtr=base_app_config.xtr,
+        embeddings=base_app_config.embeddings,
+        vllm=base_app_config.vllm,
+        search=base_app_config.search,
+        logging=base_app_config.logging,
+        index=base_app_config.index,
     )
+    settings = settings_from_app_config(app_config)
 
     service_context.reset_service_context()
 
-    def _faiss_factory(cfg: Settings, resolved: ResolvedPaths) -> FAISSManager:
+    def _faiss_factory(cfg: object, resolved: ResolvedPaths) -> FAISSManager:
         nlist_value = cfg.index.nlist or 1
         return cast(
             "FAISSManager",
@@ -234,7 +193,7 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
 
     def _catalog_factory(
         resolved: ResolvedPaths,
-        cfg: Settings,
+        cfg: object,
         manager: DuckDBManager,
     ) -> DuckDBCatalog:
         _ = cfg, manager
