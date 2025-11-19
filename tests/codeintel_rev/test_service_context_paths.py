@@ -30,8 +30,7 @@ from codeintel_rev.config.api import (
     PathsConfig as ApiPathsConfig,
 )
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.shim import settings_from_app_config
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.vllm_client import VLLMClient
@@ -175,14 +174,11 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
         logging=base_app_config.logging,
         index=base_app_config.index,
     )
-    settings = settings_from_app_config(app_config)
-
     service_context.reset_service_context()
 
     base_index_cfg = app_config.index
 
     def _faiss_factory(
-        _settings: object,
         resolved: ResolvedPaths,
         override_app_cfg: AppConfig | None = None,
     ) -> FAISSManager:
@@ -199,22 +195,23 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
         )
 
     def _catalog_factory(
-        resolved: ResolvedPaths,
-        cfg: object,
+        catalog_cfg: DuckDBCatalogConfig,
         manager: DuckDBManager,
     ) -> DuckDBCatalog:
-        _ = cfg, manager
-        catalog = RecordingDuckDBCatalog(resolved.duckdb_path, resolved.vectors_dir)
-        catalog.set_idmap_path(resolved.faiss_idmap_path)
+        _ = manager
+        catalog = RecordingDuckDBCatalog(
+            catalog_cfg.db_path,
+            catalog_cfg.vectors_dir,
+        )
+        catalog.set_idmap_path(catalog_cfg.idmap_path)
         return cast("DuckDBCatalog", catalog)
 
     overrides = ApplicationContextOverrides(
-        vllm_client=cast("VLLMClient", DummyVLLMClient(settings.vllm)),
+        vllm_client=cast("VLLMClient", DummyVLLMClient(app_config.vllm)),
         faiss_manager_factory=_faiss_factory,
         duckdb_catalog_factory=_catalog_factory,
     )
     custom_context = ApplicationContext.create(
-        settings=settings,
         overrides=overrides,
         app_config=app_config,
     )

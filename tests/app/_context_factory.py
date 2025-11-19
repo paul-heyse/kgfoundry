@@ -15,8 +15,8 @@ from unittest.mock import MagicMock
 
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.config.shim import settings_from_app_config
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
+from codeintel_rev.io.duckdb_manager import DuckDBManager
 
 from tests._helpers.settings import build_app_config_from_paths
 
@@ -29,7 +29,8 @@ _REPO_ROOT_OVERRIDE = os.getenv("KGFOUNDRY_TEST_REPO_ROOT")
 
 
 def _duckdb_catalog_factory_stub(
-    *_: object,
+    _cfg: DuckDBCatalogConfig,
+    _manager: DuckDBManager,
 ) -> DuckDBCatalog:
     """Return a stub DuckDB catalog for tests.
 
@@ -250,14 +251,22 @@ def build_application_context(
     )
     xtr_cfg = replace(app_config.xtr, enable=xtr_enabled)
     app_config = replace(app_config, bm25=bm25_cfg, splade=splade_cfg, xtr=xtr_cfg)
+    catalog_cfg = DuckDBCatalogConfig(
+        db_path=paths.duckdb_path,
+        vectors_dir=paths.vectors_dir,
+        repo_root=paths.repo_root,
+        idmap_path=paths.faiss_idmap_path,
+        materialize=app_config.index.duckdb_materialize,
+        log_queries=False,
+    )
     return ApplicationContext(
         app_config=app_config,
-        settings=settings_from_app_config(app_config),
         paths=paths,
         vllm_client=MagicMock(),
         faiss_manager=MagicMock(),
         scope_store=MagicMock(),
-        duckdb_manager=MagicMock(),
+        duckdb_manager=MagicMock(spec=DuckDBManager),
+        catalog_config=catalog_cfg,
         duckdb_catalog_factory=_duckdb_catalog_factory_stub,
         git_client=MagicMock(),
         async_git_client=MagicMock(),

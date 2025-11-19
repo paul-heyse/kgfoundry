@@ -10,9 +10,8 @@ import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.app.scope_store import ScopeStore
-from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.config.shim import settings_from_app_config
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.config.paths import resolve_application_paths
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
@@ -57,8 +56,6 @@ class _FakeRedis:
 def _build_context(repo_root: Path) -> ApplicationContext:
     app_config = build_app_config_for_repo(repo_root)
     paths = resolve_application_paths(app_config)
-    settings = settings_from_app_config(app_config)
-
     paths.data_dir.mkdir(parents=True, exist_ok=True)
     paths.vectors_dir.mkdir(parents=True, exist_ok=True)
     paths.faiss_index.parent.mkdir(parents=True, exist_ok=True)
@@ -83,29 +80,37 @@ def _build_context(repo_root: Path) -> ApplicationContext:
     async_git_client = AsyncMock(spec=AsyncGitClient)
 
     def _duckdb_catalog_factory(
-        resolved: ResolvedPaths,
-        _cfg: object,
+        catalog_cfg: DuckDBCatalogConfig,
         manager: DuckDBManager,
     ) -> DuckDBCatalog:
         catalog = DuckDBCatalog(
-            resolved.duckdb_path,
-            resolved.vectors_dir,
-            materialize=False,
+            catalog_cfg.db_path,
+            catalog_cfg.vectors_dir,
+            materialize=catalog_cfg.materialize,
             manager=manager,
-            log_queries=False,
-            repo_root=resolved.repo_root,
+            log_queries=catalog_cfg.log_queries,
+            repo_root=catalog_cfg.repo_root,
         )
-        catalog.set_idmap_path(resolved.faiss_idmap_path)
+        catalog.set_idmap_path(catalog_cfg.idmap_path)
         return catalog
+
+    catalog_cfg = DuckDBCatalogConfig(
+        db_path=paths.duckdb_path,
+        vectors_dir=paths.vectors_dir,
+        repo_root=paths.repo_root,
+        idmap_path=paths.faiss_idmap_path,
+        materialize=app_config.index.duckdb_materialize,
+        log_queries=False,
+    )
 
     return ApplicationContext(
         app_config=app_config,
-        settings=settings,
         paths=paths,
         vllm_client=vllm_client,
         faiss_manager=faiss_manager,
         scope_store=scope_store,
         duckdb_manager=duckdb_manager,
+        catalog_config=catalog_cfg,
         duckdb_catalog_factory=_duckdb_catalog_factory,
         git_client=git_client,
         async_git_client=async_git_client,

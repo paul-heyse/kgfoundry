@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from fnmatch import fnmatch
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeVar
 
@@ -23,7 +24,7 @@ from tools._shared.problem_details import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Sequence
 
     from pydantic import Field, ValidationError, field_validator
     from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,7 +52,6 @@ __all__: Final[list[str]] = [
     "SettingsError",
     "ToolRuntimeSettings",
     "get_runtime_settings",
-    "load_settings",
 ]
 
 
@@ -79,64 +79,6 @@ class SettingsError(CoreSettingsError):
             cause=cause,
             context={"problem_details": dict(problem)},
         )
-
-
-_SETTINGS_CACHE: dict[str, ToolRuntimeSettings] = {}
-
-
-def load_settings(
-    settings_factory: Callable[[], SettingsT] | type[SettingsT],
-) -> SettingsT:
-    """Instantiate settings via ``settings_factory`` with structured error handling.
-
-    Parameters
-    ----------
-    settings_factory : Callable[[], SettingsT] | type[SettingsT]
-        Zero-argument callable that returns a ``BaseSettings`` subclass.
-
-    Returns
-    -------
-    SettingsT
-        Validated settings instance.
-
-    Raises
-    ------
-    SettingsError
-        Raised when validation fails and the returned errors are converted to Problem Details.
-    """
-    try:
-        return settings_factory()
-    except ValidationError as exc:
-        attr_name: object = getattr(settings_factory, "__name__", None)
-        settings_name = (
-            attr_name if isinstance(attr_name, str) else settings_factory.__class__.__name__
-        )
-
-        raw_errors: Sequence[object] = exc.errors()
-        error_dicts: tuple[dict[str, JsonValue], ...] = tuple(
-            _as_error_dict(err) for err in raw_errors
-        )
-        extensions: dict[str, JsonValue] = {
-            "errors": list(error_dicts),
-            "settings_class": settings_name,
-        }
-        problem = build_problem_details(
-            ProblemDetailsParams(
-                type="https://kgfoundry.dev/problems/tool-settings-invalid",
-                title="Invalid tooling settings",
-                status=500,
-                detail="Failed to load tooling configuration",
-                instance=f"urn:tool-settings:{settings_name}:invalid",
-                extensions=extensions,
-            )
-        )
-        message = "Failed to load tooling settings"
-        raise SettingsError(
-            message,
-            problem=problem,
-            errors=error_dicts,
-            cause=exc,
-        ) from exc
 
 
 class ToolRuntimeSettings(BaseSettings):
@@ -281,17 +223,33 @@ def get_runtime_settings() -> ToolRuntimeSettings:
     Returns
     -------
     ToolRuntimeSettings
-        Cached settings instance populated from environment variables.
+        Cached runtime settings populated from environment variables.
     """
-    cached = _SETTINGS_CACHE.get("default")
-    if cached is None:
 
-        def _factory() -> ToolRuntimeSettings:
+    @lru_cache(maxsize=1)
+    def _cached() -> ToolRuntimeSettings:
+        try:
             return ToolRuntimeSettings()
+        except ValidationError as exc:  # pragma: no cover - configuration errors
+            error_dicts = tuple(_as_error_dict(err) for err in exc.errors())
+            extensions: dict[str, JsonValue] = {
+                "errors": list(error_dicts),
+                "settings_class": "ToolRuntimeSettings",
+            }
+            problem = build_problem_details(
+                ProblemDetailsParams(
+                    type="https://kgfoundry.dev/problems/tool-settings-invalid",
+                    title="Invalid tooling settings",
+                    status=500,
+                    detail="Failed to load tooling configuration",
+                    instance="urn:tool-settings:ToolRuntimeSettings:invalid",
+                    extensions=extensions,
+                )
+            )
+            message = "Failed to load tooling settings"
+            raise SettingsError(message, problem=problem, errors=list(error_dicts), cause=exc) from exc
 
-        cached = load_settings(_factory)
-        _SETTINGS_CACHE["default"] = cached
-    return cached
+    return _cached()
 
 
 def _as_error_dict(error: object) -> dict[str, JsonValue]:

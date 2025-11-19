@@ -6,13 +6,14 @@ import asyncio
 from http import HTTPStatus
 from pathlib import Path
 from typing import cast
+from unittest.mock import MagicMock
 
 import duckdb
 import pytest
-from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.app.config_context import ApplicationContext, ApplicationContextOverrides
 from codeintel_rev.app.main import readyz
 from codeintel_rev.app.runtime_readiness import ReadinessProbe
-from codeintel_rev.config.shim import settings_from_app_config
+from codeintel_rev.io.vllm_client import VLLMClient
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -56,8 +57,8 @@ def test_repo(tmp_path: Path) -> RepoHandle:
 
     def rebuild(index_overrides: dict[str, object] | None = None) -> None:
         app_config = build_app_config_for_repo(repo_root, index_overrides=index_overrides)
-        settings = settings_from_app_config(app_config)
-        context = ApplicationContext.create(settings=settings, app_config=app_config)
+        overrides = ApplicationContextOverrides(vllm_client=MagicMock(spec=VLLMClient))
+        context = ApplicationContext.create(app_config=app_config, overrides=overrides)
         readiness = ReadinessProbe(context)
         asyncio.run(readiness.refresh())
         app = build_test_app(context)
@@ -109,9 +110,8 @@ def test_app_startup_fails_invalid_repo_root(tmp_path: Path) -> None:
     """
     invalid_path = tmp_path / "nonexistent"
     app_config = build_app_config_for_repo(invalid_path)
-    settings = settings_from_app_config(app_config)
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
-        ApplicationContext.create(settings=settings, app_config=app_config)
+        ApplicationContext.create(app_config=app_config)
 
 
 def test_app_readyz_shows_unhealthy_resources(test_repo: RepoHandle) -> None:
@@ -168,7 +168,7 @@ def test_app_context_in_state(test_repo: RepoHandle) -> None:
     with TestClient(test_app):
         assertions.expect_true(hasattr(test_app.state, "context"))
         assertions.expect_true(test_app.state.context is not None)
-        for attr in ("settings", "paths", "vllm_client", "faiss_manager"):
+        for attr in ("app_config", "paths", "vllm_client", "faiss_manager"):
             assertions.expect_true(hasattr(test_app.state.context, attr))
 
 

@@ -6,7 +6,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import cast
 
 from codeintel_rev.cli.indexctl import IndexctlCliContext
 from codeintel_rev.cli.indexctl import app as indexctl_app
@@ -14,6 +14,7 @@ from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.faiss_manager import FAISSManager
 
 from tests._helpers import assertions, cli, constants
+from tests._helpers.settings import build_app_config_for_repo
 
 
 class _ManagerStub:
@@ -66,42 +67,19 @@ class _CatalogStub:
         return None
 
 
-class _Paths(SimpleNamespace):
-    faiss_index: str
-    duckdb_path: str
-    faiss_idmap_path: str
-    vectors_dir: str
-    repo_root: str
-
-
-class _IndexCfg(SimpleNamespace):
-    nlist: int = 1
-    vec_dim: int = constants.VECTOR_DIMS.small
-    duckdb_materialize: bool = False
-
-
-class _Settings(SimpleNamespace):
-    def __init__(self, base: Path) -> None:
-        paths = _Paths(
-            faiss_index=str(base / "faiss.index"),
-            duckdb_path=str(base / "catalog.duckdb"),
-            faiss_idmap_path=str(base / "faiss_idmap.parquet"),
-            vectors_dir=str(base),
-            repo_root=str(base),
-        )
-        super().__init__(paths=paths, index=_IndexCfg())
-
-
 def test_health_command_reports_ok(tmp_path: Path) -> None:
     """`indexctl health` reports OK when subsystems agree on counts."""
     vector_dim = constants.VECTOR_DIMS.small
     vector_count = constants.BATCH_SIZES.large
     manager = _ManagerStub(vec_dim=vector_dim, total=vector_count)
     catalog = _CatalogStub()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    app_config = build_app_config_for_repo(repo_root)
     base_context = IndexctlCliContext.production()
     context = replace(
         base_context,
-        settings_factory=lambda: cast("Any", _Settings(tmp_path)),
+        app_config_factory=lambda: app_config,
         faiss_manager_factory=lambda *_: cast("FAISSManager", manager),
         duckdb_catalog_factory=lambda *_: cast("DuckDBCatalog", catalog),
         duckdb_dim_resolver=lambda _catalog: vector_dim,

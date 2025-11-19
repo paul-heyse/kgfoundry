@@ -15,7 +15,6 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import readyz
 from codeintel_rev.app.runtime_readiness import CheckResult, ReadinessProbe
 from codeintel_rev.config.api import AppConfig
-from codeintel_rev.config.shim import settings_from_app_config
 from fastapi import FastAPI
 
 from tests._helpers import assertions
@@ -56,10 +55,7 @@ def _context_with_app_config(
     ApplicationContext
         New application context with the specified AppConfig applied.
     """
-    return context.with_overrides(
-        settings=settings_from_app_config(app_config),
-        app_config=app_config,
-    )
+    return context.with_overrides(app_config=app_config)
 
 
 def _http_vllm_app_config(context: ApplicationContext, base_url: str) -> AppConfig:

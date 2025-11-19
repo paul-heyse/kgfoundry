@@ -254,7 +254,7 @@ class BM25IndexManager:
         Build context for index construction. If None, uses production context.
     """
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         app_config: AppConfig,
         *,
@@ -722,7 +722,7 @@ class BM25QueryEngine:
         Optional analyzer name for query processing.
     """
 
-    def __init__(self, index_dir: Path, *, analyzer: str | None = None) -> None:
+    def __init__(self, index_dir: Path, *, analyzer: str | None = None) -> None:  # noqa: D107
         self._index_dir = Path(index_dir).resolve()
         self._analyzer = analyzer
         self._searcher: _LuceneSearcher | None = None

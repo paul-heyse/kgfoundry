@@ -40,7 +40,7 @@ __all__ = [
     "RuntimeSettings",
     "SearchConfig",
     "SparseEmbeddingConfig",
-    "load_settings",
+    "load_runtime_settings",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 LOGGER = logging.getLogger(__name__)
@@ -192,8 +192,8 @@ class RuntimeSettings(BaseSettings):
 KgFoundrySettings = RuntimeSettings
 
 
-# [nav:anchor load_settings]
-def load_settings(**overrides: object) -> KgFoundrySettings:
+# [nav:anchor load_runtime_settings]
+def load_runtime_settings(**overrides: object) -> KgFoundrySettings:
     """Load :class:`RuntimeSettings` with optional overrides.
 
     Parameters

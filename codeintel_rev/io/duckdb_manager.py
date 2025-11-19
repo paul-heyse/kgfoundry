@@ -210,7 +210,7 @@ class DuckDBManager:
         DuckDB entirely. Defaults to :meth:`DuckDBManagerContext.production`.
     """
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         db_path: Path,
         config: DuckDBConfig | None = None,

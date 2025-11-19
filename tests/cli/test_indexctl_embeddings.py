@@ -38,6 +38,7 @@ from codeintel_rev.embeddings import EmbeddingProvider
 from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
 from tests._helpers import assertions, cli, constants
+from tests._helpers.settings import build_app_config_for_repo
 
 
 class _StubProvider:
@@ -66,7 +67,7 @@ class _StubProvider:
 
 
 @pytest.fixture(name="indexctl_context")
-def _indexctl_context() -> IndexctlCliContext:
+def _indexctl_context(tmp_path: Path) -> IndexctlCliContext:
     """Provide an indexctl CLI context with deterministic embedding provider.
 
     Returns
@@ -76,10 +77,16 @@ def _indexctl_context() -> IndexctlCliContext:
     """
     base = IndexctlCliContext.production()
 
-    def _provider_factory(_settings: object) -> EmbeddingProvider:
+    app_config = build_app_config_for_repo(tmp_path)
+
+    def _provider_factory(_app_config: AppConfig) -> EmbeddingProvider:
         return cast("EmbeddingProvider", _StubProvider())
 
-    return replace(base, embedding_provider_factory=_provider_factory)
+    return replace(
+        base,
+        app_config_factory=lambda: app_config,
+        embedding_provider_factory=_provider_factory,
+    )
 
 
 def _create_duckdb(path: Path) -> None:

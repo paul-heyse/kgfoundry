@@ -10,7 +10,6 @@ from pathlib import Path
 
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext, ApplicationContextOverrides
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.mcp_server.server import (
     app_context as mcp_context,
 )
@@ -47,12 +46,7 @@ def build_test_context(
     repo_root = Path(repo_root)
     scaffold_repo_root(repo_root)
     app_config = build_app_config_for_repo(repo_root)
-    settings = settings_from_app_config(app_config)
-    return ApplicationContext.create(
-        settings=settings,
-        app_config=app_config,
-        overrides=context_overrides,
-    )
+    return ApplicationContext.create(app_config=app_config, overrides=context_overrides)
 
 
 def build_test_app(

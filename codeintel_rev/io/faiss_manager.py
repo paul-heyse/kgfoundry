@@ -106,7 +106,7 @@ class _RuntimeFacade:
         Function that sets runtime parameters from a JSON string and returns state.
     """
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         *,
         describe: Callable[[], dict[str, object]],
@@ -225,7 +225,7 @@ class FAISSManager:
         "kFactor": "k_factor",
     }
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         index_path: Path,
         vec_dim: int = 3584,

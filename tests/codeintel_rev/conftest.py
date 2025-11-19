@@ -17,9 +17,8 @@ os.environ.setdefault("FAISS_OPT_LEVEL", "generic")
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.app.scope_store import ScopeStore
-from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.config.shim import settings_from_app_config
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.config.paths import resolve_application_paths
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
@@ -67,8 +66,7 @@ class _FakeRedis:
 
 
 def _default_duckdb_catalog_factory(
-    resolved: ResolvedPaths,
-    _settings: object,
+    catalog_cfg: DuckDBCatalogConfig,
     manager: DuckDBManager,
 ) -> DuckDBCatalog:
     """Construct a DuckDB catalog for tests.
@@ -79,14 +77,14 @@ def _default_duckdb_catalog_factory(
         DuckDB catalog instance configured for testing.
     """
     catalog = DuckDBCatalog(
-        resolved.duckdb_path,
-        resolved.vectors_dir,
-        materialize=False,
+        catalog_cfg.db_path,
+        catalog_cfg.vectors_dir,
+        materialize=catalog_cfg.materialize,
         manager=manager,
-        log_queries=False,
-        repo_root=resolved.repo_root,
+        log_queries=catalog_cfg.log_queries,
+        repo_root=catalog_cfg.repo_root,
     )
-    catalog.set_idmap_path(resolved.faiss_idmap_path)
+    catalog.set_idmap_path(catalog_cfg.idmap_path)
     return catalog
 
 
@@ -102,14 +100,13 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
     Returns
     -------
     ApplicationContext
-        Mock application context with test paths and settings.
+        Mock application context with test paths and configuration.
     """
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
 
     app_config = build_app_config_for_repo(repo_root)
     paths = resolve_application_paths(app_config)
-    settings = settings_from_app_config(app_config)
 
     paths.data_dir.mkdir(parents=True, exist_ok=True)
     paths.vectors_dir.mkdir(parents=True, exist_ok=True)
@@ -118,12 +115,20 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
     paths.xtr_dir.mkdir(parents=True, exist_ok=True)
     paths.faiss_index.touch()
     paths.faiss_idmap_path.parent.mkdir(parents=True, exist_ok=True)
+    catalog_cfg = DuckDBCatalogConfig(
+        db_path=paths.duckdb_path,
+        vectors_dir=paths.vectors_dir,
+        repo_root=paths.repo_root,
+        idmap_path=paths.faiss_idmap_path,
+        materialize=app_config.index.duckdb_materialize,
+        log_queries=False,
+    )
     with duckdb.connect(str(paths.duckdb_path)):
         pass
 
     vllm_client = MagicMock(spec=VLLMClient)
     vllm_client.embed_batch.return_value = np.zeros(
-        (1, settings.vllm.embedding_dim),
+        (1, app_config.vllm.embedding_dim),
         dtype=np.float32,
     )
     faiss_manager = MagicMock(spec=FAISSManager)
@@ -161,12 +166,12 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
 
     return ApplicationContext(
         app_config=app_config,
-        settings=settings,
         paths=paths,
         vllm_client=vllm_client,
         faiss_manager=faiss_manager,
         scope_store=scope_store,
         duckdb_manager=duckdb_manager,
+        catalog_config=catalog_cfg,
         duckdb_catalog_factory=_default_duckdb_catalog_factory,
         git_client=git_client,
         async_git_client=async_git_client,

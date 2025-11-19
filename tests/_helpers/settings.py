@@ -1,4 +1,4 @@
-"""Helpers for constructing Settings instances tailored for tests."""
+"""Helpers for constructing AppConfig instances tailored for tests."""
 
 from __future__ import annotations
 
@@ -27,9 +27,6 @@ from codeintel_rev.config.api import (
     PathsConfig as ApiPathsConfig,
 )
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.shim import settings_from_app_config
-
-SettingsType = Any
 
 DEFAULT_XTR_SETTINGS = XTRSettings(
     model_id="nomic-ai/CodeRankEmbed",
@@ -41,41 +38,6 @@ DEFAULT_XTR_SETTINGS = XTRSettings(
     enable=False,
     mode="narrow",
 )
-
-
-def build_settings_for_repo(
-    repo_root: Path,
-    *,
-    bm25_overrides: Mapping[str, Any] | None = None,
-    splade_overrides: Mapping[str, Any] | None = None,
-    index_overrides: Mapping[str, Any] | None = None,
-) -> SettingsType:
-    """Return Settings configured to point at ``repo_root``.
-
-    Parameters
-    ----------
-    repo_root : Path
-        Synthetic repository root used for the test scenario.
-    bm25_overrides : Mapping[str, Any] | None, optional
-        Optional overrides applied to the BM25 settings subsection.
-    splade_overrides : Mapping[str, Any] | None, optional
-        Optional overrides applied to the SPLADE settings subsection.
-    index_overrides : Mapping[str, Any] | None, optional
-        Optional overrides for ``Settings.index`` used by tests to toggle
-        behaviors such as FAISS preload.
-
-    Returns
-    -------
-    Settings
-        New Settings instance whose paths/bm25/splade configs reference ``repo_root``.
-    """
-    app_config = build_app_config_for_repo(
-        repo_root,
-        bm25_overrides=bm25_overrides,
-        splade_overrides=splade_overrides,
-        index_overrides=index_overrides,
-    )
-    return settings_from_app_config(app_config)
 
 
 def build_app_config_from_paths(paths: ResolvedPaths) -> AppConfig:
@@ -241,6 +203,5 @@ __all__ = [
     "DEFAULT_XTR_SETTINGS",
     "build_app_config_for_repo",
     "build_app_config_from_paths",
-    "build_settings_for_repo",
     "scaffold_repo_root",
 ]

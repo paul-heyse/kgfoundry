@@ -109,7 +109,7 @@ class PyseriniBM25Backend(BM25Backend):
         If the index directory does not exist.
     """
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         index_dir: Path,
         *,

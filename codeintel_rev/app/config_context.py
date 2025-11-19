@@ -1,10 +1,10 @@
 """Application-level configuration context manager.
 
 This module provides centralized configuration lifecycle management for the
-CodeIntel MCP application. Instead of loading settings repeatedly from environment
-variables on each request, configuration is loaded exactly once during FastAPI
-application startup and shared across all request handlers via explicit dependency
-injection.
+CodeIntel MCP application. Instead of loading configuration repeatedly from
+environment variables on each request, AppConfig is loaded exactly once during
+FastAPI application startup and shared across all request handlers via explicit
+dependency injection.
 
 Key Components
 --------------
@@ -20,7 +20,7 @@ Design Principles
 - **Load Once**: Configuration parsed from environment exactly once at startup
 - **Explicit Injection**: Context passed as parameter (no global state)
 - **Fail-Fast**: Invalid configuration prevents application startup
-- **Immutable**: Settings frozen after creation (thread-safe)
+- **Immutable**: Configuration frozen after creation (thread-safe)
 - **RFC 9457**: All errors use Problem Details format
 
 Example Usage
@@ -40,7 +40,7 @@ In request handlers:
 See Also
 --------
 codeintel_rev.app.runtime_readiness : Readiness probe system for health checks
-codeintel_rev.config.settings : Settings dataclasses and environment loading
+codeintel_rev.config.api : AppConfig dataclasses and helpers
 """
 
 from __future__ import annotations
@@ -73,7 +73,6 @@ from codeintel_rev.config.api import (
 )
 from codeintel_rev.config.loader import load_app_config
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.indexing.index_lifecycle import IndexLifecycleManager
@@ -120,7 +119,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from codeintel_rev.app.scope_store import SupportsAsyncRedis
-    from codeintel_rev.config.settings import Settings
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
     from codeintel_rev.io.splade_onnx_encoder import (
         OnnxSpladeConfig,
@@ -141,7 +139,6 @@ else:  # pragma: no cover - runtime only; annotations are postponed
         OnnxSpladeConfig = None
         OnnxSpladeMapEncoder = None
         OnnxSpladeQueryEncoder = None
-    Settings = Any
 
 _RUNTIME_FAILURE_TTL_S = 15.0
 _AUTOTUNE_SAMPLE_LIMIT = 128
@@ -172,30 +169,29 @@ class ApplicationContextOverrides:
         :class:`NullRuntimeCellObserver` is used.
     factory_adjuster : FactoryAdjuster | None
         Override for the runtime factory adjuster. Defaults to an instance built
-        from :class:`Settings`.
+        from :class:`AppConfig` index settings.
     vllm_client : VLLMClient | None
         Preconstructed vLLM client. When omitted, :func:`build_vllm_client`
         constructs one using ``app_config.vllm``.
     faiss_manager : FAISSManager | None
-        FAISS manager override. The default is constructed from ``settings`` and
-        the resolved paths.
+        FAISS manager override. The default is constructed from AppConfig and the
+        resolved paths.
     scope_store : ScopeStore | None
         Scope store implementation (Redis-backed). Defaults to the production
-        implementation configured via settings.
+        implementation configured via AppConfig.
     duckdb_manager : DuckDBManager | None
         Manager responsible for DuckDB catalog lifecycle. Defaults to
         :class:`DuckDBManager`.
     git_client : GitClient | None
         Synchronous Git client override. When omitted, the default builder loads
-        a GitPython-backed client rooted at ``settings.paths.repo_root``.
+        a GitPython-backed client rooted at ``app_config.paths.repo_root``.
     async_git_client : AsyncGitClient | None
         Async Git client override that wraps the synchronous client.
-    faiss_manager_factory : Callable[..., FAISSManager] | None
+    faiss_manager_factory : Callable[[ResolvedPaths, AppConfig], FAISSManager] | None
         Factory for constructing the FAISS manager. When provided, overrides the
-        default import/path resolution. Factories may accept either two arguments
-        ``(settings, resolved_paths)`` or three arguments
-        ``(settings, resolved_paths, app_config)``; the latter is preferred.
-    duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] | None
+        default import/path resolution. Factories should accept ``(paths, app_config)``
+        but may also accept only ``paths`` for compatibility.
+    duckdb_catalog_factory : Callable[[DuckDBCatalogConfig, DuckDBManager], DuckDBCatalog] | None
         Factory for creating DuckDB catalog instances inside :meth:`open_catalog`.
         When omitted, :func:`_build_duckdb_catalog_from_app_config` is used.
     """
@@ -208,10 +204,10 @@ class ApplicationContextOverrides:
     duckdb_manager: DuckDBManager | None = None
     git_client: GitClient | None = None
     async_git_client: AsyncGitClient | None = None
-    faiss_manager_factory: Callable[..., FAISSManager] | None = None
-    duckdb_catalog_factory: (
-        Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] | None
-    ) = None
+    faiss_manager_factory: Callable[[ResolvedPaths, AppConfig], FAISSManager] | None = None
+    duckdb_catalog_factory: Callable[[DuckDBCatalogConfig, DuckDBManager], DuckDBCatalog] | None = (
+        None
+    )
 
 
 @dataclass(slots=True, frozen=True)
@@ -400,7 +396,6 @@ def _build_factory_adjuster(index_cfg: IndexSettings) -> FactoryAdjuster:
 
 
 def _build_faiss_manager(
-    settings: Settings,
     paths: ResolvedPaths,
     app_config: AppConfig,
     *,
@@ -410,8 +405,6 @@ def _build_faiss_manager(
 
     Parameters
     ----------
-    settings : Settings
-        Application settings containing index configuration.
     paths : ResolvedPaths
         Resolved filesystem paths including FAISS index path.
     app_config : AppConfig
@@ -433,9 +426,9 @@ def _build_faiss_manager(
     """
     if factory is not None:
         try:
-            return factory(settings, paths, app_config)
+            return factory(paths, app_config)
         except TypeError:
-            return factory(settings, paths)
+            return factory(paths)
     faiss_manager_cls = _import_faiss_manager_cls()
     index_cfg = app_config.index
     runtime_opts = _faiss_runtime_options_from_config(index_cfg, app_config.faiss)
@@ -455,21 +448,35 @@ def _duckdb_catalog_config_from_app(
     paths: ResolvedPaths,
     app_config: AppConfig,
 ) -> DuckDBCatalogConfig:
-    """Return catalog configuration derived from AppConfig and resolved paths."""
+    """Return catalog configuration derived from AppConfig and resolved paths.
+
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved application paths including DuckDB database, vectors directory,
+        repository root, and FAISS ID map paths.
+    app_config : AppConfig
+        Application configuration containing DuckDB materialization settings.
+
+    Returns
+    -------
+    DuckDBCatalogConfig
+        DuckDB catalog configuration with database path, vectors directory,
+        repository root, ID map path, materialization setting, and logging flag.
+    """
     return DuckDBCatalogConfig(
         db_path=paths.duckdb_path,
         vectors_dir=paths.vectors_dir,
         repo_root=paths.repo_root,
         idmap_path=paths.faiss_idmap_path,
         materialize=app_config.index.duckdb_materialize,
+        log_queries=getattr(app_config.duckdb, "log_queries", False),
     )
 
 
 def _build_duckdb_catalog_from_app_config(
     catalog_cfg: DuckDBCatalogConfig,
     manager: DuckDBManager,
-    *,
-    log_queries: bool,
 ) -> DuckDBCatalog:
     """Return a DuckDB catalog configured from AppConfig data.
 
@@ -479,8 +486,6 @@ def _build_duckdb_catalog_from_app_config(
         Precomputed catalog configuration derived from AppConfig and paths.
     manager : DuckDBManager
         DuckDB manager instance for database operations.
-    log_queries : bool
-        Whether to enable query logging for the catalog.
 
     Returns
     -------
@@ -492,7 +497,7 @@ def _build_duckdb_catalog_from_app_config(
         catalog_cfg.vectors_dir,
         materialize=catalog_cfg.materialize,
         manager=manager,
-        log_queries=log_queries,
+        log_queries=catalog_cfg.log_queries,
         repo_root=catalog_cfg.repo_root,
     )
     catalog.set_idmap_path(catalog_cfg.idmap_path)
@@ -663,7 +668,7 @@ def _faiss_runtime_options_from_config(
     index_cfg: IndexSettings,
     faiss_cfg: FAISSSettings,
 ) -> FAISSRuntimeOptions:
-    """Return runtime options merged from Settings and AppConfig.
+    """Return runtime options merged from AppConfig index and FAISS settings.
 
     Parameters
     ----------
@@ -1032,11 +1037,7 @@ class ApplicationContext:
     ----------
     app_config : AppConfig
         Immutable configuration loaded via :func:`load_app_config` that captures
-        path, DuckDB, FAISS, search, and logging settings external to the legacy
-        ``Settings`` model.
-    settings : Settings
-        Immutable application settings loaded from environment variables. Frozen
-        after creation to ensure thread-safe access.
+        path, DuckDB, FAISS, search, and logging settings.
     paths : ResolvedPaths
         Canonicalized filesystem paths for all resources (repo root, indexes, etc.).
         All paths are absolute.
@@ -1050,6 +1051,8 @@ class ApplicationContext:
         Redis-backed scope store for session-scoped query filters with L1/L2 caching.
     duckdb_manager : DuckDBManager
         DuckDB manager for managing the DuckDB catalog database.
+    catalog_config : DuckDBCatalogConfig
+        Immutable configuration bundle for constructing DuckDB catalog instances.
     git_client : GitClient
         Typed Git operations client using GitPython. Provides structured APIs for
         blame and history operations without subprocess overhead. Lazy-initializes
@@ -1057,7 +1060,7 @@ class ApplicationContext:
     async_git_client : AsyncGitClient
         Async wrapper around git_client for non-blocking Git operations. Runs
         synchronous GitPython operations in threadpool via asyncio.to_thread.
-    duckdb_catalog_factory : Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog]
+    duckdb_catalog_factory : Callable[[DuckDBCatalogConfig, DuckDBManager], DuckDBCatalog]
         Factory used to construct catalog instances when :meth:`open_catalog` is invoked.
         Cannot be None.
     runtime_observer : RuntimeCellObserver
@@ -1096,7 +1099,7 @@ class ApplicationContext:
 
     Notes
     -----
-    The context is designed to be immutable after creation (settings and paths
+    The context is designed to be immutable after creation (configuration and paths
     are frozen dataclasses). The FAISS manager and vLLM client maintain internal
     state (connection pools, loaded indexes) but their configuration cannot be
     changed after initialization.
@@ -1108,16 +1111,16 @@ class ApplicationContext:
     """
 
     app_config: AppConfig
-    settings: Settings
     paths: ResolvedPaths
     vllm_client: VLLMClient
     faiss_manager: FAISSManager
     scope_store: ScopeStore
     duckdb_manager: DuckDBManager
+    catalog_config: DuckDBCatalogConfig
     git_client: GitClient
     async_git_client: AsyncGitClient
-    duckdb_catalog_factory: Callable[[ResolvedPaths, Settings, DuckDBManager], DuckDBCatalog] = (
-        field(repr=False)
+    duckdb_catalog_factory: Callable[[DuckDBCatalogConfig, DuckDBManager], DuckDBCatalog] = field(
+        repr=False
     )
     runtime_observer: RuntimeCellObserver = field(
         default_factory=NullRuntimeCellObserver, repr=False
@@ -1150,7 +1153,6 @@ class ApplicationContext:
     def create(
         cls,
         *,
-        settings: Settings | None = None,
         overrides: ApplicationContextOverrides | None = None,
         app_config: AppConfig | None = None,
     ) -> ApplicationContext:
@@ -1158,7 +1160,7 @@ class ApplicationContext:
 
         Extended Summary
         ----------------
-        This is the primary way to create an ApplicationContext. It loads settings
+        This is the primary way to create an ApplicationContext. It loads AppConfig
         from environment variables, resolves and validates all filesystem paths,
         creates long-lived HTTP and index manager clients, and logs successful
         initialization with key configuration values. The method is designed to
@@ -1169,9 +1171,6 @@ class ApplicationContext:
 
         Parameters
         ----------
-        settings : Settings | None, optional
-            Preconstructed settings object. When None (default), settings are
-            loaded via ``load_settings()``.
         overrides : ApplicationContextOverrides | None, optional
             Optional dependency overrides. Useful for injecting fakes in tests
             or for swapping runtime observers, factory adjusters, and storage
@@ -1230,8 +1229,6 @@ class ApplicationContext:
         """
         effective_overrides = overrides or ApplicationContextOverrides()
         app_config = app_config or load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
-        if settings is None:
-            settings = settings_from_app_config(app_config)
         paths = resolve_application_paths(app_config)
         catalog_cfg = _duckdb_catalog_config_from_app(paths, app_config)
         try:
@@ -1244,7 +1241,6 @@ class ApplicationContext:
 
         vllm_client = effective_overrides.vllm_client or build_vllm_client(app_config.vllm)
         faiss_manager = effective_overrides.faiss_manager or _build_faiss_manager(
-            settings,
             paths,
             app_config,
             factory=effective_overrides.faiss_manager_factory,
@@ -1256,18 +1252,12 @@ class ApplicationContext:
         if effective_overrides.duckdb_catalog_factory is not None:
             duckdb_catalog_factory = effective_overrides.duckdb_catalog_factory
         else:
-            log_queries = getattr(app_config.duckdb, "log_queries", False)
 
             def _factory(
-                _resolved: ResolvedPaths,
-                _settings: Settings,
+                cfg: DuckDBCatalogConfig,
                 manager: DuckDBManager,
             ) -> DuckDBCatalog:
-                return _build_duckdb_catalog_from_app_config(
-                    catalog_cfg,
-                    manager,
-                    log_queries=log_queries,
-                )
+                return _build_duckdb_catalog_from_app_config(cfg, manager)
 
             duckdb_catalog_factory = _factory
         git_client, async_git_client = _select_git_clients(paths, effective_overrides)
@@ -1277,12 +1267,12 @@ class ApplicationContext:
         adjuster = effective_overrides.factory_adjuster or _build_factory_adjuster(app_config.index)
         return cls(
             app_config=app_config,
-            settings=settings,
             paths=paths,
             vllm_client=vllm_client,
             faiss_manager=faiss_manager,
             scope_store=scope_store,
             duckdb_manager=duckdb_manager,
+            catalog_config=catalog_cfg,
             duckdb_catalog_factory=duckdb_catalog_factory,
             git_client=git_client,
             async_git_client=async_git_client,
@@ -1960,7 +1950,7 @@ class ApplicationContext:
         --------
         codeintel_rev.io.duckdb_catalog.DuckDBCatalog : Catalog implementation
         """
-        catalog = self.duckdb_catalog_factory(self.paths, self.settings, self.duckdb_manager)
+        catalog = self.duckdb_catalog_factory(self.catalog_config, self.duckdb_manager)
         try:
             catalog.open()
             yield catalog
@@ -2055,20 +2045,19 @@ class ApplicationContext:
 
         new_app_config = app_config or self.app_config
         new_paths = paths or self.paths
-        new_settings = (
-            self.settings
-            if new_app_config is self.app_config
-            else settings_from_app_config(new_app_config)
-        )
+        if new_paths is self.paths and new_app_config is self.app_config:
+            new_catalog_config = self.catalog_config
+        else:
+            new_catalog_config = _duckdb_catalog_config_from_app(new_paths, new_app_config)
 
         return ApplicationContext(
             app_config=new_app_config,
-            settings=new_settings,
             paths=new_paths,
             vllm_client=_component_value("vllm_client", self.vllm_client),
             faiss_manager=_component_value("faiss_manager", self.faiss_manager),
             scope_store=_component_value("scope_store", self.scope_store),
             duckdb_manager=_component_value("duckdb_manager", self.duckdb_manager),
+            catalog_config=new_catalog_config,
             duckdb_catalog_factory=_component_value(
                 "duckdb_catalog_factory", self.duckdb_catalog_factory
             ),

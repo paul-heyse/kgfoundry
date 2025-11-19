@@ -9,7 +9,6 @@ import duckdb
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext, resolve_application_paths
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 
 from kgfoundry_common.errors import ConfigurationError
@@ -109,10 +108,9 @@ def test_application_context_create(tmp_path: Path) -> None:
     (repo_root / "data" / "catalog.duckdb").touch()
 
     app_config = build_app_config_for_repo(repo_root)
-    settings = settings_from_app_config(app_config)
 
     # Act
-    context = ApplicationContext.create(settings=settings, app_config=app_config)
+    context = ApplicationContext.create(app_config=app_config)
     context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Assert
@@ -130,10 +128,7 @@ def test_application_context_create_invalid_config() -> None:
 
     # Act & Assert
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
-        ApplicationContext.create(
-            settings=settings_from_app_config(app_config),
-            app_config=app_config,
-        )
+        ApplicationContext.create(app_config=app_config)
 
 
 def test_application_context_ensure_faiss_ready(
@@ -152,9 +147,8 @@ def test_application_context_ensure_faiss_ready(
     (repo_root / "data" / "catalog.duckdb").touch()
 
     app_config = build_app_config_for_repo(repo_root)
-    settings = settings_from_app_config(app_config)
 
-    context = ApplicationContext.create(settings=settings, app_config=app_config)
+    context = ApplicationContext.create(app_config=app_config)
     context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Act - ensure_faiss_ready should handle missing index gracefully
@@ -183,9 +177,8 @@ def test_application_context_ensure_faiss_ready_cached(
     (repo_root / "data" / "catalog.duckdb").touch()
 
     app_config = build_app_config_for_repo(repo_root)
-    settings = settings_from_app_config(app_config)
 
-    context = ApplicationContext.create(settings=settings, app_config=app_config)
+    context = ApplicationContext.create(app_config=app_config)
     context.faiss_manager.load_cpu_index = _noop_load_cpu_index
 
     # Act - call twice
@@ -213,8 +206,7 @@ def test_application_context_open_catalog(tmp_path: Path) -> None:
     conn.close()
 
     app_config = build_app_config_for_repo(repo_root)
-    settings = settings_from_app_config(app_config)
-    context = ApplicationContext.create(settings=settings, app_config=app_config)
+    context = ApplicationContext.create(app_config=app_config)
 
     # Act
     with context.open_catalog() as catalog:
@@ -240,8 +232,7 @@ def test_build_factory_adjuster_from_settings(
     (faiss_dir / "code.ivfpq.faiss").touch()
     (data_dir / "catalog.duckdb").touch()
     app_config = build_app_config_for_repo(repo_root)
-    settings = settings_from_app_config(app_config)
-    context = ApplicationContext.create(settings=settings, app_config=app_config)
+    context = ApplicationContext.create(app_config=app_config)
     assertions.expect_true(isinstance(context.factory_adjuster, DefaultFactoryAdjuster))
     expected = getattr(context.app_config.index, "faiss_nprobe", None)
     adjuster = cast("DefaultFactoryAdjuster", context.factory_adjuster)

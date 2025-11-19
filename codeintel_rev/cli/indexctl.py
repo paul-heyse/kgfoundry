@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Literal, Protocol, cast
+from typing import Annotated, Literal, cast
 
 import click
 import duckdb as duckdb_mod
@@ -21,8 +21,6 @@ import typer
 
 from codeintel_rev.config import AppConfig, load_app_config
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.config.settings import Settings
-from codeintel_rev.config.shim import settings_from_app_config
 from codeintel_rev.embeddings import EmbeddingProvider, get_embedding_provider
 from codeintel_rev.errors import RuntimeLifecycleError
 from codeintel_rev.eval.hybrid_evaluator import EvalConfig, HybridPoolEvaluator
@@ -60,18 +58,6 @@ app.add_typer(embeddings_app, name="embeddings")
 
 
 @lru_cache(maxsize=1)
-def _cached_settings() -> Settings:
-    """Load and cache msgspec Settings derived from AppConfig.
-
-    Returns
-    -------
-    object
-        Legacy settings struct populated from :func:`load_app_config`.
-    """
-    return settings_from_app_config(_cached_app_config())
-
-
-@lru_cache(maxsize=1)
 def _cached_app_config() -> AppConfig:
     """Load and cache immutable application configuration.
 
@@ -83,26 +69,36 @@ def _cached_app_config() -> AppConfig:
     return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
 
 
+def _get_app_config() -> AppConfig:
+    """Retrieve application configuration from the CLI context factory.
+
+    Returns
+    -------
+    AppConfig
+        Immutable configuration provided by the CLI context.
+    """
+    return _cli_context().app_config_factory()
+
+
 def _default_faiss_manager_factory(
-    _settings: Settings,
+    app_config: AppConfig,
     index_override: Path | None,
 ) -> FAISSManager:
-    """Create and load a FAISS manager instance from settings.
+    """Create and load a FAISS manager instance from AppConfig data.
 
-    This function creates a FAISSManager instance using settings configuration
+    This function creates a FAISSManager instance using AppConfig configuration
     and optional index path override. The manager is configured with vector
-    dimension and nlist parameters from settings, and the CPU index is loaded
+    dimension and nlist parameters from AppConfig, and the CPU index is loaded
     immediately for use.
 
     Parameters
     ----------
-    _settings : Settings
-        Application settings containing FAISS vector dimension and nlist
-        configuration. Index path defaults are sourced from :class:`AppConfig`.
-        This parameter is unused but kept for API compatibility.
+    app_config : AppConfig
+        Immutable configuration containing FAISS vector dimension and nlist
+        parameters alongside default index paths.
     index_override : Path | None
         Optional path override for the FAISS index file. If provided, this
-        path is used instead of the settings path. The path is expanded and
+        path is used instead of the configured default. The path is expanded and
         resolved to absolute form.
 
     Returns
@@ -118,7 +114,6 @@ def _default_faiss_manager_factory(
     index loading, providing a ready-to-use manager instance. The CPU index
     is loaded immediately to ensure it's available for operations.
     """
-    app_config = _cached_app_config()
     index_cfg = app_config.index
     default_index = app_config.faiss.index_path
     index_path = (index_override or default_index).expanduser().resolve()
@@ -133,25 +128,24 @@ def _default_faiss_manager_factory(
 
 
 def _default_duckdb_catalog_factory(
-    _settings: SupportsPathSettings,
+    app_config: AppConfig,
     path_override: Path | None,
 ) -> DuckDBCatalog:
-    """Create and configure a DuckDB catalog instance from settings.
+    """Create and configure a DuckDB catalog instance from AppConfig.
 
-    This function creates a DuckDBCatalog instance using settings configuration
+    This function creates a DuckDBCatalog instance using AppConfig configuration
     and optional path override. The catalog is configured with database path,
     vectors directory, repository root, materialization settings, and FAISS
     ID map path.
 
     Parameters
     ----------
-    _settings : SupportsPathSettings
-        Application settings (unused; retained for compatibility with existing
-        overrides). The DuckDB catalog path defaults to the value defined in
-        :class:`AppConfig`.
+    app_config : AppConfig
+        Immutable configuration providing catalog defaults and materialization
+        settings.
     path_override : Path | None
         Optional path override for the DuckDB catalog file. If provided, this
-        path is used instead of the settings path. The path is expanded and
+        path is used instead of the configured default. The path is expanded and
         resolved to absolute form.
 
     Returns
@@ -159,7 +153,7 @@ def _default_duckdb_catalog_factory(
     DuckDBCatalog
         Configured DuckDB catalog instance ready for querying chunk metadata
         and structure annotations. The catalog is configured with all necessary
-        paths and settings from the application configuration.
+        paths and options from the application configuration.
 
     Notes
     -----
@@ -168,7 +162,6 @@ def _default_duckdb_catalog_factory(
     The function handles path resolution and catalog configuration, providing a
     ready-to-use catalog instance with proper ID map and materialization settings.
     """
-    app_config = _cached_app_config()
     paths = resolve_application_paths(app_config)
     db_path = (path_override or paths.duckdb_path).expanduser().resolve()
     catalog_cfg = DuckDBCatalogConfig(
@@ -177,6 +170,7 @@ def _default_duckdb_catalog_factory(
         repo_root=paths.repo_root,
         idmap_path=paths.faiss_idmap_path,
         materialize=app_config.index.duckdb_materialize,
+        log_queries=getattr(app_config.duckdb, "log_queries", False),
     )
     catalog = DuckDBCatalog(
         catalog_cfg.db_path,
@@ -294,22 +288,20 @@ def _default_count_idmap_rows(path: Path) -> int:
     return metadata.num_rows if metadata is not None else 0
 
 
-def _default_embedding_provider_factory(_settings: Settings) -> EmbeddingProvider:
+def _default_embedding_provider_factory(app_config: AppConfig) -> EmbeddingProvider:
     """Create an embedding provider instance from the active configuration.
 
     Parameters
     ----------
-    _settings : Settings
-        Legacy settings struct that supplies index configuration (vector
-        dimensionality). Embedding/vLLM parameters are sourced from AppConfig.
-        This parameter is unused but kept for API compatibility.
+    app_config : AppConfig
+        Immutable configuration providing embedding/vLLM parameters and
+        index dimensionality.
 
     Returns
     -------
     EmbeddingProvider
         Configured embedding provider instance ready for generating embeddings.
     """
-    app_config = _cached_app_config()
     index_cfg = app_config.index
     return get_embedding_provider(
         embeddings=app_config.embeddings,
@@ -324,14 +316,14 @@ class IndexctlCliContext:
 
     Attributes
     ----------
-    settings_factory : Callable[[], Settings]
-        Factory function that returns application settings. Typically uses
-        caching to avoid repeated file I/O.
-    faiss_manager_factory : Callable[[Settings, Path | None], FAISSManager]
-        Factory function that creates FAISS manager instances from settings
+    app_config_factory : Callable[[], AppConfig]
+        Factory function that returns immutable application configuration.
+        Typically uses caching to avoid repeated file I/O.
+    faiss_manager_factory : Callable[[AppConfig, Path | None], FAISSManager]
+        Factory function that creates FAISS manager instances from AppConfig
         and optional index path override.
-    duckdb_catalog_factory : Callable[[SupportsPathSettings, Path | None], DuckDBCatalog]
-        Factory function that creates DuckDB catalog instances from settings
+    duckdb_catalog_factory : Callable[[AppConfig, Path | None], DuckDBCatalog]
+        Factory function that creates DuckDB catalog instances from AppConfig
         and optional path override.
     duckdb_dim_resolver : Callable[[DuckDBCatalog], int]
         Function that determines embedding dimension from a DuckDB catalog
@@ -339,17 +331,17 @@ class IndexctlCliContext:
     idmap_row_counter : Callable[[Path], int]
         Function that counts rows in a FAISS ID map Parquet file without
         loading the entire file.
-    embedding_provider_factory : Callable[[Settings], EmbeddingProvider]
+    embedding_provider_factory : Callable[[AppConfig], EmbeddingProvider]
         Factory function that creates embedding provider instances from
-        application settings.
+        application configuration.
     """
 
-    settings_factory: Callable[[], Settings]
-    faiss_manager_factory: Callable[[Settings, Path | None], FAISSManager]
-    duckdb_catalog_factory: Callable[[SupportsPathSettings, Path | None], DuckDBCatalog]
+    app_config_factory: Callable[[], AppConfig]
+    faiss_manager_factory: Callable[[AppConfig, Path | None], FAISSManager]
+    duckdb_catalog_factory: Callable[[AppConfig, Path | None], DuckDBCatalog]
     duckdb_dim_resolver: Callable[[DuckDBCatalog], int]
     idmap_row_counter: Callable[[Path], int]
-    embedding_provider_factory: Callable[[Settings], EmbeddingProvider]
+    embedding_provider_factory: Callable[[AppConfig], EmbeddingProvider]
 
     @classmethod
     def production(cls) -> IndexctlCliContext:
@@ -361,7 +353,7 @@ class IndexctlCliContext:
             Context configured with the production factories.
         """
         return cls(
-            settings_factory=_cached_settings,
+            app_config_factory=_cached_app_config,
             faiss_manager_factory=_default_faiss_manager_factory,
             duckdb_catalog_factory=_default_duckdb_catalog_factory,
             duckdb_dim_resolver=_default_duckdb_embedding_dim,
@@ -415,31 +407,6 @@ def _cli_context(ctx: click.Context | None = None) -> IndexctlCliContext:
         return existing
     state["cli_context"] = _DEFAULT_CONTEXT
     return _DEFAULT_CONTEXT
-
-
-def _get_settings() -> Settings:
-    """Retrieve application settings from CLI context.
-
-    This function retrieves application settings by accessing the settings factory
-    from the CLI context. The settings are loaded using the factory function
-    (typically _cached_settings) which caches the result.
-
-    Returns
-    -------
-    Settings
-        Application settings containing configuration for paths, index parameters,
-        and embedding providers. The settings are loaded from the CLI context's
-        settings factory.
-
-    Notes
-    -----
-    Settings retrieval enables commands to access application configuration
-    without directly importing settings loaders. The function uses the CLI context's
-    settings factory, enabling dependency injection and testing with mock settings.
-    The factory typically uses caching to avoid repeated file I/O.
-    """
-    return _cli_context().settings_factory()
-
 
 RootOption = Annotated[Path | None, typer.Option("--root", help="Index lifecycle root directory.")]
 ExtraOption = Annotated[
@@ -1012,12 +979,12 @@ def _build_context(
     duckdb_path: Path | None,
     output: Path | None,
 ) -> _EmbeddingBuildContext:
-    """Construct embedding build context from settings and parameters.
+    """Construct embedding build context from configuration and parameters.
 
     This function creates an _EmbeddingBuildContext object by resolving version
-    directory, DuckDB catalog path, output path, and manifest path from settings
-    and optional overrides. The context provides all paths and configuration needed
-    for embedding generation operations.
+    directory, DuckDB catalog path, output path, and manifest path from AppConfig
+    and optional overrides. The context provides all paths and configuration
+    needed for embedding generation operations.
 
     Parameters
     ----------
@@ -1033,10 +1000,11 @@ def _build_context(
         version directory is resolved and used for path resolution.
     duckdb_path : Path | None, optional
         Optional DuckDB catalog path override. If provided, this path is used
-        instead of resolving from settings or version directory.
+        instead of resolving from AppConfig defaults or version directory.
     output : Path | None, optional
         Optional output path override for embeddings Parquet file. If provided,
-        this path is used instead of resolving from settings or version directory.
+        this path is used instead of resolving from AppConfig defaults or version
+        directory.
 
     Returns
     -------
@@ -1546,7 +1514,7 @@ def _execute_embeddings_build(
     Parameters
     ----------
     context : _EmbeddingBuildContext
-        Embedding build context containing settings, manager, paths, and version
+        Embedding build context containing configuration, manager, paths, and version
         information. The context provides all configuration and paths needed
         for embedding generation.
     chunk_size : int
@@ -1567,8 +1535,9 @@ def _execute_embeddings_build(
     updates in production. The function writes both Parquet files and manifests,
     enabling downstream tools to access embeddings and metadata.
     """
-    provider = _embedding_provider(_get_settings())
-    duckdb_cfg = _duckdb_manager_config(context.app_config)
+    app_config = context.app_config
+    provider = _embedding_provider(app_config)
+    duckdb_cfg = _duckdb_manager_config(app_config)
     db_manager = DuckDBManager(context.duck_path, duckdb_cfg)
     try:
         checksum, row_count = _compute_chunk_checksum(db_manager)
@@ -1599,7 +1568,7 @@ def _execute_embeddings_build(
             embeddings,
             options=ParquetWriteOptions(
                 vec_dim=provider.metadata.dimension,
-                preview_max_chars=_cached_app_config().index.preview_max_chars,
+                preview_max_chars=app_config.index.preview_max_chars,
                 id_strategy="stable_hash",
                 table_meta=_parquet_meta(provider),
             ),
@@ -1609,7 +1578,7 @@ def _execute_embeddings_build(
             checksum=checksum,
             vector_count=len(chunks),
             output_path=context.output_path,
-            app_config=_cached_app_config(),
+            app_config=app_config,
         )
         manifest_payload["row_count"] = row_count
         _write_manifest(context.manifest_path, manifest_payload)
@@ -1675,7 +1644,7 @@ def _run_embedding_validation(
     contents = cast("list[str]", table.column("content").to_pylist())
     indices = _deterministic_sample(total_rows, sample_size)
 
-    provider = _embedding_provider(_get_settings())
+    provider = _embedding_provider(_get_app_config())
     try:
         max_drift, drift_sum, failure_count = _evaluate_drift(
             indices=indices,
@@ -1763,7 +1732,7 @@ def embeddings_build_command(
     chunk_size : ChunkBatchOption, optional
         Batch size for embedding generation. Defaults to 512.
     """
-    app_config = _cached_app_config()
+    app_config = _get_app_config()
     manager = _manager()
     context = _build_context(
         app_config,
@@ -1817,7 +1786,7 @@ def embeddings_validate_command(
         Raised when the embeddings Parquet file is missing or cannot be accessed.
         The error includes the expected path for debugging.
     """
-    app_config = _cached_app_config()
+    app_config = _get_app_config()
     paths = resolve_application_paths(app_config)
     manager = _manager()
     version_dir = _resolve_version_dir(manager, version)
@@ -1918,7 +1887,7 @@ def _parse_tune_overrides(
 def _faiss_manager(index_override: Path | None = None) -> FAISSManager:
     """Create FAISS manager instance using CLI context factory.
 
-    This function creates a FAISSManager instance by retrieving settings and
+    This function creates a FAISSManager instance by retrieving AppConfig and
     using the CLI context's FAISS manager factory. The function supports
     optional index path override for flexible index access.
 
@@ -1926,7 +1895,7 @@ def _faiss_manager(index_override: Path | None = None) -> FAISSManager:
     ----------
     index_override : Path | None, optional
         Optional path override for FAISS index file. If provided, this path
-        is used instead of the settings path. The path is expanded and resolved
+        is used instead of the configured default. The path is expanded and resolved
         to absolute form.
 
     Returns
@@ -1940,17 +1909,17 @@ def _faiss_manager(index_override: Path | None = None) -> FAISSManager:
     FAISS manager creation enables index access for CLI commands that need to
     interact with FAISS indexes. The function uses the CLI context's factory
     method, enabling dependency injection and testing with mock managers. The
-    manager is configured with settings and optional path override, providing
+    manager is configured with AppConfig data and optional path override, providing
     flexible index access.
     """
-    settings = _get_settings()
-    return _cli_context().faiss_manager_factory(settings, index_override)
+    app_config = _get_app_config()
+    return _cli_context().faiss_manager_factory(app_config, index_override)
 
 
 def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     """Create DuckDB catalog instance using CLI context factory.
 
-    This function creates a DuckDBCatalog instance by retrieving settings and
+    This function creates a DuckDBCatalog instance by retrieving AppConfig and
     using the CLI context's DuckDB catalog factory. The function supports
     optional path override for flexible catalog access.
 
@@ -1958,7 +1927,7 @@ def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     ----------
     path_override : Path | None, optional
         Optional path override for DuckDB catalog file. If provided, this path
-        is used instead of the settings path. The path is expanded and resolved
+        is used instead of the configured default. The path is expanded and resolved
         to absolute form.
 
     Returns
@@ -1966,7 +1935,7 @@ def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     DuckDBCatalog
         Configured DuckDB catalog instance ready for querying chunk metadata
         and structure annotations. The catalog is configured with all necessary
-        paths and settings from the application configuration.
+        paths and configuration from the application configuration.
 
     Notes
     -----
@@ -1974,10 +1943,10 @@ def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     to query chunk information, structure annotations, and embedding metadata.
     The function uses the CLI context's factory method, enabling dependency
     injection and testing with mock catalogs. The catalog is configured with
-    settings and optional path override, providing flexible catalog access.
+    AppConfig data and optional path override, providing flexible catalog access.
     """
-    settings = _get_settings()
-    return _cli_context().duckdb_catalog_factory(settings, path_override)
+    app_config = _get_app_config()
+    return _cli_context().duckdb_catalog_factory(app_config, path_override)
 
 
 def _duckdb_embedding_dim(catalog: DuckDBCatalog) -> int:
@@ -2016,41 +1985,41 @@ def _count_idmap_rows(path: Path) -> int:
     return _cli_context().idmap_row_counter(path)
 
 
-def _embedding_provider(settings: Settings) -> EmbeddingProvider:
+def _embedding_provider(app_config: AppConfig) -> EmbeddingProvider:
     """Create embedding provider instance using CLI context factory.
 
     This function creates an EmbeddingProvider instance by using the CLI context's
-    embedding provider factory with the provided settings. The function enables
+    embedding provider factory with the provided AppConfig. The function enables
     dependency injection and testing with mock providers.
 
     Parameters
     ----------
-    settings : Settings
-        Application settings containing embedding provider configuration (provider
-        type, model name, API keys, etc.). Used to instantiate the appropriate
-        embedding provider.
+    app_config : AppConfig
+        Application configuration containing embedding provider configuration
+        (provider type, model name, API keys, etc.). Used to instantiate the
+        appropriate embedding provider.
 
     Returns
     -------
     EmbeddingProvider
         Configured embedding provider instance ready for generating embeddings.
-        The provider type and configuration are determined from settings.
+        The provider type and configuration are determined from AppConfig.
 
     Notes
     -----
     Embedding provider creation enables embedding generation for CLI commands that
     need to create embeddings from text. The function uses the CLI context's
     factory method, enabling dependency injection and testing with mock providers.
-    The provider is configured with settings, supporting multiple provider backends
+    The provider is configured with AppConfig data, supporting multiple provider backends
     (OpenAI, VLLM, local models).
     """
-    return _cli_context().embedding_provider_factory(settings)
+    return _cli_context().embedding_provider_factory(app_config)
 
 
 def _load_xtr_index(app_config: AppConfig) -> XTRIndex | None:
     """Load XTR index if enabled and available.
 
-    This function attempts to load an XTR index from settings if XTR is enabled.
+    This function attempts to load an XTR index from AppConfig if XTR is enabled.
     The function handles errors gracefully by returning None when the index
     cannot be opened or is not ready, enabling optional XTR functionality.
 
@@ -2264,10 +2233,11 @@ def health_command(
     Prints JSON health check results to stdout including dimension matches,
     row count matches, and view validation status.
     """
-    settings = _get_settings()
+    app_config = _get_app_config()
     manager = _faiss_manager(index)
     catalog = _duckdb_catalog(duckdb)
-    idmap_path = (idmap or Path(settings.paths.faiss_idmap_path)).expanduser().resolve()
+    paths = resolve_application_paths(app_config)
+    idmap_path = (idmap or Path(paths.faiss_idmap_path)).expanduser().resolve()
     faiss_dim = manager.vec_dim
     duck_dim = _duckdb_embedding_dim(catalog)
     cpu_index = manager.require_cpu_index()
@@ -2337,9 +2307,10 @@ def export_idmap_command(
         FAISS join view after exporting the ID map. If None, only exports the
         ID map without updating DuckDB.
     """
-    settings = _get_settings()
+    app_config = _get_app_config()
     manager = _faiss_manager(index)
-    destination = (out or Path(settings.paths.faiss_idmap_path)).expanduser().resolve()
+    paths = resolve_application_paths(app_config)
+    destination = (out or Path(paths.faiss_idmap_path)).expanduser().resolve()
     rows = manager.export_idmap(destination)
     typer.echo(f"Exported {rows} FAISS rows -> {destination}")
     if duckdb is not None:
@@ -2584,7 +2555,7 @@ def _run_autotune(manager: FAISSManager, mode: SweepMode) -> None:
     queries = vectors[: min(32, vectors.shape[0])]
     sweep_values = (16, 32, 48, 64, 96, 128) if mode == "quick" else (16, 32, 64, 96, 128, 192, 256)
     sweep = tuple(f"nprobe={value}" for value in sweep_values)
-    index_cfg = _cached_app_config().index
+    index_cfg = _get_app_config().index
     manager.autotune(
         queries,
         vectors,
@@ -2601,7 +2572,7 @@ def eval_command(
     xtr_oracle: EvalXtrOracleOption = DEFAULT_XTR_ORACLE,
 ) -> None:
     """Run ANN vs Flat evaluation and optionally rescore with XTR."""
-    app_config = _cached_app_config()
+    app_config = _get_app_config()
     eval_settings = app_config.eval
     manager = _faiss_manager()
     catalog = _duckdb_catalog()
@@ -2637,10 +2608,10 @@ def _execute_search(params: SearchCommandParams) -> None:
     typer.BadParameter
         Raised when the queries file cannot be read.
     """
-    settings = _get_settings()
+    app_config = _get_app_config()
     manager = _faiss_manager(params.index)
     catalog = _duckdb_catalog(params.duckdb)
-    embedder = _embedding_provider(settings)
+    embedder = _embedding_provider(app_config)
     runtime = SearchRuntimeOverrides()
     try:
         try:
