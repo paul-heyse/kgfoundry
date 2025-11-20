@@ -100,6 +100,21 @@ def _lookup_test_goid(
     return match.goid_h128, match.urn
 
 
+def _normalize_keywords(raw: object) -> dict[str, bool]:
+    """Return marker map from pytest keywords (list or mapping).
+
+    Returns
+    -------
+    dict[str, bool]
+        Mapping of marker names to truthy flags.
+    """
+    if isinstance(raw, list):
+        return {name: True for name in raw if isinstance(name, str) and name}
+    if isinstance(raw, dict):
+        return {str(key): bool(value) for key, value in raw.items()}
+    return {}
+
+
 def build_test_catalog(
     *,
     repo: str,
@@ -158,7 +173,7 @@ def build_test_catalog(
         nodeid: str = str(test.get("nodeid") or "")
         outcome = str(test.get("outcome") or "unknown")
         duration_ms = float(test.get("duration") or 0.0) * 1000.0
-        keywords = test.get("keywords") or {}
+        keywords = _normalize_keywords(test.get("keywords"))
 
         raw_path, qualname = _parse_nodeid(nodeid)
         rel_path = normalize_path(raw_path, repo_root)

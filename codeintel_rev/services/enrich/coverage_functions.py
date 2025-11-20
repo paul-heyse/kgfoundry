@@ -9,6 +9,7 @@ for each function in the codebase.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -45,13 +46,17 @@ class CoverageFunctionRow:
     created_at: str
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 def _load_coverage_line_rows(path: Path) -> Iterator[CoverageLineRow]:
     """Load coverage line rows from JSONL file.
 
     Extended Summary
     ----------------
     Reads a JSONL file containing coverage line data and yields CoverageLineRow
-    instances. Skips empty lines and parses each non-empty line as JSON.
+    instances. Skips empty lines and tolerates malformed JSON by logging and
+    continuing, rather than failing the aggregation.
 
     Parameters
     ----------
@@ -70,11 +75,36 @@ def _load_coverage_line_rows(path: Path) -> Iterator[CoverageLineRow]:
     Time O(n) where n is the number of lines; memory O(1) aside from line buffer.
     Performs file I/O to read the JSONL file. Thread-safe for separate file handles.
     """
+    if not path.exists():
+        LOGGER.warning("coverage lines file missing at %s", path)
+        return
     with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
+        for lineno, raw_line in enumerate(handle, start=1):
+            line = raw_line.strip()
+            if not line:
                 continue
-            yield CoverageLineRow(**json.loads(line))
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError as exc:
+                LOGGER.warning(
+                    "Skipping malformed coverage line %s:%d: %s",
+                    path,
+                    lineno,
+                    exc.msg,
+                )
+                continue
+            if not isinstance(payload, dict):
+                LOGGER.warning("Skipping non-object coverage line %s:%d", path, lineno)
+                continue
+            try:
+                yield CoverageLineRow(**payload)
+            except TypeError as exc:
+                LOGGER.warning(
+                    "Skipping invalid coverage line %s:%d: %s",
+                    path,
+                    lineno,
+                    exc,
+                )
 
 
 def _bump_count(bucket: dict[str, int], key: str) -> None:

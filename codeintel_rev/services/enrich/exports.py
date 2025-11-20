@@ -618,7 +618,8 @@ def emit_modules_jsonl(ctx: PipelineContext, records: Iterable[SimpleModuleRecor
     Path
         Path to the generated modules.jsonl file.
     """
-    target = ctx.paths.data_dir / "modules.jsonl"
+    target = ctx.paths.data_dir / "modules" / "modules.jsonl"
+    target.parent.mkdir(parents=True, exist_ok=True)
     count = simple_write_jsonl(target, (record_to_json(r) for r in records))
     ctx.logger.info("Wrote %d module rows to %s", count, target)
     return target

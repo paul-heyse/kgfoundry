@@ -17,6 +17,10 @@ tools/mkdocs_suite/site-mkdocs-suite/
 Document_Output/**
 /Document_Output/**
 /Document_Output/
+io/
+codeintel_rev/io/CST/
+codeintel_rev/io/ENRICHED/
+
 # MkDocs suite generated artifacts
 *.d2
 *.min.js

@@ -171,7 +171,7 @@ def write_tabular_records(parquet_path: Path, rows: list[dict[str, Any]]) -> Non
         List of record dictionaries to write to both Parquet and JSONL formats.
     """
     write_parquet(parquet_path, rows)
-    legacy_write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
+    legacy_write_jsonl(parquet_path.with_suffix(".jsonl"), rows, writer_version="v2")
 
 
 def collect_ast_artifacts(

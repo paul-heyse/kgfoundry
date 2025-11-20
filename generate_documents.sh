@@ -3,7 +3,7 @@
 #
 # End-to-end document generation helper.
 # Runs SCIP indexing, enrichment (LibCST + AST), CST dataset build,
-# then copies outputs into a top-level "Document Output" folder.
+# then copies outputs into a top-level "Document_Output" folder.
 set -euo pipefail
 
 convert_parquet_to_jsonl() {
@@ -26,10 +26,13 @@ src = os.environ["SRC_PATH"]
 dest = os.environ["DEST_PATH"]
 
 con = duckdb.connect()
-con.execute(
-    "COPY (SELECT * FROM read_parquet(?)) TO ? (FORMAT JSON, ARRAY false)",
-    [dest, src],
-)
+try:
+    con.execute("CREATE TEMP TABLE t AS SELECT * FROM read_parquet(?)", [src])
+    con.execute("COPY t TO ? (FORMAT JSON, ARRAY false)", [dest])
+except Exception as exc:  # pragma: no cover - best effort conversion
+    import sys
+
+    sys.stderr.write(f"⚠️  Failed to convert {src} to JSONL: {exc}\n")
 PY
 }
 
@@ -61,15 +64,38 @@ copy_if_exists() {
 }
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-pushd "$REPO_ROOT" >/dev/null
-
-SCIP_DIR="codeintel_rev"
+SCIP_DIR="$REPO_ROOT"
 SCIP_BIN="$SCIP_DIR/index.scip"
 SCIP_JSON="$SCIP_DIR/index.scip.json"
 ENRICH_OUT="$SCIP_DIR/io/ENRICHED"
 CST_OUT="$SCIP_DIR/io/CST"
-DOC_OUT="$REPO_ROOT/Document Output"
+DOC_OUT="$REPO_ROOT/Document_Output"
 MAPPINGS_DIR="$DOC_OUT/mappings"
+INCLUDE_PY_GLOBS=(
+  "codeintel_rev/**/*.py"
+  "src/**/*.py"
+  "tests/**/*.py"
+  "tools/**/*.py"
+)
+EXCLUDE_PY_GLOBS=(
+  ".venv/**"
+  "io/ENRICHED/**"
+  "Document_Output/**"
+)
+
+# Build include/exclude argument arrays to avoid word-splitting issues.
+INCLUDE_ARGS=()
+ONLY_ARGS=()
+for pat in "${INCLUDE_PY_GLOBS[@]}"; do
+  INCLUDE_ARGS+=(--include "$pat")
+  ONLY_ARGS+=(--only "$pat")
+done
+EXCLUDE_ARGS=()
+for pat in "${EXCLUDE_PY_GLOBS[@]}"; do
+  EXCLUDE_ARGS+=(--exclude "$pat")
+done
+
+pushd "$REPO_ROOT" >/dev/null
 
 echo "==> Ensuring required directories/config exist..."
 mkdir -p "$REPO_ROOT/config" \
@@ -83,6 +109,7 @@ mkdir -p "$REPO_ROOT/config" \
 if [ ! -f "$REPO_ROOT/config/app.yml" ]; then
   echo "{}" > "$REPO_ROOT/config/app.yml"
 fi
+mkdir -p "$ENRICH_OUT" "$CST_OUT"
 
 echo "==> Generating SCIP index..."
 (
@@ -91,13 +118,86 @@ echo "==> Generating SCIP index..."
   scip print --json index.scip > index.scip.json
 )
 
-echo "==> Running enrichment pipeline (LibCST + AST + analytics)..."
-uv run python -m codeintel_rev.cli.enrich_pipeline \
-  all \
-  --root codeintel_rev \
+echo "==> Exporting modules and repo map..."
+uv run python -m codeintel_rev.cli.enrich exports \
+  --repo-root "$REPO_ROOT" \
+  --out-dir "$ENRICH_OUT"
+
+echo "==> Building hotspot analytics..."
+uv run python -m codeintel_rev.cli.enrich_analytics \
+  --root "$REPO_ROOT" \
   --scip "$SCIP_JSON" \
   --out "$ENRICH_OUT" \
-  --emit-ast
+  "${ONLY_ARGS[@]}" \
+  hotspots
+
+echo "==> Building AST artifacts from modules.jsonl..."
+uv run python - <<PY
+import json
+from pathlib import Path
+
+from codeintel_rev.enrich.ast_indexer import write_ast_parquet
+from codeintel_rev.services.enrich.io import collect_ast_artifacts, write_ast_jsonl
+
+repo_root = Path("$REPO_ROOT")
+modules_path = Path("$ENRICH_OUT") / "modules" / "modules.jsonl"
+if not modules_path.is_file():
+    raise SystemExit(f"modules.jsonl not found at {modules_path}")
+
+files = []
+with modules_path.open(encoding="utf-8") as handle:
+    for line in handle:
+        if not line.strip():
+            continue
+        data = json.loads(line)
+        rel = data.get("path")
+        if not rel:
+            continue
+        path = (repo_root / rel).resolve()
+        if ".venv" in path.parts:
+            continue
+        if not path.is_file():
+            continue
+        files.append(path)
+
+node_rows, metric_rows = collect_ast_artifacts(repo_root, files)
+ast_dir = Path("$ENRICH_OUT") / "ast"
+ast_dir.mkdir(parents=True, exist_ok=True)
+write_ast_jsonl(ast_dir / "ast_nodes.jsonl", node_rows)
+write_ast_jsonl(ast_dir / "ast_metrics.jsonl", metric_rows)
+write_ast_parquet(node_rows, metric_rows, out_dir=ast_dir)
+PY
+
+echo "==> Ensuring tags_index.yaml is present..."
+python - <<PY
+import json
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover - fallback writer
+    yaml = None
+
+root = Path("$ENRICH_OUT")
+json_path = root / "tag_index.json"
+yaml_path = root / "tags" / "tags_index.yaml"
+if yaml_path.is_file():
+    raise SystemExit(0)
+if not json_path.is_file():
+    raise SystemExit(f"tag_index.json missing at {json_path}")
+
+data = json.loads(json_path.read_text(encoding="utf-8"))
+yaml_path.parent.mkdir(parents=True, exist_ok=True)
+if yaml is not None:
+    yaml.safe_dump(data, yaml_path.open("w", encoding="utf-8"), sort_keys=True)
+else:
+    lines = []
+    for key in sorted(data):
+        lines.append(f"{key}:")
+        for val in data[key]:
+            lines.append(f"  - {val}")
+    yaml_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
 
 echo "==> Building GOID / call graph / CFG / DFG artifacts..."
 uv run python -m codeintel_rev.cli.enrich goids \
@@ -120,19 +220,21 @@ uv run python -m codeintel_rev.cli.enrich dfg \
 echo "==> Building coverage and test analytics (best-effort)..."
 COVERAGE_FILE="$REPO_ROOT/.coverage"
 PYTEST_REPORT="$REPO_ROOT/.cache/pytest-report.json"
+# Always regenerate analytics artifacts to avoid stale JSONL formatting.
+rm -rf "$ENRICH_OUT/analytics/coverage" "$ENRICH_OUT/analytics/tests" "$ENRICH_OUT/analytics/risk"
 if [ -f "$COVERAGE_FILE" ]; then
-  uv run python -m codeintel_rev.cli.enrich_analytics \
-    --root codeintel_rev \
-    --out "$ENRICH_OUT" \
-    coverage-detailed \
-    --coverage-file "$COVERAGE_FILE"
+uv run python -m codeintel_rev.cli.enrich_analytics \
+  --root "$REPO_ROOT" \
+  --out "$ENRICH_OUT" \
+  coverage-detailed \
+  --coverage-file "$COVERAGE_FILE"
 else
   echo "⚠️  No .coverage found; skipping coverage analytics" >&2
 fi
 
 if [ -f "$COVERAGE_FILE" ] && [ -f "$PYTEST_REPORT" ]; then
   uv run python -m codeintel_rev.cli.enrich_analytics \
-    --root codeintel_rev \
+    --root "$REPO_ROOT" \
     --out "$ENRICH_OUT" \
     test-analytics \
     --coverage-file "$COVERAGE_FILE" \
@@ -143,7 +245,7 @@ fi
 
 if [ -f "$ENRICH_OUT/analytics/coverage/coverage_functions.jsonl" ]; then
   uv run python -m codeintel_rev.cli.enrich_analytics \
-    --root codeintel_rev \
+    --root "$REPO_ROOT" \
     --out "$ENRICH_OUT" \
     risk-factors
 else
@@ -152,9 +254,11 @@ fi
 
 echo "==> Building CST dataset..."
 uv run python -m codeintel_rev.cst_build.cst_cli \
-  --root codeintel_rev \
+  --root "$REPO_ROOT" \
   --scip "$SCIP_JSON" \
   --modules "$ENRICH_OUT/modules/modules.jsonl" \
+  "${INCLUDE_ARGS[@]}" \
+  "${EXCLUDE_ARGS[@]}" \
   --out "$CST_OUT"
 
 echo "==> Normalizing CST dataset artifacts..."
@@ -171,11 +275,11 @@ mkdir -p "$DOC_OUT/scip"
 cp "$SCIP_BIN" "$DOC_OUT/scip/index.scip"
 cp "$SCIP_JSON" "$DOC_OUT/scip/index.scip.json"
 
-echo "==> Promoting frequently accessed artifacts to Document Output root..."
+echo "==> Promoting frequently accessed artifacts to Document_Output root..."
 cp "$SCIP_JSON" "$DOC_OUT/index.scip.json"
 cp "$ENRICH_OUT/repo_map.json" "$DOC_OUT/repo_map.json"
 cp "$ENRICH_OUT/modules/modules.jsonl" "$DOC_OUT/modules.jsonl"
-cp "$ENRICH_OUT/ast/ast_nodes.jsonl" "$DOC_OUT/ast_nodes.jsonl"
+convert_parquet_to_jsonl "$ENRICH_OUT/ast/ast_nodes.parquet" "$DOC_OUT/ast_nodes.jsonl"
 cp "$CST_OUT/cst_nodes.jsonl" "$DOC_OUT/cst_nodes.jsonl"
 copy_if_exists "$ENRICH_OUT/analytics/coverage/coverage_lines.parquet" "$DOC_OUT/coverage_lines.parquet"
 convert_parquet_to_jsonl "$DOC_OUT/coverage_lines.parquet" "$DOC_OUT/coverage_lines.jsonl"
@@ -264,7 +368,7 @@ copy_mapping_artifact "$DFG_EDGES_PARQUET" "dfg_edges"
 copy_mapping_artifact "$IMPORT_GRAPH_EDGES_PARQUET" "import_graph_edges"
 copy_mapping_artifact "$SYMBOL_USE_EDGES_PARQUET" "symbol_use_edges"
 
-echo "==> Promoting key analytics artifacts to Document Output root..."
+echo "==> Promoting key analytics artifacts to Document_Output root..."
 copy_if_exists "$DOC_OUT/enriched/analytics/hotspots.jsonl" "$DOC_OUT/hotspots.jsonl"
 copy_if_exists "$DOC_OUT/enriched/analytics/typedness.jsonl" "$DOC_OUT/typedness.jsonl"
 copy_if_exists "$DOC_OUT/enriched/analytics/function_metrics.jsonl" "$DOC_OUT/function_metrics.jsonl"

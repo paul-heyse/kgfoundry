@@ -1155,8 +1155,14 @@ def _preview_text(code: str, span: Span, max_chars: int, *, skip: bool) -> str |
     if skip:
         return None
     lines = code.splitlines()
+    if not lines:
+        return None
     index = max(0, min(len(lines) - 1, span.start_line - 1))
-    return shorten(lines[index].strip(), max_chars, placeholder="...")
+    try:
+        line = lines[index].strip()
+    except IndexError:  # pragma: no cover - defensive guard
+        return None
+    return shorten(line, max_chars, placeholder="...")
 
 
 def _decorators(module: cst.Module, node: cst.CSTNode) -> list[str] | None:

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -11,6 +12,8 @@ from typing import Any, ClassVar
 
 from codeintel_rev.cst_build.cst_schema import NodeRecord, StitchCandidate, StitchInfo
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -262,7 +265,11 @@ def load_scip_index(path: Path | None) -> SCIPResolver | None:
     """
     if path is None or not path.exists():
         return None
-    index = SCIPIndex.load(path)
+    try:
+        index = SCIPIndex.load(path)
+    except Exception:  # pragma: no cover - defensive
+        LOGGER.exception("Failed to load SCIP index from %s; skipping SCIP stitching", path)
+        return None
     return SCIPResolver(index.by_file())
 
 

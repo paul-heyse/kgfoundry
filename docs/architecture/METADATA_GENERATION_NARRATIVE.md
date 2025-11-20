@@ -72,15 +72,20 @@
     - [6.2 Module Catalog](#62-module-catalog)
 - [7. Data & Metadata Structures](#7-data--metadata-structures)
     - [7.1 GOID Registry Schema (`goids.parquet` / `goids.jsonl`)](#71-goid-registry-schema-goidsparquet--goidsjsonl)
-    - [7.2 GOID Crosswalk Schema (`goid_crosswalk.parquet` / `goid_crosswalk.jsonl`)](#72-goid-crosswalk-schema-goid_crosswalkparquet--goid_crosswalkjsonl)
-    - [7.3 Call Graph Nodes Schema (`call_graph_nodes.parquet` / `call_graph_nodes.jsonl`)](#73-call-graph-nodes-schema-call_graph_nodesparquet--call_graph_nodesjsonl)
-    - [7.4 Call Graph Edges Schema (`call_graph_edges.parquet` / `call_graph_edges.jsonl`)](#74-call-graph-edges-schema-call_graph_edgesparquet--call_graph_edgesjsonl)
+    - [7.2 GOID Crosswalk Schema (`goid_xwalk.parquet` / `goid_xwalk.jsonl`)](#72-goid-crosswalk-schema-goid_xwalkparquet--goid_xwalkjsonl)
+    - [7.3 Call Graph Nodes Schema (`call_nodes.parquet` / `call_nodes.jsonl`)](#73-call-graph-nodes-schema-call_nodesparquet--call_nodesjsonl)
+    - [7.4 Call Graph Edges Schema (`call_edges.parquet` / `call_edges.jsonl`)](#74-call-graph-edges-schema-call_edgesparquet--call_edgesjsonl)
     - [7.5 CFG Blocks Schema (`cfg_blocks.parquet` / `cfg_blocks.jsonl`)](#75-cfg-blocks-schema-cfg_blocksparquet--cfg_blocksjsonl)
     - [7.6 CFG Edges Schema (`cfg_edges.parquet` / `cfg_edges.jsonl`)](#76-cfg-edges-schema-cfg_edgesparquet--cfg_edgesjsonl)
     - [7.7 DFG Edges Schema (`dfg_edges.parquet` / `dfg_edges.jsonl`)](#77-dfg-edges-schema-dfg_edgesparquet--dfg_edgesjsonl)
     - [7.8 Module Records Schema (`modules.jsonl`)](#78-module-records-schema-modulesjsonl)
     - [7.9 Import Graph Edges Schema (`import_graph_edges.parquet` / `import_graph_edges.jsonl`)](#79-import-graph-edges-schema-import_graph_edgesparquet--import_graph_edgesjsonl)
     - [7.10 Symbol Use Edges Schema (`symbol_use_edges.parquet` / `symbol_use_edges.jsonl`)](#710-symbol-use-edges-schema-symbol_use_edgesparquet--symbol_use_edgesjsonl)
+    - [7.11 Coverage Lines Schema (`coverage_lines.parquet` / `coverage_lines.jsonl`)](#711-coverage-lines-schema-coverage_linesparquet--coverage_linesjsonl)
+    - [7.12 Coverage Functions Schema (`coverage_functions.parquet` / `coverage_functions.jsonl`)](#712-coverage-functions-schema-coverage_functionsparquet--coverage_functionsjsonl)
+    - [7.13 Test Catalog Schema (`test_catalog.parquet` / `test_catalog.jsonl`)](#713-test-catalog-schema-test_catalogparquet--test_catalogjsonl)
+    - [7.14 Test Coverage Edges Schema (`test_coverage_edges.parquet` / `test_coverage_edges.jsonl`)](#714-test-coverage-edges-schema-test_coverage_edgesparquet--test_coverage_edgesjsonl)
+    - [7.15 GOID Risk Factors Schema (`goid_risk_factors.parquet` / `goid_risk_factors.jsonl`)](#715-goid-risk-factors-schema-goid_risk_factorsparquet--goid_risk_factorsjsonl)
 - [8. Cross-Cutting Concerns](#8-cross-cutting-concerns)
     - [8.1 Configuration Management](#81-configuration-management)
     - [8.2 Logging & Observability](#82-logging--observability)
@@ -465,16 +470,17 @@ The `generate_documents.sh` script orchestrates the full metadata generation pip
      - Build `_CollectorInputs` with function maps and import resolver for the function's module
      - Visit function AST with `_CallCollector`:
        - `visit_Call()`: For each `ast.Call` node, resolve callee via `_resolve_callee()` → `(FunctionInfo | None, resolved_via, call_kind)`
-       - Resolution strategies: `local-symbol`, `class-self`, `imported-function`, `imported-module`, `imported-attr`, `unresolved`
-       - Create call edge → `CallEdgeRow` with `caller_goid_h128`, `callee_goid_h128` (nullable), `callsite_path`, `callsite_line`, `callsite_col`, `resolved_via`, `confidence` (from `_confidence_for_resolution()`), `evidence_json` (AST unparse, resolver name)
-       - `generic_visit()`: Skips nested function/class definitions to prevent incorrect call edges
+       - Resolution strategies: `local-symbol`, `class-self`, `class-attr`, `imported-function`, `imported-module`, `imported-attr`, `unresolved`
+       - Edge kinds: `direct`, `method`, `attr_call`, `attr` (fallback)
+       - Create call edge → `CallEdgeRow` with `caller_goid_h128`, `callee_goid_h128` (nullable), `callsite_path`, `callsite_line`, `callsite_col`, `kind`, `resolved_via`, `confidence` (from `_confidence_for_resolution()`), `evidence_json` (AST unparse, resolver name)
+      - `generic_visit()`: Skips nested function/class definitions to prevent incorrect call edges
    - Deduplicate nodes by `goid_h128` → sorted node list
    - Sort edges by `(callsite_path, callsite_line, callsite_col)` → deterministic edge list
 
 7. **Write Artifacts** (`CallGraphBuilder.write_artifacts`)
    - Create `out_dir/graphs/` directory
-   - Write `call_nodes.parquet` via `write_call_nodes()`: normalizes `goid_h128` to Decimal
-   - Write `call_edges.parquet` via `write_call_edges()`: normalizes both `caller_goid_h128` and `callee_goid_h128` to Decimal
+   - Write `call_nodes.parquet` via `write_call_nodes()` (`call_nodes.jsonl` fallback): normalizes `goid_h128` to Decimal
+   - Write `call_edges.parquet` via `write_call_edges()` (`call_edges.jsonl` fallback): normalizes both `caller_goid_h128` and `callee_goid_h128` to Decimal
    - Optionally ingest into DuckDB if `--ingest` flag set (via `DuckDBCatalog.upsert_goids()`, `upsert_call_nodes()`, `upsert_call_edges()`)
 
 **Components Involved**
@@ -492,7 +498,7 @@ The `generate_documents.sh` script orchestrates the full metadata generation pip
 
 - Every function definition produces exactly one call graph node.
 - Every call expression produces at least one edge (even if callee is unresolved → `callee_goid_h128=None`).
-- Edge confidence scores are assigned based on resolution strategy: `local-symbol` (0.95) > `imported-function` (0.85) > `unresolved` (0.25).
+- Edge confidence scores are assigned based on resolution strategy: `local-symbol` (0.95) > `class-self` (0.9) > `imported-function` (0.85) > `imported-module`/`imported-attr`/`class-attr` (~0.8) > `unresolved` (0.25).
 
 **Error Handling & Retries**
 
@@ -624,6 +630,67 @@ The `generate_documents.sh` script orchestrates the full metadata generation pip
 - File read errors are logged and skipped (file excluded from exports).
 
 ---
+
+### 5.6 Flow: Analytics CLI (`python -m codeintel_rev.cli.enrich_analytics`)
+
+**Trigger**
+
+- CLI commands: `graph`, `uses`, `typedness`, `function-metrics`, `function-types`, `doc`
+- Code entrypoint: `codeintel_rev.cli.enrich_analytics` (Typer app attaching `shared_options`)
+
+**High-Level Steps**
+
+1. Execute enrichment pipeline via `execute_pipeline_or_exit()` (reuses `enrich_pipeline all` behavior).
+2. Depending on subcommand:
+   - `graph`: `write_graph_outputs()` → symbol graph + import graph.
+   - `uses`: `write_uses_output()` → symbol use edges.
+   - `typedness`: `write_typedness_output()` + `write_static_diagnostics_output()`.
+   - `function-metrics`: `write_function_metrics_output()`.
+   - `function-types`: `write_function_types_output()`.
+   - `doc`: `write_doc_output()` (docstring coverage/quality).
+3. Each writer persists Parquet with JSONL fallback under `out/analytics/` or `out/graphs/`.
+
+**Key Notes**
+
+- Uses the same CLI flag surface as `enrich_pipeline` (`--root`, `--scip`, `--out`, `--emit-ast`, etc.).
+- Dry-run mode validates configuration without writing artifacts.
+- Graph/uses commands are used by `generate_documents.sh` as backfills when import/use graph files are missing.
+
+---
+
+### 5.7 Flow: Coverage, Test, and Risk Analytics (`enrich_analytics coverage-detailed|test-analytics|risk-factors`)
+
+**Trigger**
+
+- CLI commands (all under `codeintel_rev.cli.enrich_analytics`):
+  - `coverage-detailed --coverage-file <.coverage>` → coverage lines + function aggregation.
+  - `test-analytics --coverage-file <.coverage> --pytest-report <pytest-report.json>` → test catalog + test coverage edges.
+  - `risk-factors` → GOID risk factors (requires coverage outputs).
+
+**High-Level Steps**
+
+1. **Coverage Detailed** (`run_coverage_analytics`)
+   - Load `repo_map.json` and GOID registry from `<out>/goid/`.
+   - Extract per-line coverage via `iter_coverage_lines()` → write `analytics/coverage/coverage_lines.parquet`.
+   - Aggregate to per-function metrics via `aggregate_coverage_functions()` → write `analytics/coverage/coverage_functions.parquet`.
+2. **Test Analytics** (`run_test_analytics`)
+   - Load GOID registry and `coverage_functions.jsonl`.
+   - Build test catalog from pytest JSON report via `build_test_catalog()` → `analytics/tests/test_catalog.parquet`.
+   - Map dynamic coverage contexts to functions via `build_test_coverage_edges()` → `analytics/tests/test_coverage_edges.parquet`.
+3. **Risk Factors** (`run_risk_factors`)
+   - Load analytics inputs (coverage functions, function metrics, function types, hotspots, typedness, static diagnostics, module metadata, test counts).
+   - Compute composite risk scores per function GOID via `build_goid_risk_factors()` → `analytics/risk/goid_risk_factors.parquet`.
+
+**Key Invariants**
+
+- Coverage analytics require coverage.py data collected with dynamic contexts for test edges.
+- Test analytics depend on prior coverage aggregation (`coverage_functions.jsonl`) and pytest JSON report.
+- Risk factors require coverage outputs and function analytics; missing inputs yield partial rows but never crash the pipeline (rows skip missing paths).
+
+**Error Handling**
+
+- Missing inputs cause warning logs and skipped outputs (e.g., no `.coverage` → no coverage artifacts).
+- File normalization errors (paths outside repo) are skipped; processing continues for remaining files.
 
 ## 6. Static Structure: Layers, Modules, and Dependencies
 
@@ -1079,7 +1146,7 @@ GOID computation: deterministic hashing of code entities based on repository sna
 
 ---
 
-### 7.2 GOID Crosswalk Schema (`goid_crosswalk.parquet` / `goid_crosswalk.jsonl`)
+### 7.2 GOID Crosswalk Schema (`goid_xwalk.parquet` / `goid_xwalk.jsonl`)
 
 **Purpose**: Maps GOIDs to multiple structural sources (AST nodes, SCIP symbols, chunk IDs).
 
@@ -1092,13 +1159,13 @@ GOID computation: deterministic hashing of code entities based on repository sna
 | `chunk_id` | string/null | Chunk identifier (`<path>:<start>:<end>`) |
 | `evidence_json` | json/null | Additional context (path, lineno, end_lineno, qualname, node_type) |
 
-**Note**: The `CrosswalkRow` TypedDict definition (`codeintel_rev.ids.goid.CrosswalkRow`) includes additional optional fields (`scip_symbol`, `chunk_row_id`, `cst_node_id`, `git_blob_sha`, `git_commit_sha`) that are not currently populated by `GOIDBuilder.build()`. These fields are reserved for future cross-referencing with SCIP symbols, CST nodes, and Git blobs.
+**Note**: The `CrosswalkRow` TypedDict definition (`codeintel_rev.ids.goid.CrosswalkRow`) includes additional optional fields (`scip_symbol`, `chunk_row_id`, `cst_node_id`, `git_blob_sha`, `git_commit_sha`) that are not currently populated by `GOIDBuilder.build()`. Output filenames use `goid_xwalk.*`; `generate_documents.sh` copies them to `goid_crosswalk.*` for compatibility.
 
 **Generation**: `codeintel_rev.enrich.goid_builder.GOIDBuilder.build()` → `codeintel_rev.enrich.graph.io.write_goid_crosswalk()`
 
 ---
 
-### 7.3 Call Graph Nodes Schema (`call_graph_nodes.parquet` / `call_graph_nodes.jsonl`)
+### 7.3 Call Graph Nodes Schema (`call_nodes.parquet` / `call_nodes.jsonl`)
 
 **Purpose**: Callable entities (functions, methods) in the call graph.
 
@@ -1117,7 +1184,7 @@ GOID computation: deterministic hashing of code entities based on repository sna
 
 ---
 
-### 7.4 Call Graph Edges Schema (`call_graph_edges.parquet` / `call_graph_edges.jsonl`)
+### 7.4 Call Graph Edges Schema (`call_edges.parquet` / `call_edges.jsonl`)
 
 **Purpose**: Call sites linking callers to callees.
 
@@ -1131,10 +1198,10 @@ GOID computation: deterministic hashing of code entities based on repository sna
 | `callsite_line` | int/null | 1-based line number |
 | `callsite_col` | int/null | Column offset |
 | `language` | string | Language at the callsite |
-| `kind` | string | Edge kind (`direct`, `builtin`, `attr_call`, `method`) |
-| `resolved_via` | string | Provenance (`scip`, `scope`, `heuristic`, `unresolved`) |
-| `confidence` | float | Confidence score [0,1] |
-| `evidence_json` | json | Additional context (AST text snippets, import alias) |
+| `kind` | string | Edge kind (`direct`, `method`, `attr_call`, `attr`) |
+| `resolved_via` | string | Provenance (`local-symbol`, `class-self`, `class-attr`, `imported-function`, `imported-module`, `imported-attr`, `unresolved`) |
+| `confidence` | float | Confidence score [0,1] derived from `resolved_via` |
+| `evidence_json` | json | Additional context (AST text snippets, resolver name) |
 
 **Generation**: `codeintel_rev.enrich.callgraph.CallGraphBuilder.build()` → `codeintel_rev.enrich.graph.io.write_call_edges()`
 
@@ -1253,6 +1320,144 @@ GOID computation: deterministic hashing of code entities based on repository sna
 | `same_module` | bool | True when both paths map to the same module |
 
 **Generation**: `codeintel_rev.uses_builder.build_use_graph()` → `codeintel_rev.services.enrich.exports.write_uses_output()`
+
+---
+
+### 7.11 Coverage Lines Schema (`coverage_lines.parquet` / `coverage_lines.jsonl`)
+
+**Purpose**: Line-level coverage measurements from coverage.py (with dynamic contexts when available).
+
+**Columns**:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `repo` | string | Repository identifier |
+| `commit` | string | Commit hash used for analysis |
+| `rel_path` | string | Repo-relative file path |
+| `line` | int | Executable line number |
+| `is_executable` | bool | True when coverage identifies the line as executable |
+| `is_covered` | bool | True when executed in the collected coverage data |
+| `hits` | int | Simple hit counter (1 for covered, 0 otherwise) |
+| `context_count` | int | Number of dynamic contexts that hit the line (0 if contexts not available) |
+| `created_at` | string | ISO8601 timestamp |
+
+**Generation**: `codeintel_rev.services.enrich.coverage_pipeline.run_coverage_analytics()` → `iter_coverage_lines()` → `write_coverage_lines()`
+
+---
+
+### 7.12 Coverage Functions Schema (`coverage_functions.parquet` / `coverage_functions.jsonl`)
+
+**Purpose**: Aggregated coverage metrics per function GOID.
+
+**Columns**:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `function_goid_h128` | string | Function GOID hash |
+| `urn` | string | GOID URN |
+| `repo` | string | Repository identifier |
+| `commit` | string | Commit hash |
+| `rel_path` | string | Repo-relative file path |
+| `language` | string | `python` |
+| `kind` | string | GOID kind (`function` or `method`) |
+| `qualname` | string | Qualified function name |
+| `start_line` | int | Function start line |
+| `end_line` | int | Function end line |
+| `executable_lines` | int | Executable line count within span |
+| `covered_lines` | int | Covered line count within span |
+| `coverage_ratio` | float/null | `covered_lines / executable_lines` or null if no executable lines |
+| `tested` | bool | True when any line was covered |
+| `untested_reason` | string | Empty when tested; `no_executable_code` or `no_tests` otherwise |
+| `created_at` | string | ISO8601 timestamp |
+
+**Generation**: `aggregate_coverage_functions()` → `write_coverage_functions()`
+
+---
+
+### 7.13 Test Catalog Schema (`test_catalog.parquet` / `test_catalog.jsonl`)
+
+**Purpose**: Metadata for collected pytest tests and their GOID mappings.
+
+**Columns**:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `test_id` | string | Pytest node id (`path::qualname`) |
+| `test_goid_h128` | string/null | GOID for the test function if resolved |
+| `urn` | string/null | GOID URN for the test |
+| `repo` | string | Repository identifier |
+| `commit` | string | Commit hash |
+| `rel_path` | string | Repo-relative path of the test file |
+| `qualname` | string/null | Test qualified name (class + function) |
+| `kind` | string | `function` or `parametrized_case` |
+| `status` | string | Pytest outcome (`passed`, `failed`, etc.) |
+| `duration_ms` | float | Duration in milliseconds |
+| `markers` | array<string> | Sorted pytest markers |
+| `parametrized` | bool | True when node id contained parameters |
+| `flaky` | bool | True when `flaky` marker present |
+| `created_at` | string | ISO8601 timestamp |
+
+**Generation**: `codeintel_rev.services.enrich.coverage_pipeline.run_test_analytics()` → `build_test_catalog()` → `write_test_catalog()`
+
+---
+
+### 7.14 Test Coverage Edges Schema (`test_coverage_edges.parquet` / `test_coverage_edges.jsonl`)
+
+**Purpose**: Edges linking tests to covered functions using dynamic coverage contexts.
+
+**Columns**:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `test_id` | string | Pytest node id |
+| `test_goid_h128` | string/null | GOID for the test node if resolved |
+| `function_goid_h128` | string | Target function GOID |
+| `urn` | string | Function GOID URN |
+| `repo` | string | Repository identifier |
+| `commit` | string | Commit hash |
+| `rel_path` | string | Function path |
+| `qualname` | string | Function qualified name |
+| `covered_lines` | int | Lines executed by the test within the function span |
+| `executable_lines` | int | Executable lines within the function span |
+| `coverage_ratio` | float/null | Covered/executable ratio for this test-function pair |
+| `last_status` | string | Latest recorded status for the test (`passed`, `failed`, etc.) |
+| `created_at` | string | ISO8601 timestamp |
+
+**Generation**: `build_test_coverage_edges()` → `write_test_coverage_edges()`
+
+---
+
+### 7.15 GOID Risk Factors Schema (`goid_risk_factors.parquet` / `goid_risk_factors.jsonl`)
+
+**Purpose**: Composite risk signals per function GOID derived from coverage, complexity, typedness, hotspots, static diagnostics, and test outcomes.
+
+**Columns (selected)**:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `function_goid_h128` | string | Function GOID |
+| `urn` | string | GOID URN |
+| `rel_path` | string | Repo-relative file path |
+| `qualname` | string | Function qualified name |
+| `loc` / `logical_loc` | int/null | Lines of code metrics from function metrics |
+| `cyclomatic_complexity` | int/null | Complexity from function metrics |
+| `complexity_bucket` | string/null | Complexity bucket |
+| `typedness_bucket` | string/null | Typedness bucket for the function |
+| `typedness_source` | string/null | Source of typedness data |
+| `hotspot_score` | float/null | File-level hotspot score |
+| `file_typed_ratio` | float/null | File-level typedness ratio |
+| `static_error_count` | int/null | Static diagnostic count for file |
+| `executable_lines` / `covered_lines` / `coverage_ratio` | numeric | Coverage metrics from coverage functions |
+| `tested` | bool/null | Whether any test covered the function |
+| `test_count` / `failing_test_count` | int | Number of tests touching the function |
+| `last_test_status` | string | Last observed test status (`passed`, `failed`, `untested`, etc.) |
+| `risk_score` | float | Composite weighted risk score |
+| `risk_level` | string | `high`, `medium`, or `low` thresholded from `risk_score` |
+| `tags` | array<string> | Tags from module metadata (e.g., `overlay-needed`) |
+| `owners` | array<string> | Ownership labels when available |
+| `created_at` | string | ISO8601 timestamp |
+
+**Generation**: `codeintel_rev.services.enrich.coverage_pipeline.run_risk_factors()` → `build_goid_risk_factors()` → `write_risk_factors()`
 
 ---
 
@@ -1674,15 +1879,20 @@ All changes must pass these checks before merging.
 | Artifact Name | Schema Location | Generation Flow | Relevant Sections |
 |---------------|----------------|-----------------|-------------------|
 | `goids.parquet` | Section 7.1 | `GOIDBuilder.build()` → `write_goid_registry()` | 5.2, 7.1 |
-| `goid_crosswalk.parquet` | Section 7.2 | `GOIDBuilder.build()` → `write_goid_crosswalk()` | 5.2, 7.2 |
-| `call_graph_nodes.parquet` | Section 7.3 | `CallGraphBuilder.build()` → `write_call_nodes()` | 5.3, 7.3 |
-| `call_graph_edges.parquet` | Section 7.4 | `CallGraphBuilder.build()` → `write_call_edges()` | 5.3, 7.4 |
+| `goid_xwalk.parquet` | Section 7.2 | `GOIDBuilder.build()` → `write_goid_crosswalk()` | 5.2, 7.2 |
+| `call_nodes.parquet` | Section 7.3 | `CallGraphBuilder.build()` → `write_call_nodes()` | 5.3, 7.3 |
+| `call_edges.parquet` | Section 7.4 | `CallGraphBuilder.build()` → `write_call_edges()` | 5.3, 7.4 |
 | `cfg_blocks.parquet` | Section 7.5 | `CFGBuilder.build()` → `write_cfg_blocks()` | 5.4, 7.5 |
 | `cfg_edges.parquet` | Section 7.6 | `CFGBuilder.build()` → `write_cfg_edges()` | 5.4, 7.6 |
 | `dfg_edges.parquet` | Section 7.7 | `_DFGAnalyzer.build_edges()` → `write_dfg_edges()` | 5.4, 7.7 |
 | `modules.jsonl` | Section 7.8 | `scan_modules()` → `write_modules_json()` | 5.1, 5.5, 7.8 |
 | `import_graph_edges.parquet` | Section 7.9 | `write_import_graph()` → `write_graph_outputs()` | 5.1, 7.9 |
 | `symbol_use_edges.parquet` | Section 7.10 | `build_use_graph()` → `write_uses_output()` | 5.1, 7.10 |
+| `coverage_lines.parquet` | Section 7.11 | `run_coverage_analytics()` → `write_coverage_lines()` | 5.7, 7.11 |
+| `coverage_functions.parquet` | Section 7.12 | `run_coverage_analytics()` → `write_coverage_functions()` | 5.7, 7.12 |
+| `test_catalog.parquet` | Section 7.13 | `run_test_analytics()` → `write_test_catalog()` | 5.7, 7.13 |
+| `test_coverage_edges.parquet` | Section 7.14 | `run_test_analytics()` → `write_test_coverage_edges()` | 5.7, 7.14 |
+| `goid_risk_factors.parquet` | Section 7.15 | `run_risk_factors()` → `write_risk_factors()` | 5.7, 7.15 |
 
 ---
 
@@ -1697,7 +1907,7 @@ All changes must pass these checks before merging.
 ---
 
 **Document Version**: 1.1  
-**Last Updated**: 2024-01-XX  
+**Last Updated**: 2024-11-21  
 **Maintainer**: CodeIntel Metadata Generation Team
 
 **Revision History**:
