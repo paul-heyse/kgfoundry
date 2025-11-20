@@ -14,10 +14,24 @@ from tests._helpers import assertions
 
 
 def _queue_worker(queue: mp.Queue) -> None:  # pragma: no cover - executed in subprocess
+    """Worker function that puts message in queue.
+
+    Parameters
+    ----------
+    queue : mp.Queue
+        Queue to put message into.
+    """
     queue.put("ok")
 
 
 def _executor_task() -> int:  # pragma: no cover - executed in subprocess
+    """Task function that returns computed value.
+
+    Returns
+    -------
+    int
+        Computed value (42).
+    """
     return 21 * 2
 
 

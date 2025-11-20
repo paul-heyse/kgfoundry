@@ -18,6 +18,13 @@ def test_tools_list_includes_search_and_fetch() -> None:
     """Verify tools_list includes search and fetch tools with correct schemas."""
 
     async def _collect() -> Mapping[str, Any]:
+        """Collect tools from MCP server.
+
+        Returns
+        -------
+        Mapping[str, Any]
+            Dictionary of tool names to tool definitions.
+        """
         return await mcp.get_tools()
 
     tools: Mapping[str, Any] = asyncio.run(_collect())

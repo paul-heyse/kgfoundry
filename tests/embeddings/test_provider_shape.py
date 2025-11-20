@@ -21,8 +21,11 @@ if "codeintel_rev.io.vllm_engine" not in sys.modules:  # pragma: no cover - test
     stub = types.ModuleType("codeintel_rev.io.vllm_engine")
 
     class _StubEmbedder:
+        """Stub embedder for testing provider shape."""
+
         def __init__(self, *_args: object, **_kwargs: object) -> None:
-            return None
+            """Initialize stub embedder (no-op)."""
+            return
 
         @staticmethod
         def embed_batch_with_stats(texts: Sequence[str]) -> tuple[np.ndarray, int]:
@@ -70,6 +73,18 @@ class _DummyProvider(EmbeddingProviderBase):
         self.calls = 0
 
     def _run_inference(self, texts: Sequence[str]) -> tuple[np.ndarray, int]:
+        """Run inference and return ramp vectors.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Texts to embed.
+
+        Returns
+        -------
+        tuple[np.ndarray, int]
+            Tuple of ramp vectors and token count.
+        """
         self.calls += 1
         base = np.arange(len(texts) * 4, dtype=np.float32).reshape(len(texts), 4)
         return base + self.calls, len(texts) * 8

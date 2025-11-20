@@ -46,7 +46,6 @@
 3) **Validate quality gates locally**
   ```bash
   uv run ruff format && uv run ruff check --fix
-  uv run fixit fix -a .
   uv run pyright --warnings --pythonversion=3.13
   uv run pyrefly check
   uv run vulture src tools stubs --min-confidence 90

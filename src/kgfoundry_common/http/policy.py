@@ -143,19 +143,40 @@ def load_policy(path: Path, schema_path: Path | None = None) -> RetryPolicyDoc:
 class PolicyRegistry:
     """Registry for loading retry policies from a directory.
 
+    Extended Summary
+    ----------------
+    Provides a registry for loading and accessing retry policies stored as YAML
+    files in a directory. Policies are loaded on-demand via the get() method.
+    Supports dependency injection of the root directory for testing.
+
     Parameters
     ----------
     root : Path
-        Root directory containing policy YAML files.
+        Root directory containing policy YAML files. Must exist and be readable.
+        Policy files are expected to have .yaml extension and follow the retry
+        policy schema.
+
+    Notes
+    -----
+    Time O(1) for initialization; O(1) for get() after first load (with caching).
+    Memory O(n) where n is the number of loaded policies. No I/O during
+    initialization (lazy loading). Thread-safe if policies are immutable after
+    loading. The root directory is stored as an instance attribute.
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> registry = PolicyRegistry(Path("/path/to/policies"))
+    >>> policy = registry.get("default")
     """
 
     def __init__(self, root: Path) -> None:
-        """Initialize retry policy loader.
+        """Initialize registry with policy directory root.
 
         Parameters
         ----------
         root : Path
-            Root directory containing policy YAML files.
+            Directory containing policy YAML files.
         """
         self.root = root
 

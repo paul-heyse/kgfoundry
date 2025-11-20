@@ -14,20 +14,38 @@ class HttpError(Exception):
 class HttpStatusError(HttpError):
     """Exception raised for HTTP error status codes.
 
+    Extended Summary
+    ----------------
+    Raised when an HTTP response has an error status code (4xx or 5xx).
+    Stores the status code, response body excerpt, and headers for debugging
+    and error handling. The exception message includes the status code and
+    body excerpt.
+
     Parameters
     ----------
     status : int
-        HTTP status code.
+        HTTP status code (e.g., 404, 500, 503). Must be >= 400.
     body_excerpt : str | None, optional
-        Excerpt from response body. Defaults to None.
+        Excerpt from response body for error message. Included in the exception
+        message string. Defaults to None.
     headers : dict[str, str] | None, optional
-        Response headers. Defaults to None.
+        Response headers dictionary. If None, defaults to empty dict. Stored as
+        instance attribute for inspection. Defaults to None.
 
     Notes
     -----
-    After initialization, this exception has instance attributes:
-    - ``status``: The HTTP status code (int)
-    - ``headers``: The response headers (dict[str, str], defaults to empty dict)
+    Time O(1); memory O(1) aside from message, body_excerpt, and headers storage.
+    No I/O, no global state. Thread-safe. After initialization, this exception
+    has instance attributes: ``status`` (int) and ``headers`` (dict[str, str],
+    defaults to empty dict).
+
+    Examples
+    --------
+    >>> raise HttpStatusError(404, body_excerpt="Not Found")
+    >>> # With headers
+    >>> raise HttpStatusError(
+    ...     503, body_excerpt="Service Unavailable", headers={"Retry-After": "60"}
+    ... )
     """
 
     def __init__(
@@ -36,16 +54,9 @@ class HttpStatusError(HttpError):
         body_excerpt: str | None = None,
         headers: dict[str, str] | None = None,
     ) -> None:
-        """Initialize HTTP status error.
+        """Initialize exception with HTTP status code and optional details.
 
-        Parameters
-        ----------
-        status : int
-            HTTP status code.
-        body_excerpt : str | None, optional
-            Optional excerpt from response body for error message.
-        headers : dict[str, str] | None, optional
-            Optional response headers. If None, defaults to empty dict.
+        See class docstring for detailed parameter documentation.
         """
         super().__init__(f"HTTP {status}: {body_excerpt or ''}")
         self.status = status

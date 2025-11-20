@@ -57,21 +57,36 @@ _MODULE_DISPLAY_NAMES: dict[str, str] = {
 class OptionalDependencyError(ArtifactDependencyError):
     """Raised when an optional dependency cannot be imported.
 
+    Extended Summary
+    ----------------
     This error includes RFC 9457 Problem Details, remediation guidance,
-    and correlation IDs for observability.
-
-    Initializes optional dependency error with message, module name, and optional context.
+    and correlation IDs for observability. Inherits structured error handling
+    and Problem Details mapping from ArtifactDependencyError. Automatically
+    adds module_name and correlation_id to context for tracking and remediation.
 
     Parameters
     ----------
     message : str
-        Human-readable error message describing the missing dependency.
+        Human-readable error message describing the missing dependency
+        (e.g., "Module griffe not found").
     module_name : str, optional
-        Name of the missing module (e.g., "griffe", "autoapi"). Defaults to "".
+        Name of the missing module (e.g., "griffe", "autoapi", "sphinx").
+        Added to context["module_name"] for Problem Details. Defaults to "".
     extra : Mapping[str, object] | None, optional
-        Additional context fields for Problem Details. Defaults to None.
+        Additional context fields for Problem Details (e.g., install_command,
+        remediation guidance). Merged with module_name and correlation_id into
+        context. Defaults to None.
     cause : Exception | None, optional
-        Underlying exception that caused the import failure. Defaults to None.
+        Underlying exception that caused the import failure (e.g., ImportError
+        from missing module). Stored as exception cause for chained exception
+        handling. Defaults to None.
+
+    Notes
+    -----
+    Time O(1); memory O(1) aside from message and context storage. No I/O,
+    no global state. Thread-safe. Automatically generates a UUID correlation_id
+    and adds it to context for observability. The error code is inherited from
+    ArtifactDependencyError (ARTIFACT_DEPENDENCY_ERROR) and HTTP status is 500.
 
     Examples
     --------
@@ -87,6 +102,10 @@ class OptionalDependencyError(ArtifactDependencyError):
     ...     assert e.context is not None
     ...     assert e.context.get("module_name") == "griffe"
     Error: OptionalDependencyError[artifact-dependency-error]: Module griffe not found
+    >>> # With cause
+    >>> raise OptionalDependencyError(
+    ...     "Import failed", module_name="sphinx", cause=ImportError("No module named 'sphinx'")
+    ... )
     """
 
     def __init__(
@@ -96,18 +115,9 @@ class OptionalDependencyError(ArtifactDependencyError):
         extra: Mapping[str, object] | None = None,
         cause: Exception | None = None,
     ) -> None:
-        """Initialize optional dependency error.
+        """Initialize exception with message, module name, and optional context.
 
-        Parameters
-        ----------
-        message : str
-            Human-readable error message describing the missing dependency.
-        module_name : str, optional
-            Name of the missing module (e.g., "griffe", "autoapi"). Defaults to "".
-        extra : Mapping[str, object] | None, optional
-            Additional context fields for Problem Details. Defaults to None.
-        cause : Exception | None, optional
-            Underlying exception that caused the import failure.
+        See class docstring for detailed parameter documentation.
         """
         context = dict(extra or {})
         context["module_name"] = module_name
@@ -212,7 +222,7 @@ def safe_import_griffe(
 
     Parameters
     ----------
-    importer : Callable[[str], object] | None, optional
+    importer : ImporterCallable | None, optional
         Alternative import resolver used for dependency injection in tests.
 
     Returns
@@ -246,7 +256,7 @@ def safe_import_autoapi(
 
     Parameters
     ----------
-    importer : Callable[[str], object] | None, optional
+    importer : ImporterCallable | None, optional
         Alternative import resolver used for dependency injection in tests.
 
     Returns
@@ -280,7 +290,7 @@ def safe_import_sphinx(
 
     Parameters
     ----------
-    importer : Callable[[str], object] | None, optional
+    importer : ImporterCallable | None, optional
         Alternative import resolver used for dependency injection in tests.
 
     Returns

@@ -25,6 +25,8 @@ else:
 
 
 class _CliModuleInfo(Protocol):
+    """Protocol for CLI module metadata."""
+
     CLI_INTERFACE_ID: str
     CLI_TITLE: str
 

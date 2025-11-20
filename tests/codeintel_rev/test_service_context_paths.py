@@ -182,6 +182,20 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
         resolved: ResolvedPaths,
         override_app_cfg: AppConfig | None = None,
     ) -> FAISSManager:
+        """Create recording FAISS manager from resolved paths.
+
+        Parameters
+        ----------
+        resolved : ResolvedPaths
+            Resolved application paths.
+        override_app_cfg : AppConfig | None, optional
+            Override config (uses base if None). Defaults to None.
+
+        Returns
+        -------
+        FAISSManager
+            Recording FAISS manager instance.
+        """
         cfg = override_app_cfg.index if override_app_cfg is not None else base_index_cfg
         nlist_value = cfg.nlist or cfg.faiss_nlist or 1
         return cast(
@@ -198,6 +212,20 @@ def test_service_context_resolves_paths(tmp_path: Path) -> None:
         catalog_cfg: DuckDBCatalogConfig,
         manager: DuckDBManager,
     ) -> DuckDBCatalog:
+        """Create recording DuckDB catalog from config.
+
+        Parameters
+        ----------
+        catalog_cfg : DuckDBCatalogConfig
+            Catalog configuration.
+        manager : DuckDBManager
+            DuckDB manager (ignored).
+
+        Returns
+        -------
+        DuckDBCatalog
+            Recording catalog instance.
+        """
         _ = manager
         catalog = RecordingDuckDBCatalog(
             catalog_cfg.db_path,
@@ -328,6 +356,15 @@ def _stub_paths(repo_root: Path) -> ResolvedPaths:
 
 
 def _assert_faiss_manager(manager: object, expected_path: Path) -> None:
+    """Assert FAISS manager has expected path.
+
+    Parameters
+    ----------
+    manager : object
+        Manager instance to check.
+    expected_path : Path
+        Expected index path.
+    """
     assertions.expect_true(
         isinstance(manager, RecordingFAISSManager), reason="manager should be RecordingFAISSManager"
     )
@@ -336,6 +373,13 @@ def _assert_faiss_manager(manager: object, expected_path: Path) -> None:
 
 
 def _assert_faiss_ready(context: ApplicationContext) -> None:
+    """Assert FAISS is ready and manager was loaded.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context to check.
+    """
     ready, limits, error = context.ensure_faiss_ready()
     assertions.expect_true(ready, reason="faiss should be ready")
     assertions.expect_equal(limits, [])
@@ -347,6 +391,17 @@ def _assert_faiss_ready(context: ApplicationContext) -> None:
 def _assert_catalog(
     catalog: RecordingDuckDBCatalog, expected_db: Path, expected_vectors: Path
 ) -> None:
+    """Assert catalog has expected paths and was opened.
+
+    Parameters
+    ----------
+    catalog : RecordingDuckDBCatalog
+        Catalog instance to check.
+    expected_db : Path
+        Expected database path.
+    expected_vectors : Path
+        Expected vectors directory path.
+    """
     assertions.expect_true(
         isinstance(catalog, RecordingDuckDBCatalog),
         reason="catalog should be RecordingDuckDBCatalog",

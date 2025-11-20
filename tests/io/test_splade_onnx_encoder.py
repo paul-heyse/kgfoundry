@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 from codeintel_rev.io.splade_onnx_encoder import (
@@ -16,13 +17,18 @@ from codeintel_rev.io.splade_onnx_encoder import (
 from tests._helpers import assertions
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _StubOutput:
+    """Stub ONNX output for testing."""
+
     name: str
 
 
 class _StubSession:
+    """Stub ONNX session for testing SPLADE encoder."""
+
     def __init__(self) -> None:
+        """Initialize stub session with logits output."""
         self._outputs = [_StubOutput("logits")]
         self.invocations = 0
 
@@ -54,7 +60,10 @@ class _StubSession:
 
 
 class _StubTokenizer:
+    """Stub tokenizer for testing SPLADE encoder."""
+
     def __init__(self) -> None:
+        """Initialize stub tokenizer with call counters."""
         self.calls = 0
         self.conversions = 0
 
@@ -87,7 +96,7 @@ def test_onnx_query_encoder_builds_weighted_string() -> None:
     cfg = OnnxSpladeConfig(model_path=Path("model.onnx"), tokenizer_name="stub")
     encoder = OnnxSpladeQueryEncoder(
         cfg,
-        session_factory=lambda _cfg: _StubSession(),
+        session_factory=lambda _cfg: cast("Any", _StubSession()),
         tokenizer_factory=lambda _cfg: _StubTokenizer(),
         numpy_module=np,
     )
@@ -103,7 +112,7 @@ def test_onnx_map_encoder_returns_mapping() -> None:
     cfg = OnnxSpladeConfig(model_path=Path("model.onnx"), tokenizer_name="stub", topn=3)
     encoder = OnnxSpladeMapEncoder(
         cfg,
-        session_factory=lambda _cfg: _StubSession(),
+        session_factory=lambda _cfg: cast("Any", _StubSession()),
         tokenizer_factory=lambda _cfg: _StubTokenizer(),
         numpy_module=np,
     )

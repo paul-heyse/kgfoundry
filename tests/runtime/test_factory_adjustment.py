@@ -12,6 +12,8 @@ from tests._helpers import assertions
 
 @dataclass(frozen=False)
 class _DummyFaiss:
+    """Dummy FAISS manager for testing factory adjustment."""
+
     nprobe: int = 1
 
     def set_nprobe(self, value: int) -> None:

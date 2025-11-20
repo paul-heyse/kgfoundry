@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -75,13 +76,13 @@ def load_overlay_options(config_path: Path | None, overrides: list[str]) -> Over
     if config_path is not None:
         config_data = read_overlay_config(config_path)
         for key, value in config_data.items():
-            set_overlay_option(options, key, value)
+            options = set_overlay_option(options, key, value)
     for override in overrides:
         if "=" not in override:
             message = "Override values must use the KEY=VALUE format."
             raise typer.BadParameter(message)
         key, value = override.split("=", 1)
-        set_overlay_option(options, key, value)
+        options = set_overlay_option(options, key, value)
     return options
 
 
@@ -228,7 +229,11 @@ def _parse_path_option(raw_value: object, *, option: str) -> Path:
     raise typer.BadParameter(message)
 
 
-def set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: object) -> None:
+def set_overlay_option(
+    options: OverlayCLIOptions,
+    key: str,
+    raw_value: object,
+) -> OverlayCLIOptions:
     """Update overlay CLI options with validated values.
 
     Parameters
@@ -244,6 +249,11 @@ def set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: object) 
         Raw value to parse and set. Type depends on the option (Path for
         path options, int for integer options, bool for boolean options).
 
+    Returns
+    -------
+    OverlayCLIOptions
+        New options instance with the requested attribute updated.
+
     Raises
     ------
     typer.BadParameter
@@ -257,10 +267,10 @@ def set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: object) 
         if resolved is None:
             message = f"Overlay option '{attr}' must be a filesystem path."
             raise typer.BadParameter(message)
-        setattr(options, attr, resolved)
-    elif attr in {"min_errors", "max_overlays"}:
-        setattr(options, attr, _parse_int_option(raw_value, option=attr))
-    elif attr in {
+        return replace(options, **{attr: resolved})
+    if attr in {"min_errors", "max_overlays"}:
+        return replace(options, **{attr: _parse_int_option(raw_value, option=attr)})
+    if attr in {
         "include_public_defs",
         "inject_getattr_any",
         "dry_run",
@@ -268,10 +278,9 @@ def set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: object) 
         "deactivate_all_first",
         "type_error_overlays",
     }:
-        setattr(options, attr, _parse_bool(raw_value))
-    else:
-        message = f"Unknown overlay option '{key}'."
-        raise typer.BadParameter(message)
+        return replace(options, **{attr: _parse_bool(raw_value)})
+    message = f"Unknown overlay option '{key}'."
+    raise typer.BadParameter(message)
 
 
 def load_overlay_tagged_paths(out_dir: Path, overlay_tag: str) -> frozenset[str]:

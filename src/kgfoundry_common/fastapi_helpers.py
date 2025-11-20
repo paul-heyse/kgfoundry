@@ -187,9 +187,22 @@ def typed_middleware(
     """Register ``middleware_class`` with timeout enforcement."""
 
     class _InstrumentedMiddleware(BaseHTTPMiddleware):
-        """Middleware wrapper that enforces timeout controls."""
+        """Middleware wrapper that enforces timeout controls.
+
+        Parameters
+        ----------
+        app : ASGIApp
+            ASGI application to wrap with timeout middleware.
+        """
 
         def __init__(self, app: ASGIApp) -> None:
+            """Initialize middleware wrapper with ASGI app.
+
+            Parameters
+            ----------
+            app : ASGIApp
+                ASGI application to wrap with timeout middleware.
+            """
             self._delegate = middleware_class(app, *factory_args, **options)
             super().__init__(app)
 

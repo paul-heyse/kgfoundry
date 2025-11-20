@@ -27,9 +27,9 @@ class _DictScopeStore:
     """Minimal async scope store storing dictionaries in memory."""
 
     def __init__(self) -> None:
-        self._data: dict[str, ScopeIn] = {}
+        self._data: dict[str, Mapping[str, object]] = {}
 
-    async def get(self, name: str) -> ScopeIn | None:
+    async def get(self, name: str) -> Mapping[str, object] | None:
         """Get scope dictionary for session ID.
 
         Parameters
@@ -44,7 +44,7 @@ class _DictScopeStore:
         """
         return self._data.get(name)
 
-    async def set(self, name: str, value: ScopeIn) -> bool:
+    async def set(self, name: str, value: Mapping[str, object]) -> bool:
         """Set scope dictionary for session ID.
 
         Parameters
@@ -129,6 +129,20 @@ def text_search_session_factory(
     """
 
     def _build(scope: ScopeIn | None, session_id: str) -> ml.FakeTextSearchSession:
+        """Build text search session with seeded scope.
+
+        Parameters
+        ----------
+        scope : ScopeIn | None
+            Scope to seed into store.
+        session_id : str
+            Session ID to use.
+
+        Returns
+        -------
+        ml.FakeTextSearchSession
+            Session instance with scope seeded.
+        """
         session = ml.FakeTextSearchSession(session_id=session_id)
         asyncio.run(session.set_scope(mock_context.scope_store, scope))
         return session
@@ -137,6 +151,18 @@ def text_search_session_factory(
 
 
 def _build_match(path: Path) -> str:
+    """Build JSON match line for test.
+
+    Parameters
+    ----------
+    path : Path
+        File path to include in match.
+
+    Returns
+    -------
+    str
+        JSON string representing match line.
+    """
     return json.dumps(
         {
             "type": "match",

@@ -117,6 +117,22 @@ def _invoke_bm25(
     context: BM25CliContext,
     envelope_dir: Path,
 ) -> Result:
+    """Invoke BM25 CLI command with context and envelope directory.
+
+    Parameters
+    ----------
+    args : list[str]
+        CLI arguments to pass.
+    context : BM25CliContext
+        CLI context to inject.
+    envelope_dir : Path
+        Envelope directory path.
+
+    Returns
+    -------
+    Result
+        CLI runner result.
+    """
     return runner.invoke(
         root_app,
         [

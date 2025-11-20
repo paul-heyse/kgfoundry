@@ -17,7 +17,10 @@ from tests._helpers import assertions
 
 
 class _FakeModel:
+    """Fake model for testing CodeRank embedder."""
+
     def __init__(self) -> None:
+        """Initialize fake model with empty inputs list."""
         self.last_inputs: list[str] = []
 
     def encode(
@@ -49,7 +52,32 @@ class _FakeModel:
 
 
 def _build_context(fake_model: _FakeModel) -> CodeRankEmbedderContext:
+    """Build CodeRank embedder context with fake model provider.
+
+    Parameters
+    ----------
+    fake_model : _FakeModel
+        Fake model instance to use.
+
+    Returns
+    -------
+    CodeRankEmbedderContext
+        Context with fake model provider.
+    """
+
     def _provider(settings: SupportsCodeRankSettings) -> _FakeModel:
+        """Return fake model ignoring settings.
+
+        Parameters
+        ----------
+        settings : SupportsCodeRankSettings
+            Settings (ignored).
+
+        Returns
+        -------
+        _FakeModel
+            Fake model instance.
+        """
         _ = settings
         return fake_model
 
@@ -95,6 +123,8 @@ def test_encode_codes_requires_input() -> None:
 
 @dataclass(frozen=True)
 class _EmbedderSettings:
+    """Test settings for CodeRank embedder."""
+
     model_id: str
     device: str
     trust_remote_code: bool

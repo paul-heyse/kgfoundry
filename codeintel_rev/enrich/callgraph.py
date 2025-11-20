@@ -52,7 +52,7 @@ class CallGraphArtifacts:
     edges: list[CallEdgeRow]
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class _ImportResolver:
     """Per-module import bindings for call graph resolution."""
 
@@ -295,7 +295,7 @@ class _ResolutionContext:
         )
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class _CollectorInputs:
     module_functions: Mapping[str, FunctionInfo]
     class_methods: Mapping[tuple[str, str], Mapping[str, FunctionInfo]]

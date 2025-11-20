@@ -36,6 +36,8 @@ class _ManagerStub:
 
 
 class _ConnectionStub:
+    """Stub DuckDB connection for testing health checks."""
+
     def execute(self, *_args: object, **_kwargs: object) -> _ConnectionStub:
         """Execute SQL query and return self for chaining.
 
@@ -66,11 +68,27 @@ class _ConnectionStub:
 
 
 class _ConnectionCtx:
+    """Context manager stub for DuckDB connections."""
+
     def __enter__(self) -> _ConnectionStub:
+        """Enter context and return connection stub.
+
+        Returns
+        -------
+        _ConnectionStub
+            Fake connection instance.
+        """
         return _ConnectionStub()
 
     def __exit__(self, *_args: object) -> None:
-        return None
+        """Exit context (no-op).
+
+        Parameters
+        ----------
+        *_args : object
+            Exception arguments (ignored).
+        """
+        return
 
 
 class _CatalogStub:

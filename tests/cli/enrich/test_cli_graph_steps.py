@@ -10,6 +10,18 @@ from typer.testing import CliRunner
 
 
 def _prepare_repo(tmp_path: Path) -> tuple[Path, Path]:
+    """Prepare test repository with required directories and sample code.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test repository.
+
+    Returns
+    -------
+    tuple[Path, Path]
+        Tuple of (repo_path, out_dir_path).
+    """
     repo = tmp_path / "repo"
     repo.mkdir(parents=True, exist_ok=True)
     for required in (

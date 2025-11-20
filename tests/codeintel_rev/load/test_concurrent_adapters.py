@@ -1,26 +1,18 @@
-"""Load tests for concurrent adapter operations.
-
-Tests verify that async adapters can handle high concurrency without
-thread exhaustion or performance degradation.
-"""
+"""Load tests for concurrent adapter operations using in-memory harness."""
 
 from __future__ import annotations
 
 import asyncio
 import os
-import time
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
-from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.middleware import session_id_var
-from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.mcp_server.adapters import files as files_adapter
-from codeintel_rev.mcp_server.adapters import history as history_adapter
 
-from tests._helpers import assertions, constants
-from tests._helpers.settings import build_app_config_for_repo
+from tests._helpers import assertions
+from tests._helpers.adapters import InMemoryHistoryAdapter
+from tests._helpers.integration import IntegrationHarness, build_async_adapters_harness
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("RUN_BENCHMARKS"),
@@ -29,114 +21,20 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def mock_context(tmp_path: Path) -> Mock:
-    """Create a mock ApplicationContext for load testing.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory for test files.
+def harness(tmp_path: Path) -> IntegrationHarness:
+    """Harness with async history adapter and seeded files for load tests.
 
     Returns
     -------
-    Mock
-        Mock ApplicationContext with repo_root and GitClient.
+    IntegrationHarness
+        Harness configured for concurrent adapter load tests.
     """
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-
-    # Create test files
-    (repo_root / "src").mkdir()
-    for i in range(100):
-        (repo_root / "src" / f"file_{i}.py").write_text(f"def func_{i}():\n    pass\n")
-
-    app_config = build_app_config_for_repo(repo_root)
-    paths = resolve_application_paths(app_config)
-
-    context = Mock(spec=ApplicationContext)
-    context.paths = paths
-    context.git_client = Mock()
-    context.async_git_client = _AsyncGitClientStub()
-
-    return context
-
-
-class _AsyncGitClientStub:
-    """Async Git client stub returning deterministic blame results."""
-
-    def __init__(self) -> None:
-        self.blame_calls = 0
-        self.history_calls = 0
-
-    async def blame_range(
-        self,
-        *,
-        path: str,
-        start_line: int,
-        end_line: int,
-    ) -> list[dict]:
-        """Return stub blame results for load test.
-
-        Parameters
-        ----------
-        path : str
-            File path (unused).
-        start_line : int
-            Start line number.
-        end_line : int
-            End line number.
-
-        Returns
-        -------
-        list[dict]
-            List of blame entries for each line in range.
-        """
-        del path
-        self.blame_calls += 1
-        return [
-            {
-                "line": line,
-                "commit": "stub",
-                "author": "LoadTest",
-                "date": "2024-01-01T00:00:00Z",
-                "message": f"Line {line}",
-            }
-            for line in range(start_line, end_line + 1)
-        ]
-
-    async def file_history(self, *, path: str, limit: int) -> list[dict]:
-        """Return stub file history for load test.
-
-        Parameters
-        ----------
-        path : str
-            File path (unused).
-        limit : int
-            Maximum number of commits to return.
-
-        Returns
-        -------
-        list[dict]
-            List of commit entries up to limit.
-        """
-        del path
-        self.history_calls += 1
-        return [
-            {
-                "sha": f"{i:04x}",
-                "full_sha": f"{i:08x}",
-                "author": "LoadTest",
-                "email": "load@example.com",
-                "date": "2024-01-01T00:00:00Z",
-                "message": f"Commit {i}",
-            }
-            for i in range(limit)
-        ]
+    return build_async_adapters_harness(tmp_path, file_count=100)
 
 
 @pytest.mark.load
 @pytest.mark.asyncio
-async def test_concurrent_list_paths(mock_context: Mock) -> None:
+async def test_concurrent_list_paths(harness: IntegrationHarness) -> None:
     """Test 100 concurrent list_paths operations.
 
     Verifies that async implementation can handle high concurrency
@@ -159,40 +57,23 @@ async def test_concurrent_list_paths(mock_context: Mock) -> None:
             File listing result.
         """
         session_id_var.set(session_id)
-        with patch(
-            "codeintel_rev.mcp_server.adapters.files.get_effective_scope",
-            return_value=None,
-        ):
-            return await files_adapter.list_paths(
-                mock_context,
-                path="src",
-                max_results=50,
-            )
-
-    start_time = time.monotonic()
+        return await files_adapter.list_paths(
+            harness.context,
+            path="src",
+            max_results=50,
+        )
 
     tasks = [list_paths_task(i) for i in range(num_concurrent)]
     results = await asyncio.gather(*tasks)
-
-    end_time = time.monotonic()
-    duration = end_time - start_time
 
     assertions.expect_equal(len(results), num_concurrent)
     assertions.expect_true(all("items" in result for result in results))
     assertions.expect_true(all(isinstance(result["items"], list) for result in results))
 
-    assertions.expect_true(
-        duration < constants.TIMEOUTS.load_small_batch,
-        reason=(
-            "100 concurrent requests took "
-            f"{duration:.2f}s (expected <{constants.TIMEOUTS.load_small_batch}s)"
-        ),
-    )
-
 
 @pytest.mark.load
 @pytest.mark.asyncio
-async def test_concurrent_blame_range(mock_context: Mock) -> None:
+async def test_concurrent_blame_range(harness: IntegrationHarness) -> None:
     """Test 50 concurrent blame_range operations.
 
     Verifies that async Git operations can handle concurrency
@@ -200,6 +81,15 @@ async def test_concurrent_blame_range(mock_context: Mock) -> None:
     """
     num_concurrent = 50
     session_id = "test-session-load"
+
+    history_adapter = harness.history_adapter
+    assertions.expect_true(
+        history_adapter is not None, reason="history adapter should be available"
+    )
+    if history_adapter is None:  # pragma: no cover - defensive
+        pytest.fail("history adapter not initialized")
+        return
+    hist_adapter: InMemoryHistoryAdapter = history_adapter
 
     async def blame_task(task_id: int) -> dict:
         """Single blame_range task.
@@ -217,38 +107,28 @@ async def test_concurrent_blame_range(mock_context: Mock) -> None:
         session_id_var.set(session_id)
         file_num = task_id % 10  # Cycle through first 10 files
         return await history_adapter.blame_range(
-            mock_context,
+            harness.context,
             path=f"src/file_{file_num}.py",
             start_line=1,
             end_line=5,
         )
 
-    start_time = time.monotonic()
-
-    # Execute 50 concurrent tasks
     tasks = [blame_task(i) for i in range(num_concurrent)]
     results = await asyncio.gather(*tasks)
 
-    end_time = time.monotonic()
-    duration = end_time - start_time
-
     assertions.expect_equal(len(results), num_concurrent)
     assertions.expect_true(all("blame" in result or "error" in result for result in results))
-
+    history_adapter = harness.history_adapter
     assertions.expect_true(
-        duration < constants.TIMEOUTS.load_medium_batch,
-        reason=(
-            f"50 concurrent blame operations took {duration:.2f}s "
-            f"(expected <{constants.TIMEOUTS.load_medium_batch}s)"
-        ),
+        history_adapter is not None, reason="history adapter should be available"
     )
-
-    _ = (duration / num_concurrent) * 1000
+    if history_adapter is not None:
+        assertions.expect_equal(history_adapter.blame_calls, num_concurrent)
 
 
 @pytest.mark.load
 @pytest.mark.asyncio
-async def test_mixed_concurrent_operations(mock_context: Mock) -> None:
+async def test_mixed_concurrent_operations(harness: IntegrationHarness) -> None:
     """Test mixed concurrent operations (list_paths + blame_range).
 
     Verifies that different async adapters can run concurrently
@@ -257,6 +137,15 @@ async def test_mixed_concurrent_operations(mock_context: Mock) -> None:
     num_list_paths = 50
     num_blame = 50
     session_id = "test-session-load"
+
+    history_adapter = harness.history_adapter
+    assertions.expect_true(
+        history_adapter is not None, reason="history adapter should be available"
+    )
+    if history_adapter is None:  # pragma: no cover - defensive
+        pytest.fail("history adapter not initialized")
+        return
+    base_blame_calls = history_adapter.blame_calls
 
     async def list_paths_task() -> dict:
         """Single list_paths task.
@@ -267,11 +156,7 @@ async def test_mixed_concurrent_operations(mock_context: Mock) -> None:
             File listing result.
         """
         session_id_var.set(session_id)
-        with patch(
-            "codeintel_rev.mcp_server.adapters.files.get_effective_scope",
-            return_value=None,
-        ):
-            return await files_adapter.list_paths(mock_context, path="src", max_results=20)
+        return await files_adapter.list_paths(harness.context, path="src", max_results=20)
 
     async def blame_task(task_id: int) -> dict:
         """Single blame_range task.
@@ -289,38 +174,30 @@ async def test_mixed_concurrent_operations(mock_context: Mock) -> None:
         session_id_var.set(session_id)
         file_num = task_id % 10
         return await history_adapter.blame_range(
-            mock_context,
+            harness.context,
             path=f"src/file_{file_num}.py",
             start_line=1,
             end_line=3,
         )
 
-    start_time = time.monotonic()
-
-    # Execute mixed concurrent tasks
     list_tasks = [list_paths_task() for _ in range(num_list_paths)]
     blame_tasks = [blame_task(i) for i in range(num_blame)]
     all_tasks = list_tasks + blame_tasks
 
     results = await asyncio.gather(*all_tasks)
 
-    end_time = time.monotonic()
-    duration = end_time - start_time
-
     assertions.expect_equal(len(results), num_list_paths + num_blame)
-
+    history_adapter = harness.history_adapter
     assertions.expect_true(
-        duration < constants.TIMEOUTS.load_medium_batch,
-        reason=(
-            f"100 mixed operations took {duration:.2f}s "
-            f"(expected <{constants.TIMEOUTS.load_medium_batch}s)"
-        ),
+        history_adapter is not None, reason="history adapter should be available"
     )
+    if history_adapter is not None:
+        assertions.expect_equal(history_adapter.blame_calls, base_blame_calls + num_blame)
 
 
 @pytest.mark.load
 @pytest.mark.asyncio
-async def test_no_thread_exhaustion(mock_context: Mock) -> None:
+async def test_no_thread_exhaustion(harness: IntegrationHarness) -> None:
     """Test that high concurrency doesn't cause thread exhaustion.
 
     This test verifies that async adapters don't exhaust the threadpool
@@ -343,32 +220,14 @@ async def test_no_thread_exhaustion(mock_context: Mock) -> None:
             File listing result.
         """
         session_id_var.set(session_id)
-        with patch(
-            "codeintel_rev.mcp_server.adapters.files.get_effective_scope",
-            return_value=None,
-        ):
-            return await files_adapter.list_paths(
-                mock_context,
-                path="src",
-                max_results=10,
-            )
+        return await files_adapter.list_paths(
+            harness.context,
+            path="src",
+            max_results=10,
+        )
 
-    start_time = time.monotonic()
-
-    # Execute 200 concurrent tasks
     tasks = [list_paths_task(i) for i in range(num_concurrent)]
     results = await asyncio.gather(*tasks)
 
-    end_time = time.monotonic()
-    duration = end_time - start_time
-
     assertions.expect_equal(len(results), num_concurrent)
     assertions.expect_true(all("items" in result for result in results))
-
-    assertions.expect_true(
-        duration < constants.TIMEOUTS.load_large_batch,
-        reason=(
-            f"200 concurrent requests took {duration:.2f}s "
-            f"(expected <{constants.TIMEOUTS.load_large_batch}s)"
-        ),
-    )

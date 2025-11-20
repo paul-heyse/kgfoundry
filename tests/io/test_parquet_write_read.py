@@ -13,6 +13,13 @@ from tests._helpers import assertions
 
 
 def _make_chunk() -> Chunk:
+    """Create test chunk instance.
+
+    Returns
+    -------
+    Chunk
+        Test chunk instance.
+    """
     return Chunk(
         uri="src/app.py",
         start_byte=0,

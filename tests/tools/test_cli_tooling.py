@@ -15,15 +15,21 @@ cli_tooling = importlib.import_module("tools._shared.cli_tooling")
 
 
 class _InterfaceMetaProto(Protocol):
+    """Protocol for CLI interface metadata with entrypoint."""
+
     entrypoint: str
 
 
 class _CLIConfigProto(Protocol):
+    """Protocol for CLI configuration with bin_name and interface metadata."""
+
     bin_name: str
     interface_meta: _InterfaceMetaProto | None
 
 
 class _ProblemCarrier(Protocol):
+    """Protocol for exceptions that carry Problem Details."""
+
     problem: dict[str, object]
 
 
@@ -31,15 +37,48 @@ PROBLEM_ATTR = "problem"
 
 
 def _is_cli_config(config: object) -> TypeGuard[_CLIConfigProto]:
+    """Type guard to check if object matches CLI config protocol.
+
+    Parameters
+    ----------
+    config : object
+        Object to check.
+
+    Returns
+    -------
+    TypeGuard[_CLIConfigProto]
+        True if config has bin_name and interface_meta attributes.
+    """
     return hasattr(config, "bin_name") and hasattr(config, "interface_meta")
 
 
 def _has_problem_details(exc: BaseException) -> TypeGuard[_ProblemCarrier]:
+    """Type guard to check if exception carries Problem Details.
+
+    Parameters
+    ----------
+    exc : BaseException
+        Exception to check.
+
+    Returns
+    -------
+    TypeGuard[_ProblemCarrier]
+        True if exception has problem attribute that is a dict.
+    """
     problem = getattr(exc, PROBLEM_ATTR, None)
     return isinstance(problem, dict)
 
 
 def _write_yaml(path: Path, content: str) -> None:
+    """Write YAML content to file with dedented formatting.
+
+    Parameters
+    ----------
+    path : Path
+        File path to write to.
+    content : str
+        YAML content string (may be indented).
+    """
     path.write_text(dedent(content).strip() + "\n", encoding="utf-8")
 
 

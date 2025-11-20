@@ -22,6 +22,13 @@ pytestmark = pytest.mark.skip(
 
 
 def _git_env() -> dict[str, str]:
+    """Create Git environment variables for test commits.
+
+    Returns
+    -------
+    dict[str, str]
+        Environment dictionary with Git author and committer settings.
+    """
     env = os.environ.copy()
     env.setdefault("GIT_AUTHOR_NAME", "DryRun Tester")
     env.setdefault("GIT_AUTHOR_EMAIL", "dryrun@example.com")
@@ -31,10 +38,24 @@ def _git_env() -> dict[str, str]:
 
 
 def _git() -> str:
+    """Get path to git executable.
+
+    Returns
+    -------
+    str
+        Path to git executable or "git" if not found in PATH.
+    """
     return shutil.which("git") or "git"
 
 
 def _init_repo(repo_root: Path) -> None:
+    """Initialize a Git repository with test user configuration.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory to initialize.
+    """
     env = _git_env()
     run_process([_git(), "init"], cwd=repo_root, env=env)
     run_process([_git(), "config", "user.name", env["GIT_AUTHOR_NAME"]], cwd=repo_root, env=env)
@@ -46,6 +67,13 @@ def _init_repo(repo_root: Path) -> None:
 
 
 def _write_repo(repo_root: Path) -> None:
+    """Create test package structure and commit to Git repository.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+    """
     pkg = repo_root / "pkg"
     pkg.mkdir(parents=True, exist_ok=True)
     (pkg / "__init__.py").write_text(
@@ -73,6 +101,18 @@ def beta_fn() -> str:
 
 
 def _write_scip(repo_root: Path) -> Path:
+    """Write test SCIP index JSON file.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+
+    Returns
+    -------
+    Path
+        Path to created SCIP index file.
+    """
     payload = {
         "documents": [
             {

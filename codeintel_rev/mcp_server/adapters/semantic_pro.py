@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
 
 
-@dataclass(frozen=True)
+@dataclass
 class SemanticProOptions:
     """User-facing options for the pro semantic adapter.
 
@@ -185,7 +185,7 @@ LateInteractionFactory = Callable[[XTRIndex], LateInteractionRunner]
 RerankerFactory = Callable[[], Reranker]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class SemanticProHooks:
     """Configurable collaborators for the semantic pro adapter pipeline.
 

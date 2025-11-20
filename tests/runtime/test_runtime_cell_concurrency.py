@@ -33,6 +33,12 @@ def test_single_flight_and_backpressure() -> None:
     errors: list[Exception] = []
 
     def _call() -> None:
+        """Call get_or_initialize and collect results or errors.
+
+        Notes
+        -----
+        May raise RuntimeUnavailableError if backpressure triggers.
+        """
         try:
             results.append(cell.get_or_initialize(factory))
         except RuntimeUnavailableError as exc:  # pragma: no cover - timing dependent

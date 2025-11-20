@@ -29,7 +29,16 @@ from tests._helpers import assertions
 
 
 class _StubEmbedder:
+    """Stub embedder for testing search/fetch golden paths."""
+
     def __init__(self, dim: int) -> None:
+        """Initialize stub embedder with dimension.
+
+        Parameters
+        ----------
+        dim : int
+            Embedding dimension.
+        """
         self._dim = dim
 
     def embed_single(self, text: str) -> list[float]:
@@ -49,6 +58,8 @@ class _StubEmbedder:
 
 
 class _StubFaissRuntime(VectorRuntime):
+    """Stub FAISS runtime for testing search/fetch golden paths."""
+
     @staticmethod
     def get_runtime_tuning() -> Mapping[str, object]:
         """Stub get_runtime_tuning method.
@@ -62,11 +73,14 @@ class _StubFaissRuntime(VectorRuntime):
 
 
 class _StubFaiss:
+    """Stub FAISS manager for testing search/fetch golden paths."""
+
     vec_dim = 4
     faiss_family: str | None = "ivf_pq"
     refine_k_factor = 1.0
 
     def __init__(self) -> None:
+        """Initialize stub FAISS with runtime."""
         self._runtime = _StubFaissRuntime()
 
     @property
@@ -116,7 +130,10 @@ class _StubFaiss:
 
 
 class _StubCatalog:
+    """Stub catalog for testing search/fetch golden paths."""
+
     def __init__(self) -> None:
+        """Initialize stub catalog with test rows."""
         self._rows: list[dict[str, object]] = [
             {
                 "id": 1,

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+import os
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 
 import duckdb
 from codeintel_rev.app.config_context import ApplicationContext
@@ -13,11 +14,47 @@ from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
+from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
 
-from tests._helpers.adapters import InMemoryScopeStore
+from tests._helpers.adapters import (
+    InMemoryCommit,
+    InMemoryFileAdapter,
+    InMemoryHistoryAdapter,
+    InMemoryScopeStore,
+)
 from tests._helpers.ml import FakeEmbeddingClient
 from tests._helpers.settings import build_app_config_for_repo
+
+
+class FakeRuntimeProtocol(Protocol):
+    """Runtime tuning protocol used by FakeFAISSManager runtime stub."""
+
+    def get_runtime_tuning(self) -> dict[str, Any]:
+        """Get current runtime tuning parameters.
+
+        Returns
+        -------
+        dict[str, Any]
+            Current tuning parameters dictionary.
+        """
+        ...
+
+    def set_runtime_tuning(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Set runtime tuning parameters.
+
+        Parameters
+        ----------
+        params : dict[str, Any]
+            Tuning parameters to set.
+
+        Returns
+        -------
+        dict[str, Any]
+            Updated tuning parameters dictionary.
+        """
+        ...
 
 
 @dataclass(slots=True)
@@ -87,8 +124,22 @@ class FakeAsyncGitClient:
 class FakeGitClient:
     """Synchronous Git stub; not currently exercised by smoke tests."""
 
-    def __getattr__(self, name: str) -> Callable[..., Any]:  # pragma: no cover - defensive
-        def _missing(*_: Any, **__: Any) -> None:
+    def __getattr__(self, name: str) -> Callable[..., None]:  # pragma: no cover - defensive
+        """Return placeholder function for unimplemented GitClient methods.
+
+        Parameters
+        ----------
+        name : str
+            Method name that was accessed.
+
+        Returns
+        -------
+        Callable[..., None]
+            Placeholder function that raises NotImplementedError.
+        """
+
+        def _missing(*_: object, **__: object) -> None:
+            """Raise NotImplementedError for unimplemented method."""
             message = f"GitClient method {name} not implemented in fake"
             raise NotImplementedError(message)
 
@@ -156,6 +207,8 @@ class IntegrationHarness:
 
     context: ApplicationContext
     repo_root: Path
+    file_adapter: InMemoryFileAdapter | None = None
+    history_adapter: InMemoryHistoryAdapter | None = None
     cleanup_callbacks: list[Callable[[], None]] = field(default_factory=list)
 
     def close(self) -> None:
@@ -170,9 +223,7 @@ class FakeFAISSManager:
 
     results: list[Any] = field(default_factory=list)
     search_side_effect: Exception | None = None
-    autotune_profile_path: Path = (
-        Path(__file__).resolve().parent / "faiss-tuning.json"
-    )
+    autotune_profile_path: Path = Path(__file__).resolve().parent / "faiss-tuning.json"
     vec_dim: int = 128
     active_runtime: dict[str, Any] = field(default_factory=lambda: {"nprobe": 32})
 
@@ -205,7 +256,7 @@ class FakeFAISSManager:
         return list(self.results)
 
     @property
-    def runtime(self) -> Any:
+    def runtime(self) -> FakeRuntimeProtocol:
         """Return runtime tuning stub instance.
 
         Returns
@@ -214,8 +265,17 @@ class FakeFAISSManager:
             Runtime instance with get_runtime_tuning and set_runtime_tuning methods.
         """
 
-        class _Runtime:
+        class _Runtime(FakeRuntimeProtocol):
+            """Runtime tuning stub implementation for FakeFAISSManager."""
+
             def __init__(self, parent: FakeFAISSManager) -> None:
+                """Initialize runtime stub with parent manager.
+
+                Parameters
+                ----------
+                parent : FakeFAISSManager
+                    Parent FAISS manager instance.
+                """
                 self._parent = parent
 
             def get_runtime_tuning(self) -> dict[str, Any]:
@@ -251,6 +311,20 @@ def _default_catalog_factory(
     catalog_cfg: DuckDBCatalogConfig,
     manager: DuckDBManager,
 ) -> DuckDBCatalog:
+    """Create DuckDBCatalog instance from config and manager.
+
+    Parameters
+    ----------
+    catalog_cfg : DuckDBCatalogConfig
+        Catalog configuration.
+    manager : DuckDBManager
+        DuckDB manager instance.
+
+    Returns
+    -------
+    DuckDBCatalog
+        Configured catalog instance.
+    """
     catalog = DuckDBCatalog(
         catalog_cfg.db_path,
         catalog_cfg.vectors_dir,
@@ -268,6 +342,8 @@ def build_integration_harness(
     *,
     populate_repo: bool = True,
     seed_files: dict[str, str] | None = None,
+    file_adapter: InMemoryFileAdapter | None = None,
+    history_adapter: InMemoryHistoryAdapter | None = None,
 ) -> IntegrationHarness:
     """Create an ApplicationContext with in-memory fakes suitable for integration tests.
 
@@ -279,6 +355,10 @@ def build_integration_harness(
         Whether to create default test files, by default True.
     seed_files : dict[str, str] | None, optional
         Additional files to create (relpath -> content), by default None.
+    file_adapter : InMemoryFileAdapter | None, optional
+        Optional in-memory file adapter to attach to the harness.
+    history_adapter : InMemoryHistoryAdapter | None, optional
+        Optional in-memory history adapter to attach to the harness.
 
     Returns
     -------
@@ -286,7 +366,7 @@ def build_integration_harness(
         Integration test harness with configured ApplicationContext.
     """
     repo_root = base_dir / "repo"
-    repo_root.mkdir()
+    repo_root.mkdir(parents=True, exist_ok=True)
     if populate_repo:
         (repo_root / "README.md").write_text("sample integration content\n", encoding="utf-8")
         (repo_root / "module.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
@@ -314,14 +394,23 @@ def build_integration_harness(
         log_queries=False,
     )
 
-    with duckdb.connect(str(paths.duckdb_path)):
-        pass
+    if paths.duckdb_path.exists():
+        try:
+            duckdb.connect(str(paths.duckdb_path)).close()
+        except duckdb.IOException:
+            paths.duckdb_path.unlink(missing_ok=True)
+            duckdb.connect(str(paths.duckdb_path)).close()
+    else:
+        duckdb.connect(str(paths.duckdb_path)).close()
 
-    vllm_client: VLLMClient = FakeEmbeddingClient(
-        embedding_dim=app_config.vllm.embedding_dim,
-        batch_size=app_config.vllm.batch_size,
+    vllm_client = cast(
+        "VLLMClient",
+        FakeEmbeddingClient(
+            embedding_dim=app_config.vllm.embedding_dim,
+            batch_size=app_config.vllm.batch_size,
+        ),
     )
-    faiss_manager = FakeFAISSManager(vec_dim=app_config.index.vec_dim)
+    faiss_manager = cast("FAISSManager", FakeFAISSManager(vec_dim=app_config.index.vec_dim))
     faiss_manager.autotune_profile_path = paths.faiss_index.with_name("tuning.json")
     scope_backend = InMemoryScopeStore()
     scope_store = ScopeStore(
@@ -341,16 +430,17 @@ def build_integration_harness(
         duckdb_manager=duckdb_manager,
         catalog_config=catalog_cfg,
         duckdb_catalog_factory=_default_catalog_factory,
-        git_client=FakeGitClient(),
-        async_git_client=FakeAsyncGitClient(),
+        git_client=cast("GitClient", FakeGitClient()),
+        async_git_client=cast("AsyncGitClient", FakeAsyncGitClient()),
     )
 
-    harness = IntegrationHarness(
+    return IntegrationHarness(
         context=context,
         repo_root=repo_root,
+        file_adapter=file_adapter,
+        history_adapter=history_adapter,
         cleanup_callbacks=[duckdb_manager.close],
     )
-    return harness
 
 
 def integration_harness_fixture(tmp_path: Path) -> Iterator[IntegrationHarness]:
@@ -371,3 +461,135 @@ def integration_harness_fixture(tmp_path: Path) -> Iterator[IntegrationHarness]:
         yield harness
     finally:
         harness.close()
+
+
+def seed_repo_files(
+    repo_root: Path,
+    *,
+    files: dict[str, str],
+    mtime: float | None = None,
+) -> None:
+    """Create files on disk to mirror logical adapter seeds.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root.
+    files : dict[str, str]
+        Mapping of relative path -> content.
+    mtime : float | None, optional
+        Override modification time for all files.
+    """
+    for rel_path, content in files.items():
+        target = repo_root / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        if mtime is not None:
+            target.touch()
+            os.utime(target, (mtime, mtime))
+
+
+def build_harness_with_adapters(
+    base_dir: Path,
+    *,
+    files: dict[str, str],
+    blame_map: dict[str, list[tuple[InMemoryCommit, list[int]]]] | None = None,
+    history_map: dict[str, list[InMemoryCommit]] | None = None,
+    history_delay: float = 0.0,
+) -> IntegrationHarness:
+    """Build harness with in-memory file/history adapters pre-seeded.
+
+    Parameters
+    ----------
+    base_dir : Path
+        Temporary base directory.
+    files : dict[str, str]
+        Mapping of relative path -> content to seed adapters (and optionally disk).
+    blame_map : dict[str, list[tuple[object, list[int]]]] | None, optional
+        Optional blame mapping to seed history adapter.
+    history_map : dict[str, list[object]] | None, optional
+        Optional history mapping to seed history adapter.
+    history_delay : float, optional
+        Optional artificial delay (seconds) for history adapter operations.
+
+    Returns
+    -------
+    IntegrationHarness
+        Harness with context plus in-memory adapters attached.
+    """
+    file_adapter = InMemoryFileAdapter()
+    for rel_path, content in files.items():
+        file_adapter.add_file(rel_path, content)
+
+    history_adapter = InMemoryHistoryAdapter(delay_seconds=history_delay)
+    if blame_map:
+        for rel_path, entries in blame_map.items():
+            history_adapter.set_blame(
+                rel_path,
+                cast("list[tuple[InMemoryCommit, Sequence[int]]]", entries),
+            )
+    if history_map:
+        for rel_path, commits in history_map.items():
+            history_adapter.set_history(rel_path, commits)
+
+    harness = build_integration_harness(
+        base_dir, populate_repo=False, file_adapter=file_adapter, history_adapter=history_adapter
+    )
+    seed_repo_files(harness.repo_root, files=files)
+    return harness
+
+
+def generate_concurrent_file_set(
+    count: int = 100,
+    prefix: str = "src/file",
+    suffix: str = ".py",
+) -> dict[str, str]:
+    """Generate deterministic file payloads for concurrency adapter tests.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of relative path to file content for the requested count.
+    """
+    return {
+        f"{prefix}_{idx}{suffix}": f"def func_{idx}():\n    return {idx}\n" for idx in range(count)
+    }
+
+
+def build_async_adapters_harness(
+    base_dir: Path,
+    *,
+    file_count: int = 200,
+    history_delay: float = 0.0,
+) -> IntegrationHarness:
+    """Build harness tailored for async adapter concurrency/benchmark tests.
+
+    Returns
+    -------
+    IntegrationHarness
+        Harness with pre-seeded files and in-memory async history adapter.
+    """
+    files = generate_concurrent_file_set(count=file_count)
+    commits = [
+        InMemoryCommit(
+            hexsha=f"{idx:08x}",
+            author_name="LoadTest",
+            author_email="load@example.com",
+            summary=f"Commit {idx}",
+        )
+        for idx in range(file_count)
+    ]
+    history_map = {path: [commits[idx]] for idx, path in enumerate(files.keys())}
+    blame_map = {path: [(commits[idx], [1, 2, 3, 4, 5])] for idx, path in enumerate(files.keys())}
+    harness = build_harness_with_adapters(
+        base_dir,
+        files=files,
+        history_map=history_map,
+        blame_map=blame_map,
+        populate_repo_on_disk=True,
+        populate_repo=False,
+        history_delay=history_delay,
+    )
+    if harness.history_adapter is not None:
+        harness.context = harness.context.with_overrides(async_git_client=harness.history_adapter)
+    return harness

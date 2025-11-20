@@ -21,6 +21,22 @@ if TYPE_CHECKING:
 
 
 def _write(base: Path, name: str, content: str) -> Path:
+    """Write content to file in base directory.
+
+    Parameters
+    ----------
+    base : Path
+        Base directory path.
+    name : str
+        Filename to create.
+    content : str
+        File content to write.
+
+    Returns
+    -------
+    Path
+        Path to the created file.
+    """
     path = base / name
     path.write_text(content, encoding="utf-8")
     return path

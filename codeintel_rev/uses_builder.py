@@ -49,6 +49,9 @@ def build_use_graph(index: SCIPIndex) -> UseGraph:
     """
     symbol_defs: dict[str, str] = {}
     for doc in index.documents:
+        for symbol in doc.symbols:
+            if symbol.symbol:
+                symbol_defs.setdefault(symbol.symbol, doc.path)
         for occurrence in doc.occurrences:
             if _is_definition(occurrence.roles):
                 symbol_defs.setdefault(occurrence.symbol, doc.path)

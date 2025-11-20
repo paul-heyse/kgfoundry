@@ -15,7 +15,16 @@ from tests._helpers import assertions
 
 
 class _StubXTRIndex:
+    """Stub XTR index for testing late interaction."""
+
     def __init__(self, triples: list[tuple[int, float, dict[str, object] | None]]) -> None:
+        """Initialize stub index with pre-configured rescore results.
+
+        Parameters
+        ----------
+        triples : list[tuple[int, float, dict[str, object] | None]]
+            List of (chunk_id, score, explanation) tuples to return.
+        """
         self._triples = triples
 
     def rescore(

@@ -16,12 +16,31 @@ from tests._helpers import assertions
 
 @pytest.fixture(autouse=True)
 def _reset_navmap_caches() -> Iterator[None]:
+    """Reset navmap caches before and after each test.
+
+    Yields
+    ------
+    None
+        Fixture yields control to test execution.
+    """
     clear_navmap_caches()
     yield
     clear_navmap_caches()
 
 
 def _symbol_names(sections: object) -> set[str]:
+    """Extract symbol names from navigation sections.
+
+    Parameters
+    ----------
+    sections : object
+        Navigation sections object.
+
+    Returns
+    -------
+    set[str]
+        Set of symbol names found in sections.
+    """
     names: set[str] = set()
     if sections is None:
         return names

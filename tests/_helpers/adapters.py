@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-import time
+import asyncio
+import tempfile
+import time as time_module
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from fnmatch import fnmatch
 from pathlib import Path
-import tempfile
-from typing import Any
+from threading import Lock
+from typing import Any, cast
+
+import git
 
 
 @dataclass(slots=True)
@@ -166,7 +171,12 @@ class InMemoryGitRepo:
         If set_history_error was called for any of the paths, raises the configured exception.
         """
         _ = rev
-        key = (paths[0] if paths else None) if isinstance(paths, (list, tuple)) else paths
+        key: str | None = None
+        if isinstance(paths, (list, tuple)):
+            candidate = paths[0] if paths else None
+            key = candidate if isinstance(candidate, str) else str(candidate) if candidate else None
+        elif isinstance(paths, str):
+            key = paths
         path_key = key or ""
         if path_key in self._history_errors:
             raise self._history_errors[path_key]
@@ -179,12 +189,12 @@ class InMemoryGitRepo:
 class RecordingRepoFactory:
     """Callable factory that records invocations for assertions."""
 
-    def __init__(self, repo: InMemoryGitRepo | object) -> None:
-        self.repo = repo
+    def __init__(self, repo: git.Repo) -> None:
+        self.repo: git.Repo = repo
         self.calls = 0
         self.side_effect: Exception | None = None
 
-    def __call__(self, repo_path: Path) -> object:
+    def __call__(self, repo_path: Path) -> git.Repo:
         self.calls += 1
         _ = repo_path
         if self.side_effect is not None:
@@ -215,19 +225,19 @@ class InMemoryScopeStore:
         if record is None:
             return None
         value, expires_at = record
-        if expires_at is not None and expires_at <= time.monotonic():
+        if expires_at is not None and expires_at <= time_module.monotonic():
             self._data.pop(name, None)
             return None
         return value
 
-    async def setex(self, name: str, time_seconds: int, value: bytes) -> bool | None:
+    async def setex(self, name: str, time: int, value: bytes) -> bool | None:
         """Set value with expiration time.
 
         Parameters
         ----------
         name : str
             Key to store value under.
-        time_seconds : int
+        time : int
             Expiration time in seconds (0 means no expiration).
         value : bytes
             Value to store.
@@ -237,7 +247,7 @@ class InMemoryScopeStore:
         bool | None
             True on success.
         """
-        expires_at = time.monotonic() + time_seconds if time_seconds > 0 else None
+        expires_at = time_module.monotonic() + time if time > 0 else None
         self._data[name] = (value, expires_at)
         return True
 
@@ -359,3 +369,229 @@ class InMemoryFAISSManager:
         """
         self.search_calls += 1
         return self._results
+
+
+# ---------------------- Files + History adapter fakes ---------------------- #
+
+
+@dataclass(slots=True)
+class _FileRecord:
+    """Internal file record for in-memory adapters."""
+
+    content: bytes
+    mtime: float
+
+    @property
+    def size(self) -> int:
+        return len(self.content)
+
+
+class InMemoryFileAdapter:
+    """In-memory file adapter with deterministic metadata and tracking."""
+
+    def __init__(self, base_path: Path | None = None) -> None:
+        self.base_path = base_path or Path("/")
+        self._files: dict[str, _FileRecord] = {}
+        self.read_calls = 0
+        self.list_calls = 0
+        self.write_calls = 0
+        self._lock = Lock()
+
+    def add_file(self, rel_path: str, content: str | bytes, *, mtime: float | None = None) -> None:
+        """Insert or overwrite a file."""
+        payload = content.encode("utf-8") if isinstance(content, str) else content
+        record = _FileRecord(content=payload, mtime=mtime or time_module.time())
+        with self._lock:
+            self._files[rel_path] = record
+
+    def read_file(
+        self,
+        rel_path: str,
+        start_line: int | None = None,
+        end_line: int | None = None,
+    ) -> dict[str, object]:
+        """Return file content and metadata.
+
+        Returns
+        -------
+        dict[str, object]
+            Mapping containing path, content, lines, size, and mtime.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the requested path is not present in the in-memory store.
+        """
+        with self._lock:
+            record = self._files.get(rel_path)
+        if record is None:
+            message = f"File not found: {rel_path}"
+            raise FileNotFoundError(message)
+        self.read_calls += 1
+        text = record.content.decode("utf-8", errors="ignore")
+        lines = text.splitlines()
+        if start_line is not None or end_line is not None:
+            start = start_line - 1 if start_line and start_line > 0 else 0
+            stop = end_line if end_line and end_line > 0 else len(lines)
+            lines = lines[start:stop]
+        sliced_text = "\n".join(lines)
+        return {
+            "path": rel_path,
+            "content": sliced_text,
+            "lines": len(lines),
+            "size": record.size,
+            "mtime": record.mtime,
+        }
+
+    def list_paths(
+        self,
+        *,
+        root: str | None = None,
+        include_globs: list[str] | None = None,
+        exclude_globs: list[str] | None = None,
+        max_results: int | None = None,
+    ) -> list[dict[str, object]]:
+        """Return metadata for files matching glob/language filters.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            List of file metadata dictionaries with path, size, and mtime.
+        """
+        root_prefix = f"{root.rstrip('/')}/" if root else ""
+        include = include_globs or ["**"]
+        exclude = exclude_globs or []
+        results: list[dict[str, object]] = []
+        with self._lock:
+            items = list(self._files.items())
+        for rel_path, record in items:
+            if root and not rel_path.startswith(root_prefix):
+                continue
+            rel = rel_path if not root_prefix else rel_path[len(root_prefix) :]
+            if not any(fnmatch(rel_path, pattern) or fnmatch(rel, pattern) for pattern in include):
+                continue
+            if any(fnmatch(rel_path, pattern) or fnmatch(rel, pattern) for pattern in exclude):
+                continue
+            results.append(
+                {
+                    "path": rel_path,
+                    "size": record.size,
+                    "mtime": record.mtime,
+                }
+            )
+            if max_results is not None and len(results) >= max_results:
+                break
+        self.list_calls += 1
+        return results
+
+    def write_file(self, rel_path: str, content: str | bytes) -> None:
+        """Write file content and update metadata."""
+        self.add_file(rel_path, content)
+        self.write_calls += 1
+
+
+class InMemoryAsyncFileAdapter:
+    """Async wrapper around InMemoryFileAdapter."""
+
+    def __init__(self, file_adapter: InMemoryFileAdapter | None = None) -> None:
+        self._file_adapter = file_adapter or InMemoryFileAdapter()
+
+    async def list_paths(
+        self,
+        *,
+        root: str | None = None,
+        include_globs: list[str] | None = None,
+        exclude_globs: list[str] | None = None,
+        max_results: int | None = None,
+    ) -> list[dict[str, object]]:
+        return self._file_adapter.list_paths(
+            root=root,
+            include_globs=include_globs,
+            exclude_globs=exclude_globs,
+            max_results=max_results,
+        )
+
+    async def read_file(
+        self,
+        rel_path: str,
+        *,
+        start_line: int | None = None,
+        end_line: int | None = None,
+    ) -> dict[str, object]:
+        return self._file_adapter.read_file(rel_path, start_line=start_line, end_line=end_line)
+
+    async def write_file(self, rel_path: str, content: str | bytes) -> None:
+        self._file_adapter.write_file(rel_path, content)
+
+    @property
+    def file_adapter(self) -> InMemoryFileAdapter:
+        return self._file_adapter
+
+
+class InMemoryHistoryAdapter:
+    """Async history adapter backed by InMemoryGitRepo."""
+
+    def __init__(self, repo: InMemoryGitRepo | None = None, delay_seconds: float = 0.0) -> None:
+        self.repo = repo or InMemoryGitRepo()
+        self.blame_calls = 0
+        self.history_calls = 0
+        self.delay_seconds = delay_seconds
+
+    async def blame_range(
+        self,
+        *,
+        path: str,
+        start_line: int,
+        end_line: int,
+    ) -> list[dict[str, object]]:
+        self.blame_calls += 1
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
+        entries = self.repo.blame_incremental(path)
+        results: list[dict[str, object]] = []
+        for commit, lines in entries:
+            if not isinstance(commit, InMemoryCommit):
+                continue
+            for line in lines:
+                if line < start_line or line > end_line:
+                    continue
+                results.append(
+                    {
+                        "line": line,
+                        "author": commit.author_name,
+                        "email": commit.author_email,
+                        "sha": commit.hexsha[:7],
+                        "date": commit.authored_datetime.isoformat(),
+                        "message": commit.summary,
+                    }
+                )
+        return results
+
+    async def file_history(self, *, path: str, limit: int) -> list[dict[str, object]]:
+        self.history_calls += 1
+        if self.delay_seconds:
+            await asyncio.sleep(self.delay_seconds)
+        commits = list(self.repo.iter_commits(paths=path, max_count=limit))
+        results: list[dict[str, object]] = []
+        for commit in commits:
+            if not isinstance(commit, InMemoryCommit):
+                continue
+            results.append(
+                {
+                    "sha": commit.hexsha[:7],
+                    "full_sha": commit.hexsha,
+                    "author": commit.author_name,
+                    "email": commit.author_email,
+                    "date": commit.authored_datetime.isoformat(),
+                    "message": commit.summary,
+                }
+            )
+        return results
+
+    def set_history(self, path: str, commits: list[InMemoryCommit]) -> None:
+        """Set commit history for a file path."""
+        self.repo.set_history(path, cast("list[object]", commits))
+
+    def set_blame(self, path: str, blame: list[tuple[InMemoryCommit, Sequence[int]]]) -> None:
+        """Set blame mapping for a file path."""
+        self.repo.set_blame_result(path, cast("list[tuple[object, Sequence[int]]]", blame))

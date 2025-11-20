@@ -214,6 +214,19 @@ class EnvelopeBuilder:
         run_id: str,
         correlation_id: str,
     ) -> None:
+        """Initialize envelope builder with command metadata.
+
+        Parameters
+        ----------
+        command_path : list[str]
+            Normalized command route segments (e.g., ["harvest", "documents"]).
+        operation : str
+            Operation identifier for this CLI invocation.
+        run_id : str
+            Unique run identifier for this execution.
+        correlation_id : str
+            Correlation ID for tracing across services.
+        """
         started_at = datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
         command = command_path[0] if command_path else None
         subcommand = command_path[1] if len(command_path) > 1 else None
@@ -331,6 +344,14 @@ class EnvelopeBuilder:
 
 
 def _now_id() -> str:
+    """Generate a short unique identifier from UUID.
+
+    Returns
+    -------
+    str
+        First 6 hexadecimal characters of a UUID4, suitable for use as a
+        short run identifier or correlation ID suffix.
+    """
     return uuid.uuid4().hex[:6]
 
 

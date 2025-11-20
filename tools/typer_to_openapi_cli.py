@@ -261,10 +261,38 @@ def walk_commands(
 def _augment_lookup(
     augment: AugmentMetadataModel, op_id: str, tokens: Sequence[str]
 ) -> OperationOverrideModel | None:
+    """Look up operation override from augment metadata.
+
+    Parameters
+    ----------
+    augment : AugmentMetadataModel
+        Augment metadata model containing operation overrides.
+    op_id : str
+        Operation ID to look up.
+    tokens : Sequence[str]
+        Command tokens for matching.
+
+    Returns
+    -------
+    OperationOverrideModel | None
+        Operation override if found, None otherwise.
+    """
     return augment.operation_override(op_id, tokens=tokens)
 
 
 def _ensure_str_list(value: object) -> list[str]:
+    """Coerce value to list of strings.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce (string, sequence, or other).
+
+    Returns
+    -------
+    list[str]
+        List of strings, empty if value cannot be coerced.
+    """
     if isinstance(value, str):
         return [value]
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
@@ -273,12 +301,36 @@ def _ensure_str_list(value: object) -> list[str]:
 
 
 def _coerce_mapping(value: object) -> dict[str, object]:
+    """Coerce value to string-keyed mapping.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary with string keys, empty if value is not a mapping.
+    """
     if not isinstance(value, Mapping):
         return {}
     return {str(key): val for key, val in value.items()}
 
 
 def _coerce_mapping_list(value: object) -> list[dict[str, object]]:
+    """Coerce value to list of string-keyed mappings.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        List of dictionaries with string keys, empty if value is not a sequence of mappings.
+    """
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return []
     return [
@@ -291,6 +343,22 @@ def _operation_metadata(
     tokens: Sequence[str],
     operation_id: str,
 ) -> dict[str, object]:
+    """Extract operation metadata from interface model.
+
+    Parameters
+    ----------
+    interface_meta : RegistryInterfaceModel | None
+        Interface metadata model, or None.
+    tokens : Sequence[str]
+        Command tokens for matching.
+    operation_id : str
+        Operation ID for matching.
+
+    Returns
+    -------
+    dict[str, object]
+        Operation metadata payload, empty dict if not found.
+    """
     if interface_meta is None:
         return {}
     token_list = list(tokens)
@@ -306,6 +374,18 @@ def _operation_metadata(
 def _interface_metadata(
     interface_meta: RegistryInterfaceModel | None,
 ) -> dict[str, object] | None:
+    """Extract interface metadata as dictionary.
+
+    Parameters
+    ----------
+    interface_meta : RegistryInterfaceModel | None
+        Interface metadata model, or None.
+
+    Returns
+    -------
+    dict[str, object] | None
+        Interface metadata dictionary, or None if interface_meta is None.
+    """
     if interface_meta is None:
         return None
     return {
@@ -324,6 +404,24 @@ def _initial_document(
     augment: AugmentMetadataModel,
     interface_meta: RegistryInterfaceModel | None,
 ) -> dict[str, object]:
+    """Build initial OpenAPI document structure.
+
+    Parameters
+    ----------
+    title : str
+        OpenAPI document title.
+    version : str
+        OpenAPI document version.
+    augment : AugmentMetadataModel
+        Augment metadata model.
+    interface_meta : RegistryInterfaceModel | None
+        Optional interface metadata model.
+
+    Returns
+    -------
+    dict[str, object]
+        Initial OpenAPI document dictionary with info, tags, and paths sections.
+    """
     tag_entries = [
         entry for entry in _coerce_mapping_list(augment.payload.get("tags")) if "name" in entry
     ]
@@ -348,6 +446,18 @@ def _initial_document(
 def _request_schema_for_command(
     params: Sequence[click.Parameter],
 ) -> tuple[dict[str, object], bool]:
+    """Build JSON schema for command request body.
+
+    Parameters
+    ----------
+    params : Sequence[click.Parameter]
+        Click parameters to include in schema.
+
+    Returns
+    -------
+    tuple[dict[str, object], bool]
+        Tuple of (schema dictionary, has_properties flag).
+    """
     properties: dict[str, object] = {}
     required: list[str] = []
     for param in params:
@@ -366,6 +476,15 @@ def _request_schema_for_command(
 def _apply_override_to_x_cli(
     block: dict[str, object], override: OperationOverrideModel | None
 ) -> None:
+    """Apply operation override metadata to x-cli block.
+
+    Parameters
+    ----------
+    block : dict[str, object]
+        x-cli block dictionary to modify in-place.
+    override : OperationOverrideModel | None
+        Operation override model, or None.
+    """
     if override is None:
         return
     if override.handler:
@@ -390,6 +509,22 @@ def _collect_problem_details(
     interface_meta: RegistryInterfaceModel | None,
     override: OperationOverrideModel | None,
 ) -> list[str]:
+    """Collect problem details from multiple sources.
+
+    Parameters
+    ----------
+    op_meta : JSONMapping
+        Operation metadata dictionary.
+    interface_meta : RegistryInterfaceModel | None
+        Optional interface metadata model.
+    override : OperationOverrideModel | None
+        Optional operation override model.
+
+    Returns
+    -------
+    list[str]
+        Combined list of problem detail identifiers.
+    """
     details: list[str] = []
     details.extend(_ensure_str_list(op_meta.get("problem_details")))
     if interface_meta:
@@ -405,6 +540,24 @@ def _select_operation_tags(
     interface_meta: RegistryInterfaceModel | None,
     default_tag: str,
 ) -> list[str]:
+    """Select operation tags from multiple sources with priority.
+
+    Parameters
+    ----------
+    override : OperationOverrideModel | None
+        Optional operation override (highest priority).
+    op_meta : JSONMapping
+        Operation metadata dictionary.
+    interface_meta : RegistryInterfaceModel | None
+        Optional interface metadata model.
+    default_tag : str
+        Default tag to use if no tags found.
+
+    Returns
+    -------
+    list[str]
+        List of tags, using first non-empty source or default.
+    """
     for candidate in (
         list(override.tags) if override else [],
         _ensure_str_list(op_meta.get("tags")),
@@ -633,6 +786,24 @@ def _build_x_cli_block(
     op_meta: JSONMapping,
     context: OperationContext,
 ) -> dict[str, object]:
+    """Build x-cli extension block for operation.
+
+    Parameters
+    ----------
+    descriptor : _OperationDescriptor
+        Operation descriptor with tokens and command info.
+    params : Sequence[click.Parameter]
+        Click parameters for the command.
+    op_meta : JSONMapping
+        Operation metadata dictionary.
+    context : OperationContext
+        Operation context with bin_name and interface info.
+
+    Returns
+    -------
+    dict[str, object]
+        x-cli extension block dictionary.
+    """
     kebab_tokens = list(descriptor.kebab_tokens)
     example = build_example(context.bin_name, kebab_tokens, params)
     block: dict[str, object] = {
@@ -665,6 +836,15 @@ def _build_x_cli_block(
 
 
 def _augment_document_tags(document: dict[str, object], referenced_tags: set[str]) -> None:
+    """Add missing tags to document tags section.
+
+    Parameters
+    ----------
+    document : dict[str, object]
+        OpenAPI document dictionary to modify in-place.
+    referenced_tags : set[str]
+        Set of tag names that should exist in document.
+    """
     existing_tags = document.get("tags")
     iterable_tags = (
         existing_tags
@@ -680,6 +860,20 @@ def _augment_document_tags(document: dict[str, object], referenced_tags: set[str
 
 @dataclass(frozen=True)
 class _RegistryOperationEntry:
+    """Immutable entry for registry-based operation.
+
+    Parameters
+    ----------
+    path : str
+        OpenAPI path string.
+    operation_id : str
+        Operation ID.
+    tags : set[str]
+        Set of tag names.
+    document : dict[str, object]
+        Complete operation document dictionary.
+    """
+
     path: str
     operation_id: str
     tags: set[str]
@@ -688,6 +882,26 @@ class _RegistryOperationEntry:
 
 @dataclass(frozen=True)
 class _OperationDocumentParams:
+    """Parameters for building registry operation document.
+
+    Parameters
+    ----------
+    operation_id : str
+        Operation ID.
+    tags : Sequence[str]
+        List of tag names.
+    summary : str
+        Operation summary.
+    description : str
+        Operation description.
+    cli_extension : Mapping[str, object]
+        x-cli extension block.
+    problem_details : Sequence[str]
+        List of problem detail identifiers.
+    interface_extension : Mapping[str, object] | None
+        Optional x-kgf-interface extension block.
+    """
+
     operation_id: str
     tags: Sequence[str]
     summary: str
@@ -699,6 +913,20 @@ class _OperationDocumentParams:
 
 @dataclass(frozen=True)
 class _InterfaceOperationContext:
+    """Context for building registry interface operations.
+
+    Parameters
+    ----------
+    interface : RegistryInterfaceModel
+        Interface metadata model.
+    bin_name : str
+        Binary name for CLI examples.
+    interface_extension : Mapping[str, object] | None
+        Optional interface extension metadata.
+    augment : AugmentMetadataModel
+        Augment metadata model.
+    """
+
     interface: RegistryInterfaceModel
     bin_name: str
     interface_extension: Mapping[str, object] | None
@@ -706,6 +934,18 @@ class _InterfaceOperationContext:
 
 
 def _existing_operation_ids(paths_section: Mapping[str, object]) -> set[str]:
+    """Extract existing operation IDs from paths section.
+
+    Parameters
+    ----------
+    paths_section : Mapping[str, object]
+        OpenAPI paths section dictionary.
+
+    Returns
+    -------
+    set[str]
+        Set of existing operation IDs.
+    """
     operation_ids: set[str] = set()
     for entry in paths_section.values():
         if not isinstance(entry, Mapping):
@@ -719,6 +959,20 @@ def _existing_operation_ids(paths_section: Mapping[str, object]) -> set[str]:
 
 
 def _operation_tokens(operation_id: str, fallback: str) -> tuple[list[str], list[str]]:
+    """Parse operation ID into token lists.
+
+    Parameters
+    ----------
+    operation_id : str
+        Operation ID (e.g., "cli.sub.command").
+    fallback : str
+        Fallback token if operation_id is empty.
+
+    Returns
+    -------
+    tuple[list[str], list[str]]
+        Tuple of (sanitized tokens, kebab-case command tokens).
+    """
     tokens = [part.strip() for part in operation_id.split(".") if part.strip()]
     if tokens and tokens[0] == "cli":
         tokens = tokens[1:]
@@ -730,6 +984,18 @@ def _operation_tokens(operation_id: str, fallback: str) -> tuple[list[str], list
 
 
 def _coerce_str_list(value: object) -> list[str]:
+    """Coerce value to list of non-empty strings.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce.
+
+    Returns
+    -------
+    list[str]
+        List of non-empty strings, empty if value is not a sequence.
+    """
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
         return [str(item).strip() for item in value if str(item).strip()]
     return []
@@ -741,6 +1007,22 @@ def _build_cli_extension(
     command_tokens: Sequence[str],
     metadata: Mapping[str, object],
 ) -> dict[str, object]:
+    """Build x-cli extension block from metadata.
+
+    Parameters
+    ----------
+    bin_name : str
+        Binary name for CLI examples.
+    command_tokens : Sequence[str]
+        Command tokens for building command string.
+    metadata : Mapping[str, object]
+        Metadata dictionary containing handler, env, code_samples, examples.
+
+    Returns
+    -------
+    dict[str, object]
+        x-cli extension block dictionary.
+    """
     command_string = " ".join(command_tokens).strip()
     example_command = f"{bin_name} {command_string}".strip()
     extension: dict[str, object] = {
@@ -767,6 +1049,18 @@ def _build_cli_extension(
 
 
 def _registry_operation_document(params: _OperationDocumentParams) -> dict[str, object]:
+    """Build OpenAPI operation document from registry parameters.
+
+    Parameters
+    ----------
+    params : _OperationDocumentParams
+        Parameters for building the operation document.
+
+    Returns
+    -------
+    dict[str, object]
+        Complete OpenAPI operation dictionary.
+    """
     operation: dict[str, object] = {
         "operationId": params.operation_id,
         "tags": list(params.tags),
@@ -821,6 +1115,24 @@ def _build_registry_operation_entry(
     operation_model: RegistryOperationModel,
     existing_operation_ids: set[str],
 ) -> _RegistryOperationEntry | None:
+    """Build registry operation entry from operation model.
+
+    Parameters
+    ----------
+    context : _InterfaceOperationContext
+        Context for building operations.
+    op_key : str
+        Operation key from registry.
+    operation_model : RegistryOperationModel
+        Operation model from registry.
+    existing_operation_ids : set[str]
+        Set of existing operation IDs to avoid duplicates.
+
+    Returns
+    -------
+    _RegistryOperationEntry | None
+        Registry operation entry, or None if operation ID is duplicate or invalid.
+    """
     payload = operation_model.to_payload(op_key)
     operation_id = str(payload.get("operation_id") or op_key)
     if not operation_id or operation_id in existing_operation_ids:
@@ -877,6 +1189,19 @@ def _ensure_registry_operations(
     registry: RegistryMetadataModel | None,
     referenced_tags: set[str],
 ) -> None:
+    """Add registry-based operations to OpenAPI document.
+
+    Parameters
+    ----------
+    document : dict[str, object]
+        OpenAPI document dictionary to modify in-place.
+    config : CLIConfig
+        CLI configuration.
+    registry : RegistryMetadataModel | None
+        Optional registry metadata model.
+    referenced_tags : set[str]
+        Set of referenced tags to update.
+    """
     if registry is None:
         return
 

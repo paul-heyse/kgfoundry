@@ -59,6 +59,12 @@ class UnsafePickleError(ValueError):
 
 
 class _UnpicklerProtocol(Protocol):
+    """Protocol for unpickler interface matching stdlib pickle.Unpickler.
+
+    Used for type checking safe pickle implementations without importing
+    the actual pickle module at runtime.
+    """
+
     def __init__(
         self,
         file: BinaryIO,
@@ -67,7 +73,23 @@ class _UnpicklerProtocol(Protocol):
         encoding: str = ...,
         errors: str = ...,
         buffers: object | None = ...,
-    ) -> None: ...
+    ) -> None:
+        """Initialize unpickler with file handle and options.
+
+        Parameters
+        ----------
+        file : BinaryIO
+            Binary file handle to read pickle data from.
+        fix_imports : bool, optional
+            Whether to fix imports for Python 2 compatibility.
+        encoding : str, optional
+            Text encoding for Python 2 compatibility.
+        errors : str, optional
+            Error handling mode for encoding.
+        buffers : object | None, optional
+            Buffer protocol support.
+        """
+        ...
 
     def load(self) -> object:
         """Load and return unpickled object.
@@ -98,6 +120,12 @@ class _UnpicklerProtocol(Protocol):
 
 
 class _PickleModule(Protocol):
+    """Protocol for pickle module interface matching stdlib pickle.
+
+    Used for type checking safe pickle implementations without importing
+    the actual pickle module at runtime.
+    """
+
     Unpickler: type[_UnpicklerProtocol]
 
     def dump(self, obj: object, file: BinaryIO) -> None:
@@ -131,7 +159,21 @@ class _PickleModule(Protocol):
 if TYPE_CHECKING:
 
     class _StdlibUnpickler(_UnpicklerProtocol):
-        """Static typing shim for the stdlib Unpickler."""
+        """Static typing shim for the stdlib Unpickler.
+
+        Parameters
+        ----------
+        file : BinaryIO
+            Binary file handle to read from.
+        fix_imports : bool, optional
+            Whether to fix imports for Python 2 compatibility.
+        encoding : str, optional
+            Text encoding for Python 2 compatibility.
+        errors : str, optional
+            Error handling mode for encoding.
+        buffers : object | None, optional
+            Buffer protocol support.
+        """
 
         def __init__(
             self,
@@ -141,7 +183,12 @@ if TYPE_CHECKING:
             encoding: str = ...,
             errors: str = ...,
             buffers: object | None = ...,
-        ) -> None: ...
+        ) -> None:
+            """Initialize stdlib unpickler shim with file handle and options.
+
+            See class docstring for detailed parameter documentation.
+            """
+            ...
 
         def load(self) -> object:
             """Load and return unpickled object.
@@ -174,6 +221,18 @@ if TYPE_CHECKING:
 else:  # pragma: no cover - runtime import keeps Ruff S403 quiet
 
     def _load_stdlib_pickle() -> _PickleModule:
+        """Load stdlib _pickle module for safe unpickling.
+
+        Returns
+        -------
+        _PickleModule
+            Protocol-compatible pickle module interface.
+
+        Notes
+        -----
+        Raises ImportError indirectly via import_module() if _pickle module
+        cannot be imported.
+        """
         module_name = "_pickle"
         return cast("_PickleModule", import_module(module_name))
 

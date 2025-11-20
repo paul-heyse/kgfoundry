@@ -7,6 +7,25 @@ from typing import Any
 
 from codeintel_rev.typedness import FileTypeSignals
 
+try:  # pragma: no cover - optional dependency
+    import pyarrow as pa
+except ImportError:  # pragma: no cover - optional dependency
+    pa = None
+
+STATIC_DIAGNOSTICS_SCHEMA = (
+    pa.schema(
+        [
+            pa.field("rel_path", pa.string()),
+            pa.field("pyrefly_errors", pa.int32()),
+            pa.field("pyright_errors", pa.int32()),
+            pa.field("total_errors", pa.int32()),
+            pa.field("has_errors", pa.bool_()),
+        ]
+    )
+    if pa is not None
+    else None
+)
+
 
 def build_static_diagnostics_rows(
     type_signals: Mapping[str, FileTypeSignals],
@@ -41,4 +60,4 @@ def build_static_diagnostics_rows(
     return rows
 
 
-__all__ = ["build_static_diagnostics_rows"]
+__all__ = ["STATIC_DIAGNOSTICS_SCHEMA", "build_static_diagnostics_rows"]

@@ -57,6 +57,23 @@ _PROBLEM_TITLE = "CLI augment/registry error"
 
 
 def _ensure_str_sequence(value: object) -> tuple[str, ...]:
+    """Coerce value to tuple of unique strings.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce (None, sequence, or other).
+
+    Returns
+    -------
+    tuple[str, ...]
+        Tuple of unique strings, empty if value is None.
+
+    Raises
+    ------
+    PydanticCustomError
+        If value is a string/bytes or not a sequence.
+    """
     if value is None:
         return ()
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
@@ -79,6 +96,14 @@ class AugmentRegistryError(RuntimeError):
     """Base exception for augment/registry loading failures."""
 
     def __init__(self, problem: ProblemDetailsDict) -> None:
+        """Initialize exception with RFC 9457 Problem Details payload.
+
+        Parameters
+        ----------
+        problem : ProblemDetailsDict
+            RFC 9457 Problem Details dictionary containing type, title, status,
+            detail, instance, and optional extensions fields.
+        """
         detail = str(problem.get("detail", _PROBLEM_TITLE))
         super().__init__(detail)
         self.problem = problem
@@ -100,6 +125,18 @@ class CodeSampleModel(BaseModel):
     @field_validator("lang", "source", "label", mode="before")
     @classmethod
     def _coerce_str(cls, value: object) -> object:
+        """Coerce value to string or None.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        object
+            String representation or None if value is None.
+        """
         if value is None:
             return None
         return str(value)
@@ -139,6 +176,23 @@ class OperationOverrideModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _prepare(cls, value: object) -> Mapping[str, object]:
+        """Prepare operation override payload by extracting extras.
+
+        Parameters
+        ----------
+        value : object
+            Raw operation override payload.
+
+        Returns
+        -------
+        Mapping[str, object]
+            Prepared payload with extras separated.
+
+        Raises
+        ------
+        TypeError
+            If value is not a mapping.
+        """
         if not isinstance(value, Mapping):
             msg = "Operation override must be a mapping."
             raise TypeError(msg)
@@ -158,6 +212,18 @@ class OperationOverrideModel(BaseModel):
     @field_validator("summary", "description", "handler", mode="before")
     @classmethod
     def _coerce_optional_str(cls, value: object) -> object:
+        """Coerce value to optional string.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        object
+            String representation or None if value is None.
+        """
         if value is None:
             return None
         return str(value)
@@ -165,16 +231,52 @@ class OperationOverrideModel(BaseModel):
     @field_validator("tags", "env", "problem_details", mode="before")
     @classmethod
     def _coerce_tuple(cls, value: object) -> tuple[str, ...]:
+        """Coerce value to tuple of strings.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Tuple of unique strings.
+        """
         return _ensure_str_sequence(value)
 
     @field_validator("examples", mode="before")
     @classmethod
     def _coerce_examples(cls, value: object) -> tuple[str, ...]:
+        """Coerce examples value to tuple of strings.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Tuple of unique example strings.
+        """
         return _ensure_str_sequence(value)
 
     @field_validator("code_samples", mode="before")
     @classmethod
     def _coerce_samples(cls, value: object) -> tuple[Mapping[str, object], ...]:
+        """Coerce code samples value to tuple of mappings.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        tuple[Mapping[str, object], ...]
+            Tuple of mapping dictionaries, empty if value is None or not a sequence.
+        """
         if value is None:
             return ()
         if isinstance(value, Sequence):
@@ -184,6 +286,18 @@ class OperationOverrideModel(BaseModel):
     @field_validator("extras", mode="before")
     @classmethod
     def _coerce_extras(cls, value: object) -> Mapping[str, object]:
+        """Coerce extras value to string-keyed mapping.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        Mapping[str, object]
+            String-keyed mapping, empty if value is None or not a mapping.
+        """
         if value is None:
             return {}
         if isinstance(value, Mapping):
@@ -231,11 +345,35 @@ class TagGroupModel(BaseModel):
     @field_validator("name", mode="before")
     @classmethod
     def _coerce_name(cls, value: object) -> str:
+        """Coerce value to string for tag group name.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        str
+            String representation of value.
+        """
         return str(value)
 
     @field_validator("description", mode="before")
     @classmethod
     def _coerce_description(cls, value: object) -> object:
+        """Coerce value to optional string for tag group description.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        object
+            String representation or None if value is None.
+        """
         if value is None:
             return None
         return str(value)
@@ -243,6 +381,18 @@ class TagGroupModel(BaseModel):
     @field_validator("tags", mode="before")
     @classmethod
     def _coerce_tags(cls, value: object) -> tuple[str, ...]:
+        """Coerce tags value to tuple of unique strings preserving order.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Tuple of unique tag strings in original order.
+        """
         tags = _ensure_str_sequence(value)
         seen: set[str] = set()
         ordered: list[str] = []
@@ -280,6 +430,23 @@ class AugmentMetadataModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _prepare(cls, value: dict[str, object]) -> dict[str, object]:
+        """Prepare augment metadata by parsing operations and tag groups.
+
+        Parameters
+        ----------
+        value : dict[str, object]
+            Raw augment metadata dictionary.
+
+        Returns
+        -------
+        dict[str, object]
+            Prepared dictionary with parsed operations and tag groups.
+
+        Raises
+        ------
+        TypeError
+            If payload is not a mapping.
+        """
         payload = value.get("payload")
         if not isinstance(payload, Mapping):
             msg = "Augment payload must be a mapping."
@@ -393,6 +560,23 @@ class RegistryOperationModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _prepare(cls, value: object) -> Mapping[str, object]:
+        """Prepare registry operation metadata by extracting extras.
+
+        Parameters
+        ----------
+        value : object
+            Raw operation metadata payload.
+
+        Returns
+        -------
+        Mapping[str, object]
+            Prepared payload with extras separated.
+
+        Raises
+        ------
+        TypeError
+            If value is not a mapping.
+        """
         if not isinstance(value, Mapping):
             msg = "Operation metadata must be a mapping."
             raise TypeError(msg)
@@ -417,6 +601,18 @@ class RegistryOperationModel(BaseModel):
     @field_validator("summary", "description", "handler", mode="before")
     @classmethod
     def _coerce_optional(cls, value: object) -> object:
+        """Coerce value to optional string.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        object
+            String representation or None if value is None.
+        """
         if value is None:
             return None
         return str(value)
@@ -424,6 +620,18 @@ class RegistryOperationModel(BaseModel):
     @field_validator("operation_id", mode="before")
     @classmethod
     def _coerce_operation_id(cls, value: object) -> object:
+        """Coerce operation ID value to optional string.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        object
+            String representation or None if value is None.
+        """
         if value is None:
             return None
         return str(value)
@@ -431,6 +639,18 @@ class RegistryOperationModel(BaseModel):
     @field_validator("tags", "env", "problem_details", mode="before")
     @classmethod
     def _coerce_sequences(cls, value: object) -> tuple[str, ...]:
+        """Coerce value to tuple of strings.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Tuple of unique strings.
+        """
         return _ensure_str_sequence(value)
 
     def to_payload(self, default_operation_id: str) -> dict[str, object]:
@@ -489,6 +709,27 @@ class RegistryInterfaceModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _prepare(cls, value: object, info: ValidationInfo) -> Mapping[str, object]:
+        """Prepare registry interface metadata by parsing operations and extracting extras.
+
+        Parameters
+        ----------
+        value : object
+            Raw interface metadata payload.
+        info : ValidationInfo
+            Pydantic validation context.
+
+        Returns
+        -------
+        Mapping[str, object]
+            Prepared payload with parsed operations and extras separated.
+
+        Raises
+        ------
+        TypeError
+            If value is not a mapping.
+        ValueError
+            If identifier is missing.
+        """
         if not isinstance(value, Mapping):
             msg = "Registry interface entry must be a mapping."
             raise TypeError(msg)
@@ -543,6 +784,18 @@ class RegistryInterfaceModel(BaseModel):
     )
     @classmethod
     def _coerce_optional(cls, value: object) -> object:
+        """Coerce value to optional string.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        object
+            String representation or None if value is None.
+        """
         if value is None:
             return None
         return str(value)
@@ -550,6 +803,18 @@ class RegistryInterfaceModel(BaseModel):
     @field_validator("tags", "problem_details", mode="before")
     @classmethod
     def _coerce_tuple(cls, value: object) -> tuple[str, ...]:
+        """Coerce value to tuple of strings.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Tuple of unique strings.
+        """
         return _ensure_str_sequence(value)
 
     def to_payload(self) -> dict[str, object]:
@@ -598,6 +863,18 @@ class RegistryMetadataModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _prepare(cls, value: dict[str, object]) -> dict[str, object]:
+        """Prepare registry metadata by parsing interfaces.
+
+        Parameters
+        ----------
+        value : dict[str, object]
+            Raw registry metadata dictionary.
+
+        Returns
+        -------
+        dict[str, object]
+            Prepared dictionary with parsed interface models.
+        """
         interfaces_raw = value.get("interfaces")
         interfaces_map = _coerce_mapping(interfaces_raw)
         interfaces: dict[str, RegistryInterfaceModel] = {}
@@ -825,6 +1102,79 @@ def render_problem_details(error: AugmentRegistryError) -> str:
 
 
 def _load_augment(resolved: Path, reader: Reader) -> AugmentMetadataModel:
+    """Load and validate augment metadata from a YAML file.
+
+    Extended Summary
+    ----------------
+    This function orchestrates the loading and validation of augment metadata
+    files used by CLI tooling to customize OpenAPI operation descriptions. It
+    delegates YAML parsing to the provided reader function, validates the
+    resulting payload structure, and constructs an immutable Pydantic model
+    that downstream tooling can rely on for type safety. The function is part
+    of the internal loading pipeline called by :func:`load_augment` and
+    :func:`load_tooling_metadata`. All errors are wrapped in RFC 9457 Problem
+    Details format via :class:`AugmentRegistryError` and
+    :class:`AugmentRegistryValidationError` to ensure consistent error reporting
+    across CLI boundaries.
+
+    Parameters
+    ----------
+    resolved : Path
+        Absolute filesystem path to the augment YAML file. Must be a resolved
+        path (no symlinks or relative components).
+    reader : Reader
+        Callable that accepts a Path and returns parsed YAML content. Used for
+        dependency injection in tests; production code uses the canonical YAML
+        reader.
+
+    Returns
+    -------
+    AugmentMetadataModel
+        Immutable validated model containing augment metadata. The model
+        includes path, payload, and all validated operation overrides.
+
+    Raises
+    ------
+    AugmentRegistryError
+        If the file cannot be read (missing, permission denied, I/O error), if
+        the YAML is malformed, or if the payload is not a mapping structure.
+        The exception includes RFC 9457 Problem Details with status codes
+        (404 for missing files, 422 for invalid structure, 500 for I/O errors).
+    AugmentRegistryValidationError
+        If the payload fails Pydantic validation against the
+        :class:`AugmentMetadataModel` schema. The exception includes detailed
+        validation error information in the Problem Details extensions.
+
+    Notes
+    -----
+    • Time complexity: O(n) where n is file size; dominated by YAML parsing
+      and Pydantic validation.
+    • Side effects: Reads from filesystem via the reader function; no global
+      state mutations.
+    • Thread-safety: Safe if reader is thread-safe; no shared mutable state.
+    • Error handling: All exceptions preserve original cause chains via
+      ``raise ... from exc`` to maintain stack trace context.
+    • Design: Uses helper functions :func:`_registry_error` and
+      :func:`_validation_error` to construct exceptions with consistent Problem
+      Details structure.
+
+    See Also
+    --------
+    load_augment : Public API that resolves paths and caches results
+    _read_yaml : Lower-level YAML reading with error handling
+    AugmentMetadataModel : The validated model type returned
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> def mock_reader(path: Path) -> dict:
+    ...     return {"operations": {"test": {"summary": "Test op"}}}
+    >>> result = _load_augment(Path("/tmp/augment.yaml"), mock_reader)
+    >>> isinstance(result, AugmentMetadataModel)
+    True
+    >>> result.path == Path("/tmp/augment.yaml")
+    True
+    """
     payload = _read_yaml(resolved, reader, source="augment")
     if not isinstance(payload, Mapping):
         raise _registry_error(
@@ -841,6 +1191,83 @@ def _load_augment(resolved: Path, reader: Reader) -> AugmentMetadataModel:
 
 
 def _load_registry(resolved: Path, reader: Reader) -> RegistryMetadataModel:
+    """Load and validate registry metadata from a YAML file.
+
+    Extended Summary
+    ----------------
+    This function orchestrates the loading and validation of registry metadata
+    files that define CLI tooling interfaces and their operations. It delegates
+    YAML parsing to the provided reader function, validates the payload
+    structure (ensuring it contains an "interfaces" mapping), and constructs an
+    immutable Pydantic model that downstream tooling uses to discover and
+    configure CLI operations. The function is part of the internal loading
+    pipeline called by :func:`load_registry` and :func:`load_tooling_metadata`.
+    All errors are wrapped in RFC 9457 Problem Details format via
+    :class:`AugmentRegistryError` and :class:`AugmentRegistryValidationError` to
+    ensure consistent error reporting across CLI boundaries.
+
+    Parameters
+    ----------
+    resolved : Path
+        Absolute filesystem path to the registry YAML file. Must be a resolved
+        path (no symlinks or relative components).
+    reader : Reader
+        Callable that accepts a Path and returns parsed YAML content. Used for
+        dependency injection in tests; production code uses the canonical YAML
+        reader.
+
+    Returns
+    -------
+    RegistryMetadataModel
+        Immutable validated model containing registry metadata. The model
+        includes path, interfaces mapping, and all validated interface
+        definitions with their operations.
+
+    Raises
+    ------
+    AugmentRegistryError
+        If the file cannot be read (missing, permission denied, I/O error), if
+        the YAML is malformed, if the payload is not a mapping structure, or if
+        the required "interfaces" key is missing or not a mapping. The exception
+        includes RFC 9457 Problem Details with status codes (404 for missing
+        files, 422 for invalid structure, 500 for I/O errors).
+    AugmentRegistryValidationError
+        If the payload fails Pydantic validation against the
+        :class:`RegistryMetadataModel` schema. The exception includes detailed
+        validation error information in the Problem Details extensions.
+
+    Notes
+    -----
+    • Time complexity: O(n + m) where n is file size and m is the number of
+      interfaces; dominated by YAML parsing and recursive Pydantic validation
+      of interface and operation models.
+    • Side effects: Reads from filesystem via the reader function; no global
+      state mutations.
+    • Thread-safety: Safe if reader is thread-safe; no shared mutable state.
+    • Error handling: All exceptions preserve original cause chains via
+      ``raise ... from exc`` to maintain stack trace context.
+    • Design: Uses helper functions :func:`_registry_error` and
+      :func:`_validation_error` to construct exceptions with consistent Problem
+      Details structure. Validates both top-level structure and nested
+      "interfaces" mapping before model construction.
+
+    See Also
+    --------
+    load_registry : Public API that resolves paths and caches results
+    _read_yaml : Lower-level YAML reading with error handling
+    RegistryMetadataModel : The validated model type returned
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> def mock_reader(path: Path) -> dict:
+    ...     return {"interfaces": {"test": {"identifier": "test_iface"}}}
+    >>> result = _load_registry(Path("/tmp/registry.yaml"), mock_reader)
+    >>> isinstance(result, RegistryMetadataModel)
+    True
+    >>> result.path == Path("/tmp/registry.yaml")
+    True
+    """
     payload = _read_yaml(resolved, reader, source="registry")
     if not isinstance(payload, Mapping):
         raise _registry_error(
@@ -865,6 +1292,80 @@ def _load_registry(resolved: Path, reader: Reader) -> RegistryMetadataModel:
 
 
 def _read_yaml(resolved: Path, reader: Reader, *, source: str) -> object:
+    """Read and parse a YAML file using the provided reader function.
+
+    Extended Summary
+    ----------------
+    This function provides a unified error-handling wrapper around YAML file
+    reading operations. It invokes the provided reader function and catches
+    filesystem and YAML parsing errors, converting them into structured
+    :class:`AugmentRegistryError` exceptions with RFC 9457 Problem Details
+    payloads. The function is used internally by :func:`_load_augment` and
+    :func:`_load_registry` to handle the low-level I/O and parsing concerns,
+    allowing those functions to focus on structure validation and model
+    construction. Error messages include the source identifier ("augment" or
+    "registry") to help callers identify which metadata file failed.
+
+    Parameters
+    ----------
+    resolved : Path
+        Absolute filesystem path to the YAML file. Must be a resolved path (no
+        symlinks or relative components).
+    reader : Reader
+        Callable that accepts a Path and returns parsed YAML content. Typically
+        wraps :func:`yaml.safe_load` with file opening logic. Used for
+        dependency injection in tests.
+    source : str
+        Source identifier for error messages and Problem Details instance URIs.
+        Must be "augment" or "registry" to match expected metadata file types.
+
+    Returns
+    -------
+    object
+        Parsed YAML content, typically a dictionary but may be any YAML-serializable
+        type (list, str, int, etc.). The caller is responsible for validating
+        the structure.
+
+    Raises
+    ------
+    AugmentRegistryError
+        If the file is missing (:exc:`FileNotFoundError`), contains invalid YAML
+        (:exc:`yaml.YAMLError`), or encounters an I/O error (:exc:`OSError`).
+        The exception includes RFC 9457 Problem Details with appropriate status
+        codes (404 for missing files, 422 for YAML syntax errors, 500 for I/O
+        failures) and preserves the original exception as the cause.
+
+    Notes
+    -----
+    • Time complexity: O(n) where n is file size; dominated by filesystem I/O
+      and YAML parsing.
+    • Side effects: Reads from filesystem via the reader function; no global
+      state mutations.
+    • Thread-safety: Safe if reader is thread-safe; no shared mutable state.
+    • Error handling: All exceptions preserve original cause chains via
+      ``raise ... from exc`` to maintain stack trace context. FileNotFoundError,
+      yaml.YAMLError, and OSError are caught and re-raised as AugmentRegistryError
+      with structured Problem Details.
+    • Design: This function isolates I/O and parsing error handling from
+      structure validation, allowing callers to focus on business logic. The
+      source parameter enables contextual error messages that help diagnose
+      which metadata file failed.
+
+    See Also
+    --------
+    _load_augment : Higher-level function that validates augment structure
+    _load_registry : Higher-level function that validates registry structure
+    _registry_error : Helper that constructs AugmentRegistryError instances
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> def mock_reader(path: Path) -> dict:
+    ...     return {"key": "value"}
+    >>> result = _read_yaml(Path("/tmp/test.yaml"), mock_reader, source="augment")
+    >>> result == {"key": "value"}
+    True
+    """
     try:
         return reader(resolved)
     except FileNotFoundError as exc:  # pragma: no cover - filesystem behaviour
@@ -893,6 +1394,24 @@ def _read_yaml(resolved: Path, reader: Reader, *, source: str) -> object:
 def _registry_error(
     *, source: str, resolved: Path, detail: str, status: int
 ) -> AugmentRegistryError:
+    """Build AugmentRegistryError with Problem Details payload.
+
+    Parameters
+    ----------
+    source : str
+        Source identifier ("augment" or "registry").
+    resolved : Path
+        Resolved file path.
+    detail : str
+        Error detail message.
+    status : int
+        HTTP status code for Problem Details.
+
+    Returns
+    -------
+    AugmentRegistryError
+        Exception with Problem Details payload.
+    """
     problem = build_problem_details(
         ProblemDetailsParams(
             type=_PROBLEM_TYPE,
@@ -909,6 +1428,22 @@ def _registry_error(
 def _validation_error(
     source: str, resolved: Path, exc: ValidationError
 ) -> AugmentRegistryValidationError:
+    """Build AugmentRegistryValidationError from Pydantic ValidationError.
+
+    Parameters
+    ----------
+    source : str
+        Source identifier ("augment" or "registry").
+    resolved : Path
+        Resolved file path.
+    exc : ValidationError
+        Pydantic validation error.
+
+    Returns
+    -------
+    AugmentRegistryValidationError
+        Exception with Problem Details payload including validation errors.
+    """
     errors_raw = [
         {
             "loc": ".".join(str(token) for token in error["loc"]),
@@ -944,12 +1479,36 @@ def _validation_error(
 
 
 def _coerce_mapping(value: object) -> dict[str, object]:
+    """Coerce value to string-keyed mapping.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce.
+
+    Returns
+    -------
+    dict[str, object]
+        String-keyed dictionary, empty if value is not a mapping.
+    """
     if not isinstance(value, Mapping):
         return {}
     return {str(key): item for key, item in value.items()}
 
 
 def _coerce_mapping_list(value: object) -> list[dict[str, object]]:
+    """Coerce value to list of string-keyed mappings.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        List of string-keyed dictionaries, empty if value is not a sequence of mappings.
+    """
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return []
     return [_coerce_mapping(item) for item in value if isinstance(item, Mapping)]
@@ -957,11 +1516,35 @@ def _coerce_mapping_list(value: object) -> list[dict[str, object]]:
 
 @lru_cache(maxsize=16)
 def _cached_augment(path_str: str) -> AugmentMetadataModel:
+    """Load augment metadata with caching.
+
+    Parameters
+    ----------
+    path_str : str
+        String path to augment YAML file.
+
+    Returns
+    -------
+    AugmentMetadataModel
+        Cached augment metadata model.
+    """
     return _load_augment(Path(path_str), _default_yaml_reader)
 
 
 @lru_cache(maxsize=16)
 def _cached_registry(path_str: str) -> RegistryMetadataModel:
+    """Load registry metadata with caching.
+
+    Parameters
+    ----------
+    path_str : str
+        String path to registry YAML file.
+
+    Returns
+    -------
+    RegistryMetadataModel
+        Cached registry metadata model.
+    """
     return _load_registry(Path(path_str), _default_yaml_reader)
 
 

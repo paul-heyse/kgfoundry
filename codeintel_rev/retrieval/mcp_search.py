@@ -154,7 +154,7 @@ class VectorIndex(Protocol):
         ...
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class SearchFilters:
     """Normalized filter payload for the MCP search tool.
 
@@ -255,7 +255,7 @@ class SearchFilters:
         }
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class SearchRequest:
     """Search invocation parameters.
 
@@ -277,7 +277,7 @@ class SearchRequest:
     filters: SearchFilters
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class SearchResult:
     """Single search result entry.
 
@@ -308,7 +308,7 @@ class SearchResult:
     metadata: dict[str, object]
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class SearchResponse:
     """Structured search response returned to MCP adapters.
 
@@ -330,7 +330,7 @@ class SearchResponse:
     limits: list[str]
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class HydrationPayload:
     """Bundle of hydrated rows and structural annotations.
 
@@ -366,7 +366,7 @@ class _StageDurations:
     rerank: float = 0.0
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class SearchDependencies:
     """Dependency bundle consumed by :func:`run_search`.
 
@@ -407,7 +407,7 @@ class SearchDependencies:
     pool_dir: Path | None
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class FetchRequest:
     """Fetch invocation parameters.
 
@@ -423,7 +423,7 @@ class FetchRequest:
     max_tokens: int
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class FetchObjectResult:
     """Single hydrated chunk.
 
@@ -448,7 +448,7 @@ class FetchObjectResult:
     metadata: dict[str, object]
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class FetchResponse:
     """Structured fetch response used by MCP adapters.
 
@@ -461,7 +461,7 @@ class FetchResponse:
     objects: list[FetchObjectResult]
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class FetchDependencies:
     """Dependency bundle for :func:`run_fetch`.
 
@@ -1478,7 +1478,7 @@ def _merge_metadata(
     return metadata, changed
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class _RepairStats:
     """Aggregate counters describing validator repairs.
 

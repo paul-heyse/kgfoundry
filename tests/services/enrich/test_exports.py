@@ -17,6 +17,18 @@ from tests._helpers import assertions
 
 
 def _build_result(tmp_path: Path) -> PipelineResult:
+    """Build test pipeline result with sample module.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test files.
+
+    Returns
+    -------
+    PipelineResult
+        Pipeline result with test module record.
+    """
     module_path = tmp_path / "pkg" / "app.py"
     module_path.parent.mkdir(parents=True, exist_ok=True)
     module_path.write_text("print('ok')\n", encoding="utf-8")

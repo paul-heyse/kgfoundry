@@ -16,6 +16,20 @@ def test_decide_secondary_stage_delegates_to_core() -> None:
     captured: dict[str, object] = {}
 
     def _fake_core(signals: gating.StageSignals, config: object) -> gating.StageDecision:
+        """Capture signals and config, return decision.
+
+        Parameters
+        ----------
+        signals : gating.StageSignals
+            Stage signals to capture.
+        config : object
+            Gate config to capture.
+
+        Returns
+        -------
+        gating.StageDecision
+            Decision indicating should_run=True.
+        """
         captured["signals"] = signals
         captured["config"] = config
         return gating.StageDecision(should_run=True, reason="ok")

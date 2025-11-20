@@ -19,6 +19,13 @@ from tests._helpers import assertions
 
 
 def _write_chunks(path: Path) -> None:
+    """Write test chunks parquet file.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    """
     table = pa.table(
         {
             "id": pa.array([1, 2], pa.int64()),
@@ -33,6 +40,13 @@ def _write_chunks(path: Path) -> None:
 
 
 def _write_idmap(path: Path) -> None:
+    """Write test ID map parquet file.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    """
     table = pa.table(
         {
             "faiss_row": pa.array([0, 1], pa.int64()),

@@ -11,11 +11,8 @@ import os
 from dataclasses import replace
 from pathlib import Path
 
-import duckdb
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalogConfig
-from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 
 from tests._helpers.integration import build_integration_harness
 from tests._helpers.settings import build_app_config_from_paths
@@ -184,6 +181,7 @@ def build_application_context(
     xtr_enabled: bool = False,
     enable_bm25: bool = False,
     enable_splade: bool = False,
+    seed_coderank_runtime: bool = False,
 ) -> ApplicationContext:
     """Create a lightweight ApplicationContext for unit tests.
 
@@ -197,6 +195,9 @@ def build_application_context(
         Whether to enable BM25 search channel, by default False.
     enable_splade : bool, optional
         Whether to enable SPLADE search channel, by default False.
+    seed_coderank_runtime : bool, optional
+        Whether to pre-seed the CodeRank FAISS runtime cell. Defaults to False
+        to allow tests to exercise missing/index gating paths.
 
     Returns
     -------
@@ -205,10 +206,9 @@ def build_application_context(
     """
     paths = _prepare_paths(tmp_path)
     app_config = build_app_config_from_paths(paths)
-    data_dir = paths.data_dir
     bm25_index_dir = paths.lucene_dir / "bm25"
-    bm25_corpus_dir = data_dir / "bm25_json"
-    splade_vectors_dir = data_dir / "splade_vectors"
+    bm25_corpus_dir = paths.data_dir / "bm25_json"
+    splade_vectors_dir = paths.data_dir / "splade_vectors"
     splade_index_dir = paths.splade_dir / "impact"
     splade_model_dir = paths.repo_root / "models" / "splade"
     splade_onnx_dir = splade_model_dir / "onnx"
@@ -237,23 +237,9 @@ def build_application_context(
     )
     xtr_cfg = replace(app_config.xtr, enable=xtr_enabled)
     app_config = replace(app_config, bm25=bm25_cfg, splade=splade_cfg, xtr=xtr_cfg)
-    catalog_cfg = DuckDBCatalogConfig(
-        db_path=paths.duckdb_path,
-        vectors_dir=paths.vectors_dir,
-        repo_root=paths.repo_root,
-        idmap_path=paths.faiss_idmap_path,
-        materialize=app_config.index.duckdb_materialize,
-        log_queries=False,
-    )
     harness = build_integration_harness(tmp_path, populate_repo=False)
-    context = harness.context
-    duckdb_manager = DuckDBManager(paths.duckdb_path, DuckDBConfig())
-    if not paths.duckdb_path.exists():
-        paths.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
-        duckdb.connect(str(paths.duckdb_path)).close()
-    overrides_context = context.with_overrides(
-        app_config=app_config,
-        catalog_config=catalog_cfg,
-        duckdb_manager=duckdb_manager,
-    )
-    return overrides_context
+    base_context = harness.context
+    ctx = base_context.with_overrides(app_config=app_config)
+    if seed_coderank_runtime:
+        ctx.seed_runtime_cells_for_tests(coderank_faiss=ctx.faiss_manager)
+    return ctx

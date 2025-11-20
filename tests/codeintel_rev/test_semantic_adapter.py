@@ -23,13 +23,17 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _Stage0Expectation:
+    """Expected parameters for stage0 call validation."""
+
     limit: int | None = None
     options: Stage0Options | None = None
 
 
 class _StubContext:
+    """Stub application context for testing semantic adapter."""
+
     HYBRID_WEIGHTS: ClassVar[dict[str, float]] = {"bm25": 0.4, "splade": 0.3, "semantic": 0.3}
 
     SEARCH_SETTINGS: ClassVar[SearchSettings] = SearchSettings(
@@ -152,6 +156,27 @@ def _build_runtime_hooks(
     expected_weights: Mapping[str, float] | None = None,
     expectation: _Stage0Expectation | None = None,
 ) -> semantic_adapter.SemanticRuntimeHooks:
+    """Build runtime hooks with validation stubs.
+
+    Parameters
+    ----------
+    stage0 : Stage0Result
+        Stage0 result to return.
+    findings : list[Finding]
+        Findings to return from hydrate.
+    decision : StageDecision
+        Decision to return.
+    expected_weights : Mapping[str, float] | None, optional
+        Expected weights to validate. Defaults to None.
+    expectation : _Stage0Expectation | None, optional
+        Stage0 expectation for validation. Defaults to None.
+
+    Returns
+    -------
+    semantic_adapter.SemanticRuntimeHooks
+        Hooks with validation stubs.
+    """
+
     def _run_stage0(
         engine: HybridSearchEngine,
         *,
@@ -160,6 +185,26 @@ def _build_runtime_hooks(
         limit: int,
         options: Stage0Options | None = None,
     ) -> Stage0Result:
+        """Run stage0 and validate parameters.
+
+        Parameters
+        ----------
+        engine : HybridSearchEngine
+            Search engine (ignored).
+        query : str
+            Query string (ignored).
+        semantic_hits : Sequence[tuple[int, float]] | None
+            Semantic hits (ignored).
+        limit : int
+            Result limit to validate.
+        options : Stage0Options | None, optional
+            Stage0 options to validate.
+
+        Returns
+        -------
+        Stage0Result
+            Pre-configured stage0 result.
+        """
         del engine, query, semantic_hits
         if expectation and expectation.limit is not None:
             assertions.expect_equal(limit, expectation.limit)
@@ -178,12 +223,42 @@ def _build_runtime_hooks(
         ids: Sequence[int],
         scores: Sequence[float],
     ) -> list[Finding]:
+        """Hydrate findings ignoring catalog and IDs.
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog
+            Catalog (ignored).
+        ids : Sequence[int]
+            Chunk IDs (ignored).
+        scores : Sequence[float]
+            Scores (ignored).
+
+        Returns
+        -------
+        list[Finding]
+            Pre-configured findings list.
+        """
         del catalog, ids, scores
         return findings
 
     def _decide(
         signals: Mapping[str, object], config: semantic_adapter.StageGateConfig
     ) -> StageDecision:
+        """Make stage decision ignoring signals and config.
+
+        Parameters
+        ----------
+        signals : Mapping[str, object]
+            Signals (ignored).
+        config : semantic_adapter.StageGateConfig
+            Gate config (ignored).
+
+        Returns
+        -------
+        StageDecision
+            Pre-configured decision.
+        """
         del signals, config
         return decision
 

@@ -245,6 +245,22 @@ def override_gate_import(overrides: Mapping[str, object]) -> Iterator[None]:
         purpose: str,
         min_version: str | None = None,
     ) -> object:
+        """Patched gate_import that checks overrides before delegating.
+
+        Parameters
+        ----------
+        module_name : str
+            Module name to import.
+        purpose : str
+            Purpose description for error messages.
+        min_version : str | None, optional
+            Minimum version requirement. Defaults to None.
+
+        Returns
+        -------
+        object
+            Override object if in overrides dict, otherwise result from original gate_import.
+        """
         if module_name in overrides:
             return overrides[module_name]
         return original_gate(module_name, purpose, min_version)

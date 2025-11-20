@@ -11,6 +11,20 @@ from tests._helpers import assertions
 
 
 def _write(path: Path, content: str) -> Path:
+    """Write content to file path.
+
+    Parameters
+    ----------
+    path : Path
+        File path to write.
+    content : str
+        Content to write.
+
+    Returns
+    -------
+    Path
+        Written file path.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return path

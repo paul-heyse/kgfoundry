@@ -399,6 +399,11 @@ def write_parquet_or_jsonl(
     fallback = Path(jsonl_path)
     materialized = [dict(row) for row in rows]
     if not materialized:
+        if pa is not None and pq is not None and schema is not None:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            empty_table = pa.Table.from_pylist([], schema=schema)
+            pq.write_table(empty_table, str(target))
+            return target, 0
         fallback.parent.mkdir(parents=True, exist_ok=True)
         fallback.write_text("", encoding="utf-8")
         return fallback, 0

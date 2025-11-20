@@ -19,10 +19,29 @@ from tests._helpers import assertions
 
 @pytest.fixture(name="runner")
 def _runner() -> CliRunner:
+    """Provide CLI runner fixture.
+
+    Returns
+    -------
+    CliRunner
+        Typer CLI runner instance.
+    """
     return CliRunner()
 
 
 def _read_envelope(path: Path) -> dict[str, object]:
+    """Read and parse CLI envelope JSON file.
+
+    Parameters
+    ----------
+    path : Path
+        Envelope file path.
+
+    Returns
+    -------
+    dict[str, object]
+        Parsed envelope dictionary.
+    """
     payload = path.read_text(encoding="utf-8")
     return cast("dict[str, object]", json.loads(payload))
 

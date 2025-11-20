@@ -80,6 +80,18 @@ def test_capz_endpoint_refresh(tmp_path: Path) -> None:
     )
 
     def _fake_from_context(_context: object) -> Capabilities:
+        """Return refreshed capabilities for testing.
+
+        Parameters
+        ----------
+        _context : object
+            Context object (ignored).
+
+        Returns
+        -------
+        Capabilities
+            Refreshed capabilities instance.
+        """
         return refreshed
 
     app = build_test_app(ctx, capabilities_override=initial)

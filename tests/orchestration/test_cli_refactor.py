@@ -10,6 +10,8 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+from click.testing import Result
+
 from orchestration import cli as cli_module
 from orchestration.cli import IndexCliConfig, index_faiss, run_index_faiss
 from tests._helpers import assertions
@@ -54,7 +56,25 @@ def _invoke_index_faiss_cli(
     *,
     artifact_dir: Path | None = None,
     obj: Mapping[str, object] | None = None,
-):
+) -> Result:
+    """Invoke index-faiss CLI command.
+
+    Parameters
+    ----------
+    envelope_dir : Path
+        Envelope directory path.
+    args : Sequence[str]
+        CLI arguments to pass.
+    artifact_dir : Path | None, optional
+        Artifact directory path. Defaults to None.
+    obj : Mapping[str, object] | None, optional
+        CLI context object. Defaults to None.
+
+    Returns
+    -------
+    Result
+        CLI runner result.
+    """
     result = cli_helpers.invoke(
         cli_module.app,
         [

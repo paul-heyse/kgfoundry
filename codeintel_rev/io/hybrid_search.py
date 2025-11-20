@@ -16,7 +16,7 @@ from codeintel_rev.retrieval.fusion.api import (
 from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class HybridSearchOptions:
     """Coordinator options expressed in terms of channel budgets and fusion weights.
 
@@ -244,7 +244,7 @@ def _normalize_inputs(
     return normalized
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _FusionConfig:
     """Configuration parameters for hybrid search fusion.
 

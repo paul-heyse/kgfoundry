@@ -26,8 +26,11 @@ from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
 from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.cli.bm25 import BM25CliContext
+from codeintel_rev.cli.enrich_pipeline import OverlayContext, ScanInputs, ScipContext
 from codeintel_rev.cli.splade import SpladeCliContext
 from codeintel_rev.config.paths import ResolvedPaths
+from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
+from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
 from codeintel_rev.io.bm25_manager import BM25IndexManager
 from codeintel_rev.io.faiss_compat import load_faiss_module
 from codeintel_rev.io.splade_manager import (
@@ -54,8 +57,6 @@ if TYPE_CHECKING:
 
     from _pytest.logging import LogCaptureFixture
     from codeintel_rev.config.api import AppConfig
-    from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
-    from codeintel_rev.enrich.stubs_overlay import OverlayPolicy
 
     from kgfoundry_common.problem_details import JsonValue
 else:
@@ -77,6 +78,13 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 
 
 def _faiss_runtime_available() -> bool:
+    """Check if FAISS runtime module is available for testing.
+
+    Returns
+    -------
+    bool
+        True if FAISS module can be loaded, False otherwise.
+    """
     try:
         faiss_module = load_faiss_module("pytest FAISS support check")
     except ModuleNotFoundError:
@@ -164,6 +172,16 @@ def _networking_test_app(tmp_path: Path) -> FastAPI:
     """
 
     class _FakeReadinessResult:
+        """Fake readiness result for testing readiness probes.
+
+        Parameters
+        ----------
+        healthy : bool, optional
+            Health status. Defaults to True.
+        detail : str, optional
+            Detail message. Defaults to "ok".
+        """
+
         def __init__(self, *, healthy: bool = True, detail: str = "ok") -> None:
             self.healthy = healthy
             self._detail = detail
@@ -179,7 +197,10 @@ def _networking_test_app(tmp_path: Path) -> FastAPI:
             return {"healthy": self.healthy, "detail": self._detail}
 
     class _FakeReadinessProbe:
+        """Fake readiness probe for testing readiness checks."""
+
         def __init__(self) -> None:
+            """Initialize probe with refresh call counter."""
             self.refresh_calls = 0
 
         async def refresh(self) -> dict[str, _FakeReadinessResult]:
@@ -369,7 +390,7 @@ def structured_log_asserter() -> Callable[[logging.LogRecord, set[str]], None]:
 
 
 @pytest.fixture(name="scan_inputs_builder")
-def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., Any]:
+def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
     """Return a factory for constructing ``ScanInputs`` instances.
 
     Returns
@@ -389,7 +410,7 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., Any]:
         tagging_rules: Mapping[str, object] | None = None,
         max_file_bytes: int = 10_000,
         package_prefix: str | None = None,
-    ) -> Any:
+    ) -> ScanInputs:
         """Build ScanInputs instance with optional overrides.
 
         Parameters
@@ -418,8 +439,6 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., Any]:
         """
         root = repo_root or (tmp_path / "repo")
         root.mkdir(parents=True, exist_ok=True)
-        from codeintel_rev.cli.enrich_pipeline import ScanInputs, ScipContext
-        from codeintel_rev.enrich.scip_reader import SCIPIndex
 
         scip = scip_index or SCIPIndex()
         context = ScipContext(index=scip, by_file=scip_by_file or {})
@@ -437,7 +456,7 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., Any]:
 
 
 @pytest.fixture(name="overlay_context_builder")
-def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., Any]:
+def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., OverlayContext]:
     """Provide a factory for building ``OverlayContext`` instances.
 
     Returns
@@ -455,7 +474,7 @@ def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., Any]:
         policy: OverlayPolicy | None = None,
         scip_index: SCIPIndex | None = None,
         overlay_paths: frozenset[str] | None = None,
-    ) -> Any:
+    ) -> OverlayContext:
         """Build OverlayContext instance with optional overrides.
 
         Parameters
@@ -485,9 +504,6 @@ def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., Any]:
         stubs = stubs_root or (tmp_path / "stubs")
         for path in (root, overlays, stubs):
             path.mkdir(parents=True, exist_ok=True)
-        from codeintel_rev.cli.enrich_pipeline import OverlayContext
-        from codeintel_rev.enrich.scip_reader import SCIPIndex
-        from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
 
         scip = scip_index or SCIPIndex()
         resolved_policy = policy or OverlayPolicy(

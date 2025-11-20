@@ -29,11 +29,20 @@ SRC_PATH: Final[Path] = REPO_ROOT / "src"
 
 
 class _BootstrapState:
+    """State tracking for bootstrap operations."""
+
     bootstrapped: bool = False
 
 
 @no_type_check
 def _load_cli_runner_cls() -> type[_CliRunnerProtocol] | None:
+    """Load CliRunner class from typer.testing module if available.
+
+    Returns
+    -------
+    type[_CliRunnerProtocol] | None
+        CliRunner class if available, None otherwise.
+    """
     try:
         testing_module = import_module("typer.testing")
     except ImportError:  # pragma: no cover - typer not installed
@@ -111,6 +120,8 @@ os.environ.setdefault("KGFOUNDRY_TEST_VLLM_STUB", "1")
 
 
 class _CliRunnerProtocol(Protocol):
+    """Protocol for CLI runner classes used in tests."""
+
     def invoke(self, *args: object, **kwargs: object) -> Result:
         """Invoke the CLI with the provided arguments."""
         ...

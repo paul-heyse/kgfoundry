@@ -46,6 +46,15 @@ def test_relation_exists_returns_false_for_missing_relation() -> None:
 
 
 def _write_idmap(path: Path, size: int) -> None:
+    """Write test ID map parquet file.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    size : int
+        Number of rows to generate.
+    """
     rows = pa.array(range(size), type=pa.int64())
     externals = pa.array(range(10_000, 10_000 + size), type=pa.int64())
     sources = pa.array(["primary"] * size, type=pa.string())

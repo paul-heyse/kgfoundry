@@ -24,6 +24,18 @@ pytestmark = pytest.mark.skip(
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Read JSONL file handling multi-line JSON records.
+
+    Parameters
+    ----------
+    path : Path
+        JSONL file path.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        List of parsed JSON records.
+    """
     buffer: list[str] = []
     depth = 0
     records: list[dict[str, Any]] = []
@@ -45,6 +57,19 @@ def _assert_duckdb_ingest(
     db_path: Path,
     expected_count: int,
 ) -> None:
+    """Assert DuckDB ingestion produces expected module count.
+
+    Parameters
+    ----------
+    runner : CliRunner
+        CLI runner instance.
+    modules_jsonl : Path
+        Modules JSONL file path.
+    db_path : Path
+        Database file path.
+    expected_count : int
+        Expected module count.
+    """
     result = runner.invoke(
         app,
         [
@@ -68,6 +93,15 @@ def _assert_duckdb_ingest(
 
 
 def _assert_artifacts(out_dir: Path, module_rows: list[dict[str, object]]) -> None:
+    """Assert enrichment artifacts are present and valid.
+
+    Parameters
+    ----------
+    out_dir : Path
+        Output directory with artifacts.
+    module_rows : list[dict[str, object]]
+        Module rows to validate.
+    """
     alpha_row = next(row for row in module_rows if str(row.get("path", "")).endswith("alpha.py"))
     assertions.expect_equal(alpha_row["owner"], "@alpha-owner")
     assertions.expect_true(bool(alpha_row["primary_authors"]), reason="should have primary authors")

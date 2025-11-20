@@ -69,6 +69,19 @@ class SettingsError(CoreSettingsError):
         errors: Sequence[dict[str, JsonValue]],
         cause: Exception | None = None,
     ) -> None:
+        """Initialize settings error with Problem Details and validation errors.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the settings validation failure.
+        problem : ProblemDetailsDict
+            RFC 9457 Problem Details payload describing the failure.
+        errors : Sequence[dict[str, JsonValue]]
+            Pydantic validation error dictionaries.
+        cause : Exception | None, optional
+            Underlying exception that caused the validation failure.
+        """
         self.problem: ProblemDetailsDict = dict(problem)
         self.validation_errors: tuple[dict[str, JsonValue], ...] = tuple(
             dict(err) for err in errors
@@ -129,6 +142,26 @@ class ToolRuntimeSettings(BaseSettings):
     @field_validator("exec_allowlist", mode="before")
     @classmethod
     def _normalise_allowlist(cls, value: object) -> tuple[str, ...]:
+        """Normalize exec_allowlist field from various input formats.
+
+        Accepts comma-separated strings, lists, tuples, or sets and converts
+        them to a tuple of stripped strings. Returns default value if None.
+
+        Parameters
+        ----------
+        value : object
+            Input value to normalize (str, list, tuple, set, or None).
+
+        Returns
+        -------
+        tuple[str, ...]
+            Normalized tuple of allowlist patterns.
+
+        Raises
+        ------
+        TypeError
+            If value is not a recognized type.
+        """
         if value is None:
             default_field = cls.model_fields.get("exec_allowlist")
             if default_field is None:
@@ -151,6 +184,28 @@ class ToolRuntimeSettings(BaseSettings):
     @field_validator("exec_digests", mode="before")
     @classmethod
     def _normalise_exec_digests(cls, value: object) -> dict[str, str]:
+        """Normalize exec_digests field from mapping or comma-separated string.
+
+        Accepts dictionaries or comma-separated "key=sha256" strings and converts
+        them to a dictionary with lowercase digest values. Returns empty dict if None.
+
+        Parameters
+        ----------
+        value : object
+            Input value to normalize (Mapping, str, or None).
+
+        Returns
+        -------
+        dict[str, str]
+            Normalized dictionary mapping executable paths/names to SHA256 digests.
+
+        Raises
+        ------
+        ValueError
+            If string format is invalid (missing '=' separator).
+        TypeError
+            If value is not a recognized type.
+        """
         if value is None:
             return {}
         if isinstance(value, Mapping):
@@ -228,6 +283,23 @@ def get_runtime_settings() -> ToolRuntimeSettings:
 
     @lru_cache(maxsize=1)
     def _cached() -> ToolRuntimeSettings:
+        """Load and cache runtime settings from environment.
+
+        Creates a ToolRuntimeSettings instance from environment variables
+        (prefixed with TOOLS_). Results are cached via lru_cache to avoid
+        repeated parsing. Raises SettingsError with Problem Details if
+        validation fails.
+
+        Returns
+        -------
+        ToolRuntimeSettings
+            Loaded and validated runtime settings instance.
+
+        Raises
+        ------
+        SettingsError
+            If settings validation fails (invalid types, missing required fields).
+        """
         try:
             return ToolRuntimeSettings()
         except ValidationError as exc:  # pragma: no cover - configuration errors

@@ -154,7 +154,23 @@ class _UnpicklerProtocol(Protocol):
         encoding: str = ...,
         errors: str = ...,
         buffers: object | None = ...,
-    ) -> None: ...
+    ) -> None:
+        """Initialize unpickler with file handle and options.
+
+        Parameters
+        ----------
+        file : BinaryIO
+            Binary file handle to read pickle data from.
+        fix_imports : bool, optional
+            Whether to fix imports for Python 2 compatibility.
+        encoding : str, optional
+            Text encoding for Python 2 compatibility.
+        errors : str, optional
+            Error handling mode for encoding.
+        buffers : object | None, optional
+            Buffer protocol support.
+        """
+        ...
 
     def load(self) -> object:
         """Load and return unpickled object.
@@ -257,7 +273,12 @@ if TYPE_CHECKING:
             encoding: str = ...,
             errors: str = ...,
             buffers: object | None = ...,
-        ) -> None: ...
+        ) -> None:
+            """Initialize stdlib unpickler shim with file handle and options.
+
+            See class docstring for detailed parameter documentation.
+            """
+            ...
 
         def load(self) -> object:
             """Load and return unpickled object.
@@ -335,6 +356,10 @@ class _SafeUnpickler(_StdlibUnpickler):
         errors: str = "strict",
         buffers: object | None = None,
     ) -> None:
+        """Initialize safe unpickler with file handle and options.
+
+        See class docstring for detailed parameter documentation.
+        """
         super().__init__(
             file,
             fix_imports=fix_imports,

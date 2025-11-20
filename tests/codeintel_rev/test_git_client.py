@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 from unittest.mock import Mock
 
 import git.exc
@@ -68,7 +69,7 @@ def repo_factory(mock_repo: Mock) -> RecordingRepoFactory:
     RecordingRepoFactory
         Factory instance that records calls and returns mock_repo.
     """
-    return RecordingRepoFactory(mock_repo)
+    return RecordingRepoFactory(cast("git.Repo", mock_repo))
 
 
 @pytest.fixture

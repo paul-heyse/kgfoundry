@@ -417,6 +417,14 @@ runtime-evaluated-base-classes = [
 "src/kgfoundry_common/http/client.py" = ["DOC202"]
 "codeintel_rev/io/splade_manager.py" = ["DOC202"]
 "codeintel_rev/typing.py" = ["DOC202"]
+"tools/_shared/augment_registry.py" = ["DOC501", "DOC502"]
+# DOC502: _clean_key raises ValueError via helper pattern; exceptions raised indirectly
+"tools/_shared/cli_context_registry.py" = ["DOC502"]
+# DOC502: _resolve_cli_config_factory raises ImportError/AttributeError via importlib
+"tools/_shared/cli_tooling.py" = ["DOC502"]
+# DOC502: _hash_executable raises FileNotFoundError/PermissionError via file I/O
+# DOC502: _spawn raises TimeoutExpired/FileNotFoundError via subprocess.run()
+"tools/_shared/process.py" = ["DOC502"]
 
 
 [tool.ruff.lint.isort]
@@ -589,6 +597,10 @@ exclude = "codeintel_rev/patches|codeintel_rev/cli/telemetry.py|codeintel_rev/di
 # DOC301: __init__ methods should have docstrings per PEP 257. We document constructor parameters in __init__
 # docstrings rather than class docstrings for clarity and consistency with Python conventions.
 # DOC503: RuntimeCell.get_or_initialize raises exceptions via variable (cooldown_error), not directly
+# DOC501/DOC502: _load_augment, _load_registry, _read_yaml raise exceptions via helper functions
+# (_registry_error, _validation_error) that return exception instances. Docstrings correctly
+# document the actual exception types (AugmentRegistryError, AugmentRegistryValidationError) being
+# raised, but Ruff's static analysis cannot follow the helper function pattern.
 # Pydoclint doesn't recognize that cooldown_error is a variable containing an exception, not an exception type
 
 

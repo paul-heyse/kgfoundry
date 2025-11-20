@@ -20,6 +20,15 @@ from tests._helpers.integration import IntegrationHarness, integration_harness_f
 
 
 def _expect(*, condition: bool, message: str) -> None:
+    """Assert condition or fail test with message.
+
+    Parameters
+    ----------
+    condition : bool
+        Condition to check.
+    message : str
+        Failure message if condition is False.
+    """
     if not condition:
         pytest.fail(message)
 

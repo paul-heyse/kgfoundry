@@ -97,6 +97,31 @@ class ToolExecutionError(RuntimeError):
         command: list[str] | None = None,
         problem: Mapping[str, object] | None = None,
     ) -> RuntimeError:
+        """Create new error instance, delegating to factory if registered.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the subprocess execution failure.
+        command : list[str] | None, optional
+            Command that failed execution, as a list of strings.
+        problem : Mapping[str, object] | None, optional
+            Additional structured problem details (e.g., return code, stderr).
+
+        Returns
+        -------
+        RuntimeError
+            Error instance, either from factory or new instance of this class.
+
+        Raises
+        ------
+        TypeError
+            If factory is registered but returns a non-RuntimeError instance.
+
+        Notes
+        -----
+        See class docstring for detailed behavior documentation.
+        """
         if cls is ToolExecutionError and cls._factory is not None:
             error = cls._factory(message)
             if not isinstance(error, RuntimeError):  # pragma: no cover - defensive

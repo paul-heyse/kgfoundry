@@ -15,6 +15,13 @@ from tests._helpers.settings import build_app_config_for_repo
 
 
 def _prepare_paths(repo_root: Path) -> None:
+    """Prepare test repository directory structure.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+    """
     repo_root.mkdir()
     for relative in (
         "config",

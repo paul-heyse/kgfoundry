@@ -10,7 +10,10 @@ from tests._helpers import assertions
 
 
 class _StubCatalog:
+    """Stub catalog for testing MCP registry contracts."""
+
     def __init__(self) -> None:
+        """Initialize stub catalog with test rows."""
         self.rows = [
             {
                 "id": 1,
@@ -40,6 +43,20 @@ class _StubCatalog:
 
 
 def _faiss_search(query: str, top_k: int) -> list[tuple[int, float]]:
+    """Perform stub FAISS search.
+
+    Parameters
+    ----------
+    query : str
+        Query string (must be non-empty).
+    top_k : int
+        Number of results (ignored).
+
+    Returns
+    -------
+    list[tuple[int, float]]
+        Stub search results [(1, 0.9)].
+    """
     _ = top_k
     assertions.expect_true(bool(query), reason="query should be non-empty")
     return [(1, 0.9)]

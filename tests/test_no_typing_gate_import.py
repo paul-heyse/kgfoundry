@@ -9,6 +9,18 @@ import pytest
 
 
 def _imports_gate_from_typing(py_file: Path) -> bool:
+    """Check if Python file imports gate_import from codeintel_rev.typing.
+
+    Parameters
+    ----------
+    py_file : Path
+        Python file path to check.
+
+    Returns
+    -------
+    bool
+        True if file imports gate_import from codeintel_rev.typing, False otherwise.
+    """
     source = py_file.read_text(encoding="utf-8")
     tree = ast.parse(source)
     for node in ast.walk(tree):

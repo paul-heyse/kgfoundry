@@ -18,7 +18,10 @@ from tests.app._context_factory import build_application_context
 
 
 class _FakeScopeStore:
+    """Fake scope store for testing cleanup behavior."""
+
     def __init__(self) -> None:
+        """Initialize fake scope store with close call counter."""
         self.close_calls = 0
 
     async def close(self) -> None:
@@ -27,7 +30,10 @@ class _FakeScopeStore:
 
 
 class _FakeContext:
+    """Fake application context for testing lifespan hooks."""
+
     def __init__(self) -> None:
+        """Initialize fake context with tracking counters."""
         index_settings = SimpleNamespace(faiss_preload=False)
         self.app_config = SimpleNamespace(index=index_settings)
         self.settings = SimpleNamespace(index=index_settings)
@@ -74,7 +80,16 @@ class _FakeContext:
 
 
 class _FakeReadinessProbe:
+    """Fake readiness probe for testing lifespan initialization/shutdown."""
+
     def __init__(self, context: ApplicationContext | _FakeContext) -> None:
+        """Initialize fake probe with context and call counters.
+
+        Parameters
+        ----------
+        context : ApplicationContext | _FakeContext
+            Application context instance.
+        """
         self.context = context
         self.initialize_calls = 0
         self.shutdown_calls = 0
@@ -95,11 +110,35 @@ async def test_lifespan_preload_and_cleanup() -> None:
     probes: list[_FakeReadinessProbe] = []
 
     def _probe_factory(context: _FakeContext) -> _FakeReadinessProbe:
+        """Create fake readiness probe and track it.
+
+        Parameters
+        ----------
+        context : _FakeContext
+            Context to pass to probe.
+
+        Returns
+        -------
+        _FakeReadinessProbe
+            Created probe instance.
+        """
         probe = _FakeReadinessProbe(context)
         probes.append(probe)
         return probe
 
     def _flag(name: str) -> bool:
+        """Check if environment flag name enables preload.
+
+        Parameters
+        ----------
+        name : str
+            Flag name to check.
+
+        Returns
+        -------
+        bool
+            True if flag enables preload (XTR_PRELOAD or HYBRID_PRELOAD).
+        """
         return name in {"XTR_PRELOAD", "HYBRID_PRELOAD"}
 
     with override_app_hooks(
@@ -126,7 +165,10 @@ def test_close_all_runtimes_idempotent(
     """Ensure runtime cleanup is idempotent across repeated calls."""
 
     class _Disposable:
+        """Disposable resource for testing cleanup idempotency."""
+
         def __init__(self) -> None:
+            """Initialize disposable with close counter."""
             self.closed = 0
 
         def close(self) -> None:
@@ -136,6 +178,13 @@ def test_close_all_runtimes_idempotent(
     created: list[_Disposable] = []
 
     def _factory() -> _Disposable:
+        """Create disposable instance and track it.
+
+        Returns
+        -------
+        _Disposable
+            Created disposable instance.
+        """
         instance = _Disposable()
         created.append(instance)
         return instance
@@ -204,6 +253,13 @@ async def test_lifespan_closes_resources(tmp_path: Path) -> None:
     close_calls = {"count": 0}
 
     def _track_shutdown(target: ApplicationContext) -> None:
+        """Track shutdown calls and close runtimes.
+
+        Parameters
+        ----------
+        target : ApplicationContext
+            Context to close runtimes on.
+        """
         close_calls["count"] += 1
         target.close_all_runtimes()
 

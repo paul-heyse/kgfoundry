@@ -17,6 +17,15 @@ from tests.enrich._completeness_utils import normalize_payload
 
 
 def _emit_modules_jsonl(path: Path, mods: list[str]) -> None:
+    """Emit modules JSONL file with test modules.
+
+    Parameters
+    ----------
+    path : Path
+        Output JSONL file path.
+    mods : list[str]
+        Module names to include.
+    """
     rows = [{"module_name": mod, "path": f"{mod.replace('.', '/')}.py"} for mod in mods]
     write_jsonl(path, rows, writer_version="v2")
 

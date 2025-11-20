@@ -702,7 +702,7 @@ _CST_KIND_QUERIES: dict[str, str] = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass
 class _ScopeFilterSpec:
     """Structured scope filter metadata used during scoped queries.
 
@@ -750,7 +750,7 @@ class _ScopeFilterSpec:
         return bool(self.complex_include_patterns or self.complex_exclude_patterns)
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class StructureAnnotations:
     """Structure-aware metadata joined onto explainability pools.
 
@@ -779,7 +779,7 @@ class StructureAnnotations:
     cst_matches: tuple[str, ...]
 
 
-@dataclass(frozen=True)
+@dataclass
 class _StructMaterializationPlan:
     """Precomputed SQL statements for struct table materialization.
 
@@ -1528,6 +1528,16 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
             conn,
             "static_diagnostics",
             self._data_root / "analytics/static_diagnostics.parquet",
+        )
+        self._install_parquet_view(
+            conn,
+            "function_metrics",
+            self._data_root / "analytics/function_metrics.parquet",
+        )
+        self._install_parquet_view(
+            conn,
+            "function_types",
+            self._data_root / "analytics/function_types.parquet",
         )
         self._install_chunk_symbols_view(conn)
 
@@ -3592,7 +3602,7 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class DuckDBCatalogConfig:
     """Configuration bundle for constructing DuckDBCatalog instances."""
 

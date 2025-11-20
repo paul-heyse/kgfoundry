@@ -16,6 +16,22 @@ from tests._helpers import assertions
 
 
 def _write_module(tmp_path: Path, relative: str, content: str) -> Path:
+    """Write Python module file with dedented content.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory root.
+    relative : str
+        Relative file path.
+    content : str
+        Module content (will be dedented).
+
+    Returns
+    -------
+    Path
+        Written file path.
+    """
     file_path = tmp_path / relative
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(dedent(content), encoding="utf-8")

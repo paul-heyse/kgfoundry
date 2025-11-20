@@ -87,7 +87,7 @@ fi
 echo "==> Generating SCIP index..."
 (
   cd "$SCIP_DIR"
-  scip-python index ../src --project-name kgfoundry
+  scip-python index . --project-name kgfoundry
   scip print --json index.scip > index.scip.json
 )
 
@@ -156,6 +156,61 @@ DFG_EDGES_PARQUET="$ENRICH_OUT/graphs/dfg_edges.parquet"
 IMPORT_GRAPH_EDGES_PARQUET="$ENRICH_OUT/graphs/import_graph_edges.parquet"
 SYMBOL_USE_EDGES_PARQUET="$ENRICH_OUT/graphs/symbol_use_edges.parquet"
 
+# Ensure new graph outputs exist; fall back to legacy names if needed.
+if [ ! -f "$IMPORT_GRAPH_EDGES_PARQUET" ] && [ -f "$ENRICH_OUT/graphs/imports.parquet" ]; then
+  cp "$ENRICH_OUT/graphs/imports.parquet" "$IMPORT_GRAPH_EDGES_PARQUET"
+fi
+if [ ! -f "$SYMBOL_USE_EDGES_PARQUET" ] && [ -f "$ENRICH_OUT/graphs/uses.parquet" ]; then
+  cp "$ENRICH_OUT/graphs/uses.parquet" "$SYMBOL_USE_EDGES_PARQUET"
+fi
+
+# Generate missing graph/analytics artifacts via targeted CLI commands.
+if [ ! -f "$IMPORT_GRAPH_EDGES_PARQUET" ] || [ ! -f "$SYMBOL_USE_EDGES_PARQUET" ]; then
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --scip "$SCIP_JSON" \
+    --out "$ENRICH_OUT" \
+    graph
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --scip "$SCIP_JSON" \
+    --out "$ENRICH_OUT" \
+    uses
+fi
+
+# Ensure analytics tables are present for config values and static diagnostics.
+if [ ! -f "$ENRICH_OUT/analytics/config_values.parquet" ]; then
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --scip "$SCIP_JSON" \
+    --out "$ENRICH_OUT" \
+    config
+fi
+
+if [ ! -f "$ENRICH_OUT/analytics/static_diagnostics.parquet" ]; then
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --scip "$SCIP_JSON" \
+    --out "$ENRICH_OUT" \
+    typedness
+fi
+
+if [ ! -f "$ENRICH_OUT/analytics/function_metrics.parquet" ]; then
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --scip "$SCIP_JSON" \
+    --out "$ENRICH_OUT" \
+    function-metrics
+fi
+
+if [ ! -f "$ENRICH_OUT/analytics/function_types.parquet" ]; then
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --scip "$SCIP_JSON" \
+    --out "$ENRICH_OUT" \
+    function-types
+fi
+
 copy_mapping_artifact "$GOID_PARQUET" "goids"
 copy_mapping_artifact "$GOID_CROSSWALK_PARQUET" "goid_crosswalk"
 copy_mapping_artifact "$CALL_NODES_PARQUET" "call_graph_nodes"
@@ -169,6 +224,8 @@ copy_mapping_artifact "$SYMBOL_USE_EDGES_PARQUET" "symbol_use_edges"
 echo "==> Promoting key analytics artifacts to Document Output root..."
 copy_if_exists "$DOC_OUT/enriched/analytics/hotspots.jsonl" "$DOC_OUT/hotspots.jsonl"
 copy_if_exists "$DOC_OUT/enriched/analytics/typedness.jsonl" "$DOC_OUT/typedness.jsonl"
+copy_if_exists "$DOC_OUT/enriched/analytics/function_metrics.jsonl" "$DOC_OUT/function_metrics.jsonl"
+copy_if_exists "$DOC_OUT/enriched/analytics/function_types.jsonl" "$DOC_OUT/function_types.jsonl"
 copy_if_exists "$DOC_OUT/enriched/ast/ast_metrics.jsonl" "$DOC_OUT/ast_metrics.jsonl"
 copy_if_exists "$DOC_OUT/enriched/tags/tags_index.yaml" "$DOC_OUT/tags_index.yaml"
 convert_parquet_to_jsonl "$ENRICH_OUT/analytics/config_values.parquet" "$DOC_OUT/config_values.jsonl"

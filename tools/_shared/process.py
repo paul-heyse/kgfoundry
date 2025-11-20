@@ -65,6 +65,29 @@ ObservationFactory = Callable[
 
 @lru_cache(maxsize=128)
 def _hash_executable(path: str) -> str:
+    """Compute SHA256 digest of executable file.
+
+    Reads the file in 1MB chunks and computes a SHA256 hash. Results are
+    cached (LRU, max 128 entries) to avoid recomputing digests for the same
+    executable path.
+
+    Parameters
+    ----------
+    path : str
+        Filesystem path to executable file.
+
+    Returns
+    -------
+    str
+        Lowercase hexadecimal SHA256 digest of file contents.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the executable file does not exist.
+    PermissionError
+        If the file cannot be read due to permissions.
+    """
     executable_path = Path(path)
     hasher = hashlib.sha256()
     with executable_path.open("rb") as buffer:
@@ -168,6 +191,10 @@ class ToolExecutionError(RuntimeError):
         streams: tuple[str, str] | None = None,
         problem: ProblemDetailsDict | None = None,
     ) -> None:
+        """Initialize exception with command execution failure details.
+
+        See class docstring for detailed parameter documentation.
+        """
         super().__init__(message)
         self.command: tuple[str, ...] = tuple(command)
         self.returncode = returncode
@@ -319,6 +346,27 @@ def _default_observer_factory(
     cwd: Path | None,
     timeout: float | None,
 ) -> AbstractContextManager[ToolRunObservation]:
+    """Create default tool run observer for metrics and logging.
+
+    Returns a context manager that observes tool execution for metrics
+    collection and structured logging. Used as the default observer_factory
+    for ProcessRunner instances.
+
+    Parameters
+    ----------
+    command : Sequence[str]
+        Command being executed.
+    cwd : Path | None
+        Working directory for command execution.
+    timeout : float | None
+        Timeout in seconds, or None for no timeout.
+
+    Returns
+    -------
+    AbstractContextManager[ToolRunObservation]
+        Context manager that observes tool execution and returns observation
+        metadata on exit.
+    """
     return observe_tool_run(command, cwd=cwd, timeout=timeout)
 
 
@@ -441,6 +489,35 @@ class ProcessRunner:
         env: Mapping[str, str],
         timeout: float | None,
     ) -> CompletedProcessProtocol:
+        """Spawn subprocess with sanitized command and environment.
+
+        Internal method that delegates to subprocess.run() with text mode
+        and output capture enabled. Used by run() after allow-list and
+        environment sanitization.
+
+        Parameters
+        ----------
+        final_command : tuple[str, ...]
+            Sanitized command tuple with resolved executable path.
+        cwd : Path | None
+            Working directory for subprocess execution.
+        env : Mapping[str, str]
+            Sanitized environment dictionary.
+        timeout : float | None
+            Timeout in seconds, or None for no timeout.
+
+        Returns
+        -------
+        CompletedProcessProtocol
+            Completed process result with args, returncode, stdout, stderr.
+
+        Raises
+        ------
+        TimeoutExpired
+            If subprocess exceeds timeout.
+        FileNotFoundError
+            If executable cannot be found.
+        """
         return _run_subprocess(
             final_command,
             cwd=str(cwd) if cwd else None,
@@ -453,6 +530,21 @@ class ProcessRunner:
 
 
 def _decode_stream(stream: object) -> str:
+    """Decode subprocess stream to string.
+
+    Converts bytes to UTF-8 string with error replacement, handles None
+    by returning empty string, and converts other types to string.
+
+    Parameters
+    ----------
+    stream : object
+        Stream data from subprocess (bytes, str, None, or other).
+
+    Returns
+    -------
+    str
+        Decoded string representation of stream data.
+    """
     if isinstance(stream, bytes):
         return stream.decode("utf-8", errors="replace")
     if stream is None:

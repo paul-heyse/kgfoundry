@@ -32,6 +32,13 @@ RUNNER = CliRunner(mix_stderr=False)
 
 
 def _prepare_repo(repo_root: Path) -> None:
+    """Prepare test repository directory structure.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+    """
     repo_root.mkdir(parents=True, exist_ok=True)
     config_dir = repo_root / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -121,13 +128,23 @@ def _app_config_loader(
     )
 
     def _loader() -> AppConfig:
+        """Return AppConfig instance.
+
+        Returns
+        -------
+        AppConfig
+            Pre-configured AppConfig.
+        """
         return config
 
     return _loader
 
 
 class _ReadyIndex:
+    """Stub XTR index indicating ready state."""
+
     def __init__(self, *_: object, **__: object) -> None:
+        """Initialize ready index with ready=True."""
         self.ready = True
 
     @staticmethod
@@ -147,7 +164,10 @@ class _ReadyIndex:
 
 
 class _ExplodingIndex:
+    """Stub XTR index that raises on open to simulate corruption."""
+
     def __init__(self, *_: object, **__: object) -> None:
+        """Initialize exploding index with ready=False."""
         self.ready = False
 
     @staticmethod

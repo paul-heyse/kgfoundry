@@ -25,6 +25,25 @@ from tests._helpers import assertions
 
 
 def _expect_mapping(value: object, label: str) -> Mapping[str, Any]:
+    """Assert value is a mapping or raise TypeError.
+
+    Parameters
+    ----------
+    value : object
+        Value to check.
+    label : str
+        Label for error message.
+
+    Returns
+    -------
+    Mapping[str, Any]
+        Value cast to mapping.
+
+    Raises
+    ------
+    TypeError
+        If value is not a mapping.
+    """
     if not isinstance(value, Mapping):
         message = f"Expected {label} to be a mapping, got {type(value)!r}"
         raise TypeError(message)
@@ -94,7 +113,8 @@ def _failing_importer(calls: list[str]) -> Callable[[str], object]:
             Always raised with message "No module named '{name}'".
         """
         calls.append(name)
-        raise ImportError(f"No module named '{name}'")
+        message = f"No module named '{name}'"
+        raise ImportError(message)
 
     return importer
 

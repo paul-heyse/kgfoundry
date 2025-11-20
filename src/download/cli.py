@@ -72,7 +72,20 @@ class HarvestRequest:
 class HarvestHandler(Protocol):
     """Protocol describing harvest handler callables."""
 
-    def __call__(self, request: HarvestRequest) -> str: ...
+    def __call__(self, request: HarvestRequest) -> str:
+        """Execute harvest operation with the given request.
+
+        Parameters
+        ----------
+        request : HarvestRequest
+            Harvest request containing topic, years filter, and max_works limit.
+
+        Returns
+        -------
+        str
+            Harvest result summary or output message.
+        """
+        ...
 
 
 class ArtifactFS(Protocol):

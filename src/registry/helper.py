@@ -37,6 +37,19 @@ def _execute_with_operation(
     params: duckdb_helpers.Params,
     operation: str,
 ) -> None:
+    """Execute SQL with operation name for observability.
+
+    Parameters
+    ----------
+    conn : DuckDBPyConnection
+        DuckDB connection to execute on.
+    sql : str
+        SQL statement to execute.
+    params : duckdb_helpers.Params
+        Query parameters.
+    operation : str
+        Operation name for logging/observability.
+    """
     duckdb_helpers.execute(
         conn,
         sql,

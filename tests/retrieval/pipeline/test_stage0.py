@@ -14,7 +14,16 @@ from tests._helpers import assertions
 
 
 class _StubHybridEngine:
+    """Stub hybrid engine for testing stage0 pipeline."""
+
     def __init__(self, result: HybridSearchResult) -> None:
+        """Initialize stub engine with pre-configured result.
+
+        Parameters
+        ----------
+        result : HybridSearchResult
+            Result to return from search calls.
+        """
         self.result = result
         self.last_query: str | None = None
         self.last_semantic_hits: list[tuple[int, float]] | None = None

@@ -19,6 +19,13 @@ faiss = load_faiss_module("golden flat oracle tests")
 
 
 def _mk_chunks() -> list[Chunk]:
+    """Create test chunks for golden oracle tests.
+
+    Returns
+    -------
+    list[Chunk]
+        List of test chunk instances.
+    """
     return [
         Chunk(
             uri="pkg/math_ops.py",
@@ -54,6 +61,18 @@ def _mk_chunks() -> list[Chunk]:
 
 
 def _mk_embeddings(chunks: list[Chunk]) -> np.ndarray:
+    """Create test embeddings with deterministic random state.
+
+    Parameters
+    ----------
+    chunks : list[Chunk]
+        Chunks to create embeddings for.
+
+    Returns
+    -------
+    np.ndarray
+        Normalized embedding array.
+    """
     rng = np.random.RandomState(7)
     base = rng.randn(len(chunks), 8).astype("float32")
     base[0] = np.array([0.9, 0.9, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0], dtype="float32")

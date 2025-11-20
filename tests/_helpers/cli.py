@@ -11,13 +11,51 @@ from click.testing import Result
 from typer.main import Typer
 from typer.testing import CliRunner
 
+from orchestration.cli import ArtifactFS as OrchestrationArtifactFS
 from orchestration.cli import BM25BuildConfig, IndexCliConfig, OrchestrationCliContext
 
 _RUNNER = CliRunner(mix_stderr=False)
 
 
 class _ArgNormalizer(Protocol):
+    """Protocol for functions that normalize CLI argument sequences."""
+
     def __call__(self, argv: Sequence[str]) -> list[str]: ...
+
+
+class _StubArtifactFS(OrchestrationArtifactFS):
+    """Minimal ArtifactFS implementation for CLI tests."""
+
+    def __init__(self) -> None:
+        self.ensure_dir_calls = 0
+        self.write_text_calls = 0
+
+    def ensure_dir(self, directory: Path) -> None:
+        """Ensure directory exists, tracking call count.
+
+        Parameters
+        ----------
+        directory : Path
+            Directory path to create.
+        """
+        self.ensure_dir_calls += 1
+        directory.mkdir(parents=True, exist_ok=True)
+
+    def write_text(self, path: Path, content: str, *, encoding: str = "utf-8") -> None:
+        """Write text content to file, tracking call count.
+
+        Parameters
+        ----------
+        path : Path
+            File path to write to.
+        content : str
+            Text content to write.
+        encoding : str, optional
+            File encoding. Defaults to "utf-8".
+        """
+        self.write_text_calls += 1
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding=encoding)
 
 
 def invoke(
@@ -105,7 +143,7 @@ def orchestration_cli_context(
     uuid_factory: Callable[[], str] | None = None,
     bm25_builder: Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]] | None = None,
     faiss_runner: Callable[[IndexCliConfig], dict[str, object]] | None = None,
-    artifact_fs: object | None = None,
+    artifact_fs: OrchestrationArtifactFS | None = None,
 ) -> OrchestrationCliContext:
     """Return an orchestration CLI context with optional overrides.
 
@@ -126,11 +164,12 @@ def orchestration_cli_context(
         Frozen dataclass instance combining overrides with the production defaults.
     """
     base = OrchestrationCliContext.production()
+    fs = artifact_fs or base.artifact_fs or _StubArtifactFS()
     return OrchestrationCliContext(
         uuid_factory=uuid_factory or base.uuid_factory,
         bm25_builder=bm25_builder or base.bm25_builder,
         faiss_runner=faiss_runner or base.faiss_runner,
-        artifact_fs=artifact_fs or base.artifact_fs,
+        artifact_fs=fs,
     )
 
 
@@ -169,3 +208,34 @@ def orchestration_cli_obj(
     if cli_context is not None:
         state["orchestration_cli_context"] = cli_context
     return state
+
+
+def cli_registry_context(
+    tmp_path: Path,
+    *,
+    uuid_value: str = "registry-uuid",
+) -> dict[str, object]:
+    """Build deterministic registry context inputs for CLI registry tests.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory provided by pytest.
+    uuid_value : str, optional
+        Stable UUID value for deterministic command keys.
+
+    Returns
+    -------
+    dict[str, object]
+        Mapping containing augment/registry paths, uuid_factory, and an ArtifactFS stub.
+    """
+    augment_path = tmp_path / "augment.yaml"
+    registry_path = tmp_path / "registry.yaml"
+    augment_path.write_text("version: 1\n", encoding="utf-8")
+    registry_path.write_text("registrations: []\n", encoding="utf-8")
+    return {
+        "augment_path": augment_path,
+        "registry_path": registry_path,
+        "uuid_factory": lambda: uuid_value,
+        "artifact_fs": _StubArtifactFS(),
+    }

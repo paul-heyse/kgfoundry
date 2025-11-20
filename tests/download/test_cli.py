@@ -23,6 +23,18 @@ def test_harvest_emits_envelope(
     artifact_dir = tmp_path / "artifacts"
 
     def _handler(request: HarvestRequest) -> str:
+        """Handle harvest request and record it.
+
+        Parameters
+        ----------
+        request : HarvestRequest
+            Harvest request to process.
+
+        Returns
+        -------
+        str
+            Mock harvest response message.
+        """
         received.append(request)
         return (
             f"[dry-run] mock harvest {request.topic} years={request.years} max={request.max_works}"

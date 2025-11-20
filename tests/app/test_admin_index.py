@@ -40,7 +40,7 @@ def test_admin_tuning_updates_context(tmp_path: Path) -> None:
 
 def test_admin_faiss_runtime_status_endpoint(tmp_path: Path) -> None:
     """Test that GET /admin/index/tuning/faiss returns current FAISS runtime tuning status."""
-    ctx = build_application_context(tmp_path)
+    ctx = build_application_context(tmp_path, seed_coderank_runtime=True)
     app = build_test_app(ctx)
     app.include_router(index_admin.router)
     app.dependency_overrides[_REQUIRE_ADMIN_DEP] = lambda: None
@@ -64,7 +64,9 @@ def test_admin_faiss_runtime_session_override(tmp_path: Path) -> None:
         assertions.expect_equal(resp.status_code, HTTPStatus.OK)
         assertions.expect_equal(resp.json()["faiss_tuning"]["nprobe"], 48)
         stored = asyncio.run(ctx.scope_store.get("abc"))
-        assertions.expect_equal(stored["faiss_tuning"]["nprobe"], 48)
+        assertions.expect_true(stored is not None, reason="scope store should contain entry")
+        if stored is not None:
+            assertions.expect_equal(stored.get("faiss_tuning", {}).get("nprobe"), 48)
 
 
 def test_admin_faiss_runtime_reset_session(tmp_path: Path) -> None:
@@ -79,4 +81,12 @@ def test_admin_faiss_runtime_reset_session(tmp_path: Path) -> None:
     with TestClient(app) as client:
         resp = client.delete("/admin/index/tuning/faiss", params={"session_id": "abc"})
         assertions.expect_equal(resp.status_code, HTTPStatus.OK)
-        assertions.expect_true(asyncio.run(ctx.scope_store.get("abc")) is None)
+        stored = asyncio.run(ctx.scope_store.get("abc"))
+        assertions.expect_true(
+            stored is not None, reason="scope entry should persist without tuning"
+        )
+        if stored is not None:
+            assertions.expect_true(
+                "faiss_tuning" not in stored or stored.get("faiss_tuning") is None,
+                reason="faiss_tuning should be cleared",
+            )

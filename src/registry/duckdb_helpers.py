@@ -236,6 +236,20 @@ def _coerce_options(
     *,
     operation: str,
 ) -> DuckDBQueryOptions:
+    """Coerce query options to ensure operation matches the requested operation.
+
+    Parameters
+    ----------
+    options : DuckDBQueryOptions | None
+        Existing options or None to create new options.
+    operation : str
+        Required operation name.
+
+    Returns
+    -------
+    DuckDBQueryOptions
+        Options with operation set to the requested value.
+    """
     if options is None:
         return DuckDBQueryOptions(operation=operation)
     if options.operation == operation:

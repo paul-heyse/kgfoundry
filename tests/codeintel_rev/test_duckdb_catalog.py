@@ -58,6 +58,13 @@ def _safe_sql_path(path: Path, base_path: Path) -> str:
 
 
 def _write_chunks_parquet(path: Path) -> None:
+    """Write test chunks parquet file.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    """
     connection = duckdb.connect(database=":memory:")
     connection.execute("CREATE TABLE tmp (id INTEGER, uri VARCHAR, text VARCHAR)")
     connection.executemany(
@@ -73,6 +80,13 @@ def _write_chunks_parquet(path: Path) -> None:
 
 
 def _write_idmap_parquet(path: Path) -> None:
+    """Write test ID map parquet file.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    """
     connection = duckdb.connect(database=":memory:")
     connection.execute("CREATE TABLE tmp (faiss_row BIGINT, external_id BIGINT, source TEXT)")
     connection.executemany(
@@ -87,6 +101,20 @@ def _write_idmap_parquet(path: Path) -> None:
 
 
 def _table_exists(db_path: Path, table_name: str) -> bool:
+    """Check if table exists in DuckDB database.
+
+    Parameters
+    ----------
+    db_path : Path
+        Database file path.
+    table_name : str
+        Table name to check.
+
+    Returns
+    -------
+    bool
+        True if table exists, False otherwise.
+    """
     connection = duckdb.connect(str(db_path))
     try:
         row = connection.execute(
@@ -216,6 +244,20 @@ def _write_single_row_parquet(path: Path, select_sql: str) -> None:
 
 
 def _index_exists(db_path: Path, index_name: str) -> bool:
+    """Check if index exists in DuckDB database.
+
+    Parameters
+    ----------
+    db_path : Path
+        Database file path.
+    index_name : str
+        Index name to check.
+
+    Returns
+    -------
+    bool
+        True if index exists, False otherwise.
+    """
     connection = duckdb.connect(str(db_path))
     try:
         row = connection.execute(
@@ -742,6 +784,13 @@ class TestConcurrentAccess:
         }
 
         def _worker() -> set[str]:
+            """Execute filter query and return URI set.
+
+            Returns
+            -------
+            set[str]
+                Set of URIs from query results.
+            """
             results = test_catalog.query_by_filters(
                 ALL_CHUNK_IDS,
                 include_globs=["**/*.py"],
@@ -771,7 +820,10 @@ def test_query_by_filters_uses_query_builder(test_catalog: DuckDBCatalog) -> Non
     """query_by_filters delegates SQL generation to DuckDBQueryBuilder."""
 
     class _RecordingBuilder(DuckDBQueryBuilder):
+        """Query builder that records all build_filter_query calls."""
+
         def __init__(self) -> None:
+            """Initialize recording builder with empty calls list."""
             self.calls: list[dict[str, object]] = []
 
         def build_filter_query(

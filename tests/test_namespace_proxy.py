@@ -163,6 +163,13 @@ def test_resolve_returns_various_types() -> None:
         """
 
         def _factory() -> object:
+            """Factory function returning fixed value.
+
+            Returns
+            -------
+            object
+                Fixed value provided to make_factory.
+            """
             return val
 
         return _factory
@@ -193,7 +200,14 @@ def test_namespace_exports_with_all_attribute() -> None:
     all_exports: list[str] = ["public_func", "public_class"]
 
     def _public_func() -> None:
-        return None
+        """Public function for testing namespace exports.
+
+        Returns
+        -------
+        None
+            Always returns None.
+        """
+        return
 
     _set_module_attr(module, "__all__", all_exports)
     _set_module_attr(module, "public_func", _public_func)

@@ -142,6 +142,20 @@ def test_connection_pool_reuses_connections(tmp_path: Path) -> None:
     created: int = 0
 
     def _instrumented_connect(database: str, *, read_only: bool) -> duckdb.DuckDBPyConnection:
+        """Create DuckDB connection and track creation count.
+
+        Parameters
+        ----------
+        database : str
+            Database path.
+        read_only : bool
+            Whether connection is read-only.
+
+        Returns
+        -------
+        duckdb.DuckDBPyConnection
+            DuckDB connection instance.
+        """
         nonlocal created
         created += 1
         return duckdb.connect(database, read_only=read_only)

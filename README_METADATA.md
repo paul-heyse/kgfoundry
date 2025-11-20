@@ -225,20 +225,101 @@ Downstream consumers can therefore:
 
 ### 10b. Typedness (`typedness.jsonl`)
 
-**Purpose**: Tracks the extent of type annotation coverage per file/function. Provides signal for type migration work.
+**Purpose**: Tracks the extent of type annotation coverage per file. Provides signal for type migration work.
 
-**Origin**: `codeintel_rev.services.enrich.analytics.typedness` during the pipeline’s analytics stage.
+**Origin**: `codeintel_rev.services.enrich.exports.write_typedness_output` during the pipeline’s analytics stage.
 
 **Fields**
 
 | Field              | Type   | Description |
 |--------------------|--------|-------------|
-| `rel_path`         | string | File path. |
-| `function_count`   | int    | Total functions encountered. |
-| `typed_functions`  | int    | Functions with full type hints. |
-| `partial_functions`| int    | Functions with partial hints. |
-| `untyped_functions`| int    | Functions lacking hints. |
-| `typed_ratio`      | float  | `typed_functions / function_count`. |
+| `path`             | string | File path. |
+| `type_error_count` | int    | Max of Pyrefly/Pyright error counts for the file. |
+| `annotation_ratio` | object | Ratios for parameter and return annotations (`{"params": float, "returns": float}`). |
+| `untyped_defs`     | int    | Count of top-level functions lacking full annotations. |
+| `overlay_needed`   | bool   | Whether a stub overlay is recommended. |
+
+### 10c. Function Metrics (`function_metrics.*`)
+
+**Purpose**: Per-function structural and complexity metrics keyed by GOID.
+
+**Origin**: `codeintel_rev.services.enrich.function_metrics` via `function-metrics` CLI command.
+
+**Fields**
+
+| Field                   | Type        | Description |
+|-------------------------|-------------|-------------|
+| `function_goid_h128`    | decimal     | GOID hash for the function. |
+| `urn`                   | string      | GOID URN for the function. |
+| `repo`                  | string      | Repository identifier used for GOID generation. |
+| `commit`                | string      | Commit hash used for GOID generation. |
+| `rel_path`              | string      | File path relative to repo root. |
+| `language`              | string      | Language identifier (`python`). |
+| `kind`                  | string      | `function` or `method` based on containing class. |
+| `qualname`              | string      | Qualified name (class/function nesting). |
+| `start_line`            | int         | Starting line number. |
+| `end_line`              | int         | Ending line number. |
+| `loc`                   | int         | Physical lines of code (`end_line - start_line + 1`). |
+| `logical_loc`           | int         | Non-blank/non-comment lines within the span. |
+| `param_count`           | int         | Total parameters including varargs/varkw. |
+| `positional_params`     | int         | Positional-only + positional params. |
+| `keyword_only_params`   | int         | Keyword-only parameter count. |
+| `has_varargs`           | bool        | Whether `*args` is present. |
+| `has_varkw`             | bool        | Whether `**kwargs` is present. |
+| `is_async`              | bool        | True when defined with `async def`. |
+| `is_generator`          | bool        | True when the body contains `yield` or `yield from`. |
+| `return_count`          | int         | Number of `return` statements (excluding nested defs). |
+| `yield_count`           | int         | Number of yield statements. |
+| `raise_count`           | int         | Number of `raise` statements. |
+| `cyclomatic_complexity` | int         | `1 + decision_points` found in control flow. |
+| `max_nesting_depth`     | int         | Maximum control-structure nesting depth. |
+| `stmt_count`            | int         | Count of top-level statements in the function body. |
+| `decorator_count`       | int         | Decorator count. |
+| `has_docstring`         | bool        | True when a docstring is present. |
+| `complexity_bucket`     | string      | `low` (<=5), `medium` (<=10), or `high` (otherwise). |
+| `created_at`            | string      | ISO-8601 timestamp for the analytics run. |
+
+Join on `function_goid_h128` or `urn` with `goids.*` / `goid_crosswalk.*` /
+graph tables (`cfg_blocks.*`, `dfg_edges.*`).
+
+### 10d. Function Types (`function_types.*`)
+
+**Purpose**: Per-function typedness and signature details keyed by GOID.
+
+**Origin**: `codeintel_rev.services.enrich.function_types` via `function-types` CLI command.
+
+**Fields**
+
+| Field                 | Type             | Description |
+|-----------------------|------------------|-------------|
+| `function_goid_h128`  | decimal          | GOID hash for the function. |
+| `urn`                 | string           | GOID URN for the function. |
+| `repo`                | string           | Repository identifier used for GOID generation. |
+| `commit`              | string           | Commit hash used for GOID generation. |
+| `rel_path`            | string           | File path relative to repo root. |
+| `language`            | string           | Language identifier (`python`). |
+| `kind`                | string           | `function` or `method`. |
+| `qualname`            | string           | Qualified name (class/function nesting). |
+| `start_line`          | int              | Starting line number. |
+| `end_line`            | int              | Ending line number. |
+| `total_params`        | int              | Parameters counted (excluding `self`/`cls`). |
+| `annotated_params`    | int              | Parameters with annotations (excluding `self`/`cls`). |
+| `unannotated_params`  | int              | Parameters lacking annotations. |
+| `param_typed_ratio`   | float            | `annotated_params / total_params` (defaults to 1.0 when zero params). |
+| `has_return_annotation` | bool           | True when a return annotation is present. |
+| `return_type`         | string/null      | Return annotation text. |
+| `return_type_source`  | string           | Source of return type (`annotation`/`unknown`). |
+| `type_comment`        | string/null      | Type comment if available (currently null). |
+| `param_types`         | object           | Map of parameter name → annotation string/null. |
+| `fully_typed`         | bool             | True when all counted params and return are annotated. |
+| `partial_typed`       | bool             | True when some (but not all) annotations are present. |
+| `untyped`             | bool             | True when no annotations are present. |
+| `typedness_bucket`    | string           | `typed` / `partial` / `untyped`. |
+| `typedness_source`    | string           | `annotations`, `mixed`, or `unknown`. |
+| `created_at`          | string           | ISO-8601 timestamp for the analytics run. |
+
+Aggregates by `rel_path` align with `typedness.*` (per-file ratios); joins use
+`function_goid_h128` or `urn` to connect with GOID/crosswalk and graph tables.
 
 ## 11. Tags Index (`tags_index.yaml`)
 

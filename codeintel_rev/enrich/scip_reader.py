@@ -29,7 +29,7 @@ class SymbolInfo(msgspec.Struct, frozen=True, omit_defaults=True):
 class Document(msgspec.Struct, frozen=True, omit_defaults=True):
     """SCIP document entry (per source file)."""
 
-    path: str = msgspec.field(name="relativePath", default="")
+    path: str = msgspec.field(name="relative_path", default="")
     occurrences: list[Occurrence] = msgspec.field(default_factory=list)
     symbols: list[SymbolInfo] = msgspec.field(default_factory=list)
 
@@ -49,7 +49,10 @@ class _SCIPPayload(msgspec.Struct, frozen=True, omit_defaults=True):
     """
 
     documents: list[Document] = msgspec.field(default_factory=list)
-    external_symbols: list[SymbolInfo] = msgspec.field(default_factory=list, name="externalSymbols")
+    external_symbols: list[SymbolInfo] = msgspec.field(
+        default_factory=list,
+        name="external_symbols",
+    )
 
 
 class SCIPIndex:
@@ -121,10 +124,37 @@ class SCIPIndex:
         SCIPIndex
             Parsed index containing documents and external symbols.
         """
-        payload = Path(path).read_bytes()
-        model = msgspec.json.decode(payload, type=_SCIPPayload)
-        external = {entry.symbol: entry for entry in model.external_symbols if entry.symbol}
-        return cls(documents=list(model.documents), external_symbols=external)
+        raw = msgspec.json.decode(Path(path).read_bytes())
+        documents_data = raw.get("documents") or []
+        external_data = raw.get("external_symbols") or raw.get("externalSymbols") or []
+
+        def _coerce_occurrence(entry: dict[str, Any]) -> Occurrence:
+            return Occurrence(
+                symbol=entry.get("symbol", ""),
+                range=entry.get("range"),
+                roles=entry.get("roles") or [],
+            )
+
+        def _coerce_symbol(entry: dict[str, Any]) -> SymbolInfo:
+            return SymbolInfo(
+                symbol=entry.get("symbol", ""),
+                documentation=entry.get("documentation") or [],
+                kind=entry.get("kind"),
+                relationships=entry.get("relationships") or [],
+            )
+
+        documents: list[Document] = []
+        for entry in documents_data:
+            path_value = (
+                entry.get("relative_path") or entry.get("relativePath") or entry.get("path") or ""
+            )
+            occurrences = [_coerce_occurrence(item) for item in entry.get("occurrences") or []]
+            symbols = [_coerce_symbol(item) for item in entry.get("symbols") or []]
+            documents.append(Document(path=path_value, occurrences=occurrences, symbols=symbols))
+
+        external_symbols = [_coerce_symbol(item) for item in external_data]
+        external = {entry.symbol: entry for entry in external_symbols if entry.symbol}
+        return cls(documents=documents, external_symbols=external)
 
     def by_file(self) -> dict[str, Document]:
         """Return a mapping of relative path → SCIP document.

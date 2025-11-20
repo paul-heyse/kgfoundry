@@ -42,6 +42,8 @@ handle_dry_run = _common.handle_dry_run
 write_graph_outputs = export_service.write_graph_outputs
 write_uses_output = export_service.write_uses_output
 write_typedness_output = export_service.write_typedness_output
+write_function_metrics_output = export_service.write_function_metrics_output
+write_function_types_output = export_service.write_function_types_output
 write_doc_output = export_service.write_doc_output
 write_coverage_output = export_service.write_coverage_output
 write_config_output = export_service.write_config_output
@@ -126,6 +128,8 @@ __all__ = [
     "write_coverage_output",
     "write_doc_output",
     "write_exports_outputs",
+    "write_function_metrics_output",
+    "write_function_types_output",
     "write_graph_outputs",
     "write_hotspot_output",
     "write_slices_output",

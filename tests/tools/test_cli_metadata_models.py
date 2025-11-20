@@ -14,6 +14,8 @@ augment_registry = importlib.import_module("tools._shared.augment_registry")
 
 
 class _ProblemCarrier(Protocol):
+    """Protocol for exceptions that carry Problem Details."""
+
     problem: dict[str, object]
 
 

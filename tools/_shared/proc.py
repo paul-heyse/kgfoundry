@@ -19,6 +19,14 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True, frozen=True)
 class _ProcessRunnerState:
+    """Internal state container for process runner instance.
+
+    Attributes
+    ----------
+    runner : ProcessRunner
+        Process runner instance used for subprocess execution.
+    """
+
     runner: ProcessRunner
 
 

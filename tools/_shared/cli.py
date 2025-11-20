@@ -64,6 +64,20 @@ if TYPE_CHECKING:
         problem: ProblemDetailsDict | UnsetType = UNSET
 
     def _replace_envelope(envelope: CliEnvelope, **updates: object) -> CliEnvelope:
+        """Replace envelope fields with updates.
+
+        Parameters
+        ----------
+        envelope : CliEnvelope
+            Original envelope to update.
+        **updates : object
+            Keyword arguments mapping field names to new values.
+
+        Returns
+        -------
+        CliEnvelope
+            New envelope with updated fields.
+        """
         return dataclass_replace(envelope, **updates)
 
 else:
@@ -90,12 +104,33 @@ else:
         problem: ProblemDetailsDict | UnsetType = UNSET
 
     def _default_generated_at() -> str:
+        """Return current UTC datetime as ISO format string.
+
+        Returns
+        -------
+        str
+            ISO format datetime string (e.g., "2024-01-01T12:00:00+00:00").
+        """
         return datetime.now(tz=UTC).isoformat()
 
     def _default_files() -> list[CliFileResult]:
+        """Return empty list for files default factory.
+
+        Returns
+        -------
+        list[CliFileResult]
+            Empty list.
+        """
         return []
 
     def _default_errors() -> list[CliErrorEntry]:
+        """Return empty list for errors default factory.
+
+        Returns
+        -------
+        list[CliErrorEntry]
+            Empty list.
+        """
         return []
 
     class CliEnvelope(Struct, kw_only=True):
@@ -122,6 +157,20 @@ else:
         problem: ProblemDetailsDict | UnsetType = UNSET
 
     def _replace_envelope(envelope: CliEnvelope, **updates: object) -> CliEnvelope:
+        """Replace envelope fields with updates.
+
+        Parameters
+        ----------
+        envelope : CliEnvelope
+            Original envelope to update.
+        **updates : object
+            Keyword arguments mapping field names to new values.
+
+        Returns
+        -------
+        CliEnvelope
+            New envelope with updated fields.
+        """
         return cast("CliEnvelope", structs.replace(envelope, **updates))
 
 
@@ -204,6 +253,18 @@ class CliEnvelopeBuilder:
         return cls(new_cli_envelope(command=command, status=status, subcommand=subcommand))
 
     def _swap(self, *, update: CliEnvelope) -> CliEnvelopeBuilder:
+        """Replace builder's envelope with updated envelope.
+
+        Parameters
+        ----------
+        update : CliEnvelope
+            New envelope to set.
+
+        Returns
+        -------
+        CliEnvelopeBuilder
+            Self for fluent chaining.
+        """
         _SET_BUILDER_ATTR(self, "envelope", update)
         return self
 

@@ -16,6 +16,13 @@ THIN_CLI_OPTIONS = ("--repo-root", "--out-dir")
 
 
 def _assert_legacy_global_options(cli_app: Typer) -> None:
+    """Assert that CLI help includes legacy global option flags.
+
+    Parameters
+    ----------
+    cli_app : Typer
+        CLI application to check.
+    """
     result = invoke(cli_app, ["--help"], catch_exceptions=False)
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
     for option in LEGACY_GLOBAL_FLAGS:
@@ -23,6 +30,13 @@ def _assert_legacy_global_options(cli_app: Typer) -> None:
 
 
 def _assert_thin_cli_help(cli_app: Typer) -> None:
+    """Assert that CLI help includes thin CLI command names.
+
+    Parameters
+    ----------
+    cli_app : Typer
+        CLI application to check.
+    """
     result = invoke(cli_app, ["--help"], catch_exceptions=False)
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
     for command in THIN_CLI_COMMANDS:

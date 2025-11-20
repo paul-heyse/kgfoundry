@@ -190,6 +190,22 @@ def _invoke_splade(
     context: SpladeCliContext,
     envelope_dir: Path,
 ) -> Result:
+    """Invoke SPLADE CLI command with context and envelope directory.
+
+    Parameters
+    ----------
+    args : list[str]
+        CLI arguments to pass.
+    context : SpladeCliContext
+        CLI context to inject.
+    envelope_dir : Path
+        Envelope directory path.
+
+    Returns
+    -------
+    Result
+        CLI runner result.
+    """
     return runner.invoke(
         root_app,
         [

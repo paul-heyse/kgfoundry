@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
@@ -100,14 +100,18 @@ class FakeTextSearchSession:
         finally:
             session_id_var.reset(token)
 
-    async def set_scope(self, scope_store: object, scope: dict | None) -> None:
+    async def set_scope(
+        self,
+        scope_store: object,
+        scope: Mapping[str, object] | None,
+    ) -> None:
         """Seed or clear the scope for this session.
 
         Parameters
         ----------
         scope_store : object
             Scope store instance with async set/delete methods.
-        scope : dict | None
+        scope : Mapping[str, object] | None
             Scope dictionary to set, or None to clear.
 
         Raises
@@ -122,5 +126,6 @@ class FakeTextSearchSession:
                 await deleter(self.session_id)
             return
         if setter is None:
-            raise AttributeError("scope_store must expose an async set method")
+            message = "scope_store must expose an async set method"
+            raise AttributeError(message)
         await setter(self.session_id, scope)

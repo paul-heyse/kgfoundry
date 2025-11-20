@@ -216,6 +216,13 @@ def test_scope_baseline_query_by_ids(
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
 
     def _query() -> list[dict]:
+        """Execute baseline query by IDs.
+
+        Returns
+        -------
+        list[dict]
+            Query results.
+        """
         return benchmark_catalog.query_by_ids(chunk_ids)
 
     result = benchmark(_query)
@@ -232,6 +239,13 @@ def test_language_filter_performance(
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
 
     def _query() -> list[dict]:
+        """Execute query with language filter.
+
+        Returns
+        -------
+        list[dict]
+            Filtered query results.
+        """
         return benchmark_catalog.query_by_filters(chunk_ids, languages=["python"])
 
     result = benchmark(_query)
@@ -248,6 +262,13 @@ def test_path_glob_filter_performance(
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
 
     def _query() -> list[dict]:
+        """Execute query with path glob filter.
+
+        Returns
+        -------
+        list[dict]
+            Filtered query results.
+        """
         return benchmark_catalog.query_by_filters(chunk_ids, include_globs=["src/**"])
 
     result = benchmark(_query)
@@ -264,6 +285,13 @@ def test_combined_filters_performance(
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
 
     def _query() -> list[dict]:
+        """Execute query with combined filters.
+
+        Returns
+        -------
+        list[dict]
+            Filtered query results.
+        """
         return benchmark_catalog.query_by_filters(
             chunk_ids,
             include_globs=["src/**"],
@@ -289,6 +317,13 @@ def test_complex_glob_filter_performance(
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
 
     def _query() -> list[dict]:
+        """Execute query with complex glob pattern.
+
+        Returns
+        -------
+        list[dict]
+            Filtered query results.
+        """
         return benchmark_catalog.query_by_filters(chunk_ids, include_globs=["src/**/test_*.py"])
 
     result = benchmark(_query)
@@ -524,6 +559,18 @@ def test_materialized_vs_view_performance(tmp_path: Path) -> None:
     chunk_ids = list(range(1, 1001))
 
     def _measure(catalog: DuckDBCatalog) -> float:
+        """Measure average query time for catalog.
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog
+            Catalog to measure.
+
+        Returns
+        -------
+        float
+            Average query time in seconds.
+        """
         iterations = 15
         for _ in range(3):
             catalog.query_by_ids(chunk_ids)

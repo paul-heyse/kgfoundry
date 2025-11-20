@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from codeintel_rev.enrich.models import ModuleRecord
+from codeintel_rev.services.enrich.analytics import prepare_config_state
 from codeintel_rev.services.enrich.config_values import build_config_value_rows
 
 from tests._helpers import assertions
@@ -28,7 +31,8 @@ def test_build_config_value_rows_normalizes_references() -> None:
         },
     ]
 
-    rows = build_config_value_rows(records, module_rows)
+    state = prepare_config_state(records)
+    rows = build_config_value_rows(state, module_rows)
 
     assertions.expect_equal(len(rows), 3)
     host_row = next(row for row in rows if row["key"] == "service.host")
@@ -37,8 +41,14 @@ def test_build_config_value_rows_normalizes_references() -> None:
 
     expected_refs = ["src/app.py", "src/util.py"]
     expected_modules = ["pkg.app", "pkg.util"]
-    assertions.expect_sequence_equal(host_row["reference_paths"], expected_refs)
-    assertions.expect_sequence_equal(port_row["reference_modules"], expected_modules)
+    assertions.expect_sequence_equal(
+        cast("list[str]", host_row["reference_paths"]),
+        expected_refs,
+    )
+    assertions.expect_sequence_equal(
+        cast("list[str]", port_row["reference_modules"]),
+        expected_modules,
+    )
     assertions.expect_equal(host_row["reference_count"], 2)
     assertions.expect_equal(host_row["format"], "yaml")
     assertions.expect_equal(feature_row["format"], "toml")

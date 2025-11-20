@@ -25,6 +25,18 @@ from codeintel_rev.config.api import (
 
 
 def _make_config(tmp_path: Path) -> AppConfig:
+    """Create test AppConfig with default paths.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for paths.
+
+    Returns
+    -------
+    AppConfig
+        Configured AppConfig instance.
+    """
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     paths = PathsConfig(

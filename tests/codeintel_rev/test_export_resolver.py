@@ -13,6 +13,20 @@ from tests._helpers import assertions
 
 
 def _row_with_meta(path: str, meta: dict[str, object]) -> dict[str, object]:
+    """Create test row dictionary with path and metadata.
+
+    Parameters
+    ----------
+    path : str
+        File path.
+    meta : dict[str, object]
+        Metadata dictionary.
+
+    Returns
+    -------
+    dict[str, object]
+        Row dictionary with path and meta keys.
+    """
     return {"path": path, "meta": meta}
 
 

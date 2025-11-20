@@ -17,6 +17,8 @@ from tests._helpers.settings import build_app_config_from_paths
 
 
 class _ToyChannel(Channel):
+    """Toy channel for testing plugin registry."""
+
     name = "toy"
     cost = 0.1
     requires = frozenset()
@@ -43,6 +45,8 @@ class _ToyChannel(Channel):
 
 
 class _FakeEntryPoint:
+    """Fake entry point for testing plugin registry."""
+
     def __init__(self, factory: object) -> None:
         """Initialize fake entry point.
 
@@ -69,6 +73,18 @@ def test_registry_discovers_entry_points(tmp_path: Path) -> None:
     """Test that channel registry discovers channels via entry points."""
 
     def _factory(_: ChannelContext) -> _ToyChannel:
+        """Create toy channel ignoring context.
+
+        Parameters
+        ----------
+        _ : ChannelContext
+            Context (ignored).
+
+        Returns
+        -------
+        _ToyChannel
+            Toy channel instance.
+        """
         return _ToyChannel()
 
     entry_points = cast("Iterable[EntryPoint]", [_FakeEntryPoint(_factory)])

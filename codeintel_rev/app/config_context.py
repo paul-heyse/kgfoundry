@@ -160,7 +160,7 @@ __all__ = [
 ]
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class ApplicationContextOverrides:
     """Optional dependency overrides for :meth:`ApplicationContext.create`.
 

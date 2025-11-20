@@ -13,6 +13,13 @@ from tests._helpers import assertions
 
 
 def _row() -> dict[str, object]:
+    """Create test row dictionary.
+
+    Returns
+    -------
+    dict[str, object]
+        Test row with URI, line/byte ranges, language, and content.
+    """
     return {
         "uri": "pkg/module.py",
         "start_line": 0,

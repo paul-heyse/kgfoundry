@@ -57,6 +57,20 @@ def _graph_pipeline_options(
     *,
     only: tuple[str, ...] | None = None,
 ) -> tuple[SampleRepo, PipelineOptions]:
+    """Build sample repo and pipeline options for graph tests.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory.
+    only : tuple[str, ...] | None, optional
+        File patterns to include. Defaults to None.
+
+    Returns
+    -------
+    tuple[SampleRepo, PipelineOptions]
+        Tuple of repo bundle and pipeline options.
+    """
     repo_bundle = bootstrap_sample_repo(tmp_path)
     _ensure_app_layout(repo_bundle.root)
     data_dir = repo_bundle.root / "data"

@@ -114,7 +114,34 @@ def typedness(
     if pipeline.handle_dry_run("typedness", dry_run=dry_run, result=result):
         return
     pipeline.write_typedness_output(result, state.pipeline.out)
+    pipeline.write_static_diagnostics_output(result, state.pipeline.out)
     typer.echo("[typedness] Wrote typedness analytics.")
+
+
+def function_metrics(
+    ctx: typer.Context,
+    *,
+    dry_run: bool = pipeline.DRY_RUN_OPTION,
+) -> None:
+    """Generate per-function structural metrics."""
+    result, state = pipeline.execute_pipeline_or_exit(ctx)
+    if pipeline.handle_dry_run("function-metrics", dry_run=dry_run, result=result):
+        return
+    pipeline.write_function_metrics_output(result, state.pipeline.out)
+    typer.echo("[function-metrics] Wrote function metrics analytics.")
+
+
+def function_types(
+    ctx: typer.Context,
+    *,
+    dry_run: bool = pipeline.DRY_RUN_OPTION,
+) -> None:
+    """Generate per-function typedness analytics."""
+    result, state = pipeline.execute_pipeline_or_exit(ctx)
+    if pipeline.handle_dry_run("function-types", dry_run=dry_run, result=result):
+        return
+    pipeline.write_function_types_output(result, state.pipeline.out)
+    typer.echo("[function-types] Wrote function typedness analytics.")
 
 
 def doc(
@@ -267,6 +294,8 @@ def hotspots(
 app.command("graph")(graph)
 app.command("uses")(uses)
 app.command("typedness")(typedness)
+app.command("function-metrics")(function_metrics)
+app.command("function-types")(function_types)
 app.command("doc")(doc)
 app.command("coverage")(coverage)
 app.command("config")(config)

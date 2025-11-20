@@ -30,10 +30,29 @@ from tests._helpers import assertions
 
 
 def _unique_key(prefix: str = "test-cli") -> str:
+    """Generate unique test key with UUID suffix.
+
+    Parameters
+    ----------
+    prefix : str, optional
+        Key prefix. Defaults to "test-cli".
+
+    Returns
+    -------
+    str
+        Unique key string.
+    """
     return f"{prefix}-{uuid4().hex}"
 
 
 def _default_paths() -> tuple[Path, Path]:
+    """Get default augment and registry paths from repo root.
+
+    Returns
+    -------
+    tuple[Path, Path]
+        Tuple of (augment_path, registry_path).
+    """
     repo_root = Path(__file__).resolve().parents[2]
     augment_path = repo_root / "openapi" / "_augment_cli.yaml"
     registry_path = repo_root / "tools" / "mkdocs_suite" / "api_registry.yaml"
@@ -49,6 +68,28 @@ def _register_test_cli(  # noqa: PLR0913
     packages: Sequence[str] = ("kgfoundry",),
     context_factory: Callable[[CLIToolSettings], CLIToolingContext] | None = None,
 ) -> str:
+    """Register a test CLI context definition in the registry.
+
+    Parameters
+    ----------
+    command : str
+        CLI command name.
+    title : str, optional
+        CLI title. Defaults to "Test CLI".
+    interface_id : str | None, optional
+        Interface identifier. Defaults to "download-cli" if None.
+    operation_ids : dict[str, str] | None, optional
+        Operation ID mappings. Defaults to empty dict if None.
+    packages : Sequence[str], optional
+        Package names for version resolution. Defaults to ("kgfoundry",).
+    context_factory : Callable[[CLIToolSettings], CLIToolingContext] | None, optional
+        Custom context factory. Defaults to None.
+
+    Returns
+    -------
+    str
+        Registry key (same as command).
+    """
     key = command
     augment_path, registry_path = _default_paths()
     definition = CLIContextDefinition(

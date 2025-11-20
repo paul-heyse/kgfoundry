@@ -356,7 +356,17 @@ if TYPE_CHECKING:
             self,
             logger: logging.Logger,
             extra: LogContextExtra | Mapping[str, object] | None,
-        ) -> None: ...
+        ) -> None:
+            """Initialize logger adapter with base logger and structured fields.
+
+            Parameters
+            ----------
+            logger : logging.Logger
+                Base logger instance to wrap.
+            extra : LogContextExtra | Mapping[str, object] | None
+                Structured fields or mapping to attach to log records.
+            """
+            ...
 
 else:
     _LoggerAdapterBase = logging.LoggerAdapter
@@ -968,6 +978,15 @@ class _WithFieldsContext(AbstractContextManager[LoggerAdapter]):
     def __init__(
         self, logger: logging.Logger | LoggerAdapter, fields: Mapping[str, object]
     ) -> None:
+        """Initialize context manager with logger and fields.
+
+        Parameters
+        ----------
+        logger : logging.Logger | LoggerAdapter
+            Logger instance to attach fields to.
+        fields : Mapping[str, object]
+            Structured fields dictionary to attach to log records.
+        """
         self._logger = logger
         self._fields = dict(fields)
         self._token: contextvars.Token[str | None] | None = None

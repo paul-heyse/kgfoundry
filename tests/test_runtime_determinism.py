@@ -22,10 +22,41 @@ if TYPE_CHECKING:
 
 
 def _is_callable(value: object) -> TypeGuard[Callable[..., object]]:
+    """Check if value is callable.
+
+    Parameters
+    ----------
+    value : object
+        Value to check.
+
+    Returns
+    -------
+    TypeGuard[Callable[..., object]]
+        True if value is callable, False otherwise.
+    """
     return callable(value)
 
 
 def _require_callable(value: object, label: str) -> Callable[..., object]:
+    """Require value to be callable, failing test if not.
+
+    Parameters
+    ----------
+    value : object
+        Value to check.
+    label : str
+        Label for error message.
+
+    Returns
+    -------
+    Callable[..., object]
+        Callable value (guaranteed by type guard).
+
+    Raises
+    ------
+    pytest.Failed
+        If value is not callable.
+    """
     if not _is_callable(value):
         pytest.fail(f"{label} is not callable")
     return value

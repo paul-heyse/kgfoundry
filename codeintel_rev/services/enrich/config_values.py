@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from codeintel_rev.enrich.models import ModuleRecord
+from codeintel_rev.services.enrich.analytics import ConfigReferenceState
 
 FORMAT_BY_SUFFIX: dict[str, str] = {
     ".yaml": "yaml",
@@ -44,24 +45,17 @@ def _module_by_path(
 
 
 def build_config_value_rows(
-    records: Sequence[Mapping[str, Any]],
+    state: ConfigReferenceState,
     module_rows: Sequence[ModuleRecord | Mapping[str, Any]],
-    *,
-    reference_index: Mapping[str, Iterable[str]] | None = None,
 ) -> list[dict[str, object]]:
     """Flatten config records into per-key rows with reference metadata.
 
     Parameters
     ----------
-    records : Sequence[Mapping[str, Any]]
-        Config records produced by the config indexer and augmentation steps.
-        Each record should include ``path`` and ``keys`` fields, and may
-        optionally include ``references`` (list of code paths).
+    state : ConfigReferenceState
+        Prepared config reference state containing records and reference index.
     module_rows : Sequence[ModuleRecord | Mapping[str, Any]]
         Module rows used to derive module names for reference paths.
-    reference_index : Mapping[str, Iterable[str]] | None, optional
-        Optional override mapping from config key to referencing paths. When
-        provided, it is used in preference to ``record['references']``.
 
     Returns
     -------
@@ -71,8 +65,8 @@ def build_config_value_rows(
     module_lookup = _module_by_path(module_rows)
     rows: list[dict[str, object]] = []
 
-    for record in records:
-        config_path = record.get("path")
+    for record in state.records:
+        config_path = record.get("path") if isinstance(record, Mapping) else None
         if not isinstance(config_path, str):
             continue
         record_keys = record.get("keys") or []
@@ -86,12 +80,11 @@ def build_config_value_rows(
         for key in record_keys:
             if not isinstance(key, str):
                 continue
-            reference_paths: set[str] = set()
-            if reference_index is not None:
-                reference_paths.update(str(path) for path in reference_index.get(key, ()))
-            recorded_refs = record.get("references") or []
-            reference_paths.update(str(path) for path in recorded_refs if isinstance(path, str))
-            sorted_paths = sorted(reference_paths)
+            ref_paths = state.references.get(config_path, set())
+            recorded_refs = {
+                str(path) for path in record.get("references") or [] if isinstance(path, str)
+            }
+            sorted_paths = sorted(set(ref_paths).union(recorded_refs))
             reference_modules = sorted(
                 {module_lookup[path] for path in sorted_paths if path in module_lookup}
             )

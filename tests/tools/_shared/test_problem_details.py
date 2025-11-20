@@ -27,6 +27,8 @@ def test_coerce_optional_dict_handles_empty_values() -> None:
 
 @dataclass(slots=True, frozen=True)
 class _SchemaError:
+    """Test dataclass representing a schema validation error."""
+
     message: str
     absolute_path: tuple[str, ...] = ("root", "field")
     validator: str = "type"

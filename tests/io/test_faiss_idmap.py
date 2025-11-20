@@ -133,6 +133,18 @@ def test_load_cpu_index_applies_tuning_profile(tmp_path: Path) -> None:
 
 
 def _meta_path(manager: FAISSManager) -> Path:
+    """Get metadata path for FAISS manager index.
+
+    Parameters
+    ----------
+    manager : FAISSManager
+        FAISS manager instance.
+
+    Returns
+    -------
+    Path
+        Metadata JSON file path.
+    """
     return Path(f"{manager.index_path}.meta.json")
 
 

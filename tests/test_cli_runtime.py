@@ -11,6 +11,18 @@ from tests._helpers import assertions
 
 
 def _stub_paths(tmp_path: Path) -> Paths:
+    """Create stub paths for CLI runtime tests.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory.
+
+    Returns
+    -------
+    Paths
+        Paths instance with test directories.
+    """
     return Paths(
         repo_root=tmp_path,
         docs_data=tmp_path / "docs/_data",
@@ -51,6 +63,13 @@ def test_error(tmp_path: Path) -> None:
     )
 
     def _invoke_failure() -> None:
+        """Invoke CLI run that raises RuntimeError.
+
+        Raises
+        ------
+        RuntimeError
+            Always raised with message "boom".
+        """
         with cli_run(cfg) as (context, _):
             assertions.expect_equal(context.operation, "demo.fail")
             message = "boom"

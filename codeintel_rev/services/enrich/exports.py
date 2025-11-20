@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
+import libcst as cst
+
 from codeintel_rev.enrich.ast_indexer import write_ast_parquet
 from codeintel_rev.enrich.graph_builder import write_import_graph
 from codeintel_rev.enrich.output_writers import (
@@ -18,9 +20,11 @@ from codeintel_rev.enrich.output_writers import (
     write_jsonl,
     write_parquet,
     write_parquet_dataset,
+    write_parquet_or_jsonl,
 )
 from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
 from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
+from codeintel_rev.services.enrich.analytics import prepare_config_state
 from codeintel_rev.services.enrich.config_values import build_config_value_rows
 from codeintel_rev.services.enrich.context import (
     PipelineContext,
@@ -28,6 +32,19 @@ from codeintel_rev.services.enrich.context import (
     StageMeta,
     _stage,
 )
+from codeintel_rev.services.enrich.function_metrics import (
+    FunctionMetricsRow,
+    build_function_metrics,
+    prepare_function_metrics_json,
+    prepare_function_metrics_parquet,
+)
+from codeintel_rev.services.enrich.function_types import (
+    FunctionTypesRow,
+    build_function_types,
+    prepare_function_types_json,
+    prepare_function_types_parquet,
+)
+from codeintel_rev.services.enrich.graph_support import detect_commit
 from codeintel_rev.services.enrich.io import (
     atomic_write_text,
     collect_ast_artifacts,
@@ -43,7 +60,10 @@ from codeintel_rev.services.enrich.io import (
 )
 from codeintel_rev.services.enrich.models import ExportResult
 from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
-from codeintel_rev.services.enrich.static_diagnostics import build_static_diagnostics_rows
+from codeintel_rev.services.enrich.static_diagnostics import (
+    STATIC_DIAGNOSTICS_SCHEMA,
+    build_static_diagnostics_rows,
+)
 from codeintel_rev.typedness import FileTypeSignals
 from codeintel_rev.uses_builder import write_use_graph
 
@@ -302,6 +322,114 @@ def write_typedness_output(result: PipelineResult, out: Path) -> None:
     write_static_diagnostics_output(result, out)
 
 
+def _collect_function_rows(
+    result: PipelineResult, *, include_metrics: bool, include_types: bool
+) -> tuple[list[FunctionMetricsRow], list[FunctionTypesRow]]:
+    repo = str(result.repo_root)
+    commit = detect_commit(result.repo_root)
+    created_at = datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
+    metrics_rows: list[FunctionMetricsRow] = []
+    types_rows: list[FunctionTypesRow] = []
+    for row in result.module_rows:
+        rel_path = row.get("path")
+        if not isinstance(rel_path, str):
+            continue
+        if not row.get("parse_ok", True):
+            continue
+        file_path = (result.repo_root / rel_path).resolve()
+        if not file_path.is_file():
+            LOGGER.warning("Module path missing for function analytics: %s", rel_path)
+            continue
+        try:
+            code = file_path.read_text(encoding="utf-8", errors="ignore")
+        except OSError as exc:  # pragma: no cover - defensive
+            LOGGER.warning("Failed to read %s: %s", rel_path, exc)
+            continue
+        try:
+            module = cst.parse_module(code)
+        except Exception:  # pragma: no cover - defensive
+            LOGGER.warning("Failed to parse %s for function analytics", rel_path, exc_info=True)
+            continue
+        if include_metrics:
+            metrics_rows.extend(
+                build_function_metrics(
+                    repo=repo,
+                    commit=commit,
+                    rel_path=rel_path,
+                    module=module,
+                    code=code,
+                    created_at=created_at,
+                )
+            )
+        if include_types:
+            types_rows.extend(
+                build_function_types(
+                    repo=repo,
+                    commit=commit,
+                    rel_path=rel_path,
+                    module=module,
+                    created_at=created_at,
+                )
+            )
+    return metrics_rows, types_rows
+
+
+def _write_function_outputs(
+    result: PipelineResult,
+    out: Path,
+    *,
+    emit_metrics: bool,
+    emit_types: bool,
+) -> tuple[int, int]:
+    metrics_rows, types_rows = _collect_function_rows(
+        result, include_metrics=emit_metrics, include_types=emit_types
+    )
+    analytics_dir = out / "analytics"
+    metrics_count = 0
+    types_count = 0
+    if emit_metrics:
+        metrics_target = analytics_dir / "function_metrics.parquet"
+        write_parquet(metrics_target, prepare_function_metrics_parquet(metrics_rows))
+        simple_write_jsonl(
+            metrics_target.with_suffix(".jsonl"),
+            prepare_function_metrics_json(metrics_rows),
+        )
+        metrics_count = len(metrics_rows)
+    if emit_types:
+        types_target = analytics_dir / "function_types.parquet"
+        write_parquet(types_target, prepare_function_types_parquet(types_rows))
+        simple_write_jsonl(
+            types_target.with_suffix(".jsonl"),
+            prepare_function_types_json(types_rows),
+        )
+        types_count = len(types_rows)
+    return metrics_count, types_count
+
+
+def write_function_metrics_output(result: PipelineResult, out: Path) -> None:
+    """Write per-function structural metrics."""
+    with _stage(StageMeta("function-metrics", {"modules": len(result.module_rows)})) as meta:
+        metrics_count, _ = _write_function_outputs(
+            result,
+            out,
+            emit_metrics=True,
+            emit_types=False,
+        )
+        meta["functions"] = metrics_count
+
+
+def write_function_types_output(result: PipelineResult, out: Path) -> None:
+    """Write per-function typedness analytics."""
+    with _stage(StageMeta("function-types", {"modules": len(result.module_rows)})) as meta:
+        _, types_count = _write_function_outputs(
+            result,
+            out,
+            emit_metrics=False,
+            emit_types=True,
+        )
+        meta["functions"] = types_count
+
+
 def write_doc_output(result: PipelineResult, out: Path) -> None:
     """Write documentation health analytics.
 
@@ -350,8 +478,13 @@ def write_static_diagnostics_output(result: PipelineResult, out: Path) -> None:
     typed_signals = cast("Mapping[str, FileTypeSignals]", signals)
     rows = build_static_diagnostics_rows(typed_signals)
     parquet_path = analytics_dir / "static_diagnostics.parquet"
-    write_parquet(parquet_path, rows)
-    simple_write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
+    jsonl_path = parquet_path.with_suffix(".jsonl")
+    write_parquet_or_jsonl(
+        parquet_path,
+        jsonl_path,
+        rows,
+        schema=STATIC_DIAGNOSTICS_SCHEMA,
+    )
 
 
 def write_config_output(result: PipelineResult, out: Path) -> None:
@@ -369,7 +502,8 @@ def write_config_output(result: PipelineResult, out: Path) -> None:
     write_json(analytics_dir / "config_index.json", result.config_index)
     if not result.config_index:
         return
-    rows = build_config_value_rows(result.config_index, result.module_rows)
+    state = prepare_config_state(result.config_index)
+    rows = build_config_value_rows(state, result.module_rows)
     analytics_path = analytics_dir / "config_values.parquet"
     write_parquet(analytics_path, rows)
     simple_write_jsonl(analytics_path.with_suffix(".jsonl"), rows)
@@ -610,6 +744,8 @@ __all__ = [
     "write_coverage_output",
     "write_doc_output",
     "write_exports_outputs",
+    "write_function_metrics_output",
+    "write_function_types_output",
     "write_graph_outputs",
     "write_hotspot_output",
     "write_ownership_output",

@@ -64,6 +64,24 @@ class CanonicalErrorCode:
 
 
 def _code(code: str, **kwargs: str) -> CanonicalErrorCode:
+    """Create a CanonicalErrorCode instance with code and metadata.
+
+    Helper function for constructing error code instances in the registry.
+    Used internally to build CANONICAL_ERROR_CODES dictionary entries.
+
+    Parameters
+    ----------
+    code : str
+        Error code identifier (e.g., "KGF-DOC-BLD-001").
+    **kwargs : str
+        Additional keyword arguments passed to CanonicalErrorCode constructor
+        (title, summary, domain, category, severity, remediation).
+
+    Returns
+    -------
+    CanonicalErrorCode
+        New error code instance with provided code and metadata.
+    """
     return CanonicalErrorCode(code=code, **kwargs)
 
 

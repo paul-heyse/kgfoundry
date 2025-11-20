@@ -12,7 +12,7 @@ _DEFAULT_TOPK_EXPLANATIONS: Final[int] = 5
 _EXPLANATION_INDEX: Final[int] = 2
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class LateInteractionResult:
     """Rescoring payload returned by late-interaction engines.
 

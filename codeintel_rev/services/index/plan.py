@@ -34,7 +34,7 @@ StepName = Literal[
 StepFunc = Callable[["BuildState", "IndexPaths", "IndexBuildConfig"], None]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class IndexPaths:
     """Filesystem locations used by the index build.
 
@@ -60,7 +60,7 @@ class IndexPaths:
     duckdb_path: Path | None = None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class IndexBuildConfig:
     """Pure configuration knobs for the index pipeline.
 
@@ -130,7 +130,7 @@ class BuildState:
     idmap_rows: int = 0
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class StepRegistry:
     """Immutable registry mapping step names to implementations."""
 

@@ -117,7 +117,7 @@ class _InprocessVLLMRuntime:
         self.tokenizer = None
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class InprocessVLLMContext:
     """Dependency providers for in-process vLLM embeddings.
 

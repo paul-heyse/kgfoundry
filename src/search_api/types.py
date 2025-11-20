@@ -878,6 +878,13 @@ class _FaissModuleAdapter:
     """
 
     def __init__(self, module: _LegacyFaissModule) -> None:
+        """Initialize adapter with legacy FAISS module.
+
+        Parameters
+        ----------
+        module : _LegacyFaissModule
+            Legacy FAISS module with UPPER_CASE method names to wrap.
+        """
         self._module = module
 
     @property

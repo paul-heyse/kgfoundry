@@ -1,9 +1,4 @@
-"""Performance benchmarks comparing async vs sync adapter implementations.
-
-These benchmarks measure the concurrency benefits of async adapters,
-showing that async implementations provide significant speedup under load
-while maintaining similar single-request latency.
-"""
+"""Performance benchmarks for async adapters using in-memory harness."""
 
 from __future__ import annotations
 
@@ -11,16 +6,14 @@ import asyncio
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import Mock
 
 import pytest
-from codeintel_rev.app.config_context import ApplicationContext
-from codeintel_rev.config.paths import resolve_application_paths
+from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_app_config_for_repo
+from tests._helpers.integration import IntegrationHarness, build_async_adapters_harness
 
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
@@ -32,156 +25,32 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def mock_context(tmp_path: Path) -> Mock:
-    """Create a mock ApplicationContext for benchmarking.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory for test files.
+def harness(tmp_path: Path) -> IntegrationHarness:
+    """Harness configured for async adapter benchmarks.
 
     Returns
     -------
-    Mock
-        Mock ApplicationContext with repo_root and GitClient.
+    IntegrationHarness
+        Harness with seeded files and async history adapter.
     """
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-
-    # Create test files
-    (repo_root / "src").mkdir()
-    for i in range(200):
-        (repo_root / "src" / f"file_{i}.py").write_text(f"def func_{i}():\n    pass\n")
-
-    app_config = build_app_config_for_repo(repo_root)
-    paths = resolve_application_paths(app_config)
-
-    context = Mock(spec=ApplicationContext)
-    context.paths = paths
-    context.git_client = Mock()
-    context.async_git_client = _AsyncGitClientStub()
-    context.scope_store = _InMemoryScopeStore()
-
-    return context
+    return build_async_adapters_harness(tmp_path, file_count=200)
 
 
-class _InMemoryScopeStore:
-    """Minimal async scope store stub for benchmarks."""
-
-    def __init__(self) -> None:
-        self.get_calls: list[str] = []
-
-    async def get(
-        self,
-        session_id: str,
-    ) -> dict | None:
-        """Get scope for session ID and track call.
-
-        Parameters
-        ----------
-        session_id : str
-            Session identifier to record.
-
-        Returns
-        -------
-        dict | None
-            Always returns None (stub implementation).
-        """
-        self.get_calls.append(session_id)
-        return None
-
-
-class _AsyncGitClientStub:
-    """Async Git client stub that returns deterministic data."""
-
-    def __init__(self) -> None:
-        self.blame_requests: list[str] = []
-        self.history_requests: list[str] = []
-
-    async def blame_range(
-        self,
-        *,
-        path: str,
-        start_line: int,
-        end_line: int,
-    ) -> list[dict]:
-        """Return stub blame results for benchmark.
-
-        Parameters
-        ----------
-        path : str
-            File path to record.
-        start_line : int
-            Start line number.
-        end_line : int
-            End line number.
-
-        Returns
-        -------
-        list[dict]
-            List of blame entries for each line in range.
-        """
-        self.blame_requests.append(path)
-        return [
-            {
-                "line": line,
-                "commit": "abc123",
-                "author": "Benchmark",
-                "date": "2024-01-01T00:00:00Z",
-                "message": f"Line {line}",
-            }
-            for line in range(start_line, end_line + 1)
-        ]
-
-    async def file_history(self, *, path: str, limit: int) -> list[dict]:
-        """Return stub file history for benchmark.
-
-        Parameters
-        ----------
-        path : str
-            File path to record.
-        limit : int
-            Maximum number of commits to return.
-
-        Returns
-        -------
-        list[dict]
-            List of commit entries up to limit.
-        """
-        self.history_requests.append(path)
-        return [
-            {
-                "sha": f"{i:04x}",
-                "full_sha": f"{i:08x}",
-                "author": "Benchmark",
-                "email": "bench@example.com",
-                "date": "2024-01-01T00:00:00Z",
-                "message": f"Commit {i}",
-            }
-            for i in range(limit)
-        ]
+def _set_session(session_id: str) -> None:
+    session_id_var.set(session_id)
 
 
 @pytest.mark.benchmark
 def test_list_paths_single_request(
     benchmark: BenchmarkFixture,
-    mock_context: Mock,
+    harness: IntegrationHarness,
 ) -> None:
-    """Benchmark single list_paths request latency.
-
-    Single-request latency should be similar between sync and async
-    implementations (async overhead is minimal).
-    """
+    """Benchmark single list_paths request latency."""
+    session_id = "bench-session"
 
     async def run_async() -> dict:
-        """Execute single list_paths request for benchmark.
-
-        Returns
-        -------
-        dict
-            File listing result.
-        """
-        return await files_adapter.list_paths(mock_context, path="src", max_results=50)
+        _set_session(session_id)
+        return await files_adapter.list_paths(harness.context, path="src", max_results=50)
 
     result = benchmark.pedantic(lambda: asyncio.run(run_async()), rounds=10, iterations=5)
 
@@ -192,43 +61,21 @@ def test_list_paths_single_request(
 @pytest.mark.benchmark
 def test_list_paths_concurrent_100(
     benchmark: BenchmarkFixture,
-    mock_context: Mock,
+    harness: IntegrationHarness,
 ) -> None:
-    """Benchmark 100 concurrent list_paths requests.
-
-    Async implementation should be 5-10x faster than sync for concurrent
-    requests due to event loop efficiency vs threadpool blocking.
-    """
+    """Benchmark 100 concurrent list_paths requests."""
     num_concurrent = 100
+    session_id = "bench-session"
 
     async def run_concurrent() -> list[dict]:
-        """Execute concurrent list_paths requests for benchmark.
-
-        Returns
-        -------
-        list[dict]
-            List of file listing results.
-        """
-
         async def list_task() -> dict:
-            """Execute single list_paths task.
-
-            Returns
-            -------
-            dict
-                File listing result.
-            """
-            return await files_adapter.list_paths(mock_context, path="src", max_results=20)
+            _set_session(session_id)
+            return await files_adapter.list_paths(harness.context, path="src", max_results=20)
 
         tasks = [list_task() for _ in range(num_concurrent)]
         return await asyncio.gather(*tasks)
 
     results = benchmark.pedantic(lambda: asyncio.run(run_concurrent()), rounds=3, iterations=1)
-
-    assertions.expect_equal(len(results), num_concurrent)
-    assertions.expect_true(all("blame" in result for result in results))
-    benchmark.extra_info["blame_concurrent_requests"] = num_concurrent
-    benchmark.extra_info["blame_result_count"] = len(results)
 
     assertions.expect_equal(len(results), num_concurrent)
     assertions.expect_true(all("items" in result for result in results))
@@ -239,24 +86,15 @@ def test_list_paths_concurrent_100(
 @pytest.mark.benchmark
 def test_blame_range_single_request(
     benchmark: BenchmarkFixture,
-    mock_context: Mock,
+    harness: IntegrationHarness,
 ) -> None:
-    """Benchmark single blame_range request latency.
-
-    Single-request latency should be similar between sync and async
-    (async overhead via asyncio.to_thread is minimal).
-    """
+    """Benchmark single blame_range request latency."""
+    session_id = "bench-session"
 
     async def run_async() -> dict:
-        """Execute single blame_range request for benchmark.
-
-        Returns
-        -------
-        dict
-            Blame result.
-        """
+        _set_session(session_id)
         return await history_adapter.blame_range(
-            mock_context,
+            harness.context,
             path="src/file_0.py",
             start_line=1,
             end_line=5,
@@ -273,40 +111,18 @@ def test_blame_range_single_request(
 @pytest.mark.benchmark
 def test_blame_range_concurrent_50(
     benchmark: BenchmarkFixture,
-    mock_context: Mock,
+    harness: IntegrationHarness,
 ) -> None:
-    """Benchmark 50 concurrent blame_range requests.
-
-    Async implementation enables concurrent Git operations without
-    thread exhaustion, providing significant speedup under load.
-    """
+    """Benchmark 50 concurrent blame_range requests."""
     num_concurrent = 50
+    session_id = "bench-session"
 
     async def run_concurrent() -> list[dict]:
-        """Execute concurrent blame_range requests for benchmark.
-
-        Returns
-        -------
-        list[dict]
-            List of blame results.
-        """
-
         async def blame_task(task_id: int) -> dict:
-            """Execute single blame_range task.
-
-            Parameters
-            ----------
-            task_id : int
-                Task identifier used to select file.
-
-            Returns
-            -------
-            dict
-                Blame result.
-            """
+            _set_session(session_id)
             file_num = task_id % 10
             return await history_adapter.blame_range(
-                mock_context,
+                harness.context,
                 path=f"src/file_{file_num}.py",
                 start_line=1,
                 end_line=5,
@@ -326,50 +142,23 @@ def test_blame_range_concurrent_50(
 @pytest.mark.benchmark
 def test_mixed_concurrent_benchmark(
     benchmark: BenchmarkFixture,
-    mock_context: Mock,
+    harness: IntegrationHarness,
 ) -> None:
-    """Benchmark mixed concurrent operations (list_paths + blame_range).
-
-    Verifies that different async adapters can run concurrently efficiently.
-    """
+    """Benchmark mixed concurrent operations (list_paths + blame_range)."""
     num_list = 50
     num_blame = 50
+    session_id = "bench-session"
 
     async def run_mixed() -> tuple[list[dict], list[dict]]:
-        """Execute mixed concurrent operations for benchmark.
-
-        Returns
-        -------
-        tuple[list[dict], list[dict]]
-            Tuple of list_paths results and blame_range results.
-        """
-
         async def list_task() -> dict:
-            """Execute single list_paths task.
-
-            Returns
-            -------
-            dict
-                File listing result.
-            """
-            return await files_adapter.list_paths(mock_context, path="src", max_results=20)
+            _set_session(session_id)
+            return await files_adapter.list_paths(harness.context, path="src", max_results=20)
 
         async def blame_task(task_id: int) -> dict:
-            """Execute single blame_range task.
-
-            Parameters
-            ----------
-            task_id : int
-                Task identifier used to select file.
-
-            Returns
-            -------
-            dict
-                Blame result.
-            """
+            _set_session(session_id)
             file_num = task_id % 10
             return await history_adapter.blame_range(
-                mock_context,
+                harness.context,
                 path=f"src/file_{file_num}.py",
                 start_line=1,
                 end_line=3,

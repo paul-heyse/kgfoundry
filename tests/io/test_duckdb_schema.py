@@ -15,6 +15,15 @@ from tests._helpers import assertions
 
 
 def _write_parquet(path: Path, select_sql: str) -> None:
+    """Write parquet file from SQL SELECT statement.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    select_sql : str
+        SQL SELECT statement to execute.
+    """
     conn = duckdb.connect(database=":memory:")
     try:
         conn.execute("DROP TABLE IF EXISTS tmp")

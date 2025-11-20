@@ -28,13 +28,17 @@ _SECOND_STAGE_CHUNK_ID = 2
 _RERANKED_CHUNK_ID = 4
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _Stage0Expectation:
+    """Expected parameters for stage0 call validation."""
+
     limit: int | None = None
     options: Stage0Options | None = None
 
 
 class _StubContext:
+    """Stub application context for testing semantic pro adapter."""
+
     HYBRID_WEIGHTS: ClassVar[dict[str, float]] = {
         "bm25": 0.5,
         "splade": 0.25,
@@ -164,6 +168,26 @@ def _build_pro_hooks(
     expected_weights: Mapping[str, float] | None = None,
     expectation: _Stage0Expectation | None = None,
 ) -> semantic_pro.SemanticProHooks:
+    """Build semantic pro hooks with validation stubs.
+
+    Parameters
+    ----------
+    stage0 : Stage0Result
+        Stage0 result to return.
+    decision : StageDecision
+        Decision to return.
+    findings : list[Finding]
+        Findings to return from hydrate.
+    expected_weights : Mapping[str, float] | None, optional
+        Expected weights to validate. Defaults to None.
+    expectation : _Stage0Expectation | None, optional
+        Stage0 expectation for validation. Defaults to None.
+
+    Returns
+    -------
+    semantic_pro.SemanticProHooks
+        Hooks with validation stubs.
+    """
     base = semantic_pro.SemanticProHooks.default()
 
     def _run_stage0(
@@ -174,6 +198,26 @@ def _build_pro_hooks(
         limit: int,
         options: Stage0Options | None = None,
     ) -> Stage0Result:
+        """Run stage0 and validate parameters.
+
+        Parameters
+        ----------
+        engine : HybridSearchEngine
+            Search engine (ignored).
+        query : str
+            Query string (ignored).
+        semantic_hits : Sequence[tuple[int, float]] | None
+            Semantic hits (ignored).
+        limit : int
+            Result limit to validate.
+        options : Stage0Options | None, optional
+            Stage0 options to validate.
+
+        Returns
+        -------
+        Stage0Result
+            Pre-configured stage0 result.
+        """
         del engine, query, semantic_hits
         if expectation and expectation.limit is not None:
             assertions.expect_equal(limit, expectation.limit)
@@ -192,12 +236,42 @@ def _build_pro_hooks(
         ids: Sequence[int],
         scores: Sequence[float],
     ) -> list[Finding]:
+        """Hydrate findings ignoring catalog and IDs.
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog
+            Catalog (ignored).
+        ids : Sequence[int]
+            Chunk IDs (ignored).
+        scores : Sequence[float]
+            Scores (ignored).
+
+        Returns
+        -------
+        list[Finding]
+            Pre-configured findings list.
+        """
         del catalog, ids, scores
         return findings
 
     def _decide(
         signals: Mapping[str, object], config: semantic_pro.StageGateConfig
     ) -> StageDecision:
+        """Make stage decision ignoring signals and config.
+
+        Parameters
+        ----------
+        signals : Mapping[str, object]
+            Signals (ignored).
+        config : semantic_pro.StageGateConfig
+            Gate config (ignored).
+
+        Returns
+        -------
+        StageDecision
+            Pre-configured decision.
+        """
         del signals, config
         return decision
 
@@ -248,7 +322,22 @@ async def test_semantic_search_pro_runs_late_interaction() -> None:
     )
 
     def _late_factory(_index: semantic_pro.XTRIndex) -> semantic_pro.LateInteractionRunner:
+        """Create stub late interaction runner ignoring index.
+
+        Parameters
+        ----------
+        _index : semantic_pro.XTRIndex
+            XTR index (ignored).
+
+        Returns
+        -------
+        semantic_pro.LateInteractionRunner
+            Stub late interaction instance.
+        """
+
         class _StubLateInteraction:
+            """Stub late interaction runner for testing."""
+
             def rescore(
                 self,
                 query: str,
@@ -279,6 +368,18 @@ async def test_semantic_search_pro_runs_late_interaction() -> None:
         return _StubLateInteraction()
 
     def _resolve_stub(_ctx: ApplicationContext) -> semantic_pro.XTRIndex | None:
+        """Resolve stub XTR index ignoring context.
+
+        Parameters
+        ----------
+        _ctx : ApplicationContext
+            Context (ignored).
+
+        Returns
+        -------
+        semantic_pro.XTRIndex | None
+            Stub XTR index instance.
+        """
         del _ctx
         return cast("semantic_pro.XTRIndex", object())
 
@@ -321,6 +422,8 @@ async def test_semantic_search_pro_runs_reranker() -> None:
     )
 
     class _StubReranker:
+        """Stub reranker for testing semantic pro adapter."""
+
         def rerank(
             self,
             query: str,
@@ -349,6 +452,13 @@ async def test_semantic_search_pro_runs_reranker() -> None:
             return RerankResult(ids=list(reversed(ordered_ids)), scores=ordered_scores)
 
     def _build_reranker() -> _StubReranker:
+        """Create stub reranker instance.
+
+        Returns
+        -------
+        _StubReranker
+            Stub reranker instance.
+        """
         return _StubReranker()
 
     hooks = replace(hooks, reranker_factory=_build_reranker)

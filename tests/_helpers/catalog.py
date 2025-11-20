@@ -31,6 +31,13 @@ class _StaticCatalogContext:
         """
 
         def _scope() -> Iterator[DuckDBCatalog]:
+            """Context manager scope that opens and closes catalog.
+
+            Yields
+            ------
+            Iterator[DuckDBCatalog]
+                Catalog instance.
+            """
             self._catalog.open()
             try:
                 yield self._catalog

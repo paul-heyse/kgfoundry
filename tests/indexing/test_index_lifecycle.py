@@ -17,6 +17,20 @@ from tests._helpers import assertions
 
 
 def _make_assets(tmp_path: Path, prefix: str = "a") -> IndexAssets:
+    """Create test index assets with dummy files.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for assets.
+    prefix : str, optional
+        Directory prefix. Defaults to "a".
+
+    Returns
+    -------
+    IndexAssets
+        Assets with FAISS, DuckDB, and SCIP files.
+    """
     src = tmp_path / prefix
     src.mkdir(parents=True, exist_ok=True)
     faiss = src / "faiss.index"

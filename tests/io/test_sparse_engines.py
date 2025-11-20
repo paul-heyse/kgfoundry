@@ -15,7 +15,10 @@ from tests._helpers import assertions
 
 
 class _StubSpladeBackend(SpladeBackend):
+    """Stub SPLADE backend for testing sparse engines."""
+
     def __init__(self) -> None:
+        """Initialize stub backend with call counters."""
         self.encode_calls = 0
         self.last_k: int | None = None
 
@@ -57,7 +60,10 @@ class _StubSpladeBackend(SpladeBackend):
 
 
 class _StubBM25Backend(BM25Backend):
+    """Stub BM25 backend for testing sparse engines."""
+
     def __init__(self) -> None:
+        """Initialize stub backend with call counter."""
         self.calls = 0
 
     def search(self, query_text: str, k: int) -> list[tuple[int, float]]:
@@ -93,7 +99,10 @@ def test_bm25_engine_coerces_backend_values() -> None:
     """BM25 engine should coerce backend return values to correct types."""
 
     class _StringBackend(BM25Backend):
+        """String backend for testing BM25 coercion."""
+
         def __init__(self) -> None:
+            """Initialize string backend with call counter."""
             self.calls = 0
 
         def search(self, query_text: str, k: int) -> list[tuple[int, float]]:

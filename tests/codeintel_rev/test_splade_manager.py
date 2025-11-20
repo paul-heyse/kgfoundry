@@ -257,12 +257,36 @@ class _StubEncoder:
 
 
 def _build_stub_encoder_factory() -> Callable[[], Callable[..., _SparseEncoderProtocol]]:
+    """Build stub encoder factory for testing.
+
+    Returns
+    -------
+    Callable[[], Callable[..., _SparseEncoderProtocol]]
+        Factory function that returns encoder factory.
+    """
+
     def _factory(
         model_id: str,
         *,
         backend: str,
         model_kwargs: Mapping[str, object] | None = None,
     ) -> _SparseEncoderProtocol:
+        """Create stub encoder from parameters.
+
+        Parameters
+        ----------
+        model_id : str
+            Model identifier.
+        backend : str
+            Backend name.
+        model_kwargs : Mapping[str, object] | None, optional
+            Model keyword arguments. Defaults to None.
+
+        Returns
+        -------
+        _SparseEncoderProtocol
+            Stub encoder instance.
+        """
         encoder = _StubEncoder(
             model_id,
             backend=backend,

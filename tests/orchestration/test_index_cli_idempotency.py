@@ -35,6 +35,20 @@ def _invoke_orchestration_cli(
     envelope_dir: Path,
     args: Sequence[str],
 ) -> Result:
+    """Invoke orchestration CLI command.
+
+    Parameters
+    ----------
+    envelope_dir : Path
+        Envelope directory path.
+    args : Sequence[str]
+        CLI arguments to pass.
+
+    Returns
+    -------
+    Result
+        CLI runner result.
+    """
     return cli_helpers.invoke(
         cli_module.app,
         [

@@ -18,7 +18,16 @@ from tests._helpers import assertions
 
 
 class _StubFAISSManager:
+    """Stub FAISS manager for testing offline evaluator."""
+
     def __init__(self, chunk_ids: list[int]) -> None:
+        """Initialize stub manager with chunk IDs.
+
+        Parameters
+        ----------
+        chunk_ids : list[int]
+            Chunk IDs to return in search results.
+        """
         self._chunk_ids = chunk_ids
 
     def search(
@@ -56,7 +65,16 @@ class _StubFAISSManager:
 
 
 class _StubVLLMClient:
+    """Stub VLLM client for testing offline evaluator."""
+
     def __init__(self, dim: int) -> None:
+        """Initialize stub client with embedding dimension.
+
+        Parameters
+        ----------
+        dim : int
+            Embedding dimension.
+        """
         self._dim = dim
 
     def embed_single(self, text: str) -> list[float]:
@@ -77,6 +95,18 @@ class _StubVLLMClient:
 
 
 def _prepare_symbol_catalog(db_path: Path) -> DuckDBManager:
+    """Prepare symbol catalog database with test data.
+
+    Parameters
+    ----------
+    db_path : Path
+        Database file path.
+
+    Returns
+    -------
+    DuckDBManager
+        Manager instance with test symbol data loaded.
+    """
     db_path.parent.mkdir(parents=True, exist_ok=True)
     manager = DuckDBManager(db_path)
     catalog = SymbolCatalog(manager)

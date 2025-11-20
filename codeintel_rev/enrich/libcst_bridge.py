@@ -45,7 +45,7 @@ def _empty_doc_metrics() -> dict[str, Any]:
     return _default_doc_metrics(has_summary=False)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class ImportEntry:
     """Legacy import entry consumed by downstream enrichment components."""
 
@@ -56,7 +56,7 @@ class ImportEntry:
     level: int
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class DefEntry:
     """Legacy definition entry (name/kind/line number)."""
 

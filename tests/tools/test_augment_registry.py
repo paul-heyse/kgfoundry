@@ -13,6 +13,8 @@ from tests._helpers import assertions
 
 
 class _ProblemCarrier(Protocol):
+    """Protocol for exceptions that carry Problem Details."""
+
     problem: dict[str, object]
 
 
@@ -40,6 +42,15 @@ facade = importlib.import_module("tools._shared.augment_registry")
 
 
 def _write_yaml(path: Path, content: str) -> None:
+    """Write YAML content to file with dedented formatting.
+
+    Parameters
+    ----------
+    path : Path
+        File path to write to.
+    content : str
+        YAML content string (may be indented).
+    """
     path.write_text(dedent(content).strip() + "\n", encoding="utf-8")
 
 

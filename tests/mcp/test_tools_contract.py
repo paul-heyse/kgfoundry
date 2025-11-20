@@ -11,7 +11,10 @@ from tests._helpers import assertions
 
 
 class _CatalogStub:
+    """Stub catalog for testing MCP tools contract."""
+
     def __init__(self) -> None:
+        """Initialize stub catalog with test rows."""
         self._rows: dict[int, dict[str, object]] = {
             1: {
                 "id": 1,

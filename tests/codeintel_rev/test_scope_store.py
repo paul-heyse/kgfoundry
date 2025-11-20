@@ -186,6 +186,13 @@ class FakeRedis:
 
 
 def _sample_scope() -> ScopeIn:
+    """Create sample scope for testing.
+
+    Returns
+    -------
+    ScopeIn
+        Scope dictionary with test values.
+    """
     return cast(
         "ScopeIn",
         {

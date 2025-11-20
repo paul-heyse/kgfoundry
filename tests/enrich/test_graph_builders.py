@@ -20,6 +20,18 @@ from tests._helpers import assertions
 
 
 def _materialize_rows(path: Path) -> list[dict[str, object]]:
+    """Read rows from parquet or JSONL file.
+
+    Parameters
+    ----------
+    path : Path
+        File path (parquet or JSONL).
+
+    Returns
+    -------
+    list[dict[str, object]]
+        List of row dictionaries.
+    """
     if path.suffix == ".parquet":
         if pq is None:  # pragma: no cover - pyarrow optional
             pytest.skip("pyarrow is required to inspect parquet outputs")

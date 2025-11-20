@@ -263,22 +263,88 @@ def validate_problem_details(payload: Mapping[str, JsonValue]) -> None:
 
 
 def _type_error(message: str) -> NoReturn:
+    """Raise TypeError with the given message.
+
+    Parameters
+    ----------
+    message : str
+        Error message to include in the TypeError.
+
+    Raises
+    ------
+    TypeError
+        Always raises with the provided message.
+    """
     raise TypeError(message)
 
 
 def _ensure_int(value: object, *, message: str) -> int:
+    """Validate that value is an int, raising TypeError if not.
+
+    Parameters
+    ----------
+    value : object
+        Value to validate.
+    message : str
+        Error message to use if validation fails.
+
+    Returns
+    -------
+    int
+        The validated integer value.
+
+    Notes
+    -----
+    Raises TypeError indirectly via _type_error() if value is not an int.
+    """
     if isinstance(value, int):
         return value
     _type_error(message)
 
 
 def _ensure_exception(value: object, *, message: str) -> Exception:
+    """Validate that value is an Exception, raising TypeError if not.
+
+    Parameters
+    ----------
+    value : object
+        Value to validate.
+    message : str
+        Error message to use if validation fails.
+
+    Returns
+    -------
+    Exception
+        The validated Exception instance.
+
+    Notes
+    -----
+    Raises TypeError indirectly via _type_error() if value is not an Exception.
+    """
     if isinstance(value, Exception):
         return value
     _type_error(message)
 
 
 def _first_arg(args: tuple[object, ...], *, func_name: str) -> object:
+    """Extract the first argument from args tuple, raising TypeError if empty.
+
+    Parameters
+    ----------
+    args : tuple[object, ...]
+        Arguments tuple to extract from.
+    func_name : str
+        Function name to include in error message if args is empty.
+
+    Returns
+    -------
+    object
+        The first argument from args.
+
+    Notes
+    -----
+    Raises TypeError indirectly via _type_error() if args is empty.
+    """
     if len(args) == 0:
         _type_error(f"{func_name}() missing required argument")
     return args[0]

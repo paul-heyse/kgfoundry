@@ -92,10 +92,16 @@ def prepare_config_state(
         grouped by directory for efficient lookup.
     """
     materialized = records or []
+    seeded_refs: dict[str, set[str]] = {}
+    for record in materialized:
+        path = record.get("path")
+        if isinstance(path, str):
+            existing = record.get("references") or []
+            seeded_refs[path] = {str(ref) for ref in existing if isinstance(ref, str)}
     return ConfigReferenceState(
         records=materialized,
         by_dir=group_configs_by_dir(materialized),
-        references={record["path"]: set() for record in materialized},
+        references=seeded_refs,
     )
 
 

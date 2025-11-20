@@ -38,6 +38,17 @@ class CLIContextDefinition:
     _operation_map: Mapping[str, str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """Validate and normalize CLI context definition fields.
+
+        Validates that command and interface_id are non-empty strings, then
+        normalizes the operation_ids mapping by filtering out empty keys or
+        values and storing the result in _operation_map.
+
+        Raises
+        ------
+        ValueError
+            If command or interface_id is empty or whitespace-only.
+        """
         if not self.command.strip():
             msg = "CLI command label must be a non-empty string."
             raise ValueError(msg)
@@ -76,6 +87,17 @@ def default_version_resolver(*packages: str) -> Callable[[], str]:
     package_candidates = tuple(packages) or ("kgfoundry-tools", "kgfoundry")
 
     def _resolve() -> str:
+        """Resolve version from package metadata.
+
+        Iterates through package candidates and returns the first matching
+        package version found via importlib.metadata. Returns "0.0.0" if
+        no packages are found.
+
+        Returns
+        -------
+        str
+            Package version string or "0.0.0" if not found.
+        """
         for name in package_candidates:
             try:
                 return metadata.version(name)
@@ -90,6 +112,12 @@ class CLIContextRegistry:
     """Registry storing CLI metadata definitions and cached materialisations."""
 
     def __init__(self) -> None:
+        """Initialize empty registry with empty caches.
+
+        Creates a new registry instance with empty dictionaries for definitions,
+        settings cache, and context cache. Caches are populated on-demand via
+        register(), settings_for(), and context_for() methods.
+        """
         self._definitions: dict[str, CLIContextDefinition] = {}
         self._settings_cache: dict[str, CLIToolSettings] = {}
         self._context_cache: dict[str, CLIToolingContext] = {}
@@ -304,6 +332,23 @@ class CLIContextRegistry:
 
     @staticmethod
     def _clean_key(key: str) -> str:
+        """Strip whitespace and validate registry key.
+
+        Parameters
+        ----------
+        key : str
+            Registry key to clean and validate.
+
+        Returns
+        -------
+        str
+            Stripped key string.
+
+        Raises
+        ------
+        ValueError
+            If key is empty or whitespace-only after stripping.
+        """
         key = key.strip()
         if not key:
             msg = "CLI registry key must be a non-empty string."
@@ -311,6 +356,28 @@ class CLIContextRegistry:
         return key
 
     def _normalise_key(self, key: str) -> str:
+        """Normalize and validate registry key against registered definitions.
+
+        Cleans the key and verifies it exists in the registry. Raises KeyError
+        with available keys if the key is not registered.
+
+        Parameters
+        ----------
+        key : str
+            Registry key to normalize and validate.
+
+        Returns
+        -------
+        str
+            Normalized key string.
+
+        Raises
+        ------
+        ValueError
+            If key is empty or whitespace-only after cleaning.
+        KeyError
+            If key is not registered in the registry.
+        """
         key = self._clean_key(key)
         if key not in self._definitions:
             available = ", ".join(sorted(self._definitions))
@@ -320,6 +387,23 @@ class CLIContextRegistry:
 
     @staticmethod
     def _resolve_paths(definition: CLIContextDefinition) -> tuple[Path, Path]:
+        """Resolve augment and registry file paths from definition.
+
+        Returns paths from the definition if provided, otherwise discovers
+        repository paths and uses default locations relative to repo root.
+
+        Parameters
+        ----------
+        definition : CLIContextDefinition
+            CLI context definition containing optional augment_path and
+            registry_path fields.
+
+        Returns
+        -------
+        tuple[Path, Path]
+            Tuple of (augment_path, registry_path) resolved from definition
+            or default repository locations.
+        """
         if definition.augment_path is not None and definition.registry_path is not None:
             return definition.augment_path, definition.registry_path
         repo_paths = Paths.discover()

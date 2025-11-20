@@ -21,7 +21,10 @@ if TYPE_CHECKING:
 
 
 class _FakeCatalog:
+    """Fake catalog for testing hybrid evaluator."""
+
     def __init__(self) -> None:
+        """Initialize fake catalog with sample queries."""
         self._queries = [
             (1, np.array([1.0, 0.0], dtype=np.float32)),
             (2, np.array([0.0, 1.0], dtype=np.float32)),
@@ -85,7 +88,10 @@ class _FakeCatalog:
 
 
 class _FakeManager:
+    """Fake FAISS manager for testing hybrid evaluator."""
+
     def __init__(self) -> None:
+        """Initialize fake manager with sample vectors."""
         self._vectors = {
             100: np.array([1.0, 0.0], dtype=np.float32),
             101: np.array([0.0, 1.0], dtype=np.float32),
@@ -141,9 +147,12 @@ class _FakeManager:
 
 
 class _FakeXTRIndex:
+    """Fake XTR index for testing hybrid evaluator."""
+
     ready = True
 
     def __init__(self) -> None:
+        """Initialize fake XTR index with rescore call counter."""
         self.rescore_calls = 0
 
     def rescore(
@@ -184,6 +193,25 @@ class _UnsupportedOverrideError(ValueError):
 
 
 def _config(tmp_path: Path, **overrides: object) -> EvalConfig:
+    """Create EvalConfig with test defaults and overrides.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for default paths.
+    **overrides : object
+        Configuration overrides.
+
+    Returns
+    -------
+    EvalConfig
+        Evaluation configuration instance.
+
+    Raises
+    ------
+    _UnsupportedOverrideError
+        If unknown override keys are provided.
+    """
     pool_path = cast("Path", overrides.pop("pool_path", tmp_path / "pool.parquet"))
     metrics_path = cast("Path", overrides.pop("metrics_path", tmp_path / "metrics.json"))
     k = cast("int", overrides.pop("k", 1))

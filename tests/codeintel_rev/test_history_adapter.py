@@ -1,145 +1,127 @@
-"""Unit tests for history adapter with exception-based error handling.
-
-Tests verify that blame_range and file_history raise appropriate exceptions
-on error conditions.
-"""
+"""Unit tests for history adapter using in-memory integration harness."""
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
 
 import git.exc
 import pytest
-from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.errors import GitOperationError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters.history import blame_range, file_history
 
 from tests._helpers import assertions
-from tests._helpers.settings import build_app_config_for_repo
+from tests._helpers.adapters import InMemoryCommit
+from tests._helpers.integration import IntegrationHarness, build_harness_with_adapters
 
 pytestmark = pytest.mark.asyncio
 
 
-@pytest.fixture
-def mock_context(tmp_path: Path) -> Mock:
-    """Create a mock ApplicationContext for testing.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory for test files.
-
-    Returns
-    -------
-    Mock
-        Mock ApplicationContext with repo_root and async_git_client.
-    """
-    context = Mock()
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-
-    # Create test files
-    (repo_root / "src").mkdir()
-    (repo_root / "src" / "main.py").write_text('def main():\n    print("hello")\n')
-    (repo_root / "README.md").write_text("# Documentation\n")
-
-    app_config = build_app_config_for_repo(repo_root)
-    context.app_config = app_config
-    context.paths = resolve_application_paths(app_config)
-
-    # Mock async_git_client
-    context.async_git_client = AsyncMock()
-
-    return context
-
-
-async def test_blame_range_success(mock_context: Mock) -> None:
-    """Test blame_range returns blame entries on success."""
-    mock_context.async_git_client.blame_range.return_value = [
-        {
-            "line": 1,
-            "author": "Test Author",
-            "email": "test@example.com",
-            "sha": "abc123",
-            "date": "2024-01-01T00:00:00Z",
-        }
+def _seed_commits() -> list[InMemoryCommit]:
+    return [
+        InMemoryCommit(
+            hexsha="abc123def456",
+            author_name="Test Author",
+            author_email="test@example.com",
+            summary="Initial commit",
+        )
     ]
 
-    result = await blame_range(mock_context, "src/main.py", 1, 2)
 
+@pytest.fixture
+def harness(tmp_path: Path) -> Iterator[IntegrationHarness]:
+    """Harness with in-memory history adapter and seeded repo.
+
+    Yields
+    ------
+    IntegrationHarness
+        Harness containing ApplicationContext and in-memory history adapter.
+    """
+    files = {"src/main.py": 'def main():\n    print("hello")\n', "README.md": "# Docs\n"}
+    commits = _seed_commits()
+    harness = build_harness_with_adapters(
+        tmp_path,
+        files=files,
+        history_map={"src/main.py": commits},
+        blame_map={"src/main.py": [(commits[0], [1, 2, 3])]},
+    )
+    async_client = harness.history_adapter
+    if async_client is not None:
+        harness.context = harness.context.with_overrides(async_git_client=async_client)
+    try:
+        yield harness
+    finally:
+        harness.close()
+
+
+async def test_blame_range_success(harness: IntegrationHarness) -> None:
+    """Test blame_range returns blame entries on success."""
+    result = await blame_range(harness.context, "src/main.py", 1, 2)
     assertions.expect_in("blame", result)
-    assertions.expect_equal(len(result["blame"]), 1)
+    assertions.expect_equal(len(result["blame"]), 2)
     assertions.expect_equal(result["blame"][0]["line"], 1)
 
 
-async def test_blame_range_path_outside_repository(mock_context: Mock) -> None:
+async def test_blame_range_path_outside_repository(harness: IntegrationHarness) -> None:
     """Test blame_range raises PathOutsideRepositoryError for paths outside repo."""
     with pytest.raises(PathOutsideRepositoryError, match="escapes"):
-        await blame_range(mock_context, "../../etc/passwd", 1, 10)
+        await blame_range(harness.context, "../../etc/passwd", 1, 10)
 
 
-async def test_blame_range_file_not_found(mock_context: Mock) -> None:
+async def test_blame_range_file_not_found(harness: IntegrationHarness) -> None:
     """Test blame_range raises PathNotFoundError for nonexistent files."""
     with pytest.raises(PathNotFoundError, match="Path not found"):
-        await blame_range(mock_context, "nonexistent.py", 1, 10)
+        await blame_range(harness.context, "nonexistent.py", 1, 10)
 
 
-async def test_blame_range_git_command_error(mock_context: Mock) -> None:
+async def test_blame_range_git_command_error(harness: IntegrationHarness) -> None:
     """Test blame_range raises GitOperationError when Git command fails."""
-    mock_context.async_git_client.blame_range.side_effect = git.exc.GitCommandError(
-        "blame", "Git command failed"
-    )
-
+    history_adapter = harness.history_adapter
+    assertions.expect_true(history_adapter is not None)
+    if history_adapter is None:  # pragma: no cover - defensive
+        return
+    history_adapter.repo.set_blame_error("src/main.py", git.exc.GitCommandError("blame", "fail"))
     with pytest.raises(GitOperationError, match="Git blame failed") as exc_info:
-        await blame_range(mock_context, "src/main.py", 1, 10)
+        await blame_range(harness.context, "src/main.py", 1, 10)
 
     exc = exc_info.value
     assertions.expect_equal(exc.context["path"], "src/main.py")
     assertions.expect_equal(exc.context["git_command"], "blame")
+    # reset error to avoid leaking to other tests
+    history_adapter.repo.set_blame_result("src/main.py", [])
 
 
-async def test_file_history_success(mock_context: Mock) -> None:
+async def test_file_history_success(harness: IntegrationHarness) -> None:
     """Test file_history returns commit history on success."""
-    mock_context.async_git_client.file_history.return_value = [
-        {
-            "sha": "abc123",
-            "full_sha": "abc123def456",
-            "author": "Test Author",
-            "email": "test@example.com",
-            "date": "2024-01-01T00:00:00Z",
-            "message": "Initial commit",
-        }
-    ]
-
-    result = await file_history(mock_context, "src/main.py", limit=10)
-
+    result = await file_history(harness.context, "src/main.py", limit=10)
     assertions.expect_in("commits", result)
     assertions.expect_equal(len(result["commits"]), 1)
-    assertions.expect_equal(result["commits"][0]["sha"], "abc123")
+    assertions.expect_true(result["commits"][0]["sha"].startswith("abc123"))
 
 
-async def test_file_history_path_outside_repository(mock_context: Mock) -> None:
+async def test_file_history_path_outside_repository(harness: IntegrationHarness) -> None:
     """Test file_history raises PathOutsideRepositoryError for paths outside repo."""
     with pytest.raises(PathOutsideRepositoryError, match="escapes"):
-        await file_history(mock_context, "../../etc/passwd", limit=10)
+        await file_history(harness.context, "../../etc/passwd", limit=10)
 
 
-async def test_file_history_file_not_found(mock_context: Mock) -> None:
+async def test_file_history_file_not_found(harness: IntegrationHarness) -> None:
     """Test file_history raises PathNotFoundError for nonexistent files."""
     with pytest.raises(PathNotFoundError, match="Path not found"):
-        await file_history(mock_context, "nonexistent.py", limit=10)
+        await file_history(harness.context, "nonexistent.py", limit=10)
 
 
-async def test_file_history_git_command_error(mock_context: Mock) -> None:
+async def test_file_history_git_command_error(harness: IntegrationHarness) -> None:
     """Test file_history raises GitOperationError when Git command fails."""
-    mock_context.async_git_client.file_history.side_effect = git.exc.GitCommandError(
-        "log", "Git command failed"
-    )
+    history_adapter = harness.history_adapter
+    assertions.expect_true(history_adapter is not None)
+    if history_adapter is None:  # pragma: no cover - defensive
+        return
+    history_adapter.repo.set_history_error("src/main.py", git.exc.GitCommandError("log", "fail"))
 
     with pytest.raises(GitOperationError, match="Git log failed") as exc_info:
-        await file_history(mock_context, "src/main.py", limit=10)
+        await file_history(harness.context, "src/main.py", limit=10)
 
     exc = exc_info.value
     assertions.expect_equal(exc.context["path"], "src/main.py")

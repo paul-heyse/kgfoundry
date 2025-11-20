@@ -21,7 +21,10 @@ from tests._helpers import assertions, ml
 
 
 class _FailingHTTPClient:
+    """Failing HTTP client for testing error handling."""
+
     def __init__(self) -> None:
+        """Initialize failing client with counters."""
         self.closed = False
         self.post_calls = 0
 
@@ -50,7 +53,10 @@ class _FailingHTTPClient:
 
 
 class _FailingAsyncClient:
+    """Failing async HTTP client for testing error handling."""
+
     def __init__(self) -> None:
+        """Initialize failing async client with counters."""
         self.closed = False
         self.post_calls = 0
 
@@ -79,7 +85,16 @@ class _FailingAsyncClient:
 
 
 class _StubInprocessEngine:
+    """Stub inprocess engine for testing VLLM client."""
+
     def __init__(self, embedding_dim: int) -> None:
+        """Initialize stub engine with embedding dimension.
+
+        Parameters
+        ----------
+        embedding_dim : int
+            Embedding dimension.
+        """
         self.embedding_dim = embedding_dim
         self.embed_batch = MagicMock(return_value=np.ones((1, embedding_dim), dtype=np.float32))
         self.closed = False
@@ -95,16 +110,73 @@ def _build_transport_context(
     async_client: httpx.AsyncClient | None = None,
     inprocess_engine_factory: Callable[[VLLMSettings], _StubInprocessEngine] | None = None,
 ) -> VLLMTransportContext:
+    """Build transport context with stub factories.
+
+    Parameters
+    ----------
+    http_client : httpx.Client | None, optional
+        HTTP client to use (creates failing client if None). Defaults to None.
+    async_client : httpx.AsyncClient | None, optional
+        Async client to use (creates failing client if None). Defaults to None.
+    inprocess_engine_factory : Callable[[VLLMSettings], _StubInprocessEngine] | None, optional
+        Inprocess engine factory (raises if None). Defaults to None.
+
+    Returns
+    -------
+    VLLMTransportContext
+        Context with stub factories.
+    """
     http_instance = cast("httpx.Client", http_client or _FailingHTTPClient())
     async_instance = cast("httpx.AsyncClient", async_client or _FailingAsyncClient())
 
     def _http_factory(_: VLLMSettings) -> httpx.Client:
+        """Return HTTP client instance ignoring settings.
+
+        Parameters
+        ----------
+        _ : VLLMSettings
+            Settings (ignored).
+
+        Returns
+        -------
+        httpx.Client
+            HTTP client instance.
+        """
         return http_instance
 
     def _async_factory(_: VLLMSettings) -> httpx.AsyncClient:
+        """Return async client instance ignoring settings.
+
+        Parameters
+        ----------
+        _ : VLLMSettings
+            Settings (ignored).
+
+        Returns
+        -------
+        httpx.AsyncClient
+            Async client instance.
+        """
         return async_instance
 
     def _inprocess_factory(config: VLLMSettings) -> _StubInprocessEngine:
+        """Create inprocess engine from config or raise.
+
+        Parameters
+        ----------
+        config : VLLMSettings
+            VLLM settings.
+
+        Returns
+        -------
+        _StubInprocessEngine
+            Stub inprocess engine instance.
+
+        Raises
+        ------
+        AssertionError
+            If inprocess_engine_factory is None.
+        """
         if inprocess_engine_factory is not None:
             return inprocess_engine_factory(config)
         message = "Inprocess engine should not be used in this test"
@@ -197,6 +269,18 @@ def test_vllm_client_inprocess_uses_local_engine() -> None:
     stub_engine = _StubInprocessEngine(config.embedding_dim)
 
     def _engine_factory(_: VLLMSettings) -> _StubInprocessEngine:
+        """Return stub engine ignoring settings.
+
+        Parameters
+        ----------
+        _ : VLLMSettings
+            Settings (ignored).
+
+        Returns
+        -------
+        _StubInprocessEngine
+            Pre-configured stub engine.
+        """
         return stub_engine
 
     transport_context = _build_transport_context(inprocess_engine_factory=_engine_factory)

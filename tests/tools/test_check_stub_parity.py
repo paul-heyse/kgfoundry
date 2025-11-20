@@ -31,12 +31,23 @@ run_stub_parity_checks = _stub_parity_module.run_stub_parity_checks
 
 
 def _register_runtime_module(name: str, exports: tuple[str, ...]) -> None:
+    """Register a mock runtime module in sys.modules with placeholder exports.
+
+    Parameters
+    ----------
+    name : str
+        Module name to register.
+    exports : tuple[str, ...]
+        Export names to create as placeholder functions.
+    """
+
+    def _placeholder(*_args: object, **_kwargs: object) -> None:
+        """Return None as placeholder for mock module exports."""
+        return
+
     module = ModuleType(name)
     module_dict = cast("dict[str, object]", module.__dict__)
     module_dict["__all__"] = list(exports)
-
-    def _placeholder(*_args: object, **_kwargs: object) -> None:
-        return None
 
     for export in exports:
         setattr(module, export, _placeholder)

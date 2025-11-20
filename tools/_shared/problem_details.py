@@ -142,6 +142,24 @@ def build_problem_details(params: ProblemDetailsParams) -> ProblemDetailsDict:
 
 
 def _json_pointer_from(error: object) -> str | None:
+    """Extract JSON Pointer path from validation error object.
+
+    Attempts to extract an absolute_path attribute from the error object
+    and convert it to a JSON Pointer string (RFC 6901 format). Used to
+    identify the location of schema validation failures in Problem Details.
+
+    Parameters
+    ----------
+    error : object
+        Validation error object that may have an absolute_path attribute
+        containing a sequence of path segments.
+
+    Returns
+    -------
+    str | None
+        JSON Pointer string (e.g., "/properties/name") if absolute_path
+        is found and non-empty, None otherwise.
+    """
     raw_path = getattr(error, "absolute_path", None)
     if isinstance(raw_path, Sequence):
         tokens = [str(part) for part in raw_path]

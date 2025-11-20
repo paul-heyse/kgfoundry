@@ -143,6 +143,23 @@ def _collect_env_summary() -> dict[str, str]:
 
 
 def _apply_overrides(cfg: CliRunConfig) -> CliRunConfig:
+    """Apply CLI run config overrides from Click context.
+
+    Retrieves overrides from the current Click context's obj dictionary and
+    applies them to the provided config, returning a new config instance with
+    updated fields. Only fields in _CFG_OVERRIDE_FIELDS are applied.
+
+    Parameters
+    ----------
+    cfg : CliRunConfig
+        Base CLI run configuration to apply overrides to.
+
+    Returns
+    -------
+    CliRunConfig
+        New config instance with overrides applied, or original config if
+        no valid overrides are found in Click context.
+    """
     ctx = click.get_current_context(silent=True)
     if ctx is None or not isinstance(ctx.obj, dict):
         return cfg

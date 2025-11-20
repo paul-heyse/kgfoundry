@@ -13,6 +13,20 @@ from kgfoundry_common.subprocess_utils import run_subprocess
 
 
 def _write_json_collection(dir_path: Path, docs: Iterable[dict[str, str]]) -> Path:
+    """Write JSONL collection file for indexing.
+
+    Parameters
+    ----------
+    dir_path : Path
+        Directory to create collection in.
+    docs : Iterable[dict[str, str]]
+        Documents to write.
+
+    Returns
+    -------
+    Path
+        Path to collection directory.
+    """
     src = dir_path / "json"
     src.mkdir(parents=True, exist_ok=True)
     with (src / "docs.jsonl").open("w", encoding="utf-8") as handle:

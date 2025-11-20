@@ -44,6 +44,18 @@ _DEFAULT_FIELD_BOOSTS: Final[dict[str, float]] = {
 
 
 def _normalize_field_boosts(boosts: Mapping[str, float] | None) -> dict[str, float]:
+    """Normalize field boost values to a dict with string keys and float values.
+
+    Parameters
+    ----------
+    boosts : Mapping[str, float] | None
+        Field boost mapping. If None, returns default boosts.
+
+    Returns
+    -------
+    dict[str, float]
+        Normalized boost dictionary with string keys and float values.
+    """
     if boosts is None:
         return dict(_DEFAULT_FIELD_BOOSTS)
     normalized: dict[str, float] = {}
@@ -62,6 +74,25 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
 def _load_json_metadata(metadata_path: Path, schema_path: Path) -> dict[str, JsonValue]:
+    """Load and validate JSON metadata file against schema.
+
+    Parameters
+    ----------
+    metadata_path : Path
+        Path to JSON metadata file to load.
+    schema_path : Path
+        Path to JSON Schema file for validation.
+
+    Returns
+    -------
+    dict[str, JsonValue]
+        Validated metadata dictionary.
+
+    Raises
+    ------
+    DeserializationError
+        If metadata is not a dict or validation fails.
+    """
     data_raw = deserialize_json(metadata_path, schema_path)
     if not isinstance(data_raw, dict):
         msg = f"Invalid index data format: expected dict, got {type(data_raw)}"
@@ -73,6 +104,13 @@ TOKEN_RE: Pattern[str] = re.compile(r"[A-Za-z0-9_]+")
 
 
 def _default_int_dict() -> defaultdict[str, int]:
+    """Create a defaultdict that defaults missing keys to 0.
+
+    Returns
+    -------
+    defaultdict[str, int]
+        Dictionary with int default factory (returns 0 for missing keys).
+    """
     return defaultdict(int)
 
 
@@ -124,6 +162,18 @@ class LuceneIndexerFactory(Protocol):
 
 
 def _score_value(item: tuple[str, float]) -> float:
+    """Extract score value from (term, score) tuple.
+
+    Parameters
+    ----------
+    item : tuple[str, float]
+        Tuple containing term and score.
+
+    Returns
+    -------
+    float
+        The score value (second element of tuple).
+    """
     return item[1]
 
 
@@ -249,6 +299,24 @@ class PurePythonBM25:
         df: defaultdict[str, int],
         postings: defaultdict[str, defaultdict[str, int]],
     ) -> BM25Doc:
+        """Create a BM25Doc from fields and update document frequency/postings.
+
+        Parameters
+        ----------
+        doc_id : str
+            Document identifier.
+        fields : Mapping[str, str]
+            Document fields (title, section, body).
+        df : defaultdict[str, int]
+            Document frequency dictionary to update (mutated).
+        postings : defaultdict[str, defaultdict[str, int]]
+            Postings list dictionary to update (mutated).
+
+        Returns
+        -------
+        BM25Doc
+            Created document with tokenized content and term frequencies.
+        """
         title = fields.get("title", "")
         section = fields.get("section", "")
         body = fields.get("body", "")
@@ -315,6 +383,13 @@ class PurePythonBM25:
         self._initialize_from_payload(payload)
 
     def _metadata_payload(self) -> dict[str, JsonValue]:
+        """Build JSON-serializable metadata payload for index persistence.
+
+        Returns
+        -------
+        dict[str, JsonValue]
+            Metadata dictionary with k1, b, field_boosts, df, postings, docs, N, avgdl.
+        """
         docs_data: list[JsonValue] = [
             {
                 "chunk_id": doc_id,
@@ -344,6 +419,20 @@ class PurePythonBM25:
         }
 
     def _read_metadata(self) -> dict[str, JsonValue]:
+        """Load metadata from JSON file or fallback to legacy pickle file.
+
+        Returns
+        -------
+        dict[str, JsonValue]
+            Loaded metadata dictionary.
+
+        Raises
+        ------
+        FileNotFoundError
+            If neither JSON nor pickle file exists.
+        DeserializationError
+            If file exists but is invalid or cannot be deserialized.
+        """
         metadata_path = Path(self.index_dir) / "pure_bm25.json"
         legacy_path = Path(self.index_dir) / "pure_bm25.pkl"
 
@@ -363,6 +452,23 @@ class PurePythonBM25:
 
     @staticmethod
     def _load_legacy_payload(legacy_path: Path) -> dict[str, JsonValue]:
+        """Load legacy pickle payload with allow-list validation.
+
+        Parameters
+        ----------
+        legacy_path : Path
+            Path to legacy pickle file.
+
+        Returns
+        -------
+        dict[str, JsonValue]
+            Deserialized payload dictionary.
+
+        Raises
+        ------
+        DeserializationError
+            If pickle validation fails or payload is not a dict.
+        """
         with legacy_path.open("rb") as handle:
             try:
                 payload = load_unsigned_legacy(handle)
@@ -375,6 +481,13 @@ class PurePythonBM25:
         return cast("dict[str, JsonValue]", payload)
 
     def _initialize_from_payload(self, data: Mapping[str, JsonValue]) -> None:
+        """Initialize instance from metadata payload (scalars, docs, postings).
+
+        Parameters
+        ----------
+        data : Mapping[str, JsonValue]
+            Metadata dictionary with k1, b, field_boosts, df, postings, docs.
+        """
         self._apply_scalar_metadata(data)
         self.docs = self._build_docs_from_metadata(data)
         postings_val = data.get("postings", {})
@@ -385,6 +498,13 @@ class PurePythonBM25:
         )
 
     def _apply_scalar_metadata(self, data: Mapping[str, JsonValue]) -> None:
+        """Apply scalar metadata fields (k1, b, field_boosts, df, N, avgdl) from payload.
+
+        Parameters
+        ----------
+        data : Mapping[str, JsonValue]
+            Metadata dictionary containing scalar configuration values.
+        """
         k1_val = data.get("k1", 0.9)
         b_val = data.get("b", 0.4)
         self.k1 = float(k1_val) if isinstance(k1_val, (int, float)) else 0.9
@@ -405,6 +525,18 @@ class PurePythonBM25:
 
     @staticmethod
     def _build_docs_from_metadata(data: Mapping[str, JsonValue]) -> dict[str, BM25Doc]:
+        """Build BM25Doc dictionary from metadata docs array.
+
+        Parameters
+        ----------
+        data : Mapping[str, JsonValue]
+            Metadata dictionary containing "docs" array.
+
+        Returns
+        -------
+        dict[str, BM25Doc]
+            Dictionary mapping doc_id to BM25Doc instances.
+        """
         docs_data_raw = data.get("docs", [])
         if isinstance(docs_data_raw, list) and docs_data_raw:
             docs: dict[str, BM25Doc] = {}
@@ -637,6 +769,13 @@ class LuceneBM25:
         return [(hit.docid, float(hit.score)) for hit in hits]
 
     def _ensure_searcher(self) -> LuceneSearcherProtocol:
+        """Lazy-initialize Lucene searcher if not already created.
+
+        Returns
+        -------
+        LuceneSearcherProtocol
+            Initialized searcher with BM25 parameters configured.
+        """
         if self._searcher is None:
             searcher = self._searcher_factory(self.index_dir)
             searcher.set_bm25(self.k1, self.b)
@@ -644,6 +783,20 @@ class LuceneBM25:
         return self._searcher
 
     def _build_lucene_doc(self, doc_id: str, fields: Mapping[str, str]) -> dict[str, str]:
+        """Build Lucene document dictionary from doc_id and fields.
+
+        Parameters
+        ----------
+        doc_id : str
+            Document identifier.
+        fields : Mapping[str, str]
+            Document field mappings.
+
+        Returns
+        -------
+        dict[str, str]
+            Lucene document with id, contents, and all field values as strings.
+        """
         doc: dict[str, str] = {"id": doc_id, "contents": self._compose_contents(fields)}
         for key, value in fields.items():
             doc[key] = str(value)
@@ -651,6 +804,18 @@ class LuceneBM25:
 
     @staticmethod
     def _compose_contents(fields: Mapping[str, str]) -> str:
+        """Compose Lucene contents string from fields (ordered: title, section, body, extras).
+
+        Parameters
+        ----------
+        fields : Mapping[str, str]
+            Document field mappings.
+
+        Returns
+        -------
+        str
+            Space-separated concatenation of field values.
+        """
         ordered_fields = ("title", "section", "body")
         parts = [str(fields.get(name, "")) for name in ordered_fields]
         extras = [str(value) for key, value in fields.items() if key not in ordered_fields]
@@ -658,6 +823,20 @@ class LuceneBM25:
         return " ".join(text_parts)
 
     def _compose_query(self, query: str, fields: Mapping[str, str] | None) -> str:
+        """Compose Lucene query string from query text and field-specific terms.
+
+        Parameters
+        ----------
+        query : str
+            Base query text.
+        fields : Mapping[str, str] | None
+            Field-specific query terms (optional).
+
+        Returns
+        -------
+        str
+            Lucene query string with field boosts applied.
+        """
         components: list[str] = []
         if query:
             components.append(query)
@@ -670,6 +849,20 @@ class LuceneBM25:
 
 
 def _load_lucene_indexer_factory() -> LuceneIndexerFactory:
+    """Load LuceneIndexer factory from pyserini.index.lucene module.
+
+    Returns
+    -------
+    LuceneIndexerFactory
+        Factory callable for creating Lucene indexers.
+
+    Raises
+    ------
+    RuntimeError
+        If pyserini.index.lucene module cannot be imported.
+    TypeError
+        If LuceneIndexer class is missing from the module.
+    """
     try:
         module = import_module("pyserini.index.lucene")
     except Exception as exc:  # pragma: no cover - depends on optional dependency
@@ -686,6 +879,20 @@ def _load_lucene_indexer_factory() -> LuceneIndexerFactory:
 
 
 def _load_lucene_searcher_factory() -> LuceneSearcherFactory:
+    """Load LuceneSearcher factory from pyserini.search.lucene module.
+
+    Returns
+    -------
+    LuceneSearcherFactory
+        Factory callable for creating Lucene searchers.
+
+    Raises
+    ------
+    RuntimeError
+        If pyserini.search.lucene module cannot be imported.
+    TypeError
+        If LuceneSearcher class is missing from the module.
+    """
     try:
         module = import_module("pyserini.search.lucene")
     except Exception as exc:  # pragma: no cover - depends on optional dependency

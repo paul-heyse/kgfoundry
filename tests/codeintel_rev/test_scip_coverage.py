@@ -70,14 +70,40 @@ class _StubVLLMClient:
 
 
 def _create_stub_faiss_manager() -> _StubFaissManager:
+    """Create stub FAISS manager for testing.
+
+    Returns
+    -------
+    _StubFaissManager
+        Stub manager instance.
+    """
     return _StubFaissManager()
 
 
 def _create_stub_vllm_client() -> _StubVLLMClient:
+    """Create stub VLLM client for testing.
+
+    Returns
+    -------
+    _StubVLLMClient
+        Stub client instance.
+    """
     return _StubVLLMClient()
 
 
 def _prepare_catalog(path: Path) -> DuckDBManager:
+    """Prepare symbol catalog database with test data.
+
+    Parameters
+    ----------
+    path : Path
+        Database file path.
+
+    Returns
+    -------
+    DuckDBManager
+        Manager instance with test symbol data loaded.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     manager = DuckDBManager(path)
     catalog = SymbolCatalog(manager)

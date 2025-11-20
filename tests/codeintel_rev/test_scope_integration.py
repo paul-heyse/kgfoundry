@@ -26,6 +26,18 @@ from tests._helpers.settings import build_app_config_for_repo
 
 
 def _build_context(repo_root: Path) -> ApplicationContext:
+    """Build application context with test configuration.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+
+    Returns
+    -------
+    ApplicationContext
+        Configured context instance.
+    """
     app_config = build_app_config_for_repo(repo_root)
     paths = resolve_application_paths(app_config)
     paths.data_dir.mkdir(parents=True, exist_ok=True)
@@ -55,6 +67,20 @@ def _build_context(repo_root: Path) -> ApplicationContext:
         catalog_cfg: DuckDBCatalogConfig,
         manager: DuckDBManager,
     ) -> DuckDBCatalog:
+        """Create DuckDBCatalog from config and manager.
+
+        Parameters
+        ----------
+        catalog_cfg : DuckDBCatalogConfig
+            Catalog configuration.
+        manager : DuckDBManager
+            DuckDB manager instance.
+
+        Returns
+        -------
+        DuckDBCatalog
+            Configured catalog instance.
+        """
         catalog = DuckDBCatalog(
             catalog_cfg.db_path,
             catalog_cfg.vectors_dir,
@@ -90,6 +116,13 @@ def _build_context(repo_root: Path) -> ApplicationContext:
 
 
 def _write_repo(repo_root: Path) -> None:
+    """Create test repository structure with sample files.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+    """
     (repo_root / "src").mkdir(parents=True, exist_ok=True)
     (repo_root / "tests").mkdir(parents=True, exist_ok=True)
     (repo_root / "docs").mkdir(parents=True, exist_ok=True)

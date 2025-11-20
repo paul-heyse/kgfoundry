@@ -12,6 +12,15 @@ from tests._helpers import assertions
 
 
 def _assert_splade_overrides(cfg: AppConfig, repo_root: Path) -> None:
+    """Assert SPLADE configuration overrides are applied.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Configuration to check.
+    repo_root : Path
+        Repository root for path resolution.
+    """
     assertions.expect_equal(cfg.splade.model_id, "custom/splade")
     assertions.expect_equal(
         cfg.splade.model_dir, (repo_root / "models" / "custom").resolve(strict=False)
@@ -61,6 +70,15 @@ def _assert_splade_overrides(cfg: AppConfig, repo_root: Path) -> None:
 
 
 def _assert_bm25_overrides(cfg: AppConfig, repo_root: Path) -> None:
+    """Assert BM25 configuration overrides are applied.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Configuration to check.
+    repo_root : Path
+        Repository root for path resolution.
+    """
     bm25 = cfg.bm25
     assertions.expect_equal(
         bm25.corpus_json_dir,
@@ -83,6 +101,13 @@ def _assert_bm25_overrides(cfg: AppConfig, repo_root: Path) -> None:
 
 
 def _assert_embeddings_overrides(cfg: AppConfig) -> None:
+    """Assert embeddings configuration overrides are applied.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Configuration to check.
+    """
     embeddings = cfg.embeddings
     assertions.expect_equal(embeddings.provider, "hf")
     assertions.expect_equal(embeddings.model_name, "hf/testing")
@@ -100,6 +125,13 @@ def _assert_embeddings_overrides(cfg: AppConfig) -> None:
 
 
 def _assert_vllm_overrides(cfg: AppConfig) -> None:
+    """Assert VLLM configuration overrides are applied.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Configuration to check.
+    """
     vllm = cfg.vllm
     assertions.expect_equal(vllm.base_url, "http://localhost:9999/v1")
     assertions.expect_equal(vllm.model, "hf/testing")
@@ -116,6 +148,13 @@ def _assert_vllm_overrides(cfg: AppConfig) -> None:
 
 
 def _assert_xtr_overrides(cfg: AppConfig) -> None:
+    """Assert XTR configuration overrides are applied.
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Configuration to check.
+    """
     xtr = cfg.xtr
     assertions.expect_equal(xtr.model_id, "hf/coderank")
     assertions.expect_equal(xtr.device, "cpu")

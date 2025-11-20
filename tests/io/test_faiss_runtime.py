@@ -110,13 +110,19 @@ class _BaseStubIndex:
 
 
 class _QuantizerStub(_BaseStubIndex):
+    """Stub quantizer index for testing FAISS runtime."""
+
     def __init__(self) -> None:
+        """Initialize stub quantizer with efSearch parameter."""
         super().__init__()
         self.efSearch = 5
 
 
 class _HnswIndexStub(_BaseStubIndex):
+    """Stub HNSW index for testing FAISS runtime."""
+
     def __init__(self) -> None:
+        """Initialize stub HNSW index with quantizer."""
         super().__init__()
         self.efSearch = 16
         self.quantizer = _QuantizerStub()

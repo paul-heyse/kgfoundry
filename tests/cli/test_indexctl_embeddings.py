@@ -99,6 +99,18 @@ def _indexctl_context(tmp_path: Path) -> IndexctlCliContext:
     app_config = build_app_config_for_repo(tmp_path)
 
     def _provider_factory(_app_config: AppConfig) -> EmbeddingProvider:
+        """Create stub embedding provider for tests.
+
+        Parameters
+        ----------
+        _app_config : AppConfig
+            Application config (ignored).
+
+        Returns
+        -------
+        EmbeddingProvider
+            Stub provider instance.
+        """
         return cast("EmbeddingProvider", _StubProvider())
 
     return replace(
@@ -109,6 +121,13 @@ def _indexctl_context(tmp_path: Path) -> IndexctlCliContext:
 
 
 def _create_duckdb(path: Path) -> None:
+    """Create DuckDB database with chunks table schema.
+
+    Parameters
+    ----------
+    path : Path
+        Database file path.
+    """
     conn = duckdb.connect(str(path))
     conn.execute(
         """

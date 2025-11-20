@@ -6,6 +6,8 @@ import tempfile
 from dataclasses import replace as dc_replace
 from http import HTTPStatus
 from pathlib import Path
+from types import TracebackType
+from typing import Self
 from unittest.mock import Mock
 
 import duckdb
@@ -22,17 +24,52 @@ from tests._helpers.http import build_test_app
 
 
 class _FakeHttpClient:
+    """Fake HTTP client for testing readiness checks."""
+
     def __init__(self, *, is_success: bool = True, side_effect: Exception | None = None) -> None:
+        """Initialize fake client with success flag and side effect.
+
+        Parameters
+        ----------
+        is_success : bool, optional
+            Whether requests succeed. Defaults to True.
+        side_effect : Exception | None, optional
+            Exception to raise on get() if set. Defaults to None.
+        """
         self._is_success = is_success
         self._side_effect = side_effect
 
-    def __enter__(self) -> _FakeHttpClient:
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc: BaseException | None, tb: object | None) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         _ = exc_type, exc, tb
 
     def get(self, *_: object, **__: object) -> Mock:
+        """Make GET request and return mock response.
+
+        Parameters
+        ----------
+        *_ : object
+            Positional arguments (ignored).
+        **__ : object
+            Keyword arguments (ignored).
+
+        Returns
+        -------
+        Mock
+            Mock response object.
+
+        Raises
+        ------
+        Exception
+            If side_effect is set.
+        """
         if self._side_effect is not None:
             raise self._side_effect
         response = Mock()

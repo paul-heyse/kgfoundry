@@ -14,14 +14,40 @@ from tests._helpers.process import run_process
 
 
 def _repo_root() -> Path:
+    """Get repository root directory path.
+
+    Returns
+    -------
+    Path
+        Repository root directory (two levels up from this file).
+    """
     return Path(__file__).resolve().parents[2]
 
 
 def _cli_path() -> Path:
+    """Get path to index_all CLI script.
+
+    Returns
+    -------
+    Path
+        Path to index_all.py CLI script.
+    """
     return _repo_root() / "codeintel_rev" / "bin" / "index_all.py"
 
 
 def _load_cli_module() -> ModuleType:
+    """Load index_all CLI module from file system.
+
+    Returns
+    -------
+    ModuleType
+        Loaded CLI module.
+
+    Raises
+    ------
+    RuntimeError
+        If module spec cannot be created or loader is None.
+    """
     spec = importlib.util.spec_from_file_location("index_all_cli", _cli_path())
     if spec is None or spec.loader is None:
         message = "Unable to load CLI module spec."
@@ -34,6 +60,18 @@ def _load_cli_module() -> ModuleType:
 
 
 def _read_lines(path: Path) -> list[str]:
+    """Read file and return lines with trailing newlines stripped.
+
+    Parameters
+    ----------
+    path : Path
+        File path to read.
+
+    Returns
+    -------
+    list[str]
+        List of file lines without trailing newlines.
+    """
     content = path.read_text(encoding="utf-8")
     return [line.rstrip("\n") for line in content.splitlines()]
 

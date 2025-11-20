@@ -27,6 +27,13 @@ from tests._helpers import assertions, constants
 
 
 def _make_chunks() -> list[Chunk]:
+    """Create test chunks for parquet store tests.
+
+    Returns
+    -------
+    list[Chunk]
+        List of test chunk instances.
+    """
     return [
         Chunk(
             uri="src/app.py",
@@ -88,6 +95,18 @@ def test_write_chunks_parquet_roundtrip(tmp_path: Path) -> None:
     hashes = table.column("content_hash").to_pylist()
 
     def _expected_hash(chunk_text: str) -> int:
+        """Calculate expected content hash for chunk text.
+
+        Parameters
+        ----------
+        chunk_text : str
+            Chunk text to hash.
+
+        Returns
+        -------
+        int
+            Hash value (xxhash if available, otherwise blake2b).
+        """
         encoded = chunk_text.encode("utf-8", errors="ignore")
         if xxhash is not None:
             return xxhash.xxh64_intdigest(encoded)

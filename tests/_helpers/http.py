@@ -106,6 +106,20 @@ def build_test_app(
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
+        """Middleware handler that binds context to request and calls next handler.
+
+        Parameters
+        ----------
+        request : Request
+            FastAPI request object.
+        call_next : Callable[[Request], Awaitable[Response]]
+            Next middleware handler in chain.
+
+        Returns
+        -------
+        Response
+            Response from next handler.
+        """
         token = mcp_context.set(context)
         request.app.state.context = context
         try:

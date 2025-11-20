@@ -18,11 +18,32 @@ EXPECTED_SUBPROCESS_INVOCATIONS = 2
 
 
 def _expect(*, condition: bool, message: str) -> None:
+    """Assert condition or fail test with message.
+
+    Parameters
+    ----------
+    condition : bool
+        Condition to check.
+    message : str
+        Failure message if condition is False.
+    """
     if not condition:
         pytest.fail(message)
 
 
 def _build_match_line(path: Path) -> str:
+    """Build JSON match line for test.
+
+    Parameters
+    ----------
+    path : Path
+        File path to include in match.
+
+    Returns
+    -------
+    str
+        JSON string representing match line.
+    """
     return json.dumps(
         {
             "type": "match",

@@ -10,6 +10,15 @@ from tests._helpers import assertions
 
 
 def _write_parquet(path: Path, select_sql: str) -> None:
+    """Write parquet file from SQL SELECT statement.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    select_sql : str
+        SQL SELECT statement to execute.
+    """
     conn = duckdb.connect(database=":memory:")
     try:
         conn.execute("DROP TABLE IF EXISTS tmp")
@@ -21,6 +30,13 @@ def _write_parquet(path: Path, select_sql: str) -> None:
 
 
 def _write_chunk_parquet(path: Path) -> None:
+    """Write test chunk parquet file.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    """
     _write_parquet(
         path,
         """
@@ -40,6 +56,13 @@ def _write_chunk_parquet(path: Path) -> None:
 
 
 def _write_idmap_parquet(path: Path) -> None:
+    """Write test ID map parquet file.
+
+    Parameters
+    ----------
+    path : Path
+        Output parquet file path.
+    """
     _write_parquet(
         path,
         """
@@ -51,6 +74,18 @@ def _write_idmap_parquet(path: Path) -> None:
 
 
 def _build_catalog(tmp_path: Path) -> tuple[DuckDBCatalog, Path]:
+    """Build test catalog with chunk and ID map data.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory.
+
+    Returns
+    -------
+    tuple[DuckDBCatalog, Path]
+        Tuple of catalog instance and ID map parquet path.
+    """
     data_root = tmp_path / "data"
     vectors_dir = data_root / "vectors"
     vectors_dir.mkdir(parents=True)
@@ -65,6 +100,27 @@ def _build_catalog(tmp_path: Path) -> tuple[DuckDBCatalog, Path]:
 
 
 def _fetch_single_value(conn: duckdb.DuckDBPyConnection, sql: str, *, reason: str) -> int:
+    """Fetch single integer value from query or fail test.
+
+    Parameters
+    ----------
+    conn : duckdb.DuckDBPyConnection
+        DuckDB connection.
+    sql : str
+        SQL query to execute.
+    reason : str
+        Failure reason if query returns no rows.
+
+    Returns
+    -------
+    int
+        Integer value from first column of first row.
+
+    Raises
+    ------
+    pytest.fail
+        If query returns no rows.
+    """
     row = conn.execute(sql).fetchone()
     if row is None:
         pytest.fail(f"{reason}: query returned no rows")

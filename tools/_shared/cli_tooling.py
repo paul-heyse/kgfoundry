@@ -59,6 +59,14 @@ class CLIConfigError(RuntimeError):
     """
 
     def __init__(self, problem: ProblemDetailsDict) -> None:
+        """Initialize exception with RFC 9457 Problem Details payload.
+
+        Parameters
+        ----------
+        problem : ProblemDetailsDict
+            RFC 9457 Problem Details dictionary containing type, title, status,
+            detail, instance, and optional extensions fields.
+        """
         detail = str(problem.get("detail", _CLI_CONFIG_PROBLEM_TITLE))
         super().__init__(detail)
         self.problem = problem
@@ -255,6 +263,24 @@ def build_cli_config(
 
 
 def _resolve_cli_config_factory() -> Callable[..., object]:
+    """Resolve the canonical CLI config factory from typer_to_openapi_cli module.
+
+    Dynamically imports the CLIConfig class from tools.typer_to_openapi_cli
+    to avoid circular dependencies. Used as the default config_factory when
+    none is provided.
+
+    Returns
+    -------
+    Callable[..., object]
+        CLIConfig class constructor from typer_to_openapi_cli module.
+
+    Raises
+    ------
+    ImportError
+        If tools.typer_to_openapi_cli module cannot be imported.
+    AttributeError
+        If CLIConfig class is not found in the module.
+    """
     module = importlib.import_module("tools.typer_to_openapi_cli")
     return module.CLIConfig
 
@@ -265,6 +291,30 @@ def _load_tooling_metadata(
     augment_reader: Reader | None,
     registry_reader: Reader | None,
 ) -> ToolingMetadataModel:
+    """Load tooling metadata from augment and registry files.
+
+    Delegates to load_tooling_metadata() and wraps AugmentRegistryError
+    exceptions as CLIConfigError with remapped Problem Details instance URIs.
+
+    Parameters
+    ----------
+    settings : CLIToolSettings
+        Settings containing augment_path and registry_path.
+    augment_reader : Reader | None
+        Optional custom reader for augment files.
+    registry_reader : Reader | None
+        Optional custom reader for registry files.
+
+    Returns
+    -------
+    ToolingMetadataModel
+        Composite metadata model containing augment and registry data.
+
+    Raises
+    ------
+    CLIConfigError
+        If augment or registry files cannot be loaded or validated.
+    """
     try:
         return load_tooling_metadata(
             augment_path=settings.augment_path,
@@ -278,6 +328,24 @@ def _load_tooling_metadata(
 
 
 def _remap_problem(problem: ProblemDetailsDict, *, instance: str) -> ProblemDetailsDict:
+    """Remap Problem Details payload with new instance URI and CLI-specific type.
+
+    Extracts detail, status, and extensions from the source problem and rebuilds
+    it with CLI-specific problem type and the provided instance URI. Used to
+    convert AugmentRegistryError Problem Details into CLIConfigError format.
+
+    Parameters
+    ----------
+    problem : ProblemDetailsDict
+        Source Problem Details dictionary to remap.
+    instance : str
+        New instance URI for the remapped problem (e.g., "urn:cli:augment:file.yaml").
+
+    Returns
+    -------
+    ProblemDetailsDict
+        Remapped Problem Details with CLI-specific type and new instance URI.
+    """
     detail = str(problem.get("detail") or _CLI_CONFIG_PROBLEM_TITLE)
     status_raw = problem.get("status")
     status = int(status_raw) if isinstance(status_raw, int) else 500
