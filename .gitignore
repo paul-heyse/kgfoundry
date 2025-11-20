@@ -13,6 +13,9 @@ data/**/*
 docs/_build/**/*
 site/_build/**/*
 tools/mkdocs_suite/site-mkdocs-suite/
+Document_Output/**
+/Document_Output/**
+/Document_Output/
 # MkDocs suite generated artifacts
 *.d2
 *.min.js
