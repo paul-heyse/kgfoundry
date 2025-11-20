@@ -1050,6 +1050,8 @@ def resolve_duck_path(
     paths: ResolvedPaths,
     version_dir: Path | None,
     override: Path | None,
+    *,
+    app_config: AppConfig | None = None,
 ) -> Path:
     """Resolve DuckDB catalog path from resolved paths, version directory, or override.
 
@@ -1069,6 +1071,22 @@ def resolve_duck_path(
     override : Path | None
         Optional explicit path override. If provided, this path takes precedence
         over version directory and AppConfig defaults.
+
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Canonicalized filesystem paths derived from AppConfig. When neither override
+        nor version_dir is provided, the DuckDB catalog path falls back to the
+        resolved default.
+    version_dir : Path | None
+        Optional version directory path. If provided and override is None, the
+        catalog path is resolved as version_dir / "catalog.duckdb".
+    override : Path | None
+        Optional explicit path override. If provided, this path takes precedence
+        over version directory and AppConfig defaults.
+    app_config : AppConfig | None, optional
+        Explicit AppConfig object to use when computing the default DuckDB path.
+        Primarily used by tests; production callers can omit and rely on ``paths``.
 
     Returns
     -------
@@ -1094,6 +1112,8 @@ def resolve_duck_path(
         duck_path = override.expanduser().resolve()
     elif version_dir is not None:
         duck_path = (version_dir / "catalog.duckdb").resolve()
+    elif app_config is not None:
+        duck_path = Path(app_config.duckdb.database).expanduser().resolve()
     else:
         duck_path = paths.duckdb_path
     if not duck_path.exists():

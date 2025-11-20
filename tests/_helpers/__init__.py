@@ -28,7 +28,7 @@ def __getattr__(name: str) -> ModuleType:
     AttributeError
         If ``name`` is not a supported helper module.
     """
-    if name in {"assertions", "cli", "constants", "http", "repo", "settings"}:
+    if name in {"adapters", "assertions", "cli", "constants", "http", "ml", "repo", "settings"}:
         return importlib.import_module(f"tests._helpers.{name}")
     message = f"Module {name!r} is not part of tests._helpers"
     raise AttributeError(message)

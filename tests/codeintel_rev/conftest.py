@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import time as time_module
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -24,100 +23,10 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
 
+from tests._helpers.adapters import InMemoryScopeStore
 from tests._helpers.settings import build_app_config_for_repo
 
 # Import for side effects: ensures FAISS stub is registered
-
-
-class _FakeRedis:
-    """Simple in-memory Redis mimic for tests."""
-
-    def __init__(self) -> None:
-        self._data: dict[str, tuple[bytes, float | None]] = {}
-
-    async def get(self, name: str) -> bytes | None:
-        """Get value by key, returning None if expired or missing.
-
-        Parameters
-        ----------
-        name : str
-            Key to look up.
-
-        Returns
-        -------
-        bytes | None
-            Value associated with key, or None if expired or missing.
-        """
-        record = self._data.get(name)
-        if record is None:
-            return None
-        value, expires_at = record
-        if expires_at is not None and expires_at <= time_module.monotonic():
-            self._data.pop(name, None)
-            return None
-        return value
-
-    async def setex(self, name: str, time: int, value: bytes) -> bool | None:
-        """Set value with expiration time.
-
-        Parameters
-        ----------
-        name : str
-            Key to set.
-        time : int
-            Expiration time in seconds.
-        value : bytes
-            Value to store.
-
-        Returns
-        -------
-        bool | None
-            True on success.
-        """
-        expires_at = time_module.monotonic() + time if time > 0 else None
-        self._data[name] = (value, expires_at)
-        return True
-
-    async def set(self, name: str, value: bytes) -> bool | None:
-        """Set value without expiration.
-
-        Parameters
-        ----------
-        name : str
-            Key to set.
-        value : bytes
-            Value to store.
-
-        Returns
-        -------
-        bool | None
-            True on success.
-        """
-        self._data[name] = (value, None)
-        return True
-
-    async def delete(self, *names: str) -> int | None:
-        """Delete one or more keys, returning count of deleted keys.
-
-        Parameters
-        ----------
-        *names : str
-            Keys to delete.
-
-        Returns
-        -------
-        int | None
-            Number of keys deleted.
-        """
-        removed = 0
-        for entry in names:
-            if self._data.pop(entry, None) is not None:
-                removed += 1
-        return removed
-
-    async def close(self) -> None:
-        """Clear all data from the fake Redis store."""
-        self._data.clear()
 
 
 def _default_duckdb_catalog_factory(
@@ -210,9 +119,8 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             "message": "Test commit",
         }
     ]
-    redis_client = _FakeRedis()
     scope_store = ScopeStore(
-        redis_client,
+        scope_store_backend,
         l1_maxsize=app_config.redis.scope_l1_size,
         l1_ttl_seconds=app_config.redis.scope_l1_ttl_seconds,
         l2_ttl_seconds=app_config.redis.scope_l2_ttl_seconds,

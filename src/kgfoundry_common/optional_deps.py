@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import importlib
 import uuid
+from collections.abc import Callable
 from typing import TYPE_CHECKING, TypeVar, cast
 
 from kgfoundry_common.errors import ArtifactDependencyError
@@ -43,6 +44,13 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
 T = TypeVar("T")
+ImporterCallable = Callable[[str], object]
+_DEFAULT_IMPORTER: ImporterCallable = importlib.import_module
+_MODULE_DISPLAY_NAMES: dict[str, str] = {
+    "griffe": "Griffe",
+    "autoapi": "AutoAPI",
+    "sphinx": "Sphinx",
+}
 
 
 # [nav:anchor OptionalDependencyError]
@@ -137,8 +145,51 @@ def _make_remediation_guidance(module_name: str) -> dict[str, str]:
     return guidance_map.get(module_name, {"install": f"pip install {module_name}"})
 
 
+def _safe_import_dependency(
+    module_name: str,
+    *,
+    importer: ImporterCallable,
+) -> object:
+    """Import ``module_name`` using ``importer`` or raise OptionalDependencyError."""
+    correlation_id = str(uuid.uuid4())
+    try:
+        return importer(module_name)
+    except ImportError as exc:
+        remediation = _make_remediation_guidance(module_name)
+        display = _MODULE_DISPLAY_NAMES.get(module_name, module_name)
+        message = f"{display} is not installed. Install it with: {remediation['install']}"
+        problem = build_problem_details(
+            problem_type="https://docs.kgfoundry.dev/problems/optional-dependency-missing",
+            title="Optional dependency not installed",
+            status=400,
+            detail=message,
+            instance=f"urn:kgfoundry:docs:{module_name}:{correlation_id}",
+            extensions=cast(
+                "Mapping[str, JsonValue]",
+                {
+                    "module": module_name,
+                    "correlation_id": correlation_id,
+                    "remediation": remediation,
+                },
+            ),
+        )
+        raise OptionalDependencyError(
+            message,
+            module_name=module_name,
+            extra={
+                "correlation_id": correlation_id,
+                "remediation": remediation,
+                "problem_details": problem,
+            },
+            cause=exc,
+        ) from exc
+
+
 # [nav:anchor safe_import_griffe]
-def safe_import_griffe() -> object:
+def safe_import_griffe(
+    *,
+    importer: ImporterCallable | None = None,
+) -> object:
     """Safely import Griffe with Problem Details on failure.
 
     Returns
@@ -151,6 +202,11 @@ def safe_import_griffe() -> object:
     OptionalDependencyError
         If Griffe is not installed or cannot be imported.
 
+    Parameters
+    ----------
+    importer : Callable[[str], object] | None, optional
+        Alternative import resolver used for dependency injection in tests.
+
     Examples
     --------
     >>> from kgfoundry_common.optional_deps import safe_import_griffe
@@ -160,45 +216,14 @@ def safe_import_griffe() -> object:
     ... except OptionalDependencyError as e:
     ...     print(f"Griffe not available: {e}")
     """
-    correlation_id = str(uuid.uuid4())
-    try:
-        griffe = importlib.import_module("griffe")
-    except ImportError as exc:
-        remediation = _make_remediation_guidance("griffe")
-        message = f"Griffe is not installed. Install it with: {remediation['install']}"
-        # Build Problem Details
-        problem = build_problem_details(
-            problem_type="https://docs.kgfoundry.dev/problems/optional-dependency-missing",
-            title="Optional dependency not installed",
-            status=400,
-            detail=message,
-            instance=f"urn:kgfoundry:docs:griffe:{correlation_id}",
-            extensions=cast(
-                "Mapping[str, JsonValue]",
-                {
-                    "module": "griffe",
-                    "correlation_id": correlation_id,
-                    "remediation": remediation,
-                },
-            ),
-        )
-
-        raise OptionalDependencyError(
-            message,
-            module_name="griffe",
-            extra={
-                "correlation_id": correlation_id,
-                "remediation": remediation,
-                "problem_details": problem,
-            },
-            cause=exc,
-        ) from exc
-    else:
-        return griffe
+    return _safe_import_dependency("griffe", importer=importer or _DEFAULT_IMPORTER)
 
 
 # [nav:anchor safe_import_autoapi]
-def safe_import_autoapi() -> object:
+def safe_import_autoapi(
+    *,
+    importer: ImporterCallable | None = None,
+) -> object:
     """Safely import AutoAPI with Problem Details on failure.
 
     Returns
@@ -211,6 +236,11 @@ def safe_import_autoapi() -> object:
     OptionalDependencyError
         If AutoAPI is not installed or cannot be imported.
 
+    Parameters
+    ----------
+    importer : Callable[[str], object] | None, optional
+        Alternative import resolver used for dependency injection in tests.
+
     Examples
     --------
     >>> from kgfoundry_common.optional_deps import safe_import_autoapi
@@ -220,45 +250,14 @@ def safe_import_autoapi() -> object:
     ... except OptionalDependencyError as e:
     ...     print(f"AutoAPI not available: {e}")
     """
-    correlation_id = str(uuid.uuid4())
-    try:
-        autoapi = importlib.import_module("autoapi")
-    except ImportError as exc:
-        remediation = _make_remediation_guidance("autoapi")
-        message = f"AutoAPI is not installed. Install it with: {remediation['install']}"
-
-        problem = build_problem_details(
-            problem_type="https://docs.kgfoundry.dev/problems/optional-dependency-missing",
-            title="Optional dependency not installed",
-            status=400,
-            detail=message,
-            instance=f"urn:kgfoundry:docs:autoapi:{correlation_id}",
-            extensions=cast(
-                "Mapping[str, JsonValue]",
-                {
-                    "module": "autoapi",
-                    "correlation_id": correlation_id,
-                    "remediation": remediation,
-                },
-            ),
-        )
-
-        raise OptionalDependencyError(
-            message,
-            module_name="autoapi",
-            extra={
-                "correlation_id": correlation_id,
-                "remediation": remediation,
-                "problem_details": problem,
-            },
-            cause=exc,
-        ) from exc
-    else:
-        return autoapi
+    return _safe_import_dependency("autoapi", importer=importer or _DEFAULT_IMPORTER)
 
 
 # [nav:anchor safe_import_sphinx]
-def safe_import_sphinx() -> object:
+def safe_import_sphinx(
+    *,
+    importer: ImporterCallable | None = None,
+) -> object:
     """Safely import Sphinx with Problem Details on failure.
 
     Returns
@@ -271,6 +270,11 @@ def safe_import_sphinx() -> object:
     OptionalDependencyError
         If Sphinx is not installed or cannot be imported.
 
+    Parameters
+    ----------
+    importer : Callable[[str], object] | None, optional
+        Alternative import resolver used for dependency injection in tests.
+
     Examples
     --------
     >>> from kgfoundry_common.optional_deps import safe_import_sphinx
@@ -280,38 +284,4 @@ def safe_import_sphinx() -> object:
     ... except OptionalDependencyError as e:
     ...     print(f"Sphinx not available: {e}")
     """
-    correlation_id = str(uuid.uuid4())
-    try:
-        sphinx = importlib.import_module("sphinx")
-    except ImportError as exc:
-        remediation = _make_remediation_guidance("sphinx")
-        message = f"Sphinx is not installed. Install it with: {remediation['install']}"
-
-        problem = build_problem_details(
-            problem_type="https://docs.kgfoundry.dev/problems/optional-dependency-missing",
-            title="Optional dependency not installed",
-            status=400,
-            detail=message,
-            instance=f"urn:kgfoundry:docs:sphinx:{correlation_id}",
-            extensions=cast(
-                "Mapping[str, JsonValue]",
-                {
-                    "module": "sphinx",
-                    "correlation_id": correlation_id,
-                    "remediation": remediation,
-                },
-            ),
-        )
-
-        raise OptionalDependencyError(
-            message,
-            module_name="sphinx",
-            extra={
-                "correlation_id": correlation_id,
-                "remediation": remediation,
-                "problem_details": problem,
-            },
-            cause=exc,
-        ) from exc
-    else:
-        return sphinx
+    return _safe_import_dependency("sphinx", importer=importer or _DEFAULT_IMPORTER)

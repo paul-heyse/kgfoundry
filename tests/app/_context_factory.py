@@ -13,11 +13,16 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock
 
+import duckdb
+import numpy as np
+
 from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 
+from tests._helpers.adapters import InMemoryFAISSManager, InMemoryScopeStore
 from tests._helpers.settings import build_app_config_from_paths
 
 _REAL_DATA_ENV = os.getenv("KGFOUNDRY_TEST_USE_REAL_DATA")
@@ -29,17 +34,20 @@ _REPO_ROOT_OVERRIDE = os.getenv("KGFOUNDRY_TEST_REPO_ROOT")
 
 
 def _duckdb_catalog_factory_stub(
-    _cfg: DuckDBCatalogConfig,
-    _manager: DuckDBManager,
+    catalog_cfg: DuckDBCatalogConfig,
+    manager: DuckDBManager,
 ) -> DuckDBCatalog:
-    """Return a stub DuckDB catalog for tests.
-
-    Returns
-    -------
-    DuckDBCatalog
-        Mock DuckDB catalog instance for testing.
-    """
-    return cast("DuckDBCatalog", MagicMock(spec=DuckDBCatalog))
+    """Construct a DuckDB catalog for tests using the provided manager."""
+    catalog = DuckDBCatalog(
+        catalog_cfg.db_path,
+        catalog_cfg.vectors_dir,
+        materialize=catalog_cfg.materialize,
+        manager=manager,
+        log_queries=catalog_cfg.log_queries,
+        repo_root=catalog_cfg.repo_root,
+    )
+    catalog.set_idmap_path(catalog_cfg.idmap_path)
+    return catalog
 
 
 def _real_paths(repo_root: Path) -> ResolvedPaths:
@@ -259,13 +267,30 @@ def build_application_context(
         materialize=app_config.index.duckdb_materialize,
         log_queries=False,
     )
+    class _VLLMStub:
+        def __init__(self, dim: int) -> None:
+            self.embedding_dim = dim
+
+        def embed_batch(self, texts: list[str]) -> np.ndarray:
+            return np.zeros((len(texts), self.embedding_dim), dtype=np.float32)
+
+    scope_store = ScopeStore(
+        InMemoryScopeStore(),
+        l1_maxsize=app_config.redis.scope_l1_size,
+        l1_ttl_seconds=app_config.redis.scope_l1_ttl_seconds,
+        l2_ttl_seconds=app_config.redis.scope_l2_ttl_seconds,
+    )
+    duckdb_manager = DuckDBManager(paths.duckdb_path, DuckDBConfig())
+    if not paths.duckdb_path.exists():
+        paths.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
+        duckdb.connect(str(paths.duckdb_path)).close()
     return ApplicationContext(
         app_config=app_config,
         paths=paths,
-        vllm_client=MagicMock(),
-        faiss_manager=MagicMock(),
-        scope_store=MagicMock(),
-        duckdb_manager=MagicMock(spec=DuckDBManager),
+        vllm_client=_VLLMStub(app_config.vllm.embedding_dim),
+        faiss_manager=InMemoryFAISSManager(),
+        scope_store=scope_store,
+        duckdb_manager=duckdb_manager,
         catalog_config=catalog_cfg,
         duckdb_catalog_factory=_duckdb_catalog_factory_stub,
         git_client=MagicMock(),

@@ -276,16 +276,15 @@ def _app_config_with_duckdb(repo_root: Path, duckdb_path: Path) -> AppConfig:
     )
 
 
-def test_resolve_duck_path_prefers_app_config_default(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_duck_path_prefers_app_config_default(tmp_path: Path) -> None:
     """Default DuckDB catalog path honors AppConfig when no override is provided."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     duck_path = repo_root / "custom.duckdb"
     duck_path.touch()
     app_config = _app_config_with_duckdb(repo_root, duck_path)
-    monkeypatch.setattr(indexctl_module, "_cached_app_config", lambda: app_config)
     paths = resolve_application_paths(app_config)
-    resolved = indexctl_module.resolve_duck_path(paths, version_dir=None, override=None)
+    resolved = indexctl_module.resolve_duck_path(
+        paths, version_dir=None, override=None, app_config=app_config
+    )
     assertions.expect_equal(resolved, duck_path.resolve())

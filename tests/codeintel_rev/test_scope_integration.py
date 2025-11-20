@@ -21,91 +21,8 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import merge_scope_filters
 
 from tests._helpers import assertions
+from tests._helpers.adapters import InMemoryScopeStore
 from tests._helpers.settings import build_app_config_for_repo
-
-
-class _FakeRedis:
-    """Simple in-memory Redis mimic for tests."""
-
-    def __init__(self) -> None:
-        self._data: dict[str, bytes] = {}
-
-    async def get(self, name: str) -> bytes | None:
-        """Get value by key.
-
-        Parameters
-        ----------
-        name : str
-            Key to look up.
-
-        Returns
-        -------
-        bytes | None
-            Value if found, None otherwise.
-        """
-        return self._data.get(name)
-
-    async def setex(self, name: str, time: int, value: bytes) -> bool | None:
-        """Set value with expiration time.
-
-        Parameters
-        ----------
-        name : str
-            Key to set.
-        time : int
-            Expiration time in seconds (unused).
-        value : bytes
-            Value to store.
-
-        Returns
-        -------
-        bool | None
-            True on success.
-        """
-        _ = time
-        self._data[name] = value
-        return True
-
-    async def set(self, name: str, value: bytes) -> bool | None:
-        """Set value without expiration.
-
-        Parameters
-        ----------
-        name : str
-            Key to set.
-        value : bytes
-            Value to store.
-
-        Returns
-        -------
-        bool | None
-            True on success.
-        """
-        self._data[name] = value
-        return True
-
-    async def delete(self, *names: str) -> int | None:
-        """Delete one or more keys.
-
-        Parameters
-        ----------
-        *names : str
-            Keys to delete.
-
-        Returns
-        -------
-        int | None
-            Number of keys deleted.
-        """
-        removed = 0
-        for entry in names:
-            if self._data.pop(entry, None) is not None:
-                removed += 1
-        return removed
-
-    async def close(self) -> None:
-        """Clear all data from fake Redis store."""
-        self._data.clear()
 
 
 def _build_context(repo_root: Path) -> ApplicationContext:
@@ -121,7 +38,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
     paths.xtr_dir.mkdir(parents=True, exist_ok=True)
 
     scope_store = ScopeStore(
-        _FakeRedis(),
+        InMemoryScopeStore(),
         l1_maxsize=app_config.redis.scope_l1_size,
         l1_ttl_seconds=app_config.redis.scope_l1_ttl_seconds,
         l2_ttl_seconds=app_config.redis.scope_l2_ttl_seconds,

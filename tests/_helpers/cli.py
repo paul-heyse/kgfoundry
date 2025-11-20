@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+import logging
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from pathlib import Path
 from typing import Protocol, cast
 
 from click.testing import Result
 from typer.main import Typer
 from typer.testing import CliRunner
+
+from orchestration.cli import BM25BuildConfig, IndexCliConfig, OrchestrationCliContext
 
 _RUNNER = CliRunner(mix_stderr=False)
 
@@ -94,3 +98,74 @@ def invoke(
         catch_exceptions=catch_exceptions,
         obj=obj,
     )
+
+
+def orchestration_cli_context(
+    *,
+    uuid_factory: Callable[[], str] | None = None,
+    bm25_builder: Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]] | None = None,
+    faiss_runner: Callable[[IndexCliConfig], dict[str, object]] | None = None,
+    artifact_fs: object | None = None,
+) -> OrchestrationCliContext:
+    """Return an orchestration CLI context with optional overrides.
+
+    Parameters
+    ----------
+    uuid_factory : Callable[[], str] | None, optional
+        Custom UUID factory used for deterministic IDs in tests.
+    bm25_builder : Callable[[object, logging.Logger], tuple[str, int]] | None, optional
+        Optional BM25 builder override. Accepts the same signature as production.
+    faiss_runner : Callable[[object], dict[str, object]] | None, optional
+        Optional FAISS runner override returning deterministic metadata.
+    artifact_fs : object | None, optional
+        Optional ArtifactFS implementation. Defaults to the production filesystem.
+
+    Returns
+    -------
+    OrchestrationCliContext
+        Frozen dataclass instance combining overrides with the production defaults.
+    """
+    base = OrchestrationCliContext.production()
+    return OrchestrationCliContext(
+        uuid_factory=uuid_factory or base.uuid_factory,
+        bm25_builder=bm25_builder or base.bm25_builder,
+        faiss_runner=faiss_runner or base.faiss_runner,
+        artifact_fs=artifact_fs or base.artifact_fs,
+    )
+
+
+def orchestration_cli_obj(
+    *,
+    envelope_dir: Path | None = None,
+    artifact_dir: Path | None = None,
+    cli_context: OrchestrationCliContext | None = None,
+    overrides: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Build Typer context object for orchestration CLI invocations.
+
+    Parameters
+    ----------
+    envelope_dir : Path | None, optional
+        Optional override for the CLI envelope directory stored in context state.
+    artifact_dir : Path | None, optional
+        Optional override for the CLI artifact directory stored in context state.
+    cli_context : OrchestrationCliContext | None, optional
+        Custom orchestration CLI context (dependency injection container).
+    overrides : Mapping[str, object] | None, optional
+        Additional key/value pairs to merge into the context object.
+
+    Returns
+    -------
+    dict[str, object]
+        Mutable mapping suitable for passing as ``obj`` to Typer commands.
+    """
+    state: dict[str, object] = {}
+    if overrides:
+        state.update(overrides)
+    if envelope_dir is not None:
+        state["envelope_dir"] = envelope_dir
+    if artifact_dir is not None:
+        state["artifact_dir"] = artifact_dir
+    if cli_context is not None:
+        state["orchestration_cli_context"] = cli_context
+    return state

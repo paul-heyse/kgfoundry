@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import TYPE_CHECKING, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 else:  # pragma: no cover - type-only dependency
     import httpx
 
-from tests._helpers import assertions
+from tests._helpers import assertions, ml
 
 
 class _FailingHTTPClient:
@@ -139,7 +139,7 @@ def test_embed_batch_empty_uses_configured_dimension() -> None:
 
 
 def test_embed_chunks_empty_uses_configured_dimension() -> None:
-    """Chunk embedding should bypass network calls when no data is supplied."""
+    """Chunk embedding should return empty arrays without remote calls."""
     config = VLLMSettings(
         base_url="http://127.0.0.1:9000/v1",
         model="unit-test",
@@ -149,15 +149,19 @@ def test_embed_chunks_empty_uses_configured_dimension() -> None:
     transport_context = _build_transport_context()
     client = VLLMClient(config, transport_context=transport_context)
     try:
-        mock_embed_batch = MagicMock()
-        with patch.object(client, "embed_batch", mock_embed_batch):
-            result = client.embed_chunks([], batch_size=4)
-
+        result = client.embed_chunks([], batch_size=4)
         assertions.expect_equal(result.shape, (0, config.embedding_dim))
         assertions.expect_equal(result.dtype, np.dtype(np.float32))
-        mock_embed_batch.assert_not_called()
     finally:
         client.close()
+
+
+def test_embed_chunks_empty_does_not_invoke_embed_batch() -> None:
+    """Fake embedding client ensures embed_batch is skipped for empty data."""
+    client = ml.FakeEmbeddingClient(embedding_dim=192, batch_size=4)
+    result = client.embed_chunks([], batch_size=4)
+    assertions.expect_equal(result.shape, (0, 192))
+    assertions.expect_sequence_equal(client.calls, [])
 
 
 @pytest.mark.asyncio

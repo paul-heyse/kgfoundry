@@ -7,19 +7,32 @@ IndexCliConfig and handle error cases correctly.
 from __future__ import annotations
 
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import cast
-from unittest.mock import patch
 
 from orchestration import cli as cli_module
-from orchestration.cli import index_faiss, run_index_faiss
-from orchestration.config import IndexCliConfig
-from tests._helpers import assertions
-from tests._helpers import cli as cli_helpers
+from orchestration.cli import IndexCliConfig, index_faiss, run_index_faiss
+from tests._helpers import assertions, cli as cli_helpers
 
-# Test constants for docstring length assertions
-_MIN_DOCSTRING_LENGTH = 50
+_MIN_DOCSTRING_LENGTH = 120
+
+
+class _RecordingFaissRunner:
+    """Capture FAISS runner invocations without patching."""
+
+    def __init__(self, metadata: Mapping[str, object] | None = None) -> None:
+        self.calls: list[IndexCliConfig] = []
+        self.metadata = dict(metadata or {"vector_count": 1, "dimension": 2})
+
+    def __call__(self, config: IndexCliConfig) -> dict[str, object]:
+        self.calls.append(config)
+        return dict(self.metadata)
+
+    def latest(self) -> IndexCliConfig:
+        if not self.calls:
+            message = "FAISS runner was not invoked"
+            raise AssertionError(message)
+        return self.calls[-1]
 
 
 def _invoke_index_faiss_cli(
@@ -27,7 +40,8 @@ def _invoke_index_faiss_cli(
     args: Sequence[str],
     *,
     artifact_dir: Path | None = None,
-) -> None:
+    obj: Mapping[str, object] | None = None,
+):
     result = cli_helpers.invoke(
         cli_module.app,
         [
@@ -37,8 +51,10 @@ def _invoke_index_faiss_cli(
             "index-faiss",
             *args,
         ],
+        obj=obj,
     )
     assertions.expect_equal(result.exit_code, 0)
+    return result
 
 
 def test_keyword_only_parameter() -> None:
@@ -82,34 +98,27 @@ def test_index_faiss_constructs_config_correctly() -> None:
         vectors_file.write_text("[]", encoding="utf-8")
         envelope_dir = Path(tmpdir) / "envelopes"
 
-        # Mock run_index_faiss to capture the config
-        with patch("orchestration.cli.run_index_faiss") as mock_run:
-            mock_run.return_value = {"vector_count": 1, "dimension": 2}
-            _invoke_index_faiss_cli(
-                envelope_dir,
-                [
-                    str(vectors_file),
-                    "--index-path",
-                    str(index_file),
-                    "--factory",
-                    "Flat",
-                    "--metric",
-                    "ip",
-                ],
-            )
-            # Verify run_index_faiss was called once
-            assertions.expect_equal(mock_run.call_count, 1)
-            # Extract the config from the call
-            call_kwargs = cast("dict[str, object]", mock_run.call_args[1])
-            assertions.expect_in("config", call_kwargs)
-            config = cast("IndexCliConfig", call_kwargs["config"])
-            assertions.expect_true(
-                isinstance(config, IndexCliConfig), reason="config should be IndexCliConfig"
-            )
-            assertions.expect_equal(config.dense_vectors, str(vectors_file))
-            assertions.expect_equal(config.index_path, str(index_file))
-            assertions.expect_equal(config.factory, "Flat")
-            assertions.expect_equal(config.metric, "ip")
+        runner = _RecordingFaissRunner({"vector_count": 1, "dimension": 2})
+        context = cli_helpers.orchestration_cli_context(faiss_runner=runner)
+        obj = cli_helpers.orchestration_cli_obj(cli_context=context)
+        _invoke_index_faiss_cli(
+            envelope_dir,
+            [
+                str(vectors_file),
+                "--index-path",
+                str(index_file),
+                "--factory",
+                "Flat",
+                "--metric",
+                "ip",
+            ],
+            obj=obj,
+        )
+        config = runner.latest()
+        assertions.expect_equal(config.dense_vectors, str(vectors_file))
+        assertions.expect_equal(config.index_path, str(index_file))
+        assertions.expect_equal(config.factory, "Flat")
+        assertions.expect_equal(config.metric, "ip")
 
 
 def test_index_faiss_uses_defaults() -> None:
@@ -118,26 +127,24 @@ def test_index_faiss_uses_defaults() -> None:
         vectors_file = Path(tmpdir) / "vectors.json"
         vectors_file.write_text("[]", encoding="utf-8")
 
-        with patch("orchestration.cli.run_index_faiss") as mock_run:
-            mock_run.return_value = {"vector_count": 1, "dimension": 2}
-            _invoke_index_faiss_cli(
-                Path(tmpdir) / "envelopes",
-                [
-                    str(vectors_file),
-                ],
-                artifact_dir=Path(tmpdir) / "artifacts",
-            )
-            call_kwargs = cast("dict[str, object]", mock_run.call_args[1])
-            config = cast("IndexCliConfig", call_kwargs["config"])
-            assertions.expect_true(
-                isinstance(config, IndexCliConfig), reason="config should be IndexCliConfig"
-            )
-            assertions.expect_equal(
-                config.index_path,
-                str(Path(tmpdir) / "artifacts" / "faiss" / "shard_000.idx"),
-            )
-            assertions.expect_equal(config.factory, "Flat")
-            assertions.expect_equal(config.metric, "ip")
+        runner = _RecordingFaissRunner({"vector_count": 1, "dimension": 2})
+        context = cli_helpers.orchestration_cli_context(faiss_runner=runner)
+        obj = cli_helpers.orchestration_cli_obj(cli_context=context)
+        _invoke_index_faiss_cli(
+            Path(tmpdir) / "envelopes",
+            [
+                str(vectors_file),
+            ],
+            artifact_dir=Path(tmpdir) / "artifacts",
+            obj=obj,
+        )
+        config = runner.latest()
+        assertions.expect_equal(
+            config.index_path,
+            str(Path(tmpdir) / "artifacts" / "faiss" / "shard_000.idx"),
+        )
+        assertions.expect_equal(config.factory, "Flat")
+        assertions.expect_equal(config.metric, "ip")
 
 
 def test_docstring_present() -> None:

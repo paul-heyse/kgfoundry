@@ -8,13 +8,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import git.exc
 import pytest
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 
 from tests._helpers import assertions
+from tests._helpers.adapters import RecordingRepoFactory
 
 # Test constants for line range comparisons
 _EXPECTED_LINE_RANGE_START = 10
@@ -54,7 +55,13 @@ def mock_commit() -> Mock:
 
 
 @pytest.fixture
-def git_client(tmp_path: Path) -> GitClient:
+def repo_factory(mock_repo: Mock) -> RecordingRepoFactory:
+    """Factory that records repo construction calls for assertions."""
+    return RecordingRepoFactory(mock_repo)
+
+
+@pytest.fixture
+def git_client(tmp_path: Path, repo_factory: RecordingRepoFactory) -> GitClient:
     """Create GitClient instance for testing.
 
     Parameters
@@ -67,7 +74,7 @@ def git_client(tmp_path: Path) -> GitClient:
     GitClient
         GitClient instance with repo_path set to tmp_path.
     """
-    return GitClient(repo_path=tmp_path)
+    return GitClient(repo_path=tmp_path, repo_factory=repo_factory)
 
 
 def _client_with_repo(client: GitClient, repo: Mock) -> GitClient:
@@ -88,32 +95,32 @@ def _client_with_repo(client: GitClient, repo: Mock) -> GitClient:
     return client.with_cached_repo(repo)
 
 
-def test_git_client_repo_not_created_until_access(git_client: GitClient) -> None:
+def test_git_client_repo_not_created_until_access(
+    git_client: GitClient, repo_factory: RecordingRepoFactory
+) -> None:
     """Repo should not be created until first property access."""
-    with patch("codeintel_rev.io.git_client.git.Repo") as repo_factory:
-        assertions.expect_equal(repo_factory.call_count, 0)
     assertions.expect_true(git_client.repo_path is not None, reason="repo_path should be set")
+    assertions.expect_equal(repo_factory.calls, 0)
 
 
-def test_git_client_repo_created_on_first_access(git_client: GitClient, mock_repo: Mock) -> None:
+def test_git_client_repo_created_on_first_access(
+    git_client: GitClient, repo_factory: RecordingRepoFactory, mock_repo: Mock
+) -> None:
     """Repo should be created on first access and cached."""
-    with patch("codeintel_rev.io.git_client.git.Repo", return_value=mock_repo):
-        repo1 = git_client.repo
-        repo2 = git_client.repo
+    repo1 = git_client.repo
+    repo2 = git_client.repo
 
-        assertions.expect_true(repo1 is mock_repo, reason="repo1 should be mock_repo")
-        assertions.expect_true(repo2 is mock_repo, reason="repo2 should be mock_repo")
+    assertions.expect_true(repo1 is mock_repo, reason="repo1 should be mock_repo")
+    assertions.expect_true(repo2 is mock_repo, reason="repo2 should be mock_repo")
+    assertions.expect_equal(repo_factory.calls, 1)
 
 
-def test_git_client_repo_initialization_error(git_client: GitClient) -> None:
+def test_git_client_repo_initialization_error(
+    git_client: GitClient, repo_factory: RecordingRepoFactory
+) -> None:
     """InvalidGitRepositoryError should be raised for invalid repos."""
-    with (
-        patch(
-            "codeintel_rev.io.git_client.git.Repo",
-            side_effect=git.exc.InvalidGitRepositoryError("Not a git repo"),
-        ),
-        pytest.raises(git.exc.InvalidGitRepositoryError),
-    ):
+    repo_factory.side_effect = git.exc.InvalidGitRepositoryError("Not a git repo")
+    with pytest.raises(git.exc.InvalidGitRepositoryError):
         _ = git_client.repo
 
 

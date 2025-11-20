@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from codeintel_rev.config.paths import resolve_application_paths
@@ -19,8 +19,25 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.subprocess_utils import SubprocessError, SubprocessTimeoutError
-from tests._helpers import assertions
+from tests._helpers import assertions, ml
 from tests._helpers.settings import build_app_config_for_repo
+
+
+class _DictScopeStore:
+    """Minimal async scope store storing dictionaries in memory."""
+
+    def __init__(self) -> None:
+        self._data: dict[str, ScopeIn] = {}
+
+    async def get(self, name: str) -> ScopeIn | None:
+        return self._data.get(name)
+
+    async def set(self, name: str, value: ScopeIn) -> bool:
+        self._data[name] = value
+        return True
+
+    async def delete(self, name: str) -> int:
+        return 1 if self._data.pop(name, None) is not None else 0
 
 
 @pytest.fixture
@@ -51,8 +68,21 @@ def mock_context(tmp_path: Path) -> Mock:
     app_config = build_app_config_for_repo(repo_root)
     context.app_config = app_config
     context.paths = resolve_application_paths(app_config)
+    context.scope_store = _DictScopeStore()
 
     return context
+
+
+@pytest.fixture
+def text_search_session_factory(mock_context: Mock) -> Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]:
+    """Return a factory that seeds scopes and activates session IDs."""
+
+    def _build(scope: ScopeIn | None, session_id: str) -> ml.FakeTextSearchSession:
+        session = ml.FakeTextSearchSession(session_id=session_id)
+        asyncio.run(session.set_scope(mock_context.scope_store, scope))
+        return session
+
+    return _build
 
 
 def _build_match(path: Path) -> str:
@@ -95,7 +125,9 @@ def _run_search(
     return asyncio.run(search_text(context, options.query, options=options, runner=runner))
 
 
-def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
+def test_search_text_scope_include_and_exclude(
+    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+) -> None:
     """Scope include/exclude globs are forwarded as ripgrep ``--iglob`` options."""
     repo_root = mock_context.paths.repo_root
     scope: ScopeIn = {
@@ -134,16 +166,8 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
         captured_commands.append(list(cmd))
         return _build_match(repo_root / "src" / "main.py")
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
-            return_value="session-123",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
-            return_value=scope,
-        ),
-    ):
+    session = text_search_session_factory(scope, "session-123")
+    with session.activate():
         options = TextSearchOptions(query="main", max_results=5)
         result = _run_search(mock_context, options, runner=runner)
 
@@ -160,7 +184,9 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
         )
 
 
-def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
+def test_search_text_explicit_paths_override_scope(
+    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+) -> None:
     """Explicit paths suppress scope include globs while keeping excludes."""
     repo_root = mock_context.paths.repo_root
     scope: ScopeIn = {
@@ -199,16 +225,8 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
         captured_commands.append(list(cmd))
         return _build_match(repo_root / "tests" / "test_main.py")
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
-            return_value="session-456",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
-            return_value=scope,
-        ),
-    ):
+    session = text_search_session_factory(scope, "session-456")
+    with session.activate():
         options = TextSearchOptions(
             query="test",
             paths=["tests/"],
@@ -231,7 +249,9 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
         )
 
 
-def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
+def test_search_text_explicit_globs_override_scope(
+    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+) -> None:
     """Explicit include/exclude globs override scope-provided filters."""
     repo_root = mock_context.paths.repo_root
     scope: ScopeIn = {
@@ -270,16 +290,8 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
         captured_commands.append(list(cmd))
         return _build_match(repo_root / "tests" / "integration" / "case.py")
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
-            return_value="session-789",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
-            return_value=scope,
-        ),
-    ):
+    session = text_search_session_factory(scope, "session-789")
+    with session.activate():
         options = TextSearchOptions(
             query="case",
             include_globs=["tests/**/*.py"],
@@ -307,7 +319,9 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
 # ==================== Error Handling Tests ====================
 
 
-def test_search_text_timeout_error(mock_context: Mock) -> None:
+def test_search_text_timeout_error(
+    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+) -> None:
     """Test search_text raises VectorSearchError on timeout."""
     scope: ScopeIn = {}
 
@@ -340,22 +354,16 @@ def test_search_text_timeout_error(mock_context: Mock) -> None:
         message = "Search timeout"
         raise SubprocessTimeoutError(message, command=["rg"], timeout_seconds=30)
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
-            return_value="session-timeout",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
-            return_value=scope,
-        ),
-    ):
+    session = text_search_session_factory(scope, "session-timeout")
+    with session.activate():
         options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Search timeout"):
             _run_search(mock_context, options, runner=runner)
 
 
-def test_search_text_subprocess_error(mock_context: Mock) -> None:
+def test_search_text_subprocess_error(
+    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+) -> None:
     """Test search_text raises VectorSearchError on subprocess error."""
     scope: ScopeIn = {}
 
@@ -388,22 +396,16 @@ def test_search_text_subprocess_error(mock_context: Mock) -> None:
         message = "Command failed"
         raise SubprocessError(message, returncode=2, stderr="Error message")
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
-            return_value="session-error",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
-            return_value=scope,
-        ),
-    ):
+    session = text_search_session_factory(scope, "session-error")
+    with session.activate():
         options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Error message"):
             _run_search(mock_context, options, runner=runner)
 
 
-def test_search_text_value_error(mock_context: Mock) -> None:
+def test_search_text_value_error(
+    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+) -> None:
     """Test search_text raises VectorSearchError on ValueError."""
     scope: ScopeIn = {}
 
@@ -436,16 +438,8 @@ def test_search_text_value_error(mock_context: Mock) -> None:
         message = "Invalid query"
         raise ValueError(message)
 
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
-            return_value="session-value-error",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
-            return_value=scope,
-        ),
-    ):
+    session = text_search_session_factory(scope, "session-value-error")
+    with session.activate():
         options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Invalid query"):
             _run_search(mock_context, options, runner=runner)

@@ -41,7 +41,7 @@ GitPython documentation : https://gitpython.readthedocs.io/
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -51,6 +51,11 @@ import git.exc
 
 if TYPE_CHECKING:
     from codeintel_rev.mcp_server.schemas import GitBlameEntry
+
+
+def _default_repo_factory(repo_path: Path) -> git.Repo:
+    """Return a GitPython Repo initialized with parent directory search."""
+    return git.Repo(repo_path, search_parent_directories=True)
 
 
 def _string_attr(obj: object, attr: str) -> str:
@@ -233,6 +238,7 @@ class GitClient:
     """
 
     repo_path: Path
+    repo_factory: Callable[[Path], git.Repo] = field(default=_default_repo_factory, repr=False)
     _repo: git.Repo | None = field(default=None, init=False, repr=False)
 
     @property
@@ -263,7 +269,7 @@ class GitClient:
         """
         if self._repo is None:
             try:
-                repo = git.Repo(self.repo_path, search_parent_directories=True)
+                repo = self.repo_factory(self.repo_path)
             except git.exc.InvalidGitRepositoryError as exc:
                 message = f"Invalid Git repository: {self.repo_path}"
                 raise git.exc.InvalidGitRepositoryError(message) from exc
