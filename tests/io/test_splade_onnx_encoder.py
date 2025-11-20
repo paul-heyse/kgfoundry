@@ -43,6 +43,13 @@ class _StubSession:
         return [np.linspace(0.1, 0.6, num=6, dtype=np.float32)]
 
     def get_outputs(self) -> list[_StubOutput]:
+        """Return stub output list.
+
+        Returns
+        -------
+        list[_StubOutput]
+            List containing single stub output with name "logits".
+        """
         return self._outputs
 
 
@@ -59,6 +66,18 @@ class _StubTokenizer:
         return {"input_ids": ids, "attention_mask": mask}
 
     def convert_ids_to_tokens(self, ids: list[int]) -> list[str]:
+        """Convert token IDs to token strings.
+
+        Parameters
+        ----------
+        ids : list[int]
+            List of token IDs to convert.
+
+        Returns
+        -------
+        list[str]
+            List of token strings prefixed with "t".
+        """
         self.conversions += 1
         return [f"t{idx}" for idx in ids]
 

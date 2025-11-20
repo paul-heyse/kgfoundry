@@ -80,6 +80,18 @@ def test_lru_cache_is_thread_safe() -> None:
     cache: LRUCache[str, int] = LRUCache(maxsize=128, ttl_seconds=None)
 
     def writer_reader(idx: int) -> int | None:
+        """Write and read cache entry for thread safety test.
+
+        Parameters
+        ----------
+        idx : int
+            Index used to generate unique cache key and value.
+
+        Returns
+        -------
+        int | None
+            Cached value if found, None otherwise.
+        """
         cache.set(f"key-{idx}", idx)
         return cache.get(f"key-{idx}")
 
@@ -268,6 +280,13 @@ async def test_async_single_flight_coalesces_calls() -> None:
     call_count = 0
 
     async def expensive_call() -> int:
+        """Simulate expensive async operation for single-flight test.
+
+        Returns
+        -------
+        int
+            Expected single-flight result constant.
+        """
         nonlocal call_count
         call_count += 1
         await asyncio.sleep(0.01)
@@ -289,6 +308,13 @@ async def test_async_single_flight_propagates_exceptions_and_allows_retry() -> N
     call_count = 0
 
     async def failing_call() -> int:
+        """Simulate async operation that raises RuntimeError.
+
+        Raises
+        ------
+        RuntimeError
+            Always raised with message "boom" to test error propagation.
+        """
         nonlocal call_count
         call_count += 1
         await asyncio.sleep(0)
@@ -301,6 +327,13 @@ async def test_async_single_flight_propagates_exceptions_and_allows_retry() -> N
     assertions.expect_equal(call_count, 1)
 
     async def succeeding_call() -> int:
+        """Simulate async operation that succeeds after previous failure.
+
+        Returns
+        -------
+        int
+            Success value 7.
+        """
         await asyncio.sleep(0)
         return 7
 

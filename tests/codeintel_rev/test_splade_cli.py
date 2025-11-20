@@ -39,6 +39,18 @@ class _StubArtifactsManager:
         self.calls: list[SpladeExportOptions] = []
 
     def export_onnx(self, options: SpladeExportOptions | None = None) -> SpladeExportSummary:
+        """Export ONNX artifact and record call.
+
+        Parameters
+        ----------
+        options : SpladeExportOptions | None, optional
+            Export options to record.
+
+        Returns
+        -------
+        SpladeExportSummary
+            Stub export summary with paths.
+        """
         opts = options or SpladeExportOptions()
         self.calls.append(opts)
         onnx_dir = self.tmp_path / "models" / "splade-v3" / "onnx"
@@ -66,6 +78,20 @@ class _StubEncoderService:
         source: Path,
         options: SpladeEncodeOptions | None = None,
     ) -> SpladeEncodingSummary:
+        """Encode corpus and record call.
+
+        Parameters
+        ----------
+        source : Path
+            Source corpus path to record.
+        options : SpladeEncodeOptions | None, optional
+            Encode options to record.
+
+        Returns
+        -------
+        SpladeEncodingSummary
+            Stub encoding summary with metadata paths.
+        """
         self.calls.append((source, options))
         opts = options or SpladeEncodeOptions()
         target_dir = (
@@ -87,6 +113,20 @@ class _StubEncoderService:
         queries: list[str],
         options: SpladeBenchmarkOptions | None = None,
     ) -> SpladeBenchmarkSummary:
+        """Benchmark queries and record call.
+
+        Parameters
+        ----------
+        queries : list[str]
+            Query strings to benchmark.
+        options : SpladeBenchmarkOptions | None, optional
+            Benchmark options to record.
+
+        Returns
+        -------
+        SpladeBenchmarkSummary
+            Stub benchmark summary with latency metrics.
+        """
         opts = options or SpladeBenchmarkOptions()
         self.benchmark_calls.append((list(queries), opts))
         return SpladeBenchmarkSummary(
@@ -112,6 +152,18 @@ class _StubIndexManager:
         self.calls: list[SpladeBuildOptions | None] = []
 
     def build_index(self, options: SpladeBuildOptions | None = None) -> SpladeIndexMetadata:
+        """Build index and record call.
+
+        Parameters
+        ----------
+        options : SpladeBuildOptions | None, optional
+            Build options to record.
+
+        Returns
+        -------
+        SpladeIndexMetadata
+            Stub index metadata with test values.
+        """
         self.calls.append(options)
         index_dir = (self.tmp_path / "indexes" / "splade").resolve()
         index_dir.mkdir(parents=True, exist_ok=True)

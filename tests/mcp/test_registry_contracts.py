@@ -24,6 +24,18 @@ class _StubCatalog:
         ]
 
     def query_by_ids(self, ids: list[int]) -> list[dict[str, Any]]:
+        """Query rows by chunk IDs.
+
+        Parameters
+        ----------
+        ids : list[int]
+            Chunk IDs to look up.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Matching rows from internal storage.
+        """
         return [row for row in self.rows if row["id"] in ids]
 
 

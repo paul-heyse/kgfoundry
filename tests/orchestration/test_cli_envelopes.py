@@ -38,6 +38,20 @@ def test_index_bm25_emits_success_envelope(
         config: orchestration_cli.BM25BuildConfig,
         logger: logging.Logger,
     ) -> tuple[str, int]:
+        """Build BM25 index stub for test.
+
+        Parameters
+        ----------
+        config : orchestration_cli.BM25BuildConfig
+            Build configuration to validate.
+        logger : logging.Logger
+            Logger instance to validate.
+
+        Returns
+        -------
+        tuple[str, int]
+            Tuple of backend name "lucene" and doc count 3.
+        """
         assertions.expect_true(
             isinstance(config, orchestration_cli.BM25BuildConfig),
             reason="config should be orchestration_cli.BM25BuildConfig",
@@ -88,6 +102,17 @@ def test_index_faiss_records_validation_failure(
     error = VectorValidationError("invalid payload", errors=["row 1: missing vector"])
 
     def fake_run(*, config: orchestration_cli.IndexCliConfig) -> dict[str, object]:
+        """Run FAISS indexing stub that raises validation error.
+
+        Parameters
+        ----------
+        config : orchestration_cli.IndexCliConfig
+            Index configuration to validate.
+
+        Notes
+        -----
+        Always raises VectorValidationError with pre-configured error from outer scope.
+        """
         assertions.expect_true(
             isinstance(config, orchestration_cli.IndexCliConfig),
             reason="config should be orchestration_cli.IndexCliConfig",

@@ -29,6 +29,24 @@ class _StubHybridEngine:
         limit: int,
         options: HybridSearchOptions | None = None,
     ) -> HybridSearchResult:
+        """Record search parameters and return pre-configured result.
+
+        Parameters
+        ----------
+        query : str
+            Query string to record.
+        semantic_hits : Sequence[tuple[int, float]]
+            Semantic search hits to record.
+        limit : int
+            Result limit to record.
+        options : HybridSearchOptions | None, optional
+            Search options to record.
+
+        Returns
+        -------
+        HybridSearchResult
+            Pre-configured search result.
+        """
         self.last_query = query
         self.last_semantic_hits = list(semantic_hits)
         self.last_limit = limit

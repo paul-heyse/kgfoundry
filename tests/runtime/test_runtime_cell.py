@@ -96,6 +96,13 @@ def test_runtime_cell_initializes_once_under_high_concurrency() -> None:
     factory_calls = 0
 
     def factory() -> dict[str, int]:
+        """Create runtime payload with call tracking for concurrency test.
+
+        Returns
+        -------
+        dict[str, int]
+            Dictionary with value set to current factory call count.
+        """
         nonlocal factory_calls
         time.sleep(0.002)
         factory_calls += 1
@@ -104,6 +111,7 @@ def test_runtime_cell_initializes_once_under_high_concurrency() -> None:
     results: list[dict[str, int]] = []
 
     def worker() -> None:
+        """Worker thread that waits on barrier then initializes cell."""
         barrier.wait()
         results.append(cell.get_or_initialize(factory))
 
@@ -127,6 +135,18 @@ def test_runtime_cell_init_failure_is_reported_and_retriable() -> None:
     calls: list[str] = []
 
     def factory() -> int:
+        """Fail on first call, succeed on second.
+
+        Returns
+        -------
+        int
+            Value 7 on successful call.
+
+        Raises
+        ------
+        RuntimeError
+            Raised on first call with message "boom".
+        """
         if not calls:
             calls.append("fail")
             message = "boom"
@@ -174,6 +194,13 @@ def test_runtime_cell_record_failure_short_circuits_and_recovers() -> None:
     calls = {"count": 0}
 
     def factory() -> int:
+        """Create runtime payload with call tracking.
+
+        Returns
+        -------
+        int
+            Value 7.
+        """
         calls["count"] += 1
         return 7
 
@@ -215,10 +242,14 @@ def test_runtime_cell_close_invokes_close_and_observer() -> None:
     observer = RecordingObserver()
 
     class DummyRuntime:
+        """Test runtime that tracks close calls."""
+
         def __init__(self) -> None:
+            """Initialize with closed flag set to False."""
             self.closed = False
 
         def close(self) -> None:
+            """Mark runtime as closed."""
             self.closed = True
 
     runtime = DummyRuntime()
@@ -238,7 +269,7 @@ def test_runtime_cell_close_handles_payload_without_close_method() -> None:
     observer = RecordingObserver()
 
     class NoCloser:
-        pass
+        """Test payload without close method."""
 
     cell: RuntimeCell[NoCloser] = RuntimeCell(observer=observer)
     instance = cell.get_or_initialize(NoCloser)
@@ -257,10 +288,20 @@ def test_runtime_cell_close_exception_paths() -> None:
     observer = RecordingObserver()
 
     class ExplodingRuntime:
+        """Test runtime that raises exception on close."""
+
         def __init__(self) -> None:
+            """Initialize with closed counter set to 0."""
             self.closed = 0
 
         def close(self) -> None:
+            """Increment closed counter and raise RuntimeError.
+
+            Raises
+            ------
+            RuntimeError
+                Always raised with message "boom".
+            """
             self.closed += 1
             message = "boom"
             raise RuntimeError(message)
@@ -281,7 +322,16 @@ def test_runtime_cell_repr_masks_inner() -> None:
     """Test that runtime cell repr masks inner payload representation."""
 
     class SecretRuntime:
+        """Test runtime with secret representation for repr masking test."""
+
         def __repr__(self) -> str:  # pragma: no cover - immaterial to assertion
+            """Return secret value string.
+
+            Returns
+            -------
+            str
+                Secret value "SECRET_VALUE".
+            """
             return "SECRET_VALUE"
 
     cell: RuntimeCell[SecretRuntime] = RuntimeCell(name="secret")

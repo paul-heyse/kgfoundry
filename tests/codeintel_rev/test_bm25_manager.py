@@ -199,6 +199,13 @@ def test_build_index_writes_metadata(tmp_path: Path) -> None:
     index_dir = Path(app_config.bm25.index_dir)
 
     def fake_runner(cmd: list[str]) -> None:
+        """Record command and create stub index file for test.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments to record.
+        """
         commands.append(list(cmd))
         (index_dir / "segments_1").write_text("stub", encoding="utf-8")
 
@@ -238,6 +245,18 @@ def test_build_index_raises_when_subprocess_fails(tmp_path: Path) -> None:
     _, app_config = _bootstrap_repo(tmp_path)
 
     def fake_run(cmd: list[str]) -> None:
+        """Raise SubprocessError to test error handling.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments (unused).
+
+        Raises
+        ------
+        SubprocessError
+            Always raised with message "fail" and returncode 1.
+        """
         _ = cmd
         message = "fail"
         raise SubprocessError(message, returncode=1)

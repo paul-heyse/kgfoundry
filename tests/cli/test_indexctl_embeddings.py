@@ -56,10 +56,29 @@ class _StubProvider:
 
     @staticmethod
     def fingerprint() -> str:
+        """Return stub fingerprint string.
+
+        Returns
+        -------
+        str
+            Stub fingerprint "stub-fingerprint".
+        """
         return "stub-fingerprint"
 
     @staticmethod
     def embed_texts(texts: list[str]) -> np.ndarray:
+        """Generate deterministic embeddings for test texts.
+
+        Parameters
+        ----------
+        texts : list[str]
+            Text strings to embed.
+
+        Returns
+        -------
+        np.ndarray
+            Array of embeddings with shape (len(texts), 2).
+        """
         return np.vstack([np.arange(2, dtype=np.float32) + idx for idx in range(len(texts))])
 
     def close(self) -> None:

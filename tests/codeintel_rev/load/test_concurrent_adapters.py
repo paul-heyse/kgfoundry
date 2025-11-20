@@ -75,6 +75,22 @@ class _AsyncGitClientStub:
         start_line: int,
         end_line: int,
     ) -> list[dict]:
+        """Return stub blame results for load test.
+
+        Parameters
+        ----------
+        path : str
+            File path (unused).
+        start_line : int
+            Start line number.
+        end_line : int
+            End line number.
+
+        Returns
+        -------
+        list[dict]
+            List of blame entries for each line in range.
+        """
         del path
         self.blame_calls += 1
         return [
@@ -89,6 +105,20 @@ class _AsyncGitClientStub:
         ]
 
     async def file_history(self, *, path: str, limit: int) -> list[dict]:
+        """Return stub file history for load test.
+
+        Parameters
+        ----------
+        path : str
+            File path (unused).
+        limit : int
+            Maximum number of commits to return.
+
+        Returns
+        -------
+        list[dict]
+            List of commit entries up to limit.
+        """
         del path
         self.history_calls += 1
         return [

@@ -24,7 +24,21 @@ else:  # pragma: no cover - tests avoid importing heavy deps at runtime
 
 
 class _FakeTensor:
+    """Fake tensor stub for testing."""
+
     def to(self, _device: str) -> _FakeTensor:
+        """Move tensor to device (no-op for stub).
+
+        Parameters
+        ----------
+        _device : str
+            Device name (unused).
+
+        Returns
+        -------
+        _FakeTensor
+            Self for chaining.
+        """
         return self
 
 
@@ -38,6 +52,20 @@ class _FakeTokenizer:
         return {"input_ids": _FakeTensor()}
 
     def decode(self, _output_ids: object, *, skip_special_tokens: bool) -> str:
+        """Decode token IDs to string and track call count.
+
+        Parameters
+        ----------
+        _output_ids : object
+            Token IDs to decode (unused).
+        skip_special_tokens : bool
+            Whether to skip special tokens (must be True).
+
+        Returns
+        -------
+        str
+            Pre-configured response string.
+        """
         assertions.expect_true(skip_special_tokens)
         self.decode_calls += 1
         return self.response
@@ -48,13 +76,38 @@ class _FakeModel:
         self.generate_calls = 0
 
     def to(self, _device: str) -> _FakeModel:
+        """Move model to device (no-op for stub).
+
+        Parameters
+        ----------
+        _device : str
+            Device name (unused).
+
+        Returns
+        -------
+        _FakeModel
+            Self for chaining.
+        """
         return self
 
     @staticmethod
     def eval() -> None:
-        return None
+        """Set model to evaluation mode (no-op for stub)."""
+        return
 
     def generate(self, **_: object) -> list[list[int]]:
+        """Generate token IDs and track call count.
+
+        Parameters
+        ----------
+        **_ : object
+            Generation parameters (unused).
+
+        Returns
+        -------
+        list[list[int]]
+            Stub token IDs [[0]].
+        """
         self.generate_calls += 1
         return [[0]]
 

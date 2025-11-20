@@ -7,6 +7,7 @@ project-excludes = [
     "**/__pycache__/**",
     "src/kgfoundry_common/http/**",
     "codeintel_rev/patches/**",
+    "OpenAI_patch_maker.py"
 ]
 search-path = [".", "src", "stubs"]
 python-version = "3.13.9"

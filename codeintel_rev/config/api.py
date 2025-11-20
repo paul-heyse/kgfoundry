@@ -727,34 +727,34 @@ class AppConfig:
         Embedding provider configuration shared across CLIs and services.
     vllm : VLLMSettings
         vLLM embedding service configuration and runtime settings.
-    search : SearchSettings, optional
+    search : SearchSettings
         Hybrid search weighting and Stage-0 tuning configuration. Defaults to
         SearchSettings() with default values.
-    logging : LoggingSettings, optional
-        Logging output configuration. Defaults to LoggingSettings() with default
-        values.
-    eval : EvalSettings, optional
-        Evaluation settings configuration. Defaults to EvalSettings() with default
-        values.
-    limits : ServerLimits, optional
+    limits : ServerLimits
         Server resource limits including max results and rate limiting configuration.
         Defaults to ServerLimits() with default values.
-    redis : RedisSettings, optional
+    redis : RedisSettings
         Redis connection and L1/L2 cache configuration. Defaults to RedisSettings()
         with default values.
-    rerank : RerankSettings, optional
+    rerank : RerankSettings
         Late-interaction reranker configuration. Defaults to RerankSettings() with
         default values.
-    coderank : CodeRankSettings, optional
+    coderank : CodeRankSettings
         Dense retriever configuration for CodeRank operations. Defaults to
         CodeRankSettings() with default values.
-    coderank_llm : CodeRankLLMSettings, optional
+    coderank_llm : CodeRankLLMSettings
         Listwise reranker configuration for CodeRank LLM. Defaults to
         CodeRankLLMSettings() with default values.
-    warp : WarpSettings, optional
+    warp : WarpSettings
         WARP/XTR reranker configuration. Defaults to WarpSettings() with default
         values.
-    extras : Mapping[str, object], optional
+    logging : LoggingSettings
+        Logging output configuration. Defaults to LoggingSettings() with default
+        values.
+    eval : EvalSettings
+        Evaluation settings configuration. Defaults to EvalSettings() with default
+        values.
+    extras : Mapping[str, object]
         Additional configuration key-value pairs for extensibility. Defaults to
         empty dictionary.
     """

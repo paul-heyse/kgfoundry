@@ -85,6 +85,38 @@ MAX_FILE_BYTES_OPTION = typer.Option(
     "--max-file-bytes",
     help="Skip files larger than this many bytes (default: 2MB).",
 )
+_DEFAULT_GRAPH_FLAG = False
+
+GOIDS_STEP_OPTION = typer.Option(
+    _DEFAULT_GRAPH_FLAG,
+    "--goids/--no-goids",
+    help="Build GOID registry and cross-walk artifacts during the pipeline run.",
+    show_default=True,
+)
+CALLGRAPH_STEP_OPTION = typer.Option(
+    _DEFAULT_GRAPH_FLAG,
+    "--callgraph/--no-callgraph",
+    help="Build call graph artifacts during the pipeline run.",
+    show_default=True,
+)
+CFG_STEP_OPTION = typer.Option(
+    _DEFAULT_GRAPH_FLAG,
+    "--cfg/--no-cfg",
+    help="Build control-flow graph artifacts during the pipeline run.",
+    show_default=True,
+)
+DFG_STEP_OPTION = typer.Option(
+    _DEFAULT_GRAPH_FLAG,
+    "--dfg/--no-dfg",
+    help="Build data-flow graph artifacts during the pipeline run.",
+    show_default=True,
+)
+GRAPH_ALL_OPTION = typer.Option(
+    _DEFAULT_GRAPH_FLAG,
+    "--all/--no-all",
+    help="Enable GOID, call graph, CFG, and DFG steps in the pipeline.",
+    show_default=True,
+)
 _DEFAULT_ENABLE_OWNERS = True
 _DEFAULT_EMIT_SLICES = False
 _DEFAULT_EMIT_AST = True
@@ -220,8 +252,17 @@ def shared_options(  # noqa: PLR0913, PLR0917
     commits_window: int = COMMITS_WINDOW_OPTION,
     emit_slices: bool = EMIT_SLICES_OPTION,
     slices_filter: list[str] | None = SLICES_FILTER_OPTION,
+    goids: bool = GOIDS_STEP_OPTION,
+    callgraph: bool = CALLGRAPH_STEP_OPTION,
+    cfg: bool = CFG_STEP_OPTION,
+    dfg: bool = DFG_STEP_OPTION,
+    all_graphs: bool = GRAPH_ALL_OPTION,
 ) -> None:
     """Capture global enrichment options shared by all subcommands."""
+    build_goids = goids or all_graphs
+    build_callgraph = callgraph or all_graphs
+    build_cfg = cfg or all_graphs
+    build_dfg = dfg or all_graphs
     pipeline_options = PipelineOptions(
         root=root.resolve(),
         scip=scip.resolve() if scip else None,
@@ -231,6 +272,10 @@ def shared_options(  # noqa: PLR0913, PLR0917
         coverage_xml=coverage_xml.resolve(),
         only=tuple(only or ()),
         max_file_bytes=max_file_bytes,
+        build_goids=build_goids,
+        build_callgraph=build_callgraph,
+        build_cfg=build_cfg,
+        build_dfg=build_dfg,
     )
     analytics_options = AnalyticsOptions(
         owners=owners,
@@ -275,7 +320,8 @@ def execute_pipeline(state: CLIContextState) -> PipelineResult:
     PipelineResult
         Aggregate pipeline result bundle.
     """
-    return run_pipeline(pipeline=state.pipeline)
+    result = run_pipeline(pipeline=state.pipeline)
+    return result
 
 
 def handle_stage_error(exc: StageError) -> NoReturn:

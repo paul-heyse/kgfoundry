@@ -112,6 +112,24 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
         timeout: int,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Record command and return fake match for scope include/exclude test.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments to record.
+        cwd : Path | None
+            Working directory (unused).
+        timeout : int
+            Timeout value (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Returns
+        -------
+        str
+            JSON match line for src/main.py.
+        """
         _ = cwd, timeout, env
         captured_commands.append(list(cmd))
         return _build_match(repo_root / "src" / "main.py")
@@ -159,6 +177,24 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
         timeout: int,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Record command and return fake match for explicit paths test.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments to record.
+        cwd : Path | None
+            Working directory (unused).
+        timeout : int
+            Timeout value (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Returns
+        -------
+        str
+            JSON match line for tests/test_main.py.
+        """
         _ = cwd, timeout, env
         captured_commands.append(list(cmd))
         return _build_match(repo_root / "tests" / "test_main.py")
@@ -212,6 +248,24 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
         timeout: int,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Record command and return fake match for explicit globs test.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments to record.
+        cwd : Path | None
+            Working directory (unused).
+        timeout : int
+            Timeout value (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Returns
+        -------
+        str
+            JSON match line for tests/integration/case.py.
+        """
         _ = cwd, timeout, env
         captured_commands.append(list(cmd))
         return _build_match(repo_root / "tests" / "integration" / "case.py")
@@ -264,6 +318,24 @@ def test_search_text_timeout_error(mock_context: Mock) -> None:
         timeout: int,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Raise SubprocessTimeoutError to test timeout handling.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments (unused).
+        cwd : Path | None
+            Working directory (unused).
+        timeout : int
+            Timeout value (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Raises
+        ------
+        SubprocessTimeoutError
+            Always raised with message "Search timeout" and 30 second timeout.
+        """
         _ = cmd, cwd, timeout, env
         message = "Search timeout"
         raise SubprocessTimeoutError(message, command=["rg"], timeout_seconds=30)
@@ -294,6 +366,24 @@ def test_search_text_subprocess_error(mock_context: Mock) -> None:
         timeout: int,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Raise SubprocessError to test subprocess error handling.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments (unused).
+        cwd : Path | None
+            Working directory (unused).
+        timeout : int
+            Timeout value (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Raises
+        ------
+        SubprocessError
+            Always raised with returncode 2 and stderr "Error message".
+        """
         _ = cmd, cwd, timeout, env
         message = "Command failed"
         raise SubprocessError(message, returncode=2, stderr="Error message")
@@ -324,6 +414,24 @@ def test_search_text_value_error(mock_context: Mock) -> None:
         timeout: int,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Raise ValueError to test value error handling.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments (unused).
+        cwd : Path | None
+            Working directory (unused).
+        timeout : int
+            Timeout value (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Raises
+        ------
+        ValueError
+            Always raised with message "Invalid query".
+        """
         _ = cmd, cwd, timeout, env
         message = "Invalid query"
         raise ValueError(message)

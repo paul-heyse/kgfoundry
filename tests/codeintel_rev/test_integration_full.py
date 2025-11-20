@@ -64,6 +64,13 @@ def test_repo(tmp_path: Path) -> RepoHandle:
     handle = RepoHandle(repo_root)
 
     def rebuild(index_overrides: dict[str, object] | None = None) -> None:
+        """Rebuild application context and FastAPI app with optional overrides.
+
+        Parameters
+        ----------
+        index_overrides : dict[str, object] | None, optional
+            Index configuration overrides.
+        """
         app_config = build_app_config_for_repo(repo_root, index_overrides=index_overrides)
         overrides = ApplicationContextOverrides(vllm_client=MagicMock(spec=VLLMClient))
         context = ApplicationContext.create(app_config=app_config, overrides=overrides)

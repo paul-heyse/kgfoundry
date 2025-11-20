@@ -75,6 +75,18 @@ class _InMemoryScopeStore:
         self,
         session_id: str,
     ) -> dict | None:
+        """Get scope for session ID and track call.
+
+        Parameters
+        ----------
+        session_id : str
+            Session identifier to record.
+
+        Returns
+        -------
+        dict | None
+            Always returns None (stub implementation).
+        """
         self.get_calls.append(session_id)
         return None
 
@@ -93,6 +105,22 @@ class _AsyncGitClientStub:
         start_line: int,
         end_line: int,
     ) -> list[dict]:
+        """Return stub blame results for benchmark.
+
+        Parameters
+        ----------
+        path : str
+            File path to record.
+        start_line : int
+            Start line number.
+        end_line : int
+            End line number.
+
+        Returns
+        -------
+        list[dict]
+            List of blame entries for each line in range.
+        """
         self.blame_requests.append(path)
         return [
             {
@@ -106,6 +134,20 @@ class _AsyncGitClientStub:
         ]
 
     async def file_history(self, *, path: str, limit: int) -> list[dict]:
+        """Return stub file history for benchmark.
+
+        Parameters
+        ----------
+        path : str
+            File path to record.
+        limit : int
+            Maximum number of commits to return.
+
+        Returns
+        -------
+        list[dict]
+            List of commit entries up to limit.
+        """
         self.history_requests.append(path)
         return [
             {
@@ -132,6 +174,13 @@ def test_list_paths_single_request(
     """
 
     async def run_async() -> dict:
+        """Execute single list_paths request for benchmark.
+
+        Returns
+        -------
+        dict
+            File listing result.
+        """
         return await files_adapter.list_paths(mock_context, path="src", max_results=50)
 
     result = benchmark.pedantic(lambda: asyncio.run(run_async()), rounds=10, iterations=5)
@@ -153,7 +202,22 @@ def test_list_paths_concurrent_100(
     num_concurrent = 100
 
     async def run_concurrent() -> list[dict]:
+        """Execute concurrent list_paths requests for benchmark.
+
+        Returns
+        -------
+        list[dict]
+            List of file listing results.
+        """
+
         async def list_task() -> dict:
+            """Execute single list_paths task.
+
+            Returns
+            -------
+            dict
+                File listing result.
+            """
             return await files_adapter.list_paths(mock_context, path="src", max_results=20)
 
         tasks = [list_task() for _ in range(num_concurrent)]
@@ -184,6 +248,13 @@ def test_blame_range_single_request(
     """
 
     async def run_async() -> dict:
+        """Execute single blame_range request for benchmark.
+
+        Returns
+        -------
+        dict
+            Blame result.
+        """
         return await history_adapter.blame_range(
             mock_context,
             path="src/file_0.py",
@@ -212,7 +283,27 @@ def test_blame_range_concurrent_50(
     num_concurrent = 50
 
     async def run_concurrent() -> list[dict]:
+        """Execute concurrent blame_range requests for benchmark.
+
+        Returns
+        -------
+        list[dict]
+            List of blame results.
+        """
+
         async def blame_task(task_id: int) -> dict:
+            """Execute single blame_range task.
+
+            Parameters
+            ----------
+            task_id : int
+                Task identifier used to select file.
+
+            Returns
+            -------
+            dict
+                Blame result.
+            """
             file_num = task_id % 10
             return await history_adapter.blame_range(
                 mock_context,
@@ -245,10 +336,37 @@ def test_mixed_concurrent_benchmark(
     num_blame = 50
 
     async def run_mixed() -> tuple[list[dict], list[dict]]:
+        """Execute mixed concurrent operations for benchmark.
+
+        Returns
+        -------
+        tuple[list[dict], list[dict]]
+            Tuple of list_paths results and blame_range results.
+        """
+
         async def list_task() -> dict:
+            """Execute single list_paths task.
+
+            Returns
+            -------
+            dict
+                File listing result.
+            """
             return await files_adapter.list_paths(mock_context, path="src", max_results=20)
 
         async def blame_task(task_id: int) -> dict:
+            """Execute single blame_range task.
+
+            Parameters
+            ----------
+            task_id : int
+                Task identifier used to select file.
+
+            Returns
+            -------
+            dict
+                Blame result.
+            """
             file_num = task_id % 10
             return await history_adapter.blame_range(
                 mock_context,

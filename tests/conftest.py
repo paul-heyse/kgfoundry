@@ -170,6 +170,13 @@ def _networking_test_app(tmp_path: Path) -> FastAPI:
             self._detail = detail
 
         def as_payload(self) -> dict[str, object]:
+            """Convert readiness result to payload dictionary.
+
+            Returns
+            -------
+            dict[str, object]
+                Dictionary with healthy and detail fields.
+            """
             return {"healthy": self.healthy, "detail": self._detail}
 
     class _FakeReadinessProbe:
@@ -177,6 +184,13 @@ def _networking_test_app(tmp_path: Path) -> FastAPI:
             self.refresh_calls = 0
 
         async def refresh(self) -> dict[str, _FakeReadinessResult]:
+            """Refresh readiness checks and track call count.
+
+            Returns
+            -------
+            dict[str, _FakeReadinessResult]
+                Dictionary mapping "faiss" to fake readiness result.
+            """
             await asyncio.sleep(0)
             self.refresh_calls += 1
             return {"faiss": _FakeReadinessResult()}
@@ -377,6 +391,32 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
         max_file_bytes: int = 10_000,
         package_prefix: str | None = None,
     ) -> ScanInputs:
+        """Build ScanInputs instance with optional overrides.
+
+        Parameters
+        ----------
+        repo_root : Path | None, optional
+            Repository root directory.
+        scip_index : SCIPIndex | None, optional
+            SCIP index instance.
+        scip_by_file : Mapping[str, Document] | None, optional
+            SCIP documents by file path.
+        type_signals : Mapping[str, FileTypeSignals] | None, optional
+            Type signals by file path.
+        coverage_map : Mapping[str, Mapping[str, float]] | None, optional
+            Coverage map by file path.
+        tagging_rules : Mapping[str, object] | None, optional
+            Tagging rules.
+        max_file_bytes : int, optional
+            Maximum file size in bytes, by default 10_000.
+        package_prefix : str | None, optional
+            Package prefix string.
+
+        Returns
+        -------
+        ScanInputs
+            Configured ScanInputs instance.
+        """
         root = repo_root or (tmp_path / "repo")
         root.mkdir(parents=True, exist_ok=True)
         scip = scip_index or SCIPIndex()
@@ -414,6 +454,30 @@ def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., OverlayCont
         scip_index: SCIPIndex | None = None,
         overlay_paths: frozenset[str] | None = None,
     ) -> OverlayContext:
+        """Build OverlayContext instance with optional overrides.
+
+        Parameters
+        ----------
+        repo_root : Path | None, optional
+            Repository root directory.
+        overlays_root : Path | None, optional
+            Overlays directory root.
+        stubs_root : Path | None, optional
+            Stubs directory root.
+        type_counts : Mapping[str, int] | None, optional
+            Type error counts by file path.
+        policy : OverlayPolicy | None, optional
+            Overlay policy configuration.
+        scip_index : SCIPIndex | None, optional
+            SCIP index instance.
+        overlay_paths : frozenset[str] | None, optional
+            Set of overlay-tagged file paths.
+
+        Returns
+        -------
+        OverlayContext
+            Configured OverlayContext instance.
+        """
         root = repo_root or (tmp_path / "overlay_repo")
         overlays = overlays_root or (tmp_path / "overlays")
         stubs = stubs_root or (tmp_path / "stubs")
@@ -466,6 +530,24 @@ def fixture_orchestration_cli_context_builder() -> Callable[..., OrchestrationCl
         faiss_runner: Callable[[IndexCliConfig], dict[str, object]] | None = None,
         artifact_fs: ArtifactFS | None = None,
     ) -> OrchestrationCliContext:
+        """Build OrchestrationCliContext with optional dependency overrides.
+
+        Parameters
+        ----------
+        uuid_factory : Callable[[], str] | None, optional
+            UUID generation factory.
+        bm25_builder : Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]] | None, optional
+            BM25 index builder function.
+        faiss_runner : Callable[[IndexCliConfig], dict[str, object]] | None, optional
+            FAISS indexing runner function.
+        artifact_fs : ArtifactFS | None, optional
+            Artifact filesystem interface.
+
+        Returns
+        -------
+        OrchestrationCliContext
+            Configured orchestration CLI context.
+        """
         return OrchestrationCliContext(
             uuid_factory=uuid_factory or base.uuid_factory,
             bm25_builder=bm25_builder or base.bm25_builder,
@@ -494,6 +576,22 @@ def fixture_xtr_cli_context_builder() -> Callable[..., XtrOpenContext]:
         paths_resolver: Callable[[AppConfig], ResolvedPaths] | None = None,
         index_factory: Callable[[Path, AppConfig], XTRIndex] | None = None,
     ) -> XtrOpenContext:
+        """Build XtrOpenContext with optional dependency overrides.
+
+        Parameters
+        ----------
+        app_config_loader : Callable[[], AppConfig] | None, optional
+            Application configuration loader.
+        paths_resolver : Callable[[AppConfig], ResolvedPaths] | None, optional
+            Paths resolver function.
+        index_factory : Callable[[Path, AppConfig], XTRIndex] | None, optional
+            XTR index factory function.
+
+        Returns
+        -------
+        XtrOpenContext
+            Configured XTR CLI context.
+        """
         return XtrOpenContext(
             app_config_loader=app_config_loader or base.app_config_loader,
             paths_resolver=paths_resolver or base.paths_resolver,
@@ -518,6 +616,18 @@ def fixture_bm25_cli_context_builder() -> Callable[..., BM25CliContext]:
         *,
         manager_factory: Callable[[], BM25IndexManager] | None = None,
     ) -> BM25CliContext:
+        """Build BM25CliContext with optional manager factory override.
+
+        Parameters
+        ----------
+        manager_factory : Callable[[], BM25IndexManager] | None, optional
+            BM25 index manager factory.
+
+        Returns
+        -------
+        BM25CliContext
+            Configured BM25 CLI context.
+        """
         return BM25CliContext(manager_factory=manager_factory or base.manager_factory)
 
     return build
@@ -540,6 +650,22 @@ def fixture_splade_cli_context_builder() -> Callable[..., SpladeCliContext]:
         encoder_factory: Callable[[], SpladeEncoderService] | None = None,
         index_factory: Callable[[], SpladeIndexManager] | None = None,
     ) -> SpladeCliContext:
+        """Build SpladeCliContext with optional factory overrides.
+
+        Parameters
+        ----------
+        artifacts_factory : Callable[[], SpladeArtifactsManager] | None, optional
+            Artifacts manager factory.
+        encoder_factory : Callable[[], SpladeEncoderService] | None, optional
+            Encoder service factory.
+        index_factory : Callable[[], SpladeIndexManager] | None, optional
+            Index manager factory.
+
+        Returns
+        -------
+        SpladeCliContext
+            Configured SPLADE CLI context.
+        """
         return SpladeCliContext(
             artifacts_factory=artifacts_factory or base.artifacts_factory,
             encoder_factory=encoder_factory or base.encoder_factory,
@@ -566,6 +692,22 @@ def fixture_download_cli_context_builder() -> Callable[..., DownloadCliContext]:
         artifact_dir: Path | None = None,
         artifact_fs: ArtifactFS | None = None,
     ) -> DownloadCliContext:
+        """Build DownloadCliContext with optional dependency overrides.
+
+        Parameters
+        ----------
+        harvest_handler : HarvestHandler | None, optional
+            Harvest handler instance.
+        artifact_dir : Path | None, optional
+            Artifact directory path.
+        artifact_fs : ArtifactFS | None, optional
+            Artifact filesystem interface.
+
+        Returns
+        -------
+        DownloadCliContext
+            Configured download CLI context.
+        """
         return DownloadCliContext(
             harvest_handler=harvest_handler or base.harvest_handler,
             artifact_dir=artifact_dir or base.artifact_dir,
@@ -588,6 +730,18 @@ def fixture_sample_repo_builder(
     """
 
     def build(subdir: str | None = None) -> SampleRepo:
+        """Build sample repository in temporary directory.
+
+        Parameters
+        ----------
+        subdir : str | None, optional
+            Subdirectory name for temporary directory.
+
+        Returns
+        -------
+        SampleRepo
+            Bootstrapped sample repository instance.
+        """
         base_dir = tmp_path_factory.mktemp(subdir or "sample_repo")
         return bootstrap_sample_repo(base_dir)
 
@@ -624,6 +778,22 @@ def fixture_repo_scan_invoker(tmp_path: Path) -> Callable[..., tuple[dict[str, A
         out_dir: Path | None = None,
         argv: list[str] | None = None,
     ) -> tuple[dict[str, Any], Path, Path]:
+        """Run repo_scan with specified arguments.
+
+        Parameters
+        ----------
+        scan_root : Path
+            Root directory to scan.
+        out_dir : Path | None, optional
+            Output directory for artifacts.
+        argv : list[str] | None, optional
+            Additional command-line arguments.
+
+        Returns
+        -------
+        tuple[dict[str, Any], Path, Path]
+            Tuple of payload dictionary, dot file path, and enriched dot file path.
+        """
         out_root = out_dir or (tmp_path / "repo_scan_out")
         out_root.mkdir(parents=True, exist_ok=True)
         json_path = out_root / "metrics.json"

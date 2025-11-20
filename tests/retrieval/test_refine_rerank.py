@@ -20,6 +20,18 @@ class _CatalogStub:
         self._embeddings = embeddings
 
     def get_embeddings_by_ids(self, ids: list[int]) -> tuple[list[int], np.ndarray]:
+        """Get embeddings for chunk IDs.
+
+        Parameters
+        ----------
+        ids : list[int]
+            Chunk IDs to look up.
+
+        Returns
+        -------
+        tuple[list[int], np.ndarray]
+            Tuple of filtered IDs and stacked embedding vectors.
+        """
         filtered = [chunk_id for chunk_id in ids if chunk_id in self._embeddings]
         if not filtered:
             dim = len(next(iter(self._embeddings.values())))

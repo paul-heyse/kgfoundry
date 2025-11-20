@@ -312,6 +312,13 @@ def test_decorator_success_case() -> None:
 
     @handle_adapter_errors(operation="test:operation", empty_result=empty_result)
     def test_func() -> dict:
+        """Return successful result for decorator test.
+
+        Returns
+        -------
+        dict
+            Dictionary with value and other fields.
+        """
         return {"value": 42, "other": "data"}
 
     result = test_func()
@@ -328,6 +335,13 @@ def test_decorator_catches_exception() -> None:
 
     @handle_adapter_errors(operation="test:operation", empty_result=empty_result)
     def test_func() -> dict:
+        """Raise FileNotFoundError to test decorator exception handling.
+
+        Raises
+        ------
+        FileNotFoundError
+            Always raised with message "File not found".
+        """
         msg = "File not found"
         raise FileNotFoundError(msg)
 
@@ -378,6 +392,13 @@ async def test_decorator_async_function() -> None:
 
     @handle_adapter_errors(operation="test:operation", empty_result=empty_result)
     async def async_test_func() -> dict:
+        """Return successful async result for decorator test.
+
+        Returns
+        -------
+        dict
+            Dictionary with value field.
+        """
         await asyncio.sleep(0)  # Ensure function is actually async
         return {"value": 42}
 
@@ -394,6 +415,13 @@ async def test_decorator_async_function_error() -> None:
 
     @handle_adapter_errors(operation="test:operation", empty_result=empty_result)
     async def async_test_func() -> dict:
+        """Raise ValueError in async function to test decorator exception handling.
+
+        Raises
+        ------
+        ValueError
+            Always raised with message "Async error".
+        """
         await asyncio.sleep(0)  # Ensure function is actually async
         msg = "Async error"
         raise ValueError(msg)
@@ -411,6 +439,27 @@ def test_decorator_multiple_exception_types() -> None:
 
     @handle_adapter_errors(operation="test:operation", empty_result=empty_result)
     def test_func(raise_type: str) -> dict:
+        """Raise exception based on raise_type parameter for decorator test.
+
+        Parameters
+        ----------
+        raise_type : str
+            Type of exception to raise: "FileNotFoundError", "ValueError", or "RuntimeError".
+
+        Returns
+        -------
+        dict
+            Dictionary with value field if no exception is raised.
+
+        Raises
+        ------
+        FileNotFoundError
+            Raised when raise_type is "FileNotFoundError".
+        ValueError
+            Raised when raise_type is "ValueError".
+        RuntimeError
+            Raised when raise_type is "RuntimeError".
+        """
         if raise_type == "FileNotFoundError":
             msg = "File not found"
             raise FileNotFoundError(msg)
@@ -441,6 +490,13 @@ def test_decorator_with_kgfoundry_error() -> None:
 
     @handle_adapter_errors(operation="search:text", empty_result=empty_result)
     def test_func() -> dict:
+        """Raise VectorSearchError to test KgFoundryError handling in decorator.
+
+        Raises
+        ------
+        VectorSearchError
+            Always raised with message "Search timeout" and query context.
+        """
         msg = "Search timeout"
         raise VectorSearchError(msg, context={"query": "test"})
 
@@ -460,6 +516,13 @@ def test_decorator_empty_result_variations() -> None:
 
     @handle_adapter_errors(operation="files:open_file", empty_result=open_file_empty)
     def open_file_func() -> dict:
+        """Raise FileNotFoundError to test open_file empty result structure.
+
+        Raises
+        ------
+        FileNotFoundError
+            Always raised with message "File not found".
+        """
         msg = "File not found"
         raise FileNotFoundError(msg)
 
@@ -474,6 +537,13 @@ def test_decorator_empty_result_variations() -> None:
 
     @handle_adapter_errors(operation="files:list_paths", empty_result=list_paths_empty)
     def list_paths_func() -> dict:
+        """Raise ValueError to test list_paths empty result structure.
+
+        Raises
+        ------
+        ValueError
+            Always raised with message "Invalid path".
+        """
         msg = "Invalid path"
         raise ValueError(msg)
 

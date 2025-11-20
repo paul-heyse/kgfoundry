@@ -15,6 +15,13 @@ class _DummyFaiss:
     nprobe: int = 1
 
     def set_nprobe(self, value: int) -> None:
+        """Set nprobe parameter value.
+
+        Parameters
+        ----------
+        value : int
+            New nprobe value to set.
+        """
         self.nprobe = value
 
 
@@ -41,6 +48,13 @@ def test_adjuster_runs_once() -> None:
     calls = {"count": 0}
 
     def factory() -> _DummyFaiss:
+        """Create DummyFaiss instance and track call count.
+
+        Returns
+        -------
+        _DummyFaiss
+            New DummyFaiss instance.
+        """
         calls["count"] += 1
         return _DummyFaiss()
 

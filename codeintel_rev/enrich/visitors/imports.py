@@ -21,6 +21,21 @@ class _LegacyImportMutable:
     level: int
 
     def to_record(self) -> LegacyImportRecord:
+        """Convert mutable accumulator to immutable legacy import record.
+
+        Returns
+        -------
+        LegacyImportRecord
+            Immutable record containing module, names tuple, aliases dictionary,
+            star import flag, and relative import level. Names and aliases are
+            converted from mutable lists/dicts to immutable tuples/dicts.
+
+        Notes
+        -----
+        This method creates an immutable snapshot of the import state for
+        serialization and graph construction. The conversion ensures that
+        the record cannot be modified after creation.
+        """
         return LegacyImportRecord(
             module=self.module,
             names=tuple(self.names),

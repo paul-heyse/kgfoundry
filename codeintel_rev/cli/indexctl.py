@@ -408,6 +408,7 @@ def _cli_context(ctx: click.Context | None = None) -> IndexctlCliContext:
     state["cli_context"] = _DEFAULT_CONTEXT
     return _DEFAULT_CONTEXT
 
+
 RootOption = Annotated[Path | None, typer.Option("--root", help="Index lifecycle root directory.")]
 ExtraOption = Annotated[
     list[str],

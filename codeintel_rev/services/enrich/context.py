@@ -204,6 +204,14 @@ class PipelineOptions:
     max_file_bytes : int, optional
         Maximum file size in bytes to process. Files larger than this are
         skipped. Must be positive. Defaults to DEFAULT_MAX_FILE_BYTES.
+    graph_goids : bool, optional
+        Whether to build GOID artifacts during pipeline execution.
+    graph_callgraph : bool, optional
+        Whether to build call graph artifacts during pipeline execution.
+    graph_cfg : bool, optional
+        Whether to build CFG artifacts during pipeline execution.
+    graph_dfg : bool, optional
+        Whether to build DFG artifacts during pipeline execution.
     """
 
     root: Path = Path()
@@ -214,6 +222,10 @@ class PipelineOptions:
     coverage_xml: Path = Path("coverage.xml")
     only: tuple[str, ...] = ()
     max_file_bytes: int = DEFAULT_MAX_FILE_BYTES
+    build_goids: bool = False
+    build_callgraph: bool = False
+    build_cfg: bool = False
+    build_dfg: bool = False
 
 
 @dataclass(slots=True, frozen=True)

@@ -26,6 +26,24 @@ class _StubXTRIndex:
         explain: bool,
         topk_explanations: int,
     ) -> list[tuple[int, float, dict[str, object] | None]]:
+        """Rescore candidates and track call parameters.
+
+        Parameters
+        ----------
+        query : str
+            Query string to record.
+        candidate_chunk_ids : Iterable[int]
+            Candidate chunk IDs to record.
+        explain : bool
+            Explanation flag to record.
+        topk_explanations : int
+            Top-K explanations count to record.
+
+        Returns
+        -------
+        list[tuple[int, float, dict[str, object] | None]]
+            Pre-configured triples (chunk_id, score, explanation).
+        """
         self.last_query = query
         self.last_candidates = list(candidate_chunk_ids)
         self.last_explain = explain

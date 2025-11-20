@@ -126,6 +126,26 @@ if cst is not None:
             self,
             original_node: libcst_types.If,
         ) -> None:
+            """Bridge CamelCase hook invoked by LibCST to the snake_case override.
+
+            Extended Summary
+            ----------------
+            This method is the CamelCase entry point required by LibCST's visitor
+            framework. It delegates to the snake_case :meth:`leave_if` method,
+            which handles tracking exit from TYPE_CHECKING guard blocks. This bridge
+            pattern allows the codebase to use consistent snake_case naming while
+            maintaining LibCST compatibility.
+
+            Parameters
+            ----------
+            original_node : libcst_types.If
+                If statement node being exited.
+
+            Notes
+            -----
+            This is a bridge method that should not be overridden directly. The
+            implementation delegates to :meth:`leave_if` for actual processing.
+            """
             self.leave_if(original_node)
 
         def visit_import(self, node: libcst_types.Import) -> bool | None:

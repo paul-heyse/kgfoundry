@@ -96,6 +96,26 @@ def test_dual_search_merge_with_refine() -> None:
         top_k: int,
         metric: str,
     ) -> tuple[NDArrayF32, NDArrayI64]:
+        """Return stub rerank results for test.
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog
+            Catalog (unused).
+        queries : NDArrayF32
+            Query vectors (unused).
+        candidate_ids : NDArrayI64
+            Candidate chunk IDs.
+        top_k : int
+            Number of top results to return.
+        metric : str
+            Distance metric (unused).
+
+        Returns
+        -------
+        tuple[NDArrayF32, NDArrayI64]
+            Tuple of distance and ID arrays.
+        """
         del catalog, queries, metric
         batch = candidate_ids.shape[0]
         distances: NDArrayF32 = np.full((batch, top_k), 1.0, dtype=np.float32)

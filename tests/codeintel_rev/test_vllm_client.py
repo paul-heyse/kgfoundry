@@ -26,11 +26,26 @@ class _FailingHTTPClient:
         self.post_calls = 0
 
     def post(self, *_: object, **__: object) -> object:
+        """Raise AssertionError to prevent HTTP client usage.
+
+        Parameters
+        ----------
+        *_ : object
+            Positional arguments (unused).
+        **__ : object
+            Keyword arguments (unused).
+
+        Raises
+        ------
+        AssertionError
+            Always raised with message "HTTP client should not be used".
+        """
         self.post_calls += 1
         message = "HTTP client should not be used"
         raise AssertionError(message)
 
     def close(self) -> None:
+        """Mark client as closed."""
         self.closed = True
 
 
@@ -40,11 +55,26 @@ class _FailingAsyncClient:
         self.post_calls = 0
 
     async def post(self, *_: object, **__: object) -> object:
+        """Raise AssertionError to prevent async HTTP client usage.
+
+        Parameters
+        ----------
+        *_ : object
+            Positional arguments (unused).
+        **__ : object
+            Keyword arguments (unused).
+
+        Raises
+        ------
+        AssertionError
+            Always raised with message "Async HTTP client should not be used".
+        """
         self.post_calls += 1
         message = "Async HTTP client should not be used"
         raise AssertionError(message)
 
     async def aclose(self) -> None:
+        """Mark async client as closed."""
         self.closed = True
 
 
@@ -55,6 +85,7 @@ class _StubInprocessEngine:
         self.closed = False
 
     def close(self) -> None:
+        """Mark inprocess engine as closed."""
         self.closed = True
 
 

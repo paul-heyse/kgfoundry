@@ -26,8 +26,8 @@ class XTRReranker(Reranker):
         Set of capability requirements: "xtr_index_present", "torch_importable".
     """
 
-    name = "xtr"
-    requires = frozenset({"xtr_index_present", "torch_importable"})
+    name: str = "xtr"
+    requires: frozenset[str] = frozenset({"xtr_index_present", "torch_importable"})
 
     def __init__(self, index: XTRIndex) -> None:
         self._index = index

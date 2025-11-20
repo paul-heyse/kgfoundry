@@ -17,7 +17,7 @@ dependencies = [
     "certifi>=2025.10.5",
     "pyrate-limiter>=3.9",
     "url-normalize>=2.2.0",
-    "uvicorn>=0.38.0",
+    #"uvicorn>=0.38.0",
     "fastapi>=0.115.0",
     # ============================================================================
     # Data Processing & Storage
@@ -70,21 +70,13 @@ dependencies = [
     # ============================================================================
     # CLI & User Experience
     # ============================================================================
-    "typer<0.20.0",
+    "typer",
     "rich",
     "tqdm>=4.67.1",
-    "black[jupyter]>=25.9.0",
     "ruff>=0.14.2",
-    "prefect>=3.4.25",
     # ============================================================================
     # Type Stubs
     # ============================================================================
-    "types-networkx",
-    "types-protobuf",
-    "types-psutil",
-    "types-python-dateutil",
-    "types-tqdm",
-    "types-ujson",
     # ============================================================================
     # Utilities
     # ============================================================================
@@ -120,66 +112,24 @@ dependencies = [
     # ============================================================================
     # Documentation
     # ============================================================================
-    "sphinx>=8.2.3",
-    "myst-parser[linkify]>=3.0.1",
-    "pydata-sphinx-theme>=0.15.4",
-    "sphinx-sitemap>=2.6.0",
-    "sphinx-copybutton>=0.5.2",
-    "sphinx-design>=0.5.0",
-    "sphinx-autoapi>=3.3.0",
-    "astroid>=4.0.0",
-    "sphinx-autobuild>=2024.4.3",
-    "sphinx-autodoc-typehints>=1.27.0",
-    "sphinxext-opengraph[social-cards]>=0.13.0",
-    "sphinx-notfound-page>=1.1.0",
-    "sphinxext-rediraffe>=0.3.0",
-    "sphinx-codeautolink>=0.17.5",
-    "autodoc-pydantic>=2.0.0",
-    "myst-nb>=1.3.0",
-    "sphinxcontrib-mermaid>=0.7.1",
-    "sphinx-issues>=5.0.1",
-    "sphinxcontrib-spelling>=7.7.0",
-    "numpydoc>=1.7.0",
     "pyenchant>=3.3.0",
-    "linkify-it-py>=2.0.3",
-    "sphinxcontrib-typer>=0.6.2",
-    "nbsphinx>=0.9.1",
-    "nbformat>=5.10.2",
-    "ipykernel>=6.29.5",
-    "ipywidgets>=8.1.1",
-    "sphinx-favicon>=0.2.0",
-    "sphinx-inline-tabs>=0.3.0",
-    "sphobjinv>=2.3.1.3",
-    "graphviz>=0.21",
     "pydeps>=1.12.20",
     "pylint>=3.2.0",
-    "sphinx-gallery>=0.17.1",
     "xdoctest>=1.1.4",
     "pandera>=0.20.0",
     "griffe",
     "jinja2>=3.1.4",
     "LibCST>=1.4.0",
-    "doq", # generate docstring skeletons
     "pyment", # fill/convert to preferred style (Google/NumPy/reST)
     "docstr-coverage>=2.3.2", # enforce docstring coverage
     "pydoclint>=0.4.0", # enforce numpy-style parameter/return parity
     "pydocstyle", # PEP-257 lint
     "docformatter", # format docstrings
-    "mkdocs",
-    "mkdocs-material",
-    "mkdocstrings[python]",
-    "mkdocs-gen-files",
-    "mkdocs-literate-nav",
-    "mkdocs-section-index",
-    "numpydoc-validation",
     "pydot",
     "networkx",
     "pytest-doctestplus",
-    "griffe2md",
     "scipy-doctest",
-    "mkdocs-llmstxt",
     "jpype1>=1.6.0",
-    "myst-parser",
     "pytest-asyncio>=1.2.0",
     "pytestarch>=4.0.1",
     "build>=1.2.2",
@@ -203,22 +153,6 @@ dependencies = [
     "griffe-public-wildcard-imports>=0.2.1",
     "click",
     "cyclonedx-python-lib>=11.5.0",
-    "mkdocstrings-python>=1.18.2",
-    "mkdocs-autorefs>=1.4.3",
-    "mkdocs-d2-plugin>=1.6.0",
-    "mkdocs-redoc-tag>=0.2.0",
-    "mkdocs-redirects>=1.2.2",
-    "mkdocs-minify-plugin>=0.8.0",
-    "mkdocs-git-revision-date-localized-plugin>=1.5.0",
-    "mkdocs-glightbox>=0.5.2",
-    "mkdocs-mermaid2-plugin>=1.2.3",
-    "mkdocs-puml>=2.1.0",
-    "mkdocs-awesome-nav>=3.2.0",
-    "mkdocs-include-markdown-plugin>=7.2.0",
-    "mkdocs-macros-plugin>=1.4.1",
-    "mkdocs-monorepo-plugin>=1.1.2",
-    "mkdocs-typer>=0.0.3",
-    "mkdocs-typer2>=0.1.6",
     "mcp[cli]>=1.20.0",
     "hypercorn[h3]>=0.17.3",
     "ast-grep-py>=0.39.9",
@@ -238,9 +172,6 @@ dependencies = [
     "onnxruntime>=1.18.0",
     "sentence-transformers>=5.1.2",
     "fixit>=2.2.0",
-    "ufmt",
-    "usort",
-    "apache-tvm-ffi>=0.1.0b15",
     "pyan3>=1.2.0",
     "pycg>=0.0.8",
     "pipdeptree>=2.29.0",
@@ -257,6 +188,7 @@ dependencies = [
     "uuid6>=2025.0.1",
     "faiss-cpu>=1.12",
     "pytest-xdist[psutil]>=3.8.0",
+    "prefect>=3.6.3",
 ]
 
 [project.scripts]
@@ -264,7 +196,6 @@ docs-build-symbol-index = "docs.toolchain:build_symbol_index"
 docs-validate-artifacts = "docs.toolchain:validate_artifacts"
 docs-symbol-delta = "docs.toolchain:symbol_delta"
 tools-build-navmap = "tools.cli:build_navmap"
-docs-serve-mkdocs = "tools.mkdocs_suite.serve:main"
 codeintel-enrich = "codeintel_rev.cli.enrich.__main__:main"
 codeintel-enrich-pipeline = "codeintel_rev.cli.enrich_pipeline:main"
 codeintel-enrich-analytics = "codeintel_rev.cli.enrich.analytics:main"
@@ -276,8 +207,6 @@ codeintel-cst = "codeintel_rev.cst_build.cst_cli:main"
 [project.optional-dependencies]
 docs = [
     "griffe>=1.8.0",
-    "sphinx>=8.2.3,<9",
-    "sphinx-autoapi>=3.2.0",
 ]
 faiss = [
     "faiss-cpu>=1.12",
@@ -312,32 +241,22 @@ scan-plus = [
 ]
 gpu = [
     "cython>=3.2.0b1",
-    "pylibraft-cu12",
-    "rmm-cu12",
+    #"pylibraft-cu12",
+    #"rmm-cu12",
     "torch",
     "torchvision",
     "torchaudio",
-    "apache-tvm-ffi",
     "flashinfer-python",
     "flashinfer-cubin",
-    "compressed-tensors",
-    "accelerate",
-    "easyocr",
     "docling",
     "docling-ibm-models",
-    "openai",
-    "openai-harmony",
-    "openai-whisper",
     "transformers",
     "keybert",
     "stanza",
-    "xgrammar",
-    "safetensors",
-    "triton",
-    "vllm==0.11.0",
-    #"faiss==1.12.0 ; python_version >= '3.13' and python_version < '3.14' and platform_system == 'Linux' and platform_machine == 'x86_64'",
-    "ray",
+    "vllm>=0.11.1",
 ]
+    #"faiss==1.12.0 ; python_version >= '3.13' and python_version < '3.14' and platform_system == 'Linux' and platform_machine == 'x86_64'",
+
 minimal = [
     "fastapi>=0.115.0",
     "msgspec>=0.19.0",
@@ -394,6 +313,7 @@ extend-exclude = [
     "codeintel/ts_languages/**",
     "codeintel_rev/io/TEMP_BM25+SPLADE_GUIDE/**",
     "codeintel_rev/patches/**",
+    "OpenAI_patch_maker.py"
 ]
 
 [tool.ruff.format]
@@ -565,38 +485,6 @@ ignore_names = [
 ]
 
 
-[tool.docs.extensions]
-enabled = [
-    "myst_parser",
-    "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
-    "sphinx.ext.napoleon",
-    "sphinx.ext.intersphinx",
-    "sphinx.ext.viewcode",
-    "sphinx.ext.linkcode",
-    "sphinx.ext.autosectionlabel",
-    "sphinx.ext.githubpages",
-    "sphinx.ext.todo",
-    "sphinx.ext.coverage",
-    "sphinx_sitemap",
-    "sphinx_copybutton",
-    "sphinx_design",
-    "autoapi.extension",
-    "sphinxext.opengraph",
-    "notfound.extension",
-    "sphinxext.rediraffe",
-    "sphinx_codeautolink",
-    "sphinxcontrib.autodoc_pydantic",
-    "sphinx_issues",
-    "sphinxcontrib.spelling",
-    "sphinx.ext.graphviz",
-    "sphinx.ext.inheritance_diagram",
-    "sphinxcontrib.mermaid",
-    "numpydoc-validation",
-]
-optional = [
-    "myst_nb",
-]
 
 [tool.pytest.ini_options]
 markers = [
@@ -616,9 +504,9 @@ testpaths = ["tests"]
 #xformers = { index = "wheelhouse" }
 
 # point torch packages to the *named* PyTorch cu129 index
-torch = [       { index = "pytorch-cu129" } ]
-torchvision = [ { index = "pytorch-cu129" } ]
-torchaudio = [  { index = "pytorch-cu129" } ]
+torch = [       { index = "pytorch-cu130" } ]
+torchvision = [ { index = "pytorch-cu130" } ]
+torchaudio = [  { index = "pytorch-cu130" } ]
 
 #flashinfer-python = [  { index = "flashinfer-nightly" } ]
 #flashinfer-cubin = [  { index = "flashinfer-nightly" } ]
@@ -653,10 +541,10 @@ url  = "https://download.pytorch.org/whl/cu129"
 explicit = true
 
 # NEW — define the cu130 index *by name*, then reference it above
-#[[tool.uv.index]]
-#name = "pytorch-cu130"
-#url  = "https://download.pytorch.org/whl/cu130"
-#explicit = true
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url  = "https://download.pytorch.org/whl/cu130"
+explicit = true
 
 #[[tool.uv.index]]
 #name = "flashinfer-nightly"
@@ -724,14 +612,3 @@ coverage-action = "error"
 missing-params-action = "error"
 missing-returns-action = "error"
 
-[tool.refurb]
-python_version = "3.13"
-# Once the initial migration is complete, add rule IDs along with justifications when
-# suppressing specific diagnostics.
-# ignore = [
-#   "FURB123",
-# ]
-
-[dependency-groups]
-dev = [
-]

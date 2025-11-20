@@ -40,6 +40,18 @@ class _StubLLM:
         self.calls: list[list[list[int]]] = []
 
     def embed(self, prompts: Sequence[TokensPrompt]) -> list[_StubEmbeddingResult]:
+        """Generate stub embeddings for test prompts.
+
+        Parameters
+        ----------
+        prompts : Sequence[TokensPrompt]
+            Token prompts to embed.
+
+        Returns
+        -------
+        list[_StubEmbeddingResult]
+            List of stub embedding results with embeddings based on token length.
+        """
         token_ids = [prompt.prompt_token_ids for prompt in prompts]
         self.calls.append([list(ids) for ids in token_ids])
 

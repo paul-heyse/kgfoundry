@@ -433,7 +433,7 @@ class RuntimeCell[T]:
         mode catches and swallows all exceptions.
 
         When ``silent=False`` and an unexpected exception occurs during payload disposal
-        (not AttributeError, OSError, or RuntimeError), it is re-raised via ``raise exc``
+        (not AttributeError, OSError, or RuntimeError), it is re-raised via bare ``raise``
         to preserve the original exception type and stack trace. This defensive catch-all
         ensures all exceptions propagate correctly when silent mode is disabled. The
         specific exception type is determined by the payload being closed and can be
@@ -702,10 +702,10 @@ class RuntimeCell[T]:
 
         Notes
         -----
-        Any exception raised by the factory function is re-raised after recording
-        the failure in the observer. The exception type matches what the factory
-        function raises. This method handles initialization lifecycle tracking and
-        error propagation.
+        Any exception raised by the factory function is re-raised via bare ``raise``
+        after recording the failure in the observer. The exception type matches what
+        the factory function raises. This method handles initialization lifecycle
+        tracking and error propagation.
         """
         start = time.monotonic()
         self._observer.on_init_start(cell=self._name, generation=generation, context=context)

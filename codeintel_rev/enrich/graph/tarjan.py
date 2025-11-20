@@ -27,6 +27,21 @@ def tarjan_scc(edges: Mapping[str, set[str]]) -> dict[str, int]:
     component_id = 0
 
     def strongconnect(node: str) -> None:
+        """Compute strongly connected component for a node using Tarjan's algorithm.
+
+        Parameters
+        ----------
+        node : str
+            Node identifier to compute SCC for. The function recursively
+            processes neighbors and assigns component IDs.
+
+        Notes
+        -----
+        This is a nested function implementing Tarjan's SCC algorithm. It
+        maintains indices, lowlink values, and a stack to identify strongly
+        connected components. Nodes are assigned component IDs when a root
+        of an SCC is found.
+        """
         nonlocal index, component_id
         indices[node] = index
         lowlink[node] = index

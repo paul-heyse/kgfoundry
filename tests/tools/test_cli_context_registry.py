@@ -91,6 +91,18 @@ def test_context_for_is_cached() -> None:
     call_count = {"value": 0}
 
     def tracking_loader(settings: CLIToolSettings) -> CLIToolingContext:
+        """Context factory that tracks invocation count.
+
+        Parameters
+        ----------
+        settings : CLIToolSettings
+            CLI tool settings for context creation.
+
+        Returns
+        -------
+        CLIToolingContext
+            Loaded CLI tooling context.
+        """
         call_count["value"] += 1
         return load_cli_tooling_context(settings)
 
@@ -141,7 +153,10 @@ def test_operation_override_dispatch() -> None:
     command = _unique_key("override-cli")
 
     class DummyAugment:
+        """Test double for augment metadata that records operation override calls."""
+
         def __init__(self) -> None:
+            """Initialize with empty call log."""
             self.calls: list[tuple[str, Sequence[str] | None]] = []
 
         def operation_override(
@@ -149,12 +164,38 @@ def test_operation_override_dispatch() -> None:
             operation_id: str,
             tokens: Sequence[str] | None = None,
         ) -> OperationOverrideModel:
+            """Record operation override call and return test model.
+
+            Parameters
+            ----------
+            operation_id : str
+                Operation identifier being overridden.
+            tokens : Sequence[str] | None, optional
+                Optional command tokens for the operation.
+
+            Returns
+            -------
+            OperationOverrideModel
+                Test override model with summary "override-result".
+            """
             self.calls.append((operation_id, tokens))
             return OperationOverrideModel(summary="override-result")
 
     dummy = DummyAugment()
 
     def context_factory(_settings: CLIToolSettings) -> CLIToolingContext:
+        """Create test CLI tooling context with dummy augment.
+
+        Parameters
+        ----------
+        _settings : CLIToolSettings
+            CLI tool settings (unused in test context).
+
+        Returns
+        -------
+        CLIToolingContext
+            Test context with dummy augment and registry.
+        """
         registry = SimpleNamespace(interface=lambda *_args, **_kwargs: None)
         return CLIToolingContext(
             augment=cast("AugmentMetadataModel", dummy),

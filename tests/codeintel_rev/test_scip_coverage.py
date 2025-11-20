@@ -23,6 +23,24 @@ class _StubFaissManager:
         nprobe: int | None = None,
         runtime: object | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
+        """Return stub search results for test.
+
+        Parameters
+        ----------
+        query : np.ndarray
+            Query vector (unused).
+        k : int | None, optional
+            Number of results to return.
+        nprobe : int | None, optional
+            Nprobe parameter (unused).
+        runtime : object | None, optional
+            Runtime object (unused).
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            Tuple of distance and ID arrays with stub values.
+        """
         del self, query, nprobe, runtime
         result_k = max(1, int(k or 1))
         ids = np.full((1, result_k), 101, dtype=np.int64)
@@ -34,6 +52,18 @@ class _StubVLLMClient:
     """Stub satisfying SupportsEmbedSingle."""
 
     def embed_single(self, text: str) -> list[float]:
+        """Return stub embedding vector for test.
+
+        Parameters
+        ----------
+        text : str
+            Text to embed (must be non-empty).
+
+        Returns
+        -------
+        list[float]
+            Zero-filled embedding vector [0.0, 0.0].
+        """
         del self
         assertions.expect_true(bool(text), reason="text should be non-empty")
         return [0.0, 0.0]

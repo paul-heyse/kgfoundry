@@ -20,11 +20,37 @@ class _StubSpladeBackend(SpladeBackend):
         self.last_k: int | None = None
 
     def encode_query(self, text: str) -> np.ndarray:
+        """Encode query text and track call count.
+
+        Parameters
+        ----------
+        text : str
+            Query text (unused).
+
+        Returns
+        -------
+        np.ndarray
+            Stub embedding array of shape (1, 2).
+        """
         self.encode_calls += 1
         _ = text
         return np.ones((1, 2), dtype=np.float32)
 
     def search(self, query_vec: SpladeQueryRepresentation, k: int) -> list[tuple[int, float]]:
+        """Search with query vector and record k parameter.
+
+        Parameters
+        ----------
+        query_vec : SpladeQueryRepresentation
+            Query vector representation (unused).
+        k : int
+            Number of results to return.
+
+        Returns
+        -------
+        list[tuple[int, float]]
+            Stub search results [(10, 1.2), (20, 0.4)].
+        """
         self.last_k = k
         _ = query_vec
         return [(10, 1.2), (20, 0.4)]
@@ -35,6 +61,20 @@ class _StubBM25Backend(BM25Backend):
         self.calls = 0
 
     def search(self, query_text: str, k: int) -> list[tuple[int, float]]:
+        """Search with query text and track call count.
+
+        Parameters
+        ----------
+        query_text : str
+            Query text (unused).
+        k : int
+            Number of results (unused).
+
+        Returns
+        -------
+        list[tuple[int, float]]
+            Stub search results [(5, 0.9), (15, 0.2)].
+        """
         _ = (query_text, k)
         self.calls += 1
         return [(5, 0.9), (15, 0.2)]
@@ -57,6 +97,20 @@ def test_bm25_engine_coerces_backend_values() -> None:
             self.calls = 0
 
         def search(self, query_text: str, k: int) -> list[tuple[int, float]]:
+            """Search with query text and track call count.
+
+            Parameters
+            ----------
+            query_text : str
+                Query text (unused).
+            k : int
+                Number of results (unused).
+
+            Returns
+            -------
+            list[tuple[int, float]]
+                Stub search results [(9, 3.14), (11, 2.0)].
+            """
             _ = (query_text, k)
             self.calls += 1
             return [(9, 3.14), (11, 2.0)]

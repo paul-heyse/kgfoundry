@@ -33,6 +33,18 @@ class _StubEmbedder:
         self._dim = dim
 
     def embed_single(self, text: str) -> list[float]:
+        """Return stub embedding based on text length.
+
+        Parameters
+        ----------
+        text : str
+            Text to embed.
+
+        Returns
+        -------
+        list[float]
+            Embedding vector with length(text) repeated dim times.
+        """
         return [float(len(text))] * self._dim
 
 
@@ -59,6 +71,13 @@ class _StubFaiss:
 
     @property
     def runtime(self) -> VectorRuntime:
+        """Return stub runtime instance.
+
+        Returns
+        -------
+        VectorRuntime
+            Stub FAISS runtime.
+        """
         return self._runtime
 
     @staticmethod
@@ -126,6 +145,18 @@ class _StubCatalog:
         ]
 
     def query_by_ids(self, ids: Sequence[int]) -> list[dict[str, object]]:
+        """Query rows by chunk IDs.
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Chunk IDs to look up.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            Matching rows from internal storage.
+        """
         wanted = set(ids)
         return [row for row in self._rows if row["id"] in wanted]
 
@@ -137,10 +168,40 @@ class _StubCatalog:
         exclude_globs: list[str] | None = None,
         languages: list[str] | None = None,
     ) -> list[dict[str, object]]:
+        """Query rows by IDs with filter options (unused in stub).
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Chunk IDs to look up.
+        include_globs : list[str] | None, optional
+            Include glob patterns (unused).
+        exclude_globs : list[str] | None, optional
+            Exclude glob patterns (unused).
+        languages : list[str] | None, optional
+            Language filters (unused).
+
+        Returns
+        -------
+        list[dict[str, object]]
+            Matching rows from query_by_ids.
+        """
         _ = (include_globs, exclude_globs, languages)
         return self.query_by_ids(ids)
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
+        """Get structure annotations for chunk IDs.
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Chunk IDs to look up.
+
+        Returns
+        -------
+        dict[int, StructureAnnotations]
+            Dictionary mapping chunk IDs to structure annotations.
+        """
         row_map: dict[int, dict[str, object]] = {}
         for row in self._rows:
             row_id = row.get("id")

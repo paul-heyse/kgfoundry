@@ -11,6 +11,13 @@ problem_details = importlib.import_module("tools._shared.problem_details")
 
 
 def test_coerce_optional_dict_handles_empty_values() -> None:
+    """Test that coerce_optional_dict returns None for empty inputs.
+
+    Extended Summary
+    ----------------
+    Verifies that the helper function correctly handles None and empty dict
+    inputs by returning None, while preserving non-empty dictionaries.
+    """
     helper = problem_details.coerce_optional_dict
     assertions.expect_equal(helper(None), None)
     assertions.expect_equal(helper({}), None)
@@ -26,6 +33,15 @@ class _SchemaError:
 
 
 def test_build_schema_problem_details_merges_optional_extensions() -> None:
+    """Test that schema problem details merge base and extension fields.
+
+    Extended Summary
+    ----------------
+    Verifies that build_schema_problem_details correctly merges base problem
+    details parameters with schema-specific error information and custom
+    extension fields, ensuring all fields appear in the final problem details
+    structure.
+    """
     base = problem_details.ProblemDetailsParams(
         type="https://kgfoundry.dev/problems/test",
         title="Test",

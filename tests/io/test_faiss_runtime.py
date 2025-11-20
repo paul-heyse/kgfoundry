@@ -31,18 +31,55 @@ class _BaseStubIndex:
         self.is_trained = True
 
     def add(self, vectors: object) -> None:  # pragma: no cover - interface stub
+        """Add vectors to index stub (no-op).
+
+        Parameters
+        ----------
+        vectors : object
+            Vectors to add (unused).
+        """
         del vectors
         self.ntotal += 0
 
     def add_with_ids(self, vectors: object, ids: object) -> None:  # pragma: no cover
+        """Add vectors with IDs to index stub (no-op).
+
+        Parameters
+        ----------
+        vectors : object
+            Vectors to add (unused).
+        ids : object
+            Vector IDs (unused).
+        """
         del vectors, ids
         self.ntotal += 0
 
     def train(self, vectors: object) -> None:  # pragma: no cover
+        """Train index stub (no-op).
+
+        Parameters
+        ----------
+        vectors : object
+            Training vectors (unused).
+        """
         del vectors
         self.is_trained = True
 
     def search(self, vectors: object, k: int) -> tuple[np.ndarray, np.ndarray]:  # pragma: no cover
+        """Search index stub (no-op).
+
+        Parameters
+        ----------
+        vectors : object
+            Query vectors (unused).
+        k : int
+            Number of results (unused).
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            Empty distance and ID arrays.
+        """
         del vectors, k
         self.ntotal += 0
         return (
@@ -51,9 +88,22 @@ class _BaseStubIndex:
         )
 
     def make_direct_map(self) -> None:  # pragma: no cover
+        """Create direct map stub (no-op)."""
         self.ntotal += 0
 
     def reconstruct(self, idx: int) -> np.ndarray:  # pragma: no cover
+        """Reconstruct vector stub (no-op).
+
+        Parameters
+        ----------
+        idx : int
+            Vector index (unused).
+
+        Returns
+        -------
+        np.ndarray
+            Empty vector array.
+        """
         del idx
         self.ntotal += 0
         return np.empty((0, 0), dtype=np.float32)

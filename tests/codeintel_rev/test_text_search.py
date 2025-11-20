@@ -53,6 +53,24 @@ async def test_search_text_flag_prefixed_query(
         cwd: Path | None = None,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Record command and return fake match result.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments to record.
+        timeout : int | None, optional
+            Timeout value (unused).
+        cwd : Path | None, optional
+            Working directory (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Returns
+        -------
+        str
+            JSON match line for target_path.
+        """
         captured_commands.append(list(cmd))
         _ = timeout, cwd, env
         return _build_match_line(target_path)
@@ -95,6 +113,24 @@ async def test_search_text_surfaces_ripgrep_failure(
         cwd: Path | None = None,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Raise SubprocessError to test ripgrep failure handling.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments (unused).
+        timeout : int | None, optional
+            Timeout value (unused).
+        cwd : Path | None, optional
+            Working directory (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Raises
+        ------
+        SubprocessError
+            Always raised with returncode 2 and message "rg failed".
+        """
         _ = cmd, timeout, cwd, env
         error_message = "rg failed"
         raise SubprocessError(error_message, returncode=RG_FAILURE_CODE, stderr=error_message)
@@ -121,6 +157,29 @@ async def test_search_text_falls_back_to_grep(mock_application_context: Applicat
         cwd: Path | None = None,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Simulate ripgrep failure and grep fallback for test.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments to record. Raises error if cmd[0] is "rg".
+        timeout : int | None, optional
+            Timeout value (unused).
+        cwd : Path | None, optional
+            Working directory (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Returns
+        -------
+        str
+            Grep-formatted match line when cmd[0] is not "rg".
+
+        Raises
+        ------
+        SubprocessError
+            Raised when cmd[0] is "rg" with returncode 127.
+        """
         _ = timeout, cwd, env
         captured_commands.append(list(cmd))
         if cmd[0] == "rg":
@@ -161,6 +220,29 @@ async def test_search_text_fallback_normalizes_relative_paths(
         cwd: Path | None = None,
         env: Mapping[str, str] | None = None,
     ) -> str:
+        """Simulate ripgrep failure and return grep results with relative paths.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments. Raises error if cmd[0] is "rg".
+        timeout : int | None, optional
+            Timeout value (unused).
+        cwd : Path | None, optional
+            Working directory (unused).
+        env : Mapping[str, str] | None, optional
+            Environment variables (unused).
+
+        Returns
+        -------
+        str
+            Grep-formatted match lines with relative paths when cmd[0] is not "rg".
+
+        Raises
+        ------
+        SubprocessError
+            Raised when cmd[0] is "rg" with returncode 127.
+        """
         _ = timeout, cwd, env
         if cmd[0] == "rg":
             error_message = "rg missing"

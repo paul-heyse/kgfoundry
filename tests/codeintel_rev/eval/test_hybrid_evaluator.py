@@ -28,14 +28,50 @@ class _FakeCatalog:
         ]
 
     def sample_query_vectors(self, limit: int = 64) -> list[tuple[int, np.ndarray]]:
+        """Return sample query vectors up to limit.
+
+        Parameters
+        ----------
+        limit : int, optional
+            Maximum number of queries to return, by default 64.
+
+        Returns
+        -------
+        list[tuple[int, np.ndarray]]
+            List of (query_id, vector) tuples.
+        """
         return self._queries[:limit]
 
     def get_chunk_by_id(self, chunk_id: int) -> dict[str, str]:
+        """Get chunk metadata by ID.
+
+        Parameters
+        ----------
+        chunk_id : int
+            Chunk identifier.
+
+        Returns
+        -------
+        dict[str, str]
+            Dictionary with content and summary fields.
+        """
         # Access internal queries so Ruff treats this as a genuine instance method.
         vector_dims = len(self._queries[chunk_id % len(self._queries)][1])
         return {"content": f"chunk-{chunk_id}", "summary": f"{vector_dims}-dim"}
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
+        """Get structure annotations for chunk IDs.
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Chunk IDs to look up.
+
+        Returns
+        -------
+        dict[int, StructureAnnotations]
+            Dictionary mapping chunk IDs to structure annotations.
+        """
         _ = len(self._queries)
         return {
             int(chunk_id): StructureAnnotations(
@@ -63,6 +99,24 @@ class _FakeManager:
         nprobe: int | None = None,
         catalog: object | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
+        """Return stub search results.
+
+        Parameters
+        ----------
+        _query : np.ndarray
+            Query vector (unused).
+        k : int
+            Number of results to return.
+        nprobe : int | None, optional
+            Nprobe parameter (unused).
+        catalog : object | None, optional
+            Catalog object (unused).
+
+        Returns
+        -------
+        tuple[np.ndarray, np.ndarray]
+            Tuple of distance and ID arrays.
+        """
         available = list(self._vectors.keys())
         ids = np.array([available], dtype=np.int64)[:, :k]
         scores = np.array([[0.9, 0.1]], dtype=np.float32)[:, :k]
@@ -71,6 +125,18 @@ class _FakeManager:
         return scores, ids
 
     def reconstruct_batch(self, ids: list[int] | np.ndarray) -> np.ndarray:
+        """Reconstruct vectors for chunk IDs.
+
+        Parameters
+        ----------
+        ids : list[int] | np.ndarray
+            Chunk IDs to reconstruct.
+
+        Returns
+        -------
+        np.ndarray
+            Stacked vector array.
+        """
         return np.stack([self._vectors[int(i)] for i in ids], dtype=np.float32)
 
 
@@ -87,6 +153,22 @@ class _FakeXTRIndex:
         *,
         explain: bool = False,
     ) -> list[tuple[int, float, None]]:
+        """Rescore candidates and track call count.
+
+        Parameters
+        ----------
+        _query : str
+            Query string (unused).
+        candidate_chunk_ids : Sequence[int]
+            Candidate chunk IDs to rescore.
+        explain : bool, optional
+            Explanation flag affecting score, by default False.
+
+        Returns
+        -------
+        list[tuple[int, float, None]]
+            List containing single triple (first_chunk_id, score, None).
+        """
         if not candidate_chunk_ids:
             return []
         self.rescore_calls += 1

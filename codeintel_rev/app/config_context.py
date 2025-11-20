@@ -923,6 +923,11 @@ class _DisabledSpladeBackend:
     def encode_query(self, text: str) -> SpladeQueryRepresentation:
         """Return a zero vector to satisfy the SPLADE contract.
 
+        Parameters
+        ----------
+        text : str
+            Query text string. Ignored in this disabled backend implementation.
+
         Returns
         -------
         SpladeQueryRepresentation
@@ -933,6 +938,15 @@ class _DisabledSpladeBackend:
 
     def search(self, query_vec: SpladeQueryRepresentation, k: int) -> Sequence[tuple[int, float]]:
         """Return an empty result set regardless of inputs.
+
+        Parameters
+        ----------
+        query_vec : SpladeQueryRepresentation
+            Query vector representation. Ignored in this disabled backend
+            implementation.
+        k : int
+            Number of results to return. Ignored in this disabled backend
+            implementation.
 
         Returns
         -------

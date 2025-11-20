@@ -25,15 +25,43 @@ class _ManagerStub:
         self._cpu_index = SimpleNamespace(ntotal=total)
 
     def require_cpu_index(self) -> SimpleNamespace:
+        """Return CPU index stub.
+
+        Returns
+        -------
+        SimpleNamespace
+            Fake CPU index with ntotal attribute.
+        """
         return self._cpu_index
 
 
 class _ConnectionStub:
     def execute(self, *_args: object, **_kwargs: object) -> _ConnectionStub:
+        """Execute SQL query and return self for chaining.
+
+        Parameters
+        ----------
+        *_args : object
+            Positional arguments (unused).
+        **_kwargs : object
+            Keyword arguments (unused).
+
+        Returns
+        -------
+        _ConnectionStub
+            Self for method chaining.
+        """
         return self
 
     @staticmethod
     def fetchone() -> tuple[int]:
+        """Return fake query result.
+
+        Returns
+        -------
+        tuple[int]
+            Tuple containing single integer value 1.
+        """
         return (1,)
 
 
@@ -52,19 +80,41 @@ class _CatalogStub:
         self.view_calls = 0
 
     def ensure_faiss_idmap_views(self, *_args: object) -> None:
+        """Increment view creation call counter.
+
+        Parameters
+        ----------
+        *_args : object
+            Positional arguments (unused).
+        """
         self.view_calls += 1
 
     @staticmethod
     def connection() -> _ConnectionCtx:
+        """Return connection context manager stub.
+
+        Returns
+        -------
+        _ConnectionCtx
+            Fake connection context manager.
+        """
         return _ConnectionCtx()
 
     @staticmethod
     def count_chunks() -> int:
+        """Return fake chunk count.
+
+        Returns
+        -------
+        int
+            Large batch size constant.
+        """
         return constants.BATCH_SIZES.large
 
     @staticmethod
     def close() -> None:  # pragma: no cover - no-op
-        return None
+        """Close catalog stub (no-op)."""
+        return
 
 
 def test_health_command_reports_ok(tmp_path: Path) -> None:

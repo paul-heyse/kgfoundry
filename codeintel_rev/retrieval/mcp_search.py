@@ -380,6 +380,8 @@ class SearchDependencies:
         Catalog for hydrating chunk metadata.
     settings : SearchConfig
         Search configuration settings (hybrid fusion knobs).
+    limits_cfg : ServerLimits
+        Server resource limits configuration.
     index : IndexConfigLike
         Immutable index configuration (vector dimension, FAISS tuning).
     session_id : str | None
@@ -388,8 +390,6 @@ class SearchDependencies:
         Optional run identifier for request tracking. None if not tracked.
     limits : Sequence[str]
         Sequence of limit identifiers applied to this search.
-    limits_cfg : ServerLimits
-        Server resource limits configuration.
     pool_dir : Path | None
         Optional directory path for evaluation pool output. None if pools are
         not recorded.

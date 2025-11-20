@@ -66,12 +66,37 @@ class ImportFromTransformerMixin:
         del self, original_node
         return updated_node
 
-    # Bridge CamelCase hook invoked by LibCST to the snake_case override.
     def leave_ImportFrom(  # noqa: N802
         self,
         original_node: cst.ImportFrom,
         updated_node: cst.ImportFrom,
     ) -> cst.ImportFrom | cst.RemovalSentinel | cst.FlattenSentinel[cst.BaseSmallStatement]:
+        """Bridge CamelCase hook invoked by LibCST to the snake_case override.
+
+        Extended Summary
+        ----------------
+        This method is the CamelCase entry point required by LibCST's transformation
+        framework. It delegates to the snake_case :meth:`leave_import_from` method,
+        which subclasses should override. This bridge pattern allows the codebase to
+        use consistent snake_case naming while maintaining LibCST compatibility.
+
+        Parameters
+        ----------
+        original_node : cst.ImportFrom
+            Original ImportFrom node before any transformations.
+        updated_node : cst.ImportFrom
+            ImportFrom node after child transformations have been applied.
+
+        Returns
+        -------
+        cst.ImportFrom | cst.RemovalSentinel | cst.FlattenSentinel[cst.BaseSmallStatement]
+            Result from the snake_case override method.
+
+        Notes
+        -----
+        This is a bridge method that should not be overridden directly. Subclasses
+        should override :meth:`leave_import_from` instead.
+        """
         return self.leave_import_from(original_node, updated_node)
 
 
@@ -136,6 +161,32 @@ class CallTransformerMixin:
         original_node: cst.Call,
         updated_node: cst.Call,
     ) -> cst.Call:
+        """Bridge CamelCase hook invoked by LibCST to the snake_case override.
+
+        Extended Summary
+        ----------------
+        This method is the CamelCase entry point required by LibCST's transformation
+        framework. It delegates to the snake_case :meth:`leave_call` method, which
+        subclasses should override. This bridge pattern allows the codebase to use
+        consistent snake_case naming while maintaining LibCST compatibility.
+
+        Parameters
+        ----------
+        original_node : cst.Call
+            Original Call node before any transformations.
+        updated_node : cst.Call
+            Call node after child transformations have been applied.
+
+        Returns
+        -------
+        cst.Call
+            Result from the snake_case override method.
+
+        Notes
+        -----
+        This is a bridge method that should not be overridden directly. Subclasses
+        should override :meth:`leave_call` instead.
+        """
         return self.leave_call(original_node, updated_node)
 
 
@@ -204,6 +255,32 @@ class ExceptHandlerTransformerMixin:
         original_node: cst.ExceptHandler,
         updated_node: cst.ExceptHandler,
     ) -> cst.ExceptHandler:
+        """Bridge CamelCase hook invoked by LibCST to the snake_case override.
+
+        Extended Summary
+        ----------------
+        This method is the CamelCase entry point required by LibCST's transformation
+        framework. It delegates to the snake_case :meth:`leave_except_handler` method,
+        which subclasses should override. This bridge pattern allows the codebase to
+        use consistent snake_case naming while maintaining LibCST compatibility.
+
+        Parameters
+        ----------
+        original_node : cst.ExceptHandler
+            Original ExceptHandler node before any transformations.
+        updated_node : cst.ExceptHandler
+            ExceptHandler node after child transformations have been applied.
+
+        Returns
+        -------
+        cst.ExceptHandler
+            Result from the snake_case override method.
+
+        Notes
+        -----
+        This is a bridge method that should not be overridden directly. Subclasses
+        should override :meth:`leave_except_handler` instead.
+        """
         return self.leave_except_handler(original_node, updated_node)
 
 
@@ -268,6 +345,32 @@ class WithTransformerMixin:
         original_node: cst.With,
         updated_node: cst.With,
     ) -> cst.With:
+        """Bridge CamelCase hook invoked by LibCST to the snake_case override.
+
+        Extended Summary
+        ----------------
+        This method is the CamelCase entry point required by LibCST's transformation
+        framework. It delegates to the snake_case :meth:`leave_with` method, which
+        subclasses should override. This bridge pattern allows the codebase to use
+        consistent snake_case naming while maintaining LibCST compatibility.
+
+        Parameters
+        ----------
+        original_node : cst.With
+            Original With node before any transformations.
+        updated_node : cst.With
+            With node after child transformations have been applied.
+
+        Returns
+        -------
+        cst.With
+            Result from the snake_case override method.
+
+        Notes
+        -----
+        This is a bridge method that should not be overridden directly. Subclasses
+        should override :meth:`leave_with` instead.
+        """
         return self.leave_with(original_node, updated_node)
 
 
@@ -331,4 +434,30 @@ class IfTransformerMixin:
         original_node: cst.If,
         updated_node: cst.If,
     ) -> cst.If:
+        """Bridge CamelCase hook invoked by LibCST to the snake_case override.
+
+        Extended Summary
+        ----------------
+        This method is the CamelCase entry point required by LibCST's transformation
+        framework. It delegates to the snake_case :meth:`leave_if` method, which
+        subclasses should override. This bridge pattern allows the codebase to use
+        consistent snake_case naming while maintaining LibCST compatibility.
+
+        Parameters
+        ----------
+        original_node : cst.If
+            Original If node before any transformations.
+        updated_node : cst.If
+            If node after child transformations have been applied.
+
+        Returns
+        -------
+        cst.If
+            Result from the snake_case override method.
+
+        Notes
+        -----
+        This is a bridge method that should not be overridden directly. Subclasses
+        should override :meth:`leave_if` instead.
+        """
         return self.leave_if(original_node, updated_node)

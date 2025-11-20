@@ -66,6 +66,36 @@ class OfflineRecallEvaluator:
         vllm_client: VLLMClient,
         duckdb_manager: DuckDBManager,
     ) -> None:
+        """Initialize offline recall evaluator with required dependencies.
+
+        Parameters
+        ----------
+        eval_settings : EvalSettings
+            Evaluation configuration containing k values, query limits, and
+            output directory settings. Used to control evaluation behavior
+            and artifact generation.
+        repo_root : str | Path
+            Repository root directory path. Used to resolve relative output
+            paths and locate evaluation artifacts. Converted to Path internally.
+        faiss_manager : FAISSManager
+            FAISS manager instance for performing vector similarity search
+            against the indexed code chunks. Must be initialized with the
+            target index loaded.
+        vllm_client : VLLMClient
+            VLLM client instance for embedding query text into dense vectors.
+            Used to convert natural language queries into the same vector
+            space as indexed chunks.
+        duckdb_manager : DuckDBManager
+            DuckDB manager instance for accessing the symbol catalog database.
+            Used to fetch symbol definitions and synthesize evaluation queries.
+
+        Notes
+        -----
+        This constructor initializes internal state and creates a SymbolCatalog
+        instance from the provided DuckDB manager. All dependencies are stored
+        as private attributes for use during evaluation execution. No I/O or
+        network operations are performed during initialization.
+        """
         self._eval_settings = eval_settings
         self._repo_root = Path(repo_root)
         self._faiss = faiss_manager

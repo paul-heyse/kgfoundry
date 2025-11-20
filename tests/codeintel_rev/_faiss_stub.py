@@ -1,3 +1,5 @@
+"""Register a minimal FAISS module stub for test environments without FAISS."""
+
 from __future__ import annotations
 
 import importlib

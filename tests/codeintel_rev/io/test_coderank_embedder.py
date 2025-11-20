@@ -27,6 +27,22 @@ class _FakeModel:
         normalize_embeddings: bool,
         batch_size: int,
     ) -> Sequence[Sequence[float]]:
+        """Encode texts to embeddings and store inputs.
+
+        Parameters
+        ----------
+        texts : Iterable[str]
+            Text strings to encode.
+        normalize_embeddings : bool
+            Whether to normalize embeddings (unused).
+        batch_size : int
+            Batch size (unused).
+
+        Returns
+        -------
+        Sequence[Sequence[float]]
+            Stub embeddings [[0.1, 0.2]] for each input text.
+        """
         _ = normalize_embeddings, batch_size
         self.last_inputs = list(texts)
         return [[0.1, 0.2] for _ in texts]

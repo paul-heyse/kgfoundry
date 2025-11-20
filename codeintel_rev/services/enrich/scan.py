@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import ast
 import logging
-from collections.abc import Iterable, Iterator, Mapping, Sequence
-from fnmatch import fnmatch
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 import typer
 
+from codeintel_rev.app.readiness import raise_on_errors, validate_paths
 from codeintel_rev.config_indexer import index_config_files
 from codeintel_rev.coverage_ingest import collect_coverage
 from codeintel_rev.enrich.errors import TaggingError, TypeSignalError
@@ -21,6 +21,7 @@ from codeintel_rev.enrich.pipeline_helpers import build_module_row, normalized_r
 from codeintel_rev.enrich.scip_reader import SCIPIndex
 from codeintel_rev.enrich.tagging import load_rules
 from codeintel_rev.enrich.validators import ModuleRecordModel
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.services.enrich.analytics import compute_pipeline_analytics
 from codeintel_rev.services.enrich.context import (
     LegacyPipelineContext,
@@ -33,108 +34,27 @@ from codeintel_rev.services.enrich.context import (
     StageMeta,
     _stage,
 )
+from codeintel_rev.services.enrich.graph_steps import (
+    build_callgraph_artifacts,
+    build_cfg_artifacts,
+    build_goid_artifacts,
+)
 from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
+from codeintel_rev.services.enrich.python_files import (
+    EXCLUDED_SCAN_SEGMENTS,
+    iter_python_files,
+    should_skip_candidate,
+)
 from codeintel_rev.typedness import FileTypeSignals, collect_type_signals
 
 LOGGER = logging.getLogger(__name__)
 
-_EXCLUDED_SCAN_SEGMENTS = {"stubs", "overlays"}
-
 
 def discover_python_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
-    """Return ordered Python files under ``root`` honoring include patterns.
-
-    Parameters
-    ----------
-    root : Path
-        Repository root or subfolder to scan.
-    patterns : tuple[str, ...]
-        Glob include patterns relative to ``root``. If empty, all Python files
-        are included.
-
-    Returns
-    -------
-    list[Path]
-        Deterministically ordered list of Python files.
-    """
+    """Return ordered Python files under ``root`` honoring include patterns."""
     normalized_patterns = tuple(patterns or ())
-    candidates = [
-        fp
-        for fp in iter_python_files(root)
-        if not normalized_patterns or _matches_any(fp, root, normalized_patterns)
-    ]
-    return sorted(candidates)
-
-
-def _matches_any(candidate: Path, root: Path, patterns: tuple[str, ...]) -> bool:
-    """Check if candidate path matches any of the glob patterns.
-
-    Parameters
-    ----------
-    candidate : Path
-        File path to check.
-    root : Path
-        Repository root for relative path computation.
-    patterns : tuple[str, ...]
-        Glob patterns to match against.
-
-    Returns
-    -------
-    bool
-        True if candidate matches any pattern, False otherwise.
-    """
-    rel = normalized_rel_path(candidate, root)
-    return any(fnmatch(rel, pattern) for pattern in patterns)
-
-
-def iter_python_files(root: Path, patterns: tuple[str, ...] | None = None) -> Iterable[Path]:
-    """Yield Python files under ``root`` optionally filtered by patterns.
-
-    Parameters
-    ----------
-    root : Path
-        Repository root to traverse.
-    patterns : tuple[str, ...] | None, optional
-        Optional glob include filters. If None or empty, all Python files
-        are yielded (subject to skip rules).
-
-    Yields
-    ------
-    Path
-        Individual Python file paths meeting the filter criteria.
-    """
-    normalized_patterns = tuple(patterns or ())
-    for candidate in root.rglob("*.py"):
-        if should_skip_candidate(candidate, root):
-            continue
-        if normalized_patterns and not _matches_any(candidate, root, normalized_patterns):
-            continue
-        yield candidate
-
-
-def should_skip_candidate(candidate: Path, root: Path) -> bool:
-    """Return whether the candidate should be skipped.
-
-    Parameters
-    ----------
-    candidate : Path
-        File path candidate to check for exclusion.
-    root : Path
-        Repository root directory for relative path computation.
-
-    Returns
-    -------
-    bool
-        ``True`` when hidden folders or excluded segments are detected.
-    """
-    if any(part.startswith(".") for part in candidate.parts):
-        return True
-    try:
-        rel_parts = candidate.relative_to(root).parts
-    except ValueError:  # pragma: no cover - defensive
-        rel_parts = candidate.parts
-    lowered = {part.lower() for part in rel_parts}
-    return bool(lowered & _EXCLUDED_SCAN_SEGMENTS)
+    files = iter_python_files(root, normalized_patterns or None)
+    return sorted(files)
 
 
 def load_scip_artifacts(path: Path) -> tuple[SCIPIndex, ScipContext]:
@@ -385,6 +305,7 @@ def run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
     ctx = prepared.context
     module_rows, symbol_edges = scan_modules(ctx, pipeline, prepared.files)
     analytics = compute_pipeline_analytics(ctx, module_rows)
+    _run_requested_graph_steps(ctx, pipeline)
     return PipelineResult(
         root=ctx.root,
         repo_root=ctx.repo_root,
@@ -397,6 +318,38 @@ def run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
         hotspot_rows=analytics.hotspot_rows,
         tag_index=analytics.tag_index,
     )
+
+
+def _run_requested_graph_steps(ctx: LegacyPipelineContext, pipeline: PipelineOptions) -> None:
+    """Execute GOID/callgraph/CFG/DFG steps when requested via pipeline options."""
+    if not (
+        pipeline.build_goids or pipeline.build_callgraph or pipeline.build_cfg or pipeline.build_dfg
+    ):
+        return
+    pipeline_ctx, resolved_paths = _build_graph_context(ctx.repo_root, pipeline.out)
+    try:
+        if pipeline.build_goids:
+            build_goid_artifacts(pipeline_ctx, out_dir=resolved_paths.data_dir, ingest=True)
+        if pipeline.build_callgraph:
+            build_callgraph_artifacts(pipeline_ctx, out_dir=resolved_paths.data_dir, ingest=True)
+        if pipeline.build_cfg or pipeline.build_dfg:
+            build_cfg_artifacts(
+                pipeline_ctx,
+                out_dir=resolved_paths.data_dir,
+                ingest_cfg=pipeline.build_cfg,
+                ingest_dfg=pipeline.build_dfg,
+            )
+    finally:
+        pipeline_ctx.close()
+
+
+def _build_graph_context(repo_root: Path, out_dir: Path) -> tuple[PipelineContext, ResolvedPaths]:
+    mapping = {"BASE_DIR": repo_root, "DATA_DIR": out_dir}
+    paths = resolve_application_paths(mapping)
+    raise_on_errors(validate_paths(paths))
+    paths.data_dir.mkdir(parents=True, exist_ok=True)
+    ctx = PipelineContext.from_paths(paths)
+    return ctx, paths
 
 
 def _iter_source_files(
@@ -607,11 +560,9 @@ __all__ = [
     "collect_type_signal_map",
     "discover_python_files",
     "index_config_records",
-    "iter_python_files",
     "load_scip_artifacts",
     "load_tagging_rules",
     "prepare_pipeline",
     "run_pipeline",
     "scan_modules",
-    "should_skip_candidate",
 ]

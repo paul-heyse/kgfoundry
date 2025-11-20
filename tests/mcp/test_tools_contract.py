@@ -34,6 +34,18 @@ class _CatalogStub:
         }
 
     def query_by_ids(self, ids: Sequence[int]) -> list[dict[str, object]]:
+        """Query rows by chunk IDs.
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Chunk IDs to look up.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            Matching rows from internal storage.
+        """
         return [self._rows[i] for i in ids if i in self._rows]
 
 

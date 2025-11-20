@@ -247,7 +247,9 @@ def get_runtime_settings() -> ToolRuntimeSettings:
                 )
             )
             message = "Failed to load tooling settings"
-            raise SettingsError(message, problem=problem, errors=list(error_dicts), cause=exc) from exc
+            raise SettingsError(
+                message, problem=problem, errors=list(error_dicts), cause=exc
+            ) from exc
 
     return _cached()
 

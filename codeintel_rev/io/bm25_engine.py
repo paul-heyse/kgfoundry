@@ -117,6 +117,41 @@ class PyseriniBM25Backend(BM25Backend):
         b: float,
         rm3: BM25Rm3Config | None = None,
     ) -> None:
+        """Initialize Pyserini BM25 backend with index and scoring parameters.
+
+        Parameters
+        ----------
+        index_dir : Path
+            Path to the Lucene BM25 index directory created by Pyserini.
+            Must exist and contain a valid Lucene index structure. The index
+            is opened in read-only mode for search operations.
+        k1 : float
+            BM25 k1 parameter controlling term frequency saturation. Higher
+            values increase the impact of term frequency on scoring. Typical
+            range is 0.5 to 2.0, with 1.2 being a common default.
+        b : float
+            BM25 b parameter controlling length normalization. Values range
+            from 0.0 (no normalization) to 1.0 (full normalization). Typical
+            values are 0.5 to 0.75. Higher values penalize longer documents.
+        rm3 : BM25Rm3Config | None, optional
+            Optional RM3 (Relevance Model 3) query expansion configuration.
+            If None, a default BM25Rm3Config is created with RM3 disabled.
+            RM3 expands queries using top-ranked documents from initial search.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the index directory does not exist or is not accessible.
+            The error message includes the missing index directory path.
+
+        Notes
+        -----
+        This constructor validates the index directory exists and initializes
+        the Pyserini searcher with the provided scoring parameters. The RM3
+        configuration is created from the provided config or defaults to a
+        disabled state. The index is opened lazily on first search operation.
+        No I/O operations beyond directory existence check are performed.
+        """
         if not index_dir.exists():
             msg = f"BM25 index not found: {index_dir}"
             raise FileNotFoundError(msg)

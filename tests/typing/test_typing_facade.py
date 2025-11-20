@@ -10,19 +10,66 @@ from tests._helpers import assertions
 
 
 class _DummyLogger:
+    """Test logger that records the last logging call."""
+
     def __init__(self) -> None:
+        """Initialize with no recorded calls."""
         self.last_call: tuple[str, str, tuple[object, ...], dict[str, object]] | None = None
 
     def debug(self, msg: str, *args: object, **kwargs: object) -> None:
+        """Record a debug-level log call.
+
+        Parameters
+        ----------
+        msg : str
+            Log message.
+        *args : object
+            Positional arguments.
+        **kwargs : object
+            Keyword arguments.
+        """
         self.last_call = ("debug", msg, args, kwargs)
 
     def info(self, msg: str, *args: object, **kwargs: object) -> None:
+        """Record an info-level log call.
+
+        Parameters
+        ----------
+        msg : str
+            Log message.
+        *args : object
+            Positional arguments.
+        **kwargs : object
+            Keyword arguments.
+        """
         self.last_call = ("info", msg, args, kwargs)
 
     def warning(self, msg: str, *args: object, **kwargs: object) -> None:
+        """Record a warning-level log call.
+
+        Parameters
+        ----------
+        msg : str
+            Log message.
+        *args : object
+            Positional arguments.
+        **kwargs : object
+            Keyword arguments.
+        """
         self.last_call = ("warning", msg, args, kwargs)
 
     def error(self, msg: str, *args: object, **kwargs: object) -> None:
+        """Record an error-level log call.
+
+        Parameters
+        ----------
+        msg : str
+            Log message.
+        *args : object
+            Positional arguments.
+        **kwargs : object
+            Keyword arguments.
+        """
         self.last_call = ("error", msg, args, kwargs)
 
 

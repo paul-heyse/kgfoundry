@@ -34,6 +34,25 @@ def test_coderank_faiss_missing_dependency_propagates(
     ctx = build_application_context(tmp_path)
 
     def fake_gate(module: str, purpose: str) -> object:
+        """Raise ImportError for faiss module to test error propagation.
+
+        Parameters
+        ----------
+        module : str
+            Module name to import.
+        purpose : str
+            Purpose description (unused).
+
+        Returns
+        -------
+        object
+            Imported module if not faiss.
+
+        Raises
+        ------
+        ImportError
+            Raised when module is "faiss" with message "faiss missing".
+        """
         if module == "faiss":
             error_msg = "faiss missing"
             raise ImportError(error_msg)
@@ -64,6 +83,25 @@ def test_xtr_missing_dependency_raise(tmp_path: Path) -> None:
     ctx = build_application_context(tmp_path, xtr_enabled=True)
 
     def fake_gate(module: str, purpose: str) -> object:
+        """Raise ImportError for torch module to test error propagation.
+
+        Parameters
+        ----------
+        module : str
+            Module name to import.
+        purpose : str
+            Purpose description (unused).
+
+        Returns
+        -------
+        object
+            Imported module if not torch.
+
+        Raises
+        ------
+        ImportError
+            Raised when module is "torch" with message "torch missing".
+        """
         if module == "torch":
             error_msg = "torch missing"
             raise ImportError(error_msg)

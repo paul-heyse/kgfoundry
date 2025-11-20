@@ -373,6 +373,25 @@ class IndexLifecycleManager:
     """
 
     def __init__(self, base_dir: Path) -> None:
+        """Initialize index lifecycle manager for version management.
+
+        Parameters
+        ----------
+        base_dir : Path
+            Base directory for index version management. The manager creates
+            a "versions" subdirectory for storing versioned index artifacts
+            and a "CURRENT" pointer file to track the active published version.
+            The directory structure is created if it does not exist.
+
+        Notes
+        -----
+        This constructor creates the directory structure needed for version
+        management, including the "versions" subdirectory and necessary parent
+        directories. The "CURRENT" file and "current" symlink are initialized
+        but may not exist until a version is published. Directory creation uses
+        mkdir(parents=True, exist_ok=True) to handle existing directories
+        gracefully.
+        """
         self.base_dir = base_dir
         self.versions_dir = self.base_dir / "versions"
         self.current_file = self.base_dir / "CURRENT"

@@ -26,9 +26,30 @@ class _ScopeStoreStub:
         self.data: dict[str, dict] = {}
 
     async def get(self, session_id: str) -> dict | None:  # pragma: no cover - exercised via router
+        """Get scope for session ID.
+
+        Parameters
+        ----------
+        session_id : str
+            Session identifier.
+
+        Returns
+        -------
+        dict | None
+            Scope dictionary if found, None otherwise.
+        """
         return self.data.get(session_id)
 
     async def set(self, session_id: str, scope: dict) -> None:
+        """Set scope for session ID.
+
+        Parameters
+        ----------
+        session_id : str
+            Session identifier.
+        scope : dict
+            Scope dictionary to store.
+        """
         self.data[session_id] = dict(scope)
 
 

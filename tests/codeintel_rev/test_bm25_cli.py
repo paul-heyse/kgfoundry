@@ -43,6 +43,22 @@ class _StubBM25Manager:
         output_dir: Path | None = None,
         overwrite: bool = True,
     ) -> BM25CorpusSummary:
+        """Prepare corpus and record call.
+
+        Parameters
+        ----------
+        source : Path
+            Source corpus path to record.
+        output_dir : Path | None, optional
+            Output directory (unused).
+        overwrite : bool, optional
+            Overwrite flag to record.
+
+        Returns
+        -------
+        BM25CorpusSummary
+            Stub corpus summary with metadata paths.
+        """
         self.prepare_calls.append((source, output_dir, overwrite))
         json_dir = self.tmp_path / "bm25_json"
         json_dir.mkdir(parents=True, exist_ok=True)
@@ -60,6 +76,18 @@ class _StubBM25Manager:
         )
 
     def build_index(self, options: BM25BuildOptions | None = None) -> BM25IndexMetadata:
+        """Build index and record call.
+
+        Parameters
+        ----------
+        options : BM25BuildOptions | None, optional
+            Build options to record.
+
+        Returns
+        -------
+        BM25IndexMetadata
+            Stub index metadata with test values.
+        """
         self.build_calls.append(options)
         index_dir = self.tmp_path / "bm25_index"
         index_dir.mkdir(parents=True, exist_ok=True)

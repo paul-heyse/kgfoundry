@@ -136,6 +136,13 @@ class _ReadyIndex:
 
     @staticmethod
     def metadata() -> dict[str, object]:
+        """Return stub metadata for test.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary with doc_count, total_tokens, dim, and dtype.
+        """
         return {"doc_count": 1, "total_tokens": 4, "dim": 8, "dtype": "float16"}
 
 
@@ -145,11 +152,25 @@ class _ExplodingIndex:
 
     @staticmethod
     def open() -> None:
+        """Raise RuntimeError to simulate corruption.
+
+        Raises
+        ------
+        RuntimeError
+            Always raised with message "boom".
+        """
         message = "boom"
         raise RuntimeError(message)
 
     @staticmethod
     def metadata() -> dict[str, object]:
+        """Return empty metadata stub.
+
+        Returns
+        -------
+        dict[str, object]
+            Empty dictionary.
+        """
         return {}
 
 

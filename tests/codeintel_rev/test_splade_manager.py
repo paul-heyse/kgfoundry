@@ -279,12 +279,21 @@ def test_export_onnx_writes_metadata(tmp_path: Path) -> None:
     encoder_context = SpladeEncoderContext(encoder_factory=_build_stub_encoder_factory())
 
     def fake_export_helpers() -> tuple[Callable[..., None], Callable[..., None]]:
+        """Return fake optimizer and quantizer functions for test.
+
+        Returns
+        -------
+        tuple[Callable[..., None], Callable[..., None]]
+            Tuple containing optimizer and quantizer functions.
+        """
         onnx_dir = app_config.splade.onnx_dir
 
         def optimizer(**_: object) -> None:
+            """Write optimized ONNX model file."""
             (onnx_dir / "model_O3.onnx").write_text("optimized", encoding="utf-8")
 
         def quantizer(**_: object) -> None:
+            """Write quantized ONNX model file."""
             (onnx_dir / "model_qint8.onnx").write_text("quantized", encoding="utf-8")
 
         return optimizer, quantizer
@@ -413,6 +422,20 @@ def test_build_index_persists_metadata(tmp_path: Path) -> None:
     captured_commands: list[list[str]] = []
 
     def fake_run(cmd: list[str], env: dict[str, str] | None = None) -> str:
+        """Record command and create stub index file.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments to record.
+        env : dict[str, str] | None, optional
+            Environment variables (unused).
+
+        Returns
+        -------
+        str
+            Empty string.
+        """
         captured_commands.append(cmd)
         _ = env
         index_dir = app_config.splade.index_dir
@@ -454,6 +477,20 @@ def test_build_index_raises_when_subprocess_fails(tmp_path: Path) -> None:
     _, app_config = _bootstrap_repo(tmp_path)
 
     def fake_run(cmd: list[str], env: dict[str, str] | None = None) -> str:
+        """Raise SubprocessError to test error handling.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments (unused).
+        env : dict[str, str] | None, optional
+            Environment variables (unused).
+
+        Raises
+        ------
+        SubprocessError
+            Always raised with returncode 1 and message "fail".
+        """
         _ = cmd, env
         message = "fail"
         raise SubprocessError(message, returncode=1)

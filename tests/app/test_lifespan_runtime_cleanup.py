@@ -22,6 +22,7 @@ class _FakeScopeStore:
         self.close_calls = 0
 
     async def close(self) -> None:
+        """Increment close call counter."""
         self.close_calls += 1
 
 
@@ -36,14 +37,29 @@ class _FakeContext:
         self._hybrid_calls = 0
 
     def get_xtr_index(self) -> SimpleNamespace:
+        """Return fake XTR index and track call count.
+
+        Returns
+        -------
+        SimpleNamespace
+            Fake XTR index with ready=True.
+        """
         self._xtr_calls += 1
         return SimpleNamespace(ready=True)
 
     def get_hybrid_engine(self) -> object:
+        """Return fake hybrid engine and track call count.
+
+        Returns
+        -------
+        object
+            Fake hybrid engine instance.
+        """
         self._hybrid_calls += 1
         return object()
 
     def close_all_runtimes(self) -> None:
+        """Increment close call counter."""
         self.close_calls += 1
 
     @property
@@ -64,9 +80,11 @@ class _FakeReadinessProbe:
         self.shutdown_calls = 0
 
     async def initialize(self) -> None:
+        """Increment initialize call counter."""
         self.initialize_calls += 1
 
     async def shutdown(self) -> None:
+        """Increment shutdown call counter."""
         self.shutdown_calls += 1
 
 
@@ -112,6 +130,7 @@ def test_close_all_runtimes_idempotent(
             self.closed = 0
 
         def close(self) -> None:
+            """Increment closed counter."""
             self.closed += 1
 
     created: list[_Disposable] = []

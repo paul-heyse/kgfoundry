@@ -17,6 +17,13 @@ def test_single_flight_and_backpressure() -> None:
     build_count = 0
 
     def factory() -> int:
+        """Track invocations and simulate slow initialization.
+
+        Returns
+        -------
+        int
+            Always returns 42 after a 0.1 second delay.
+        """
         nonlocal build_count
         build_count += 1
         time.sleep(0.1)

@@ -160,7 +160,7 @@ class FAISSManager:
         ----------
         vectors : NDArrayF32
             Training vectors, shape (n, vec_dim).
-        family : str | None, optional
+        family : IndexFamily | None, optional
             Override the adaptive family selection ("flat", "ivfflat", "ivfpq").
             If None, uses adaptive heuristic based on corpus size.
 
@@ -365,8 +365,9 @@ class FAISSManager:
             IVF probe count override. Defaults to self.default_nprobe.
         runtime : SearchRuntimeOverrides | None, optional
             Runtime parameter overrides (ef_search, k_factor, etc.).
-        catalog : DuckDBCatalog | None, optional
+        catalog : object | None, optional
             Catalog for exact reranking. If provided, enables flat reranking.
+            Typically a DuckDBCatalog instance, but typed as object for flexibility.
 
         Returns
         -------

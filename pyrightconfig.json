@@ -22,7 +22,8 @@
     "kgfoundry.egg-info/**",
     "src/kgfoundry_common/http/**",
     "codeintel_rev/patches/**",
-    "docs/**"
+    "docs/**",
+    "OpenAI_patch_maker.py"
   ],
   "executionEnvironments": [
     {

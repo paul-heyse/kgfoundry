@@ -404,6 +404,8 @@ def _error_envelope(reason: str) -> AnswerEnvelope:
 
 
 __all__ = ["SemanticRuntimeHooks", "semantic_search"]
+
+
 class _SearchGuard(Protocol):
     def __call__(
         self,
@@ -413,5 +415,4 @@ class _SearchGuard(Protocol):
         nprobe: int | None = None,
         runtime: SearchRuntimeOverrides | None = None,
         catalog: object | None = None,
-    ) -> tuple[NDArrayF32, NDArrayI64]:
-        ...
+    ) -> tuple[NDArrayF32, NDArrayI64]: ...

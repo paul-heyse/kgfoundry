@@ -780,6 +780,20 @@ def test_query_by_filters_uses_query_builder(test_catalog: DuckDBCatalog) -> Non
             chunk_ids: Sequence[int],
             options: DuckDBQueryOptions | None = None,
         ) -> tuple[str, dict[str, list[int] | list[str] | str]]:
+            """Record call and return test SQL query.
+
+            Parameters
+            ----------
+            chunk_ids : Sequence[int]
+                Chunk IDs to filter by.
+            options : DuckDBQueryOptions | None, optional
+                Query options (unused in test implementation).
+
+            Returns
+            -------
+            tuple[str, dict[str, list[int] | list[str] | str]]
+                SQL query string and parameters dictionary.
+            """
             self.calls.append(
                 {
                     "chunk_ids": list(chunk_ids),

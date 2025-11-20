@@ -24,6 +24,13 @@ class _DummyFrame(PolarsDataFrame):
         self.records = [dict(record) for record in records]
 
     def write_parquet(self, file: str | PathLike[str]) -> None:
+        """Write frame records as JSON to file.
+
+        Parameters
+        ----------
+        file : str | PathLike[str]
+            Output file path.
+        """
         Path(file).write_text(json.dumps(self.records), encoding="utf-8")
 
 
@@ -34,6 +41,18 @@ class _PolarsLegacy:
         self.calls: list[list[dict[str, object]]] = []
 
     def data_frame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:
+        """Create data frame from sequence of mappings.
+
+        Parameters
+        ----------
+        data : Sequence[Mapping[str, object]]
+            Input data records.
+
+        Returns
+        -------
+        PolarsDataFrame
+            Dummy frame containing records.
+        """
         payload = [dict(item) for item in data]
         self.calls.append(payload)
         return _DummyFrame(payload)
@@ -49,6 +68,18 @@ class _PolarsModern:
         self,
         data: Sequence[Mapping[str, object]],
     ) -> PolarsDataFrame:
+        """Create data frame from sequence of mappings.
+
+        Parameters
+        ----------
+        data : Sequence[Mapping[str, object]]
+            Input data records.
+
+        Returns
+        -------
+        PolarsDataFrame
+            Dummy frame containing records.
+        """
         payload = [dict(item) for item in data]
         self.calls.append(payload)
         return _DummyFrame(payload)

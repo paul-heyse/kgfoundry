@@ -55,6 +55,13 @@ class _FakeEntryPoint:
         self._factory = factory
 
     def load(self) -> object:
+        """Load factory function.
+
+        Returns
+        -------
+        object
+            Factory function stored during initialization.
+        """
         return self._factory
 
 

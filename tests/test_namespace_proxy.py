@@ -45,6 +45,13 @@ def test_resolve_caches_result() -> None:
     call_count = 0
 
     def loader() -> object:
+        """Track invocation count and return result.
+
+        Returns
+        -------
+        object
+            String result with incremented call count.
+        """
         nonlocal call_count
         call_count += 1
         return f"result_{call_count}"
@@ -113,6 +120,13 @@ def test_resolve_with_exception_in_loader() -> None:
     registry = NamespaceRegistry()
 
     def failing_loader() -> NoReturn:
+        """Raise RuntimeError to test error propagation.
+
+        Raises
+        ------
+        RuntimeError
+            Always raised with message "Loader failed" to test error propagation.
+        """
         error_message = "Loader failed"
         raise RuntimeError(error_message)
 
@@ -135,6 +149,19 @@ def test_resolve_returns_various_types() -> None:
     }
 
     def make_factory(val: object) -> Callable[[], object]:
+        """Create a factory function that returns a fixed value.
+
+        Parameters
+        ----------
+        val : object
+            Value to return from the factory function.
+
+        Returns
+        -------
+        Callable[[], object]
+            Factory function that returns the provided value.
+        """
+
         def _factory() -> object:
             return val
 

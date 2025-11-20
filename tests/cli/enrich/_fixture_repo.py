@@ -15,8 +15,7 @@ FIXTURE_FILES: dict[Path, str] = {
     ),
     Path("pkg/b.py"): '"""Test fixture module B for completeness validation tests."""\n',
     Path("pkg/sub/module.py"): (
-        '"""Test fixture submodule for completeness validation tests."""\n\n'
-        "VALUE = 1\n"
+        '"""Test fixture submodule for completeness validation tests."""\n\nVALUE = 1\n'
     ),
 }
 

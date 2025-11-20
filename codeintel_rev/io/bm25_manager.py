@@ -261,6 +261,32 @@ class BM25IndexManager:
         logger_: logging.Logger | None = None,
         build_context: BM25BuildContext | None = None,
     ) -> None:
+        """Initialize BM25 index manager with application configuration.
+
+        Parameters
+        ----------
+        app_config : AppConfig
+            Immutable application configuration containing BM25 settings,
+            repository paths, and corpus directory specifications. The BM25
+            configuration section is extracted and stored for index operations.
+        logger_ : logging.Logger | None, optional
+            Custom logger instance for this manager. If None, uses the module
+            logger obtained via logging.getLogger(__name__). Used for all
+            logging operations during index building and management.
+        build_context : BM25BuildContext | None, optional
+            Build context for index construction containing test doubles and
+            dependency injection overrides. If None, uses BM25BuildContext.production()
+            which provides real implementations for all dependencies. Used to
+            enable testing with controlled dependencies.
+
+        Notes
+        -----
+        This constructor extracts BM25-specific configuration from the app
+        config and resolves the repository root path (expanding user home
+        directory notation). The build context defaults to production mode
+        if not provided, ensuring real implementations are used in normal
+        operation. No I/O operations are performed during initialization.
+        """
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(app_config.paths.repo_root).expanduser().resolve()
         self._config = app_config.bm25

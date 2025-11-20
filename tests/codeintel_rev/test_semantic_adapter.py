@@ -46,18 +46,46 @@ class _StubContext:
 
     @staticmethod
     def get_hybrid_engine() -> object:  # pragma: no cover - patched run_stage0 ignores
+        """Return fake hybrid engine for test.
+
+        Returns
+        -------
+        object
+            Fake engine instance.
+        """
         return object()
 
     @staticmethod
     def open_catalog() -> contextlib.AbstractContextManager[object]:
+        """Return fake catalog context manager.
+
+        Returns
+        -------
+        contextlib.AbstractContextManager[object]
+            Null context manager returning fake catalog.
+        """
         return contextlib.nullcontext(object())
 
     @staticmethod
     def ensure_faiss_ready() -> tuple[bool, list[str], str | None]:  # pragma: no cover
+        """Return fake FAISS readiness status.
+
+        Returns
+        -------
+        tuple[bool, list[str], str | None]
+            Tuple indicating ready=True, empty warnings, no error.
+        """
         return True, [], None
 
     @staticmethod
     def hybrid_fusion_weights() -> Mapping[str, float]:
+        """Return hybrid fusion weights from search settings.
+
+        Returns
+        -------
+        Mapping[str, float]
+            Dictionary mapping channel names to weights.
+        """
         return {
             "bm25": float(_StubContext.SEARCH_SETTINGS.bm25_weight),
             "splade": float(_StubContext.SEARCH_SETTINGS.splade_weight),
@@ -66,15 +94,46 @@ class _StubContext:
 
     @staticmethod
     def hybrid_search_settings() -> SearchSettings:
+        """Return search settings for test.
+
+        Returns
+        -------
+        SearchSettings
+            Pre-configured search settings.
+        """
         return _StubContext.SEARCH_SETTINGS
 
     @staticmethod
     def clamp_hybrid_limit(candidate: int) -> int:
+        """Clamp candidate limit to valid range.
+
+        Parameters
+        ----------
+        candidate : int
+            Candidate limit value.
+
+        Returns
+        -------
+        int
+            Clamped value between 1 and max_results.
+        """
         max_results = int(_StubContext.SEARCH_SETTINGS.max_results)
         return max(1, min(int(candidate), max_results))
 
     @staticmethod
     def build_stage0_options(*, weights: Mapping[str, float]) -> Stage0Options:
+        """Build Stage0Options from weights and search settings.
+
+        Parameters
+        ----------
+        weights : Mapping[str, float]
+            Channel weights to use.
+
+        Returns
+        -------
+        Stage0Options
+            Configured stage 0 options.
+        """
         return Stage0Options(
             weights=dict(weights),
             per_channel_k=_StubContext.SEARCH_SETTINGS.per_channel_k,

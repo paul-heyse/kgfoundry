@@ -7,9 +7,10 @@ chunk retrieval and joins.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,7 +35,23 @@ from codeintel_rev.io.duckdb_dao import (
     relation_exists as _dao_relation_exists,
 )
 from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.duckdb_schema import VIEW_V_FAISS_JOIN, IdMapMeta
+from codeintel_rev.io.duckdb_schema import (
+    SQL_CREATE_CALL_EDGES_TABLE,
+    SQL_CREATE_CALL_NODES_TABLE,
+    SQL_CREATE_CFG_BLOCKS_TABLE,
+    SQL_CREATE_CFG_EDGES_TABLE,
+    SQL_CREATE_DFG_EDGES_TABLE,
+    SQL_CREATE_GOID_XWALK_TABLE,
+    SQL_CREATE_GOIDS_TABLE,
+    SQL_CREATE_V_GOID_BY_SYMBOL,
+    SQL_INDEX_CALL_EDGES_CALLEE,
+    SQL_INDEX_CFG_BLOCKS_FUNCTION,
+    SQL_INDEX_DFG_SYMBOL,
+    SQL_INDEX_GOID_XWALK_SYMBOL,
+    SQL_INDEX_GOIDS_PATH_KIND,
+    VIEW_V_FAISS_JOIN,
+    IdMapMeta,
+)
 from codeintel_rev.io.parquet_store import extract_embeddings
 from codeintel_rev.mcp_server.scope_utils import (
     LANGUAGE_EXTENSIONS,
@@ -46,12 +63,106 @@ relation_exists = _dao_relation_exists
 if TYPE_CHECKING:
     import duckdb
     import numpy as np
+
+    from codeintel_rev.ids.goid import GOID, CrosswalkRow
 else:
     duckdb = cast("duckdb", LazyModule("duckdb", "DuckDB catalog operations"))
     np = cast("np", LazyModule("numpy", "DuckDB catalog embeddings"))
+    GOID = Any
+    CrosswalkRow = Mapping[str, object]
 
 LOGGER = logging.getLogger(__name__)
 _PARQUET_MAGIC = b"PAR1"
+
+_SQL_INSERT_GOIDS = """
+INSERT OR REPLACE INTO "goids"(
+    goid_h128,
+    urn,
+    repo,
+    commit,
+    rel_path,
+    language,
+    kind,
+    qualname,
+    start_line,
+    end_line
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+_SQL_INSERT_GOID_XWALK = """
+INSERT OR REPLACE INTO "goid_xwalk"(
+    goid_h128,
+    scip_symbol,
+    chunk_id,
+    chunk_row_id,
+    cst_node_id,
+    ast_node_type,
+    git_blob_sha,
+    git_commit_sha,
+    evidence_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+_SQL_INSERT_CALL_NODE = """
+INSERT OR REPLACE INTO "call_nodes"(
+    goid_h128,
+    language,
+    kind,
+    arity,
+    is_public,
+    rel_path
+) VALUES (?, ?, ?, ?, ?, ?)
+"""
+
+_SQL_INSERT_CALL_EDGE = """
+INSERT OR REPLACE INTO "call_edges"(
+    caller_goid_h128,
+    callee_goid_h128,
+    callsite_path,
+    callsite_line,
+    callsite_col,
+    language,
+    kind,
+    resolved_via,
+    confidence,
+    evidence_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+_SQL_INSERT_CFG_BLOCK = """
+INSERT OR REPLACE INTO "cfg_blocks"(
+    function_goid_h128,
+    block_idx,
+    kind,
+    start_line,
+    end_line,
+    stmts_json,
+    in_degree,
+    out_degree
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+_SQL_INSERT_CFG_EDGE = """
+INSERT OR REPLACE INTO "cfg_edges"(
+    function_goid_h128,
+    src_block_idx,
+    dst_block_idx,
+    edge_type,
+    cond_json
+) VALUES (?, ?, ?, ?, ?)
+"""
+
+_SQL_INSERT_DFG_EDGE = """
+INSERT OR REPLACE INTO "dfg_edges"(
+    function_goid_h128,
+    src_block_idx,
+    dst_block_idx,
+    src_symbol,
+    dst_symbol,
+    via_phi,
+    use_kind
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+"""
 
 
 def _escape_identifier(expr: str) -> str:
@@ -99,6 +210,135 @@ def _is_valid_parquet_file(path: Path) -> bool:
             return footer == _PARQUET_MAGIC
     except (OSError, ValueError):
         return False
+
+
+def _goid_params(entry: GOID | Mapping[str, object]) -> tuple[object, ...]:
+    if isinstance(entry, Mapping):
+        return (
+            entry.get("h128") or entry.get("goid_h128"),
+            entry.get("urn"),
+            entry.get("repo"),
+            entry.get("commit"),
+            entry.get("rel_path"),
+            entry.get("language"),
+            entry.get("kind"),
+            entry.get("qualname"),
+            entry.get("start_line"),
+            entry.get("end_line"),
+        )
+    return (
+        entry.h128,
+        entry.urn,
+        entry.repo,
+        entry.commit,
+        entry.rel_path,
+        entry.language,
+        entry.kind,
+        entry.qualname,
+        entry.start_line,
+        entry.end_line,
+    )
+
+
+def _crosswalk_params(row: CrosswalkRow | Mapping[str, object]) -> tuple[object, ...] | None:
+    payload: Mapping[str, object]
+    if isinstance(row, Mapping):
+        payload = row
+    else:  # pragma: no cover - defensive
+        payload = {
+            "goid_h128": getattr(row, "goid_h128", None),
+            "scip_symbol": getattr(row, "scip_symbol", None),
+            "chunk_id": getattr(row, "chunk_id", None),
+            "chunk_row_id": getattr(row, "chunk_row_id", None),
+            "cst_node_id": getattr(row, "cst_node_id", None),
+            "ast_node_type": getattr(row, "ast_node_type", None),
+            "git_blob_sha": getattr(row, "git_blob_sha", None),
+            "git_commit_sha": getattr(row, "git_commit_sha", None),
+            "evidence_json": getattr(row, "evidence_json", None),
+        }
+    goid_h128 = payload.get("goid_h128")
+    if goid_h128 is None:
+        return None
+    evidence = payload.get("evidence_json")
+    evidence_json = json.dumps(evidence) if evidence is not None else None
+    return (
+        goid_h128,
+        payload.get("scip_symbol"),
+        payload.get("chunk_id"),
+        payload.get("chunk_row_id"),
+        payload.get("cst_node_id"),
+        payload.get("ast_node_type"),
+        payload.get("git_blob_sha"),
+        payload.get("git_commit_sha"),
+        evidence_json,
+    )
+
+
+def _call_node_params(row: Mapping[str, object]) -> tuple[object, ...]:
+    return (
+        row.get("goid_h128"),
+        row.get("language"),
+        row.get("kind"),
+        row.get("arity"),
+        row.get("is_public"),
+        row.get("rel_path"),
+    )
+
+
+def _call_edge_params(row: Mapping[str, object]) -> tuple[object, ...]:
+    evidence = row.get("evidence_json")
+    evidence_json = json.dumps(evidence) if evidence is not None else None
+    return (
+        row.get("caller_goid_h128"),
+        row.get("callee_goid_h128"),
+        row.get("callsite_path"),
+        row.get("callsite_line"),
+        row.get("callsite_col"),
+        row.get("language"),
+        row.get("kind"),
+        row.get("resolved_via"),
+        row.get("confidence"),
+        evidence_json,
+    )
+
+
+def _cfg_block_params(row: Mapping[str, object]) -> tuple[object, ...]:
+    stmts = row.get("stmts_json")
+    stmts_json = json.dumps(stmts) if stmts is not None else None
+    return (
+        row.get("function_goid_h128"),
+        row.get("block_idx"),
+        row.get("kind"),
+        row.get("start_line"),
+        row.get("end_line"),
+        stmts_json,
+        row.get("in_degree"),
+        row.get("out_degree"),
+    )
+
+
+def _cfg_edge_params(row: Mapping[str, object]) -> tuple[object, ...]:
+    cond = row.get("cond_json")
+    cond_json = json.dumps(cond) if cond is not None else None
+    return (
+        row.get("function_goid_h128"),
+        row.get("src_block_idx"),
+        row.get("dst_block_idx"),
+        row.get("edge_type"),
+        cond_json,
+    )
+
+
+def _dfg_edge_params(row: Mapping[str, object]) -> tuple[object, ...]:
+    return (
+        row.get("function_goid_h128"),
+        row.get("src_block_idx"),
+        row.get("dst_block_idx"),
+        row.get("src_symbol"),
+        row.get("dst_symbol"),
+        row.get("via_phi"),
+        row.get("use_kind"),
+    )
 
 
 _CST_KIND_QUERIES: dict[str, str] = {
@@ -1803,6 +2043,488 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
 
         vectors = np.vstack(embeddings)
         return ordered_ids, vectors
+
+    def upsert_goids(self, goids: Iterable[GOID | Mapping[str, object]]) -> int:
+        """Insert or update GOID registry rows.
+
+        Parameters
+        ----------
+        goids : Iterable[GOID | Mapping[str, object]]
+            Iterable of GOID objects or dictionaries to insert or update
+            in the goids table.
+
+        Returns
+        -------
+        int
+            Number of rows successfully inserted or updated. Returns 0 if
+            no valid GOIDs were provided or all GOIDs were filtered out.
+        """
+        rows: list[tuple[object, ...]] = []
+        for goid in goids:
+            params = _goid_params(goid)
+            if params[0] is None:
+                continue
+            rows.append(params)
+        if not rows:
+            return 0
+        with self.connection() as conn:
+            conn.execute(SQL_CREATE_GOIDS_TABLE)
+            conn.execute(SQL_CREATE_GOID_XWALK_TABLE)
+            conn.execute(SQL_INDEX_GOIDS_PATH_KIND)
+            conn.executemany(_SQL_INSERT_GOIDS, rows)
+            conn.execute(SQL_CREATE_V_GOID_BY_SYMBOL)
+        return len(rows)
+
+    def upsert_goid_xwalk(self, rows: Iterable[CrosswalkRow | Mapping[str, object]]) -> int:
+        """Insert or update GOID crosswalk rows.
+
+        Parameters
+        ----------
+        rows : Iterable[CrosswalkRow | Mapping[str, object]]
+            Iterable of crosswalk row objects or dictionaries to insert or
+            update in the goid_xwalk table.
+
+        Returns
+        -------
+        int
+            Number of rows successfully inserted or updated. Returns 0 if
+            no valid crosswalk rows were provided or all rows were filtered out.
+        """
+        payload: list[tuple[object, ...]] = []
+        for row in rows:
+            params = _crosswalk_params(row)
+            if params is None:
+                continue
+            payload.append(params)
+        if not payload:
+            return 0
+        with self.connection() as conn:
+            conn.execute(SQL_CREATE_GOID_XWALK_TABLE)
+            conn.execute(SQL_INDEX_GOID_XWALK_SYMBOL)
+            conn.executemany(_SQL_INSERT_GOID_XWALK, payload)
+            conn.execute(SQL_CREATE_V_GOID_BY_SYMBOL)
+        return len(payload)
+
+    def find_goid_by_symbol(self, scip_symbol: str) -> list[dict[str, object]]:
+        """Return GOID rows that match a SCIP symbol.
+
+        Parameters
+        ----------
+        scip_symbol : str
+            SCIP symbol identifier to search for in the crosswalk table.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            List of GOID dictionary rows matching the SCIP symbol. Each
+            dictionary contains GOID attributes (urn, h128, repo, commit,
+            rel_path, language, kind, qualname, start_line, end_line).
+            Returns empty list if symbol is empty or no matches found.
+        """
+        if not scip_symbol:
+            return []
+        with self.readonly_connection() as conn:
+            conn.execute(SQL_CREATE_V_GOID_BY_SYMBOL)
+            relation = conn.execute(
+                """
+                SELECT go.*
+                FROM goids AS go
+                JOIN goid_xwalk AS gx USING (goid_h128)
+                WHERE gx.scip_symbol = ?
+                """,
+                [scip_symbol],
+            )
+            return self.catalog_payload(relation, query_name="goid-by-symbol")
+
+    def resolve_goid_by_path_span(
+        self,
+        rel_path: str,
+        *,
+        kind: str | None = None,
+        start_line: int | None = None,
+        end_line: int | None = None,
+    ) -> list[dict[str, object]]:
+        """Resolve GOIDs for a repo-relative path filtered by optional span.
+
+        Parameters
+        ----------
+        rel_path : str
+            Repository-relative file path to search for GOIDs.
+        kind : str | None, optional
+            Optional code element kind filter (e.g., "function", "class").
+            If None, all kinds are included.
+        start_line : int | None, optional
+            Optional starting line number filter. GOIDs with start_line <=
+            this value or NULL are included.
+        end_line : int | None, optional
+            Optional ending line number filter. GOIDs with end_line >=
+            this value or NULL are included.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            List of GOID dictionary rows matching the path and span filters.
+            Results are ordered by start_line with NULL values first.
+            Each dictionary contains all GOID attributes.
+        """
+        clauses = ["rel_path = ?"]
+        params: list[object] = [rel_path]
+        if kind:
+            clauses.append("kind = ?")
+            params.append(kind)
+        if start_line is not None:
+            clauses.append("(start_line IS NULL OR start_line <= ?)")
+            params.append(start_line)
+        if end_line is not None:
+            clauses.append("(end_line IS NULL OR end_line >= ?)")
+            params.append(end_line)
+        sql_parts = [
+            "SELECT * FROM goids WHERE ",
+            " AND ".join(clauses),
+            " ORDER BY start_line NULLS FIRST",
+        ]
+        sql = "".join(sql_parts)
+        with self.readonly_connection() as conn:
+            relation = conn.execute(sql, params)
+            return self.catalog_payload(relation, query_name="goid-by-span")
+
+    def crosswalk_for_goid(self, goid_h128: int) -> list[dict[str, object]]:
+        """Return all crosswalk anchors for a GOID.
+
+        Parameters
+        ----------
+        goid_h128 : int
+            128-bit hash identifier of the GOID to look up crosswalk entries.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            List of crosswalk row dictionaries for the specified GOID hash.
+            Each dictionary contains crosswalk attributes (goid_h128,
+            scip_symbol, ast_node_type, chunk_id, evidence_json, etc.).
+            Returns empty list if no crosswalk entries exist for the GOID.
+        """
+        with self.readonly_connection() as conn:
+            relation = conn.execute(
+                "SELECT * FROM goid_xwalk WHERE goid_h128 = ?",
+                [goid_h128],
+            )
+            return self.catalog_payload(relation, query_name="goid-crosswalk")
+
+    def upsert_call_nodes(self, nodes: Iterable[Mapping[str, object]]) -> int:
+        """Insert or update call graph node rows.
+
+        Parameters
+        ----------
+        nodes : Iterable[Mapping[str, object]]
+            Iterable of call node dictionaries to insert or update.
+
+        Returns
+        -------
+        int
+            Number of rows successfully inserted or updated. Returns 0 if
+            no valid nodes were provided.
+        """
+        payload = [_call_node_params(node) for node in nodes]
+        if not payload:
+            return 0
+        with self.connection() as conn:
+            conn.execute(SQL_CREATE_CALL_NODES_TABLE)
+            conn.executemany(_SQL_INSERT_CALL_NODE, payload)
+        return len(payload)
+
+    def upsert_call_edges(self, edges: Iterable[Mapping[str, object]]) -> int:
+        """Insert or update call graph edges.
+
+        Parameters
+        ----------
+        edges : Iterable[Mapping[str, object]]
+            Iterable of call edge dictionaries to insert or update.
+
+        Returns
+        -------
+        int
+            Number of rows successfully inserted or updated. Returns 0 if
+            no valid edges were provided.
+        """
+        payload = [_call_edge_params(edge) for edge in edges]
+        if not payload:
+            return 0
+        with self.connection() as conn:
+            conn.execute(SQL_CREATE_CALL_NODES_TABLE)
+            conn.execute(SQL_CREATE_CALL_EDGES_TABLE)
+            conn.execute(SQL_INDEX_CALL_EDGES_CALLEE)
+            conn.executemany(_SQL_INSERT_CALL_EDGE, payload)
+        return len(payload)
+
+    def upsert_cfg_blocks(self, blocks: Iterable[Mapping[str, object]]) -> int:
+        """Insert or update CFG block rows.
+
+        Parameters
+        ----------
+        blocks : Iterable[Mapping[str, object]]
+            Iterable of CFG block dictionaries to insert or update.
+
+        Returns
+        -------
+        int
+            Number of rows successfully inserted or updated. Returns 0 if
+            no valid blocks were provided.
+        """
+        payload = [_cfg_block_params(block) for block in blocks]
+        if not payload:
+            return 0
+        with self.connection() as conn:
+            conn.execute(SQL_CREATE_CFG_BLOCKS_TABLE)
+            conn.execute(SQL_INDEX_CFG_BLOCKS_FUNCTION)
+            conn.executemany(_SQL_INSERT_CFG_BLOCK, payload)
+        return len(payload)
+
+    def upsert_cfg_edges(self, edges: Iterable[Mapping[str, object]]) -> int:
+        """Insert or update CFG edge rows.
+
+        Parameters
+        ----------
+        edges : Iterable[Mapping[str, object]]
+            Iterable of CFG edge dictionaries to insert or update.
+
+        Returns
+        -------
+        int
+            Number of rows successfully inserted or updated. Returns 0 if
+            no valid edges were provided.
+        """
+        payload = [_cfg_edge_params(edge) for edge in edges]
+        if not payload:
+            return 0
+        with self.connection() as conn:
+            conn.execute(SQL_CREATE_CFG_EDGES_TABLE)
+            conn.executemany(_SQL_INSERT_CFG_EDGE, payload)
+        return len(payload)
+
+    def upsert_dfg_edges(self, edges: Iterable[Mapping[str, object]]) -> int:
+        """Insert or update DFG edge rows.
+
+        Parameters
+        ----------
+        edges : Iterable[Mapping[str, object]]
+            Iterable of DFG edge dictionaries to insert or update.
+
+        Returns
+        -------
+        int
+            Number of rows successfully inserted or updated. Returns 0 if
+            no valid edges were provided.
+        """
+        payload = [_dfg_edge_params(edge) for edge in edges]
+        if not payload:
+            return 0
+        with self.connection() as conn:
+            conn.execute(SQL_CREATE_DFG_EDGES_TABLE)
+            conn.execute(SQL_INDEX_DFG_SYMBOL)
+            conn.executemany(_SQL_INSERT_DFG_EDGE, payload)
+        return len(payload)
+
+    def get_callees(self, goid_h128: int, *, limit: int = 50) -> list[dict[str, object]]:
+        """Return callee edges for a GOID.
+
+        Parameters
+        ----------
+        goid_h128 : int
+            128-bit hash identifier of the caller GOID.
+        limit : int, optional
+            Maximum number of callee edges to return. Defaults to 50.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            List of call edge dictionaries where the caller matches the specified
+            GOID. Edges are ordered by callsite line and column. Each dictionary
+            contains caller_goid_h128, callee_goid_h128, callsite information,
+            and resolution metadata.
+        """
+        with self.readonly_connection() as conn:
+            relation = conn.execute(
+                """
+                SELECT *
+                FROM call_edges
+                WHERE caller_goid_h128 = ?
+                ORDER BY callsite_line, callsite_col
+                LIMIT ?
+                """,
+                [goid_h128, limit],
+            )
+            return self.catalog_payload(relation, query_name="callgraph-callees")
+
+    def get_callers(self, goid_h128: int, *, limit: int = 50) -> list[dict[str, object]]:
+        """Return caller edges for a GOID.
+
+        Parameters
+        ----------
+        goid_h128 : int
+            128-bit hash identifier of the callee GOID.
+        limit : int, optional
+            Maximum number of caller edges to return. Defaults to 50.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            List of call edge dictionaries where the callee matches the specified
+            GOID. Edges are ordered by callsite line and column. Each dictionary
+            contains caller_goid_h128, callee_goid_h128, callsite information,
+            and resolution metadata.
+        """
+        with self.readonly_connection() as conn:
+            relation = conn.execute(
+                """
+                SELECT *
+                FROM call_edges
+                WHERE callee_goid_h128 = ?
+                ORDER BY callsite_line, callsite_col
+                LIMIT ?
+                """,
+                [goid_h128, limit],
+            )
+            return self.catalog_payload(relation, query_name="callgraph-callers")
+
+    def get_call_graph_subgraph(
+        self,
+        seed_goids: Sequence[int],
+        *,
+        direction: str = "outbound",
+        limit: int = 200,
+    ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+        """Return call graph nodes/edges adjacent to seed GOIDs.
+
+        Parameters
+        ----------
+        seed_goids : Sequence[int]
+            Sequence of GOID hashes to use as seeds for subgraph extraction.
+        direction : str, optional
+            Direction of traversal: "outbound" (default) for callees, "inbound"
+            for callers.
+        limit : int, optional
+            Maximum number of edges to return. Defaults to 200.
+
+        Returns
+        -------
+        tuple[list[dict[str, object]], list[dict[str, object]]]
+            Tuple containing:
+            - List of call node dictionaries for GOIDs in the subgraph.
+            - List of call edge dictionaries connecting the seed GOIDs.
+            Returns empty lists if seed_goids is empty.
+        """
+        if not seed_goids:
+            return [], []
+        values = [int(value) for value in seed_goids]
+        column = "callee" if direction == "inbound" else "caller"
+        with self.readonly_connection() as conn:
+            if column == "callee":
+                relation = conn.execute(
+                    """
+                    SELECT *
+                    FROM call_edges
+                    WHERE callee_goid_h128 IN UNNEST(?)
+                    LIMIT ?
+                    """,
+                    [values, limit],
+                )
+            else:
+                relation = conn.execute(
+                    """
+                    SELECT *
+                    FROM call_edges
+                    WHERE caller_goid_h128 IN UNNEST(?)
+                    LIMIT ?
+                    """,
+                    [values, limit],
+                )
+            edges = self.catalog_payload(relation, query_name="callgraph-subgraph-edges")
+            node_ids: set[int] = set()
+            for edge in edges:
+                caller = edge.get("caller_goid_h128")
+                if isinstance(caller, int):
+                    node_ids.add(caller)
+                callee = edge.get("callee_goid_h128")
+                if isinstance(callee, int):
+                    node_ids.add(callee)
+            if not node_ids:
+                return [], edges
+            node_relation = conn.execute(
+                """
+                SELECT *
+                FROM call_nodes
+                WHERE goid_h128 IN UNNEST(?)
+                """,
+                [list(node_ids)],
+            )
+            nodes = self.catalog_payload(node_relation, query_name="callgraph-subgraph-nodes")
+            return nodes, edges
+
+    def cfg_for_function(self, goid_h128: int) -> dict[str, list[dict[str, object]]]:
+        """Return CFG blocks/edges for a GOID.
+
+        Parameters
+        ----------
+        goid_h128 : int
+            128-bit hash identifier of the function GOID.
+
+        Returns
+        -------
+        dict[str, list[dict[str, object]]]
+            Dictionary with two keys:
+            - "blocks": List of CFG block dictionaries ordered by block_idx.
+            - "edges": List of CFG edge dictionaries connecting blocks.
+            Returns empty lists if no CFG data exists for the function.
+        """
+        with self.readonly_connection() as conn:
+            block_relation = conn.execute(
+                """
+                SELECT *
+                FROM cfg_blocks
+                WHERE function_goid_h128 = ?
+                ORDER BY block_idx
+                """,
+                [goid_h128],
+            )
+            edge_relation = conn.execute(
+                """
+                SELECT *
+                FROM cfg_edges
+                WHERE function_goid_h128 = ?
+                """,
+                [goid_h128],
+            )
+            return {
+                "blocks": self.catalog_payload(block_relation, query_name="cfg-blocks"),
+                "edges": self.catalog_payload(edge_relation, query_name="cfg-edges"),
+            }
+
+    def dfg_for_function(self, goid_h128: int) -> list[dict[str, object]]:
+        """Return DFG edges for a GOID.
+
+        Parameters
+        ----------
+        goid_h128 : int
+            128-bit hash identifier of the function GOID.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            List of data flow graph edge dictionaries for the specified function.
+            Each edge represents a data dependency between symbols. Returns empty
+            list if no DFG data exists for the function.
+        """
+        with self.readonly_connection() as conn:
+            relation = conn.execute(
+                """
+                SELECT *
+                FROM dfg_edges
+                WHERE function_goid_h128 = ?
+                """,
+                [goid_h128],
+            )
+            return self.catalog_payload(relation, query_name="dfg-edges")
 
     def count_chunks(self) -> int:
         """Count total number of chunks in the index.

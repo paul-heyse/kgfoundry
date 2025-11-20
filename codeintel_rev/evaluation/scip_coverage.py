@@ -100,6 +100,37 @@ class SCIPCoverageEvaluator:
         vllm_client: SupportsEmbedSingle,
         default_output_dir: Path | str,
     ) -> None:
+        """Initialize SCIP coverage evaluator with required dependencies.
+
+        Parameters
+        ----------
+        repo_root : str | Path
+            Repository root directory path. Used to resolve relative output
+            paths when writing coverage artifacts. Converted to Path internally.
+        duckdb_manager : DuckDBManager
+            DuckDB manager instance for querying the symbol catalog database.
+            Used to fetch symbol definitions and check chunk presence.
+        faiss_manager : SupportsFaissSearch
+            FAISS manager instance implementing the search protocol. Used to
+            perform vector similarity search and verify symbol retrievability.
+            Must support the search() method with query vectors and k parameter.
+        vllm_client : SupportsEmbedSingle
+            VLLM client instance implementing the embedding protocol. Used to
+            convert symbol names into dense vector embeddings for search.
+            Must support the embed_single() method returning a sequence or array.
+        default_output_dir : Path | str
+            Default directory path for coverage evaluation artifacts. Expanded
+            and resolved to an absolute path. Used when run() is called without
+            an explicit output_dir parameter.
+
+        Notes
+        -----
+        This constructor initializes internal state and creates a SymbolCatalog
+        instance from the provided DuckDB manager. The default output directory
+        is expanded (handling ~ home directory notation) and resolved to an
+        absolute path. No I/O or network operations are performed during
+        initialization.
+        """
         self._repo_root = Path(repo_root)
         self._duckdb = duckdb_manager
         self._faiss = faiss_manager
