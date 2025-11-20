@@ -113,6 +113,17 @@ def build_app_config_for_repo(
 ) -> AppConfig:
     """Return AppConfig configured to point at ``repo_root``.
 
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory for configuration paths.
+    bm25_overrides : Mapping[str, Any] | None, optional
+        Optional BM25 configuration overrides, by default None.
+    splade_overrides : Mapping[str, Any] | None, optional
+        Optional SPLADE configuration overrides, by default None.
+    index_overrides : Mapping[str, Any] | None, optional
+        Optional index configuration overrides, by default None.
+
     Returns
     -------
     AppConfig

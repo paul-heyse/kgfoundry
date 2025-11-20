@@ -19,7 +19,8 @@ def _pipeline_result(tmp_path: Path) -> PipelineResult:
     module_path = tmp_path / "pkg" / "calc.py"
     module_path.parent.mkdir(parents=True, exist_ok=True)
     module_path.write_text(
-        "def add(x: int, y: int) -> int:\\n    return x + y\\n", encoding="utf-8"
+        "def add(x: int, y: int) -> int:\n    return x + y\n",
+        encoding="utf-8",
     )
     record = ModuleRecord(
         path="pkg/calc.py",

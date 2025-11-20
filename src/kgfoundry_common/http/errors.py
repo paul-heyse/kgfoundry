@@ -21,17 +21,6 @@ class HttpStatusError(HttpError):
     and error handling. The exception message includes the status code and
     body excerpt.
 
-    Parameters
-    ----------
-    status : int
-        HTTP status code (e.g., 404, 500, 503). Must be >= 400.
-    body_excerpt : str | None, optional
-        Excerpt from response body for error message. Included in the exception
-        message string. Defaults to None.
-    headers : dict[str, str] | None, optional
-        Response headers dictionary. If None, defaults to empty dict. Stored as
-        instance attribute for inspection. Defaults to None.
-
     Notes
     -----
     Time O(1); memory O(1) aside from message, body_excerpt, and headers storage.
@@ -56,7 +45,25 @@ class HttpStatusError(HttpError):
     ) -> None:
         """Initialize exception with HTTP status code and optional details.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        status : int
+            HTTP status code (e.g., 404, 500, 503). Must be >= 400. Stored as
+            instance attribute for programmatic error handling and inspection.
+        body_excerpt : str | None, optional
+            Excerpt from response body for error message. Included in the exception
+            message string. Defaults to None. When provided, helps diagnose the
+            specific error condition from the server response.
+        headers : dict[str, str] | None, optional
+            Response headers dictionary. If None, defaults to empty dict. Stored as
+            instance attribute for inspection. Useful for extracting rate limit
+            information, retry-after headers, or other metadata. Defaults to None.
+
+        Notes
+        -----
+        Constructs exception message as "HTTP {status}: {body_excerpt or ''}".
+        Headers are normalized to empty dict if None is provided. No validation
+        is performed on status code range; callers should ensure status >= 400.
         """
         super().__init__(f"HTTP {status}: {body_excerpt or ''}")
         self.status = status

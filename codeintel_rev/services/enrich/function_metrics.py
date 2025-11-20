@@ -19,6 +19,17 @@ from codeintel_rev.services.enrich.function_analysis import (
     count_parameters,
 )
 
+LOW_COMPLEXITY_THRESHOLD = 5
+MEDIUM_COMPLEXITY_THRESHOLD = 10
+CONTROL_NODES: tuple[type[cst.CSTNode], ...] = (
+    cst.If,
+    cst.For,
+    cst.Asynchronous,
+    cst.While,
+    cst.With,
+    cst.Try,
+)
+
 
 @dataclass(slots=True, frozen=True)
 class FunctionMetricsRow:
@@ -77,74 +88,24 @@ class _BodyMetricsVisitor(cst.CSTVisitor):
     def max_depth(self) -> int:
         return self._max_depth
 
-    def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:  # noqa: N802
-        return False
+    def on_visit(self, node: cst.CSTNode) -> bool:
+        if isinstance(node, (cst.FunctionDef, cst.Lambda, cst.ClassDef)):
+            return False
+        if isinstance(node, cst.Return):
+            self.return_count += 1
+        elif isinstance(node, cst.Yield):
+            self.yield_count += 1
+        elif isinstance(node, cst.Raise):
+            self.raise_count += 1
+        if isinstance(node, CONTROL_NODES):
+            self._enter()
+        elif isinstance(node, (cst.BooleanOperation, cst.IfExp)):
+            self.decision_points += 1
+        return True
 
-    def visit_ClassDef(self, node: cst.ClassDef) -> bool:  # noqa: N802
-        return False
-
-    def visit_Lambda(self, node: cst.Lambda) -> bool:  # noqa: N802
-        return False
-
-    def visit_Return(self, node: cst.Return) -> None:  # noqa: N802
-        self.return_count += 1
-
-    def visit_Raise(self, node: cst.Raise) -> None:  # noqa: N802
-        self.raise_count += 1
-
-    def visit_Yield(self, node: cst.Yield) -> None:  # noqa: N802
-        self.yield_count += 1
-
-    def visit_YieldFrom(self, node: cst.YieldFrom) -> None:  # noqa: N802
-        self.yield_count += 1
-
-    def visit_BooleanOperation(self, node: cst.BooleanOperation) -> None:  # noqa: N802
-        self.decision_points += 1
-
-    def visit_IfExp(self, node: cst.IfExp) -> None:  # noqa: N802
-        self.decision_points += 1
-
-    def visit_If(self, node: cst.If) -> None:  # noqa: N802
-        self._enter()
-
-    def leave_If(self, original_node: cst.If) -> None:  # noqa: N802
-        self._leave()
-
-    def visit_For(self, node: cst.For) -> None:  # noqa: N802
-        self._enter()
-
-    def leave_For(self, original_node: cst.For) -> None:  # noqa: N802
-        self._leave()
-
-    def visit_AsyncFor(self, node: cst.AsyncFor) -> None:  # noqa: N802
-        self._enter()
-
-    def leave_AsyncFor(self, original_node: cst.AsyncFor) -> None:  # noqa: N802
-        self._leave()
-
-    def visit_While(self, node: cst.While) -> None:  # noqa: N802
-        self._enter()
-
-    def leave_While(self, original_node: cst.While) -> None:  # noqa: N802
-        self._leave()
-
-    def visit_With(self, node: cst.With) -> None:  # noqa: N802
-        self._enter()
-
-    def leave_With(self, original_node: cst.With) -> None:  # noqa: N802
-        self._leave()
-
-    def visit_AsyncWith(self, node: cst.AsyncWith) -> None:  # noqa: N802
-        self._enter()
-
-    def leave_AsyncWith(self, original_node: cst.AsyncWith) -> None:  # noqa: N802
-        self._leave()
-
-    def visit_Try(self, node: cst.Try) -> None:  # noqa: N802
-        self._enter()
-
-    def leave_Try(self, original_node: cst.Try) -> None:  # noqa: N802
-        self._leave()
+    def on_leave(self, original_node: cst.CSTNode) -> None:
+        if isinstance(original_node, CONTROL_NODES):
+            self._leave()
 
     def _enter(self) -> None:
         self.decision_points += 1
@@ -227,8 +188,19 @@ def _function_body_metrics(node: FunctionNode) -> _BodyMetrics:
     )
 
 
+def _function_statements(node: FunctionNode) -> list[cst.BaseStatement]:
+    """Return function body statements filtered to BaseStatement.
+
+    Returns
+    -------
+    list[cst.BaseStatement]
+        Statements from the function body that conform to BaseStatement.
+    """
+    return [statement for statement in node.body.body if isinstance(statement, cst.BaseStatement)]
+
+
 def _statement_count(node: FunctionNode) -> int:
-    statements = list(node.body.body)
+    statements = _function_statements(node)
     if statements and _is_docstring_statement(statements[0]):
         statements = statements[1:]
     return len(statements)
@@ -244,7 +216,7 @@ def _is_docstring_statement(statement: cst.BaseStatement) -> bool:
 
 
 def _has_docstring(node: FunctionNode) -> bool:
-    statements = list(node.body.body)
+    statements = _function_statements(node)
     return bool(statements and _is_docstring_statement(statements[0]))
 
 
@@ -261,24 +233,41 @@ def _logical_loc(start_line: int, end_line: int, code_lines: Sequence[str]) -> i
 
 
 def _complexity_bucket(cyclomatic: int) -> str:
-    if cyclomatic <= 5:
+    if cyclomatic <= LOW_COMPLEXITY_THRESHOLD:
         return "low"
-    if cyclomatic <= 10:
+    if cyclomatic <= MEDIUM_COMPLEXITY_THRESHOLD:
         return "medium"
     return "high"
 
 
 def build_function_metrics(
     *,
-    repo: str,
-    commit: str,
+    snapshot: RepoSnapshot,
     rel_path: str,
     module: cst.Module,
     code: str,
     created_at: str | None = None,
 ) -> list[FunctionMetricsRow]:
-    """Return per-function metrics for ``module``."""
-    snapshot = RepoSnapshot(repo=repo, commit=commit)
+    """Return per-function metrics for ``module``.
+
+    Parameters
+    ----------
+    snapshot : RepoSnapshot
+        Repository identity used for GOID derivation.
+    rel_path : str
+        Repository-relative path to the module.
+    module : cst.Module
+        Parsed CST module to analyze.
+    code : str
+        Source code for the module, used to compute logical LOC.
+    created_at : str | None, optional
+        Optional ISO-8601 timestamp. When None, uses current UTC time.
+
+    Returns
+    -------
+    list[FunctionMetricsRow]
+        Metrics rows for each discovered function or method.
+    """
     wrapper = MetadataWrapper(module)
     timestamp = created_at or datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
     visitor = FunctionMetricsVisitor(
@@ -294,14 +283,36 @@ def build_function_metrics(
 def prepare_function_metrics_parquet(
     rows: Sequence[FunctionMetricsRow],
 ) -> list[dict[str, object]]:
-    """Return Parquet-friendly payloads for metrics rows."""
+    """Return Parquet-friendly payloads for metrics rows.
+
+    Parameters
+    ----------
+    rows : Sequence[FunctionMetricsRow]
+        Metrics rows to serialize.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        JSON-serializable dictionaries ready for Parquet writer.
+    """
     return [asdict(row) for row in rows]
 
 
 def prepare_function_metrics_json(
     rows: Sequence[FunctionMetricsRow],
 ) -> list[dict[str, object]]:
-    """Return JSON-serializable payloads for metrics rows."""
+    """Return JSON-serializable payloads for metrics rows.
+
+    Parameters
+    ----------
+    rows : Sequence[FunctionMetricsRow]
+        Metrics rows to serialize.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        Dictionaries with stringified GOID hashes for JSONL output.
+    """
     serialized: list[dict[str, object]] = []
     for row in rows:
         record = asdict(row)

@@ -26,6 +26,18 @@ from tools._shared.error_codes import CANONICAL_ERROR_CODES, get_error_code
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse command-line arguments for error codes CLI.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Command-line arguments to parse. Defaults to sys.argv if None.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed command-line arguments.
+    """
     parser = argparse.ArgumentParser(description="Inspect canonical error codes.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 

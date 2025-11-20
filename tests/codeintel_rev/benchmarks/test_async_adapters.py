@@ -28,6 +28,11 @@ pytestmark = pytest.mark.skipif(
 def harness(tmp_path: Path) -> IntegrationHarness:
     """Harness configured for async adapter benchmarks.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+
     Returns
     -------
     IntegrationHarness

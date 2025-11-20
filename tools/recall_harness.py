@@ -38,6 +38,13 @@ class BM25SweepPlan:
 
 @lru_cache(maxsize=1)
 def _cached_app_config() -> AppConfig:
+    """Load application configuration from environment or default.
+
+    Returns
+    -------
+    AppConfig
+        Loaded application configuration instance.
+    """
     return load_app_config(file=os.environ.get("CODEINTEL_CONFIG_FILE"))
 
 
@@ -299,6 +306,18 @@ def _compute_metrics(
 
 
 def _write_rows(out: Path, rows: list[dict[str, object]]) -> None:
+    """Write rows to CSV file with auto-detected fieldnames.
+
+    Creates parent directories if needed and writes CSV with header
+    row containing all unique keys from rows.
+
+    Parameters
+    ----------
+    out : Path
+        Output CSV file path.
+    rows : list[dict[str, object]]
+        List of dictionaries to write as CSV rows.
+    """
     out.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = sorted({key for row in rows for key in row})
     with out.open("w", newline="", encoding="utf-8") as handle:
@@ -308,6 +327,18 @@ def _write_rows(out: Path, rows: list[dict[str, object]]) -> None:
 
 
 def _record_recall_metrics(rows: list[dict[str, object]], k_values: Sequence[int]) -> None:
+    """Log average recall metrics for each k value.
+
+    Computes and logs average recall@k values across all rows for
+    each k value in k_values.
+
+    Parameters
+    ----------
+    rows : list[dict[str, object]]
+        Rows containing recall@k metrics.
+    k_values : Sequence[int]
+        K values to compute averages for.
+    """
     per_k: dict[int, list[float]] = {k: [] for k in k_values}
     for row in rows:
         for k in k_values:

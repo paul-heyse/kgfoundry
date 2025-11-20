@@ -61,17 +61,6 @@ class ToolExecutionError(RuntimeError):
     This pattern enables lazy loading of heavy dependencies while maintaining
     type safety and explicit error raising for static analysis tools.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the subprocess execution failure.
-    command : list[str] | None, optional
-        Command that failed execution, as a list of strings. Included in the
-        error for debugging. Defaults to None.
-    problem : Mapping[str, object] | None, optional
-        Additional structured problem details (e.g., return code, stderr).
-        Included in the error for debugging. Defaults to None.
-
     Notes
     -----
     This class uses a factory pattern where `__new__` delegates to a registered
@@ -146,10 +135,20 @@ class ToolExecutionError(RuntimeError):
         ----------
         message : str
             Human-readable error message describing the subprocess execution failure.
+            Stored as the exception message via parent RuntimeError constructor.
         command : list[str] | None, optional
-            Command that failed execution, as a list of strings.
+            Command that failed execution, as a list of strings. Included in the
+            error for debugging. Normalized to empty list if None. Defaults to None.
         problem : Mapping[str, object] | None, optional
             Additional structured problem details (e.g., return code, stderr).
+            Included in the error for debugging. Stored as instance attribute.
+            Defaults to None.
+
+        Notes
+        -----
+        Calls parent RuntimeError constructor with message. Sets command and problem
+        as instance attributes. This __init__ is only called when no factory is
+        registered; when a factory exists, __new__ handles instantiation.
         """
         super().__init__(message)
         self.command = list(command or [])
@@ -532,14 +531,11 @@ class SubprocessTimeoutError(TimeoutError):
     duration. Includes the command that timed out and the timeout value
     for debugging and error reporting.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error description.
-    command : list[str] | None, optional
-        The command sequence that timed out. Defaults to None.
-    timeout_seconds : int | None, optional
-        The timeout duration in seconds that was configured. Defaults to None.
+    Notes
+    -----
+    Time O(1); memory O(1) aside from message and attribute storage. No I/O,
+    no global state. Thread-safe. Inherits from TimeoutError for compatibility
+    with stdlib subprocess timeout handling.
     """
 
     def __init__(
@@ -553,11 +549,20 @@ class SubprocessTimeoutError(TimeoutError):
         Parameters
         ----------
         message : str
-            Human-readable error description.
+            Human-readable error description explaining that the subprocess
+            exceeded its timeout. Stored as the exception message via parent
+            TimeoutError constructor.
         command : list[str] | None, optional
-            The command sequence that timed out.
+            The command sequence that timed out. Included in the error for
+            debugging. Stored as instance attribute. Defaults to None.
         timeout_seconds : int | None, optional
-            The timeout duration in seconds that was configured.
+            The timeout duration in seconds that was configured. Included in
+            the error for debugging. Stored as instance attribute. Defaults to None.
+
+        Notes
+        -----
+        Calls parent TimeoutError constructor with message. Sets command and
+        timeout_seconds as instance attributes for programmatic error handling.
         """
         super().__init__(message)
         self.command = command
@@ -574,18 +579,11 @@ class SubprocessError(RuntimeError):
     or encountered an error during execution. Includes the command that failed,
     the exit code, and captured stderr output for debugging and error reporting.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error description.
-    command : Sequence[str] | None, optional
-        Command that failed execution, as a sequence of strings. Included in
-        the error for debugging. Defaults to None.
-    returncode : int | None, optional
-        Exit code from subprocess. None if the process did not exit normally.
-        Defaults to None.
-    stderr : str | None, optional
-        Captured stderr output from the failed process. Defaults to None.
+    Notes
+    -----
+    Time O(1); memory O(1) aside from message and attribute storage. No I/O,
+    no global state. Thread-safe. The command is normalized to a list if provided,
+    ensuring consistent type for programmatic access.
     """
 
     def __init__(
@@ -601,13 +599,24 @@ class SubprocessError(RuntimeError):
         Parameters
         ----------
         message : str
-            Human-readable error description.
+            Human-readable error description explaining the subprocess failure.
+            Stored as the exception message via parent RuntimeError constructor.
         command : Sequence[str] | None, optional
-            Command that failed execution, as a sequence of strings.
+            Command that failed execution, as a sequence of strings. Included in
+            the error for debugging. Normalized to a list and stored as instance
+            attribute. Defaults to None.
         returncode : int | None, optional
-            Exit code from subprocess. None if the process did not exit normally.
+            Exit code from subprocess. None if the process did not exit normally
+            (e.g., terminated by signal). Stored as instance attribute for
+            programmatic error handling. Defaults to None.
         stderr : str | None, optional
-            Captured stderr output from the failed process.
+            Captured stderr output from the failed process. Included in the error
+            for debugging. Stored as instance attribute. Defaults to None.
+
+        Notes
+        -----
+        Calls parent RuntimeError constructor with message. Sets command (as list),
+        returncode, and stderr as instance attributes for programmatic error handling.
         """
         super().__init__(message)
         self.command = list(command or [])

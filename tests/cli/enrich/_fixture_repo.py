@@ -23,6 +23,11 @@ FIXTURE_FILES: dict[Path, str] = {
 def write_completeness_fixture_repo(dst: Path) -> Path:
     """Create the completeness audit fixture repository under ``dst``.
 
+    Parameters
+    ----------
+    dst : Path
+        Destination directory for the fixture repository.
+
     Returns
     -------
     Path

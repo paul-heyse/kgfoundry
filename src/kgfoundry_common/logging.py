@@ -332,14 +332,12 @@ if TYPE_CHECKING:
     class _LoggerAdapterBase:  # pragma: no cover - typing helper
         """Typing helper matching logging.LoggerAdapter interface.
 
-        Initializes logger adapter with base logger and structured fields.
-
-        Parameters
-        ----------
-        logger : logging.Logger
-            Base logger instance.
-        extra : LogContextExtra | Mapping[str, object] | None, optional
-            Structured fields to inject into log entries.
+        Extended Summary
+        ----------------
+        Typing stub that provides type hints compatible with stdlib
+        logging.LoggerAdapter when TYPE_CHECKING is True. At runtime, this
+        is replaced with the actual logging.LoggerAdapter class. Used for
+        type checking compatibility with structured logging adapters.
 
         Attributes
         ----------
@@ -362,9 +360,18 @@ if TYPE_CHECKING:
             Parameters
             ----------
             logger : logging.Logger
-                Base logger instance to wrap.
+                Base logger instance to wrap. All log calls through this adapter
+                will use the underlying logger with additional structured fields
+                injected.
             extra : LogContextExtra | Mapping[str, object] | None
-                Structured fields or mapping to attach to log records.
+                Structured fields or mapping to attach to log records. These
+                fields are merged into the 'extra' dict of every log record
+                created through this adapter. Defaults to None.
+
+            Notes
+            -----
+            This is a typing stub method. The actual implementation is provided
+            by stdlib logging.LoggerAdapter at runtime.
             """
             ...
 
@@ -376,22 +383,24 @@ else:
 class LoggerAdapter(_LoggerAdapterBase):
     """Logger adapter that injects structured context fields.
 
+    Extended Summary
+    ----------------
     This adapter ensures that all log entries include correlation_id,
     operation, status, and duration_ms fields. It propagates correlation
-    IDs from context variables for async-safe operation.
-
-    Parameters
-    ----------
-    logger : logging.Logger
-        Base logger instance to wrap.
-    extra : LogContextExtra | Mapping[str, object] | None, optional
-        Structured fields to inject into log entries. Can be a LogContextExtra
-        frozen dataclass or dict of fields. Defaults to None.
+    IDs from context variables for async-safe operation. Overrides process()
+    to merge structured fields from the adapter's extra dict and contextvars
+    into log records.
 
     Attributes
     ----------
     logger : logging.Logger
         Base logger instance to wrap.
+
+    Notes
+    -----
+    Time O(1) for log processing; memory O(1) aside from field storage.
+    Thread-safe for separate instances. Correlation IDs are automatically
+    injected from contextvars when available, ensuring async-safe propagation.
 
     Examples
     --------
@@ -893,19 +902,19 @@ def get_correlation_id() -> str | None:
 class CorrelationContext:
     """Context manager for correlation ID propagation using contextvars.
 
+    Extended Summary
+    ----------------
     Manages correlation ID context using `contextvars.ContextVar`, ensuring
     IDs propagate correctly through async tasks and thread pools without
     cross-contamination between concurrent requests. Automatically restores
     the previous correlation ID when the context exits.
 
-    Initializes correlation context with correlation ID.
-
-    Parameters
-    ----------
-    correlation_id : str | None
-        Correlation ID to set in context. This ID will be automatically
-        injected into all log entries within the context. Set to None to
-        clear the correlation ID.
+    Notes
+    -----
+    Time O(1) for initialization and context entry/exit; memory O(1) aside
+    from correlation_id storage. Uses contextvars for async-safe propagation.
+    Thread-safe and async-safe. The correlation ID is automatically injected
+    into all log entries created within the context via LoggerAdapter.process().
 
     Examples
     --------
@@ -917,14 +926,22 @@ class CorrelationContext:
     """
 
     def __init__(self, correlation_id: str | None) -> None:
-        """Initialize correlation context.
+        """Initialize correlation context with correlation ID.
 
         Parameters
         ----------
         correlation_id : str | None
             Correlation ID to set in context. This ID will be automatically
-            injected into all log entries within the context. Set to None to
-            clear the correlation ID.
+            injected into all log entries within the context via LoggerAdapter.
+            Set to None to clear the correlation ID. The ID is stored as an
+            instance attribute and set in the context variable when entering
+            the context manager.
+
+        Notes
+        -----
+        Stores the correlation_id and prepares for context entry. The actual
+        context variable is set when __enter__() is called, and restored
+        when __exit__() is called.
         """
         self.correlation_id = correlation_id
         self._token: contextvars.Token[str | None] | None = None
@@ -965,14 +982,19 @@ class CorrelationContext:
 class _WithFieldsContext(AbstractContextManager[LoggerAdapter]):
     """Context manager implementation for `with_fields`.
 
-    Initializes context manager with logger and fields.
+    Extended Summary
+    ----------------
+    Context manager that wraps a logger with additional structured fields
+    for the duration of the context. Returns a LoggerAdapter instance that
+    automatically injects the fields into all log entries. Used internally
+    by the with_fields() function.
 
-    Parameters
-    ----------
-    logger : logging.Logger | LoggerAdapter
-        Base logger to wrap (may already be an adapter).
-    fields : Mapping[str, object]
-        Structured fields to inject into log entries.
+    Notes
+    -----
+    Time O(1) for initialization and context entry/exit; memory O(1) aside
+    from logger and fields storage. Thread-safe for separate instances.
+    The fields are merged with any existing fields from the logger's extra
+    attribute when creating the adapter.
     """
 
     def __init__(
@@ -983,9 +1005,12 @@ class _WithFieldsContext(AbstractContextManager[LoggerAdapter]):
         Parameters
         ----------
         logger : logging.Logger | LoggerAdapter
-            Logger instance to attach fields to.
+            Base logger to wrap. May already be a LoggerAdapter instance.
+            If it is, the fields are merged with the existing adapter's fields.
         fields : Mapping[str, object]
-            Structured fields dictionary to attach to log records.
+            Structured fields to inject into log entries. These fields are
+            merged with any existing fields from the logger and attached to
+            all log records created within the context.
         """
         self._logger = logger
         self._fields = dict(fields)

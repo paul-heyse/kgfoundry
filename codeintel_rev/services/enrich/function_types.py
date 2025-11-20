@@ -142,10 +142,7 @@ def _annotation_string(
 ) -> str | None:
     if annotation is None or annotation is cst.MaybeSentinel.DEFAULT:
         return None
-    try:
-        return module.code_for_node(annotation.annotation)
-    except Exception:  # pragma: no cover - defensive
-        return None
+    return module.code_for_node(annotation.annotation)
 
 
 def _typedness_bucket(*, fully_typed: bool, untyped: bool) -> str:
@@ -177,7 +174,26 @@ def build_function_types(
     module: cst.Module,
     created_at: str | None = None,
 ) -> list[FunctionTypesRow]:
-    """Return per-function typedness rows for ``module``."""
+    """Return per-function typedness rows for ``module``.
+
+    Parameters
+    ----------
+    repo : str
+        Repository identifier for GOID generation.
+    commit : str
+        Commit hash for GOID generation.
+    rel_path : str
+        Repository-relative module path.
+    module : cst.Module
+        Parsed CST module to analyze.
+    created_at : str | None, optional
+        Optional ISO-8601 timestamp. When None, uses current UTC time.
+
+    Returns
+    -------
+    list[FunctionTypesRow]
+        Typedness rows for each discovered function or method.
+    """
     snapshot = RepoSnapshot(repo=repo, commit=commit)
     wrapper = MetadataWrapper(module)
     timestamp = created_at or datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
@@ -194,14 +210,36 @@ def build_function_types(
 def prepare_function_types_parquet(
     rows: Sequence[FunctionTypesRow],
 ) -> list[dict[str, object]]:
-    """Return Parquet-friendly payloads for typedness rows."""
+    """Return Parquet-friendly payloads for typedness rows.
+
+    Parameters
+    ----------
+    rows : Sequence[FunctionTypesRow]
+        Typedness rows to serialize.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        JSON-serializable dictionaries ready for Parquet writer.
+    """
     return [asdict(row) for row in rows]
 
 
 def prepare_function_types_json(
     rows: Sequence[FunctionTypesRow],
 ) -> list[dict[str, object]]:
-    """Return JSON-serializable payloads for typedness rows."""
+    """Return JSON-serializable payloads for typedness rows.
+
+    Parameters
+    ----------
+    rows : Sequence[FunctionTypesRow]
+        Typedness rows to serialize.
+
+    Returns
+    -------
+    list[dict[str, object]]
+        Dictionaries with stringified GOID hashes for JSONL output.
+    """
     serialized: list[dict[str, object]] = []
     for row in rows:
         record = asdict(row)

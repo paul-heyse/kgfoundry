@@ -120,6 +120,12 @@ def sha256_file(path: Path) -> str:
 
 
 class _CliRunConfigParams(TypedDict, total=False):
+    """TypedDict for optional CLI run configuration parameters.
+
+    Used for unpacking keyword arguments when creating CliRunConfig instances.
+    All fields are optional (total=False) to allow partial configuration.
+    """
+
     envelope_dir: Path | None
     correlation_id: str | None
     write_envelope_on: Literal["always", "error", "success"]
@@ -703,6 +709,12 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         so default signal handling semantics apply.
     GeneratorExit
         When the generator context is closed externally. Propagated immediately.
+    Exception
+        Any exception raised by user code when ``cfg.exit_on_error`` is ``False``.
+        The exception is re-raised after cleanup and envelope finalization via
+        ``raise error`` where ``error`` is the caught exception variable.
+        Common exception types include ValueError, TypeError, OSError, RuntimeError,
+        KgFoundryError, and other built-in exception types.
 
     Notes
     -----

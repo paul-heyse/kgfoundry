@@ -51,13 +51,6 @@ class StubHttpClient:
     requests. It maintains queues of responses that are consumed in order when
     requests are made. This enables deterministic testing of HTTP interactions
     without requiring a real HTTP server.
-
-    Parameters
-    ----------
-    get_responses : list[StubResponse] | None, optional
-        Queue of GET responses that will be returned in order.
-    post_responses : list[StubResponse] | None, optional
-        Queue of POST responses that will be returned in order.
     """
 
     def __init__(
@@ -66,6 +59,15 @@ class StubHttpClient:
         get_responses: list[StubResponse] | None = None,
         post_responses: list[StubResponse] | None = None,
     ) -> None:
+        """Initialize stub HTTP client with response queues.
+
+        Parameters
+        ----------
+        get_responses : list[StubResponse] | None, optional
+            Queue of GET responses that will be returned in order, by default None.
+        post_responses : list[StubResponse] | None, optional
+            Queue of POST responses that will be returned in order, by default None.
+        """
         """Initialize stub HTTP adapter.
 
         Parameters
@@ -161,13 +163,26 @@ class StubHttpClient:
 def _require_json_object(value: JsonValue, *, label: str) -> dict[str, JsonValue]:
     """Return the provided JSON payload as a mapping or fail the test.
 
+    Parameters
+    ----------
+    value : JsonValue
+        JSON value to check and cast.
+    label : str
+        Label for error message if value is not a dict.
+
     Returns
     -------
     dict[str, JsonValue]
         The value cast to a dictionary mapping.
+
+    Raises
+    ------
+    TypeError
+        If value is not a dict.
     """
     if not isinstance(value, dict):
-        pytest.fail(f"{label} should be a JSON object")
+        message = f"{label} should be a JSON object"
+        raise TypeError(message)
     return cast("dict[str, JsonValue]", value)
 
 

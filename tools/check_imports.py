@@ -25,6 +25,21 @@ if TYPE_CHECKING:
 
 
 def _build_envelope(result: architecture.ArchitectureResult) -> CliEnvelope:
+    """Build CLI envelope from architecture check result.
+
+    Creates envelope with success or violation status and adds error
+    messages for each violation if present.
+
+    Parameters
+    ----------
+    result : architecture.ArchitectureResult
+        Architecture check result containing violations.
+
+    Returns
+    -------
+    CliEnvelope
+        Completed CLI envelope with status and errors.
+    """
     status: CliStatus = "success" if result.is_success else "violation"
     builder = CliEnvelopeBuilder.create(command="check_imports", status=status)
     if not result.is_success:

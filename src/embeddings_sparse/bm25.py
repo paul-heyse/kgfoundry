@@ -209,36 +209,20 @@ class BM25Doc:
 class PurePythonBM25:
     """Pure Python BM25 implementation backed by simple in-memory data structures.
 
+    Extended Summary
+    ----------------
     Implements BM25 ranking algorithm using Python dictionaries and lists
     without external dependencies. Suitable for small to medium-sized indexes
-    that fit in memory.
-
-    Sets up BM25 scoring parameters and initializes empty data structures
-    for documents, postings, and document frequencies.
-
-    Parameters
-    ----------
-    index_dir : str
-        Directory path where index metadata will be stored. Created if it
-        doesn't exist.
-    k1 : float, optional
-        Term frequency saturation parameter. Controls how quickly term frequency
-        saturates. Higher values allow more influence from repeated terms.
-        Defaults to 0.9.
-    b : float, optional
-        Document length normalization parameter. Controls the degree of length
-        normalization. Values closer to 1.0 normalize more aggressively.
-        Defaults to 0.4.
-    field_boosts : Mapping[str, float] | None, optional
-        Optional mapping of field names to boost weights. Fields with higher
-        boosts contribute more to relevance scores. Normalized and merged with
-        default boosts. Defaults to None (uses default boosts: title=2.0, section=1.2, body=1.0).
+    that fit in memory. Sets up BM25 scoring parameters and initializes empty
+    data structures for documents, postings, and document frequencies.
 
     Notes
     -----
     The implementation uses in-memory data structures and is suitable for
     indexes that fit in RAM. For larger indexes, consider using LuceneBM25
-    which uses Pyserini's disk-backed Lucene index.
+    which uses Pyserini's disk-backed Lucene index. Time O(1) for initialization;
+    memory O(n) where n is the number of documents indexed. Thread-safe for
+    separate instances reading from the same index directory.
     """
 
     def __init__(
@@ -248,18 +232,31 @@ class PurePythonBM25:
         b: float = 0.4,
         field_boosts: Mapping[str, float] | None = None,
     ) -> None:
-        """Initialize in-memory BM25 index.
+        """Initialize in-memory BM25 index with scoring parameters.
 
         Parameters
         ----------
         index_dir : str
-            Directory path containing the BM25 index files.
+            Directory path where index metadata will be stored. Created if it
+            doesn't exist. Used for loading and saving index data structures.
         k1 : float, optional
-            BM25 k1 parameter (term frequency saturation). Defaults to 0.9.
+            Term frequency saturation parameter. Controls how quickly term frequency
+            saturates. Higher values allow more influence from repeated terms.
+            Typical range is 0.5-2.0. Defaults to 0.9.
         b : float, optional
-            BM25 b parameter (length normalization). Defaults to 0.4.
+            Document length normalization parameter. Controls the degree of length
+            normalization. Values closer to 1.0 normalize more aggressively.
+            Typical range is 0.0-1.0. Defaults to 0.4.
         field_boosts : Mapping[str, float] | None, optional
-            Field boost multipliers for multi-field scoring.
+            Optional mapping of field names to boost weights. Fields with higher
+            boosts contribute more to relevance scores. Normalized and merged with
+            default boosts (title=2.0, section=1.2, body=1.0). Defaults to None.
+
+        Notes
+        -----
+        Initializes empty data structures (df, postings, docs) and sets document
+        count (N) and average document length (avgdl) to zero. Field boosts are
+        normalized via _normalize_field_boosts() helper function.
         """
         self.index_dir = index_dir
         self.k1 = k1
@@ -668,34 +665,20 @@ class PurePythonBM25:
 class LuceneBM25:
     """Wrap Pyserini's Lucene BM25 indexer with project defaults.
 
+    Extended Summary
+    ----------------
     Provides a BM25 implementation backed by Apache Lucene via Pyserini.
     Suitable for large indexes that benefit from disk-backed storage and
-    optimized search performance.
-
-    Initializes the Lucene-backed BM25 adapter with index directory and scoring parameters.
-
-    Parameters
-    ----------
-    index_dir : str
-        Path to the Lucene index directory on disk.
-    k1 : float, optional
-        BM25 term saturation parameter forwarded to Pyserini. Controls how quickly
-        term frequency saturates. Higher values allow more influence from repeated terms.
-        Defaults to 0.9.
-    b : float, optional
-        BM25 document length normalization parameter. Controls the degree of length
-        normalization. Values closer to 1.0 normalize more aggressively.
-        Defaults to 0.4.
-    field_boosts : Mapping[str, float] | None, optional
-        Optional mapping of field names to boost weights. Used when composing
-        Lucene query strings with field-specific boosts. Normalized and merged with
-        default boosts. Defaults to None (uses default boosts: title=2.0, section=1.2, body=1.0).
+    optimized search performance. Wraps Pyserini's Lucene indexer and searcher
+    with BM25 scoring parameters and field boosts.
 
     Notes
     -----
     Requires the optional ``pyserini`` dependency. Import errors propagate as
     :class:`RuntimeError` when helper factories are loaded. The searcher is
     lazy-initialized on first search call to avoid unnecessary index loading.
+    Time O(1) for initialization; memory O(1) aside from configuration storage.
+    Thread-safe for separate instances reading from the same index directory.
     """
 
     def __init__(
@@ -705,18 +688,32 @@ class LuceneBM25:
         b: float = 0.4,
         field_boosts: Mapping[str, float] | None = None,
     ) -> None:
-        """Initialize Lucene-backed BM25 searcher.
+        """Initialize Lucene-backed BM25 adapter with index directory and scoring parameters.
 
         Parameters
         ----------
         index_dir : str
-            Directory path containing the Lucene BM25 index.
+            Path to the Lucene index directory on disk. Must exist and contain
+            a valid Lucene index created via build() or external tools. Used for
+            loading the searcher when search() is called.
         k1 : float, optional
-            BM25 k1 parameter (term frequency saturation). Defaults to 0.9.
+            BM25 term saturation parameter forwarded to Pyserini. Controls how quickly
+            term frequency saturates. Higher values allow more influence from repeated terms.
+            Typical range is 0.5-2.0. Defaults to 0.9.
         b : float, optional
-            BM25 b parameter (length normalization). Defaults to 0.4.
+            BM25 document length normalization parameter. Controls the degree of length
+            normalization. Values closer to 1.0 normalize more aggressively.
+            Typical range is 0.0-1.0. Defaults to 0.4.
         field_boosts : Mapping[str, float] | None, optional
-            Field boost multipliers for multi-field scoring.
+            Optional mapping of field names to boost weights. Used when composing
+            Lucene query strings with field-specific boosts. Normalized and merged with
+            default boosts (title=2.0, section=1.2, body=1.0). Defaults to None.
+
+        Notes
+        -----
+        Loads Pyserini factory functions for indexer and searcher creation. The
+        searcher is created lazily on first search() call. Field boosts are
+        normalized via _normalize_field_boosts() helper function.
         """
         self.index_dir = index_dir
         self.k1 = k1

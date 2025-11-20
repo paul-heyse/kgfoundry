@@ -101,6 +101,21 @@ class ApiSymbol:
 
 
 def _render_expr(expr: object) -> str | None:
+    """Render Griffe expression to string representation.
+
+    Attempts to call .render() method if available, otherwise falls back
+    to str() conversion. Returns None if expression is None or rendering fails.
+
+    Parameters
+    ----------
+    expr : object
+        Griffe expression object to render.
+
+    Returns
+    -------
+    str | None
+        String representation of expression, or None if rendering fails.
+    """
     # Griffe Expressions render as strings; fall back gracefully.
     try:
         if expr is None:
@@ -113,6 +128,20 @@ def _render_expr(expr: object) -> str | None:
 
 
 def _doc_summary(text: str | None) -> str | None:
+    """Extract first line summary from docstring text.
+
+    Returns the first non-empty line of text, stripped of whitespace.
+
+    Parameters
+    ----------
+    text : str | None
+        Docstring text to extract summary from.
+
+    Returns
+    -------
+    str | None
+        First line summary, or None if text is empty or None.
+    """
     if not text:
         return None
     ls = text.strip().splitlines()
@@ -120,6 +149,21 @@ def _doc_summary(text: str | None) -> str | None:
 
 
 def _iter_objects(root: GriffeModule) -> Iterator[GriffeObject]:
+    """Iterate over all objects in Griffe module tree.
+
+    Performs depth-first traversal of module members, resolving aliases
+    and including all nested objects.
+
+    Parameters
+    ----------
+    root : GriffeModule
+        Root module to traverse.
+
+    Yields
+    ------
+    GriffeObject
+        Each object in the module tree.
+    """
     stack: list[GriffeObject] = [root]
     while stack:
         obj = stack.pop()
@@ -145,6 +189,21 @@ def _iter_objects(root: GriffeModule) -> Iterator[GriffeObject]:
 
 
 def _param_kind(p: object) -> str:
+    """Extract parameter kind as stable string.
+
+    Maps Griffe Parameter.kind enum to string representation, defaulting
+    to "pos" if kind is not available.
+
+    Parameters
+    ----------
+    p : object
+        Parameter object with optional kind attribute.
+
+    Returns
+    -------
+    str
+        Parameter kind string (e.g., "pos", "kwonly", "var_pos").
+    """
     # Map griffe Parameter.kind (enum-like) to a stable string.
     k = getattr(p, "kind", None)
     return str(k).split(".")[-1] if k is not None else "pos"

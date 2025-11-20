@@ -649,3 +649,8 @@ class ReadinessProbe:
                 healthy=False,
                 detail=f"vLLM service unreachable: {exc}",
             )
+        except (RuntimeError, OSError, ValueError) as exc:  # pragma: no cover - defensive
+            return CheckResult(
+                healthy=False,
+                detail=f"vLLM service unreachable: {exc}",
+            )

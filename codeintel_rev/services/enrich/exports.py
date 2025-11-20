@@ -24,6 +24,7 @@ from codeintel_rev.enrich.output_writers import (
 )
 from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
 from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
+from codeintel_rev.ids.goid import RepoSnapshot
 from codeintel_rev.services.enrich.analytics import prepare_config_state
 from codeintel_rev.services.enrich.config_values import build_config_value_rows
 from codeintel_rev.services.enrich.context import (
@@ -328,6 +329,7 @@ def _collect_function_rows(
     repo = str(result.repo_root)
     commit = detect_commit(result.repo_root)
     created_at = datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
+    snapshot = RepoSnapshot(repo=repo, commit=commit)
     metrics_rows: list[FunctionMetricsRow] = []
     types_rows: list[FunctionTypesRow] = []
     for row in result.module_rows:
@@ -347,14 +349,13 @@ def _collect_function_rows(
             continue
         try:
             module = cst.parse_module(code)
-        except Exception:  # pragma: no cover - defensive
+        except cst.ParserSyntaxError:  # pragma: no cover - defensive
             LOGGER.warning("Failed to parse %s for function analytics", rel_path, exc_info=True)
             continue
         if include_metrics:
             metrics_rows.extend(
                 build_function_metrics(
-                    repo=repo,
-                    commit=commit,
+                    snapshot=snapshot,
                     rel_path=rel_path,
                     module=module,
                     code=code,

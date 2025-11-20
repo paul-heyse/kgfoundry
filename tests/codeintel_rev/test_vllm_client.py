@@ -132,11 +132,6 @@ def _build_transport_context(
     def _http_factory(_: VLLMSettings) -> httpx.Client:
         """Return HTTP client instance ignoring settings.
 
-        Parameters
-        ----------
-        _ : VLLMSettings
-            Settings (ignored).
-
         Returns
         -------
         httpx.Client
@@ -146,11 +141,6 @@ def _build_transport_context(
 
     def _async_factory(_: VLLMSettings) -> httpx.AsyncClient:
         """Return async client instance ignoring settings.
-
-        Parameters
-        ----------
-        _ : VLLMSettings
-            Settings (ignored).
 
         Returns
         -------
@@ -270,11 +260,6 @@ def test_vllm_client_inprocess_uses_local_engine() -> None:
 
     def _engine_factory(_: VLLMSettings) -> _StubInprocessEngine:
         """Return stub engine ignoring settings.
-
-        Parameters
-        ----------
-        _ : VLLMSettings
-            Settings (ignored).
 
         Returns
         -------

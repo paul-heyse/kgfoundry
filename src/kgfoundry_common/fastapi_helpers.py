@@ -189,10 +189,18 @@ def typed_middleware(
     class _InstrumentedMiddleware(BaseHTTPMiddleware):
         """Middleware wrapper that enforces timeout controls.
 
-        Parameters
-        ----------
-        app : ASGIApp
-            ASGI application to wrap with timeout middleware.
+        Extended Summary
+        ----------------
+        Wraps a middleware factory with timeout enforcement using asyncio.wait_for().
+        Ensures that middleware execution does not exceed the configured timeout,
+        raising asyncio.TimeoutError if the timeout is exceeded. Delegates actual
+        middleware behavior to the wrapped middleware_class instance.
+
+        Notes
+        -----
+        Time O(1) for initialization; O(n) for dispatch where n is request processing
+        time. Memory O(1) aside from middleware delegate storage. Thread-safe for
+        separate instances. The timeout is enforced per-request using asyncio.wait_for().
         """
 
         def __init__(self, app: ASGIApp) -> None:
@@ -201,7 +209,16 @@ def typed_middleware(
             Parameters
             ----------
             app : ASGIApp
-                ASGI application to wrap with timeout middleware.
+                ASGI application to wrap with timeout middleware. The app is passed
+                to both the parent BaseHTTPMiddleware constructor and the wrapped
+                middleware_class factory. The wrapped middleware instance is stored
+                as _delegate for use in dispatch().
+
+            Notes
+            -----
+            Creates the wrapped middleware instance using middleware_class factory
+            with provided factory_args and options. Calls parent BaseHTTPMiddleware
+            constructor with the app for proper ASGI middleware chain integration.
             """
             self._delegate = middleware_class(app, *factory_args, **options)
             super().__init__(app)

@@ -58,6 +58,9 @@ type NavMetadataIterator = Generator[tuple[str, JsonValue]]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_AUGMENT_PATH = REPO_ROOT / "openapi" / "_augment_cli.yaml"
 CLI_REGISTRY_PATH = REPO_ROOT / "tools" / "mkdocs_suite" / "api_registry.yaml"
+_DEFAULT_MODULE_OWNERS: dict[str, str] = {
+    "registry": "@registry",
+}
 
 
 def _candidate_sidecars(package: str) -> list[Path]:
@@ -491,6 +494,31 @@ def _default_nav_payload(package: str, exports: Sequence[str]) -> dict[str, Any]
     }
 
 
+def _apply_default_module_owner(package: str, metadata: NavMetadataModel) -> NavMetadataModel:
+    """Ensure a default module owner is set when available.
+
+    Parameters
+    ----------
+    package : str
+        Fully qualified package name used to determine owner fallbacks.
+    metadata : NavMetadataModel
+        Navigation metadata to augment.
+
+    Returns
+    -------
+    NavMetadataModel
+        Metadata with module_meta.owner populated when a default mapping exists.
+    """
+    if metadata.module_meta.owner:
+        return metadata
+    root = package.split(".", maxsplit=1)[0]
+    owner = _DEFAULT_MODULE_OWNERS.get(root)
+    if not owner:
+        return metadata
+    module_meta = metadata.module_meta.model_copy(update={"owner": owner})
+    return metadata.model_copy(update={"module_meta": module_meta})
+
+
 def _to_nav_metadata(
     package: str, raw: Mapping[str, Any], exports: Sequence[str]
 ) -> NavMetadataModel:
@@ -534,7 +562,8 @@ def _to_nav_metadata(
     sections = merged.get("sections")
     if not sections:
         merged["sections"] = base["sections"]
-    return NavMetadataModel.model_validate(merged)
+    metadata = NavMetadataModel.model_validate(merged)
+    return _apply_default_module_owner(package, metadata)
 
 
 def _registry_operation_candidates(operation: RegistryOperationModel, key: str) -> list[str]:
@@ -1049,7 +1078,7 @@ def _cli_nav_metadata(package: str, exports: Sequence[str]) -> NavMetadataModel 
     extras: dict[str, Any] = {
         "interface_id": interface.identifier,
     }
-    return NavMetadataModel(
+    metadata = NavMetadataModel(
         title=title,
         synopsis=synopsis,
         exports=tuple(dict.fromkeys(normalized_exports)),
@@ -1058,6 +1087,7 @@ def _cli_nav_metadata(package: str, exports: Sequence[str]) -> NavMetadataModel 
         symbols=symbols,
         extras=extras,
     )
+    return _apply_default_module_owner(package, metadata)
 
 
 def _sidecar_nav_metadata(package: str, exports: Sequence[str]) -> NavMetadataModel:

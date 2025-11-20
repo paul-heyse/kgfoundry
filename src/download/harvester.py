@@ -61,22 +61,24 @@ class HarvesterConfig:
 class OpenAccessHarvester:
     """Harvester for downloading open-access PDFs from OpenAlex.
 
+    Extended Summary
+    ----------------
     Provides functionality to search for academic works in OpenAlex, resolve
     PDF URLs through multiple sources (direct links, locations, Unpaywall, or
-    custom PDF host), and download PDFs to local storage.
+    custom PDF host), and download PDFs to local storage. Sets up HTTP session
+    with proper headers and creates output directory if it doesn't exist.
 
-    Sets up HTTP session with proper headers and creates output directory
-    if it doesn't exist.
+    This class serves as the primary interface for batch downloading academic
+    papers from OpenAlex, handling API authentication, URL resolution through
+    multiple fallback mechanisms, and local file management. It integrates
+    with OpenAlex search API, Unpaywall for open-access discovery, and
+    supports custom PDF hosting endpoints.
 
-    Parameters
-    ----------
-    user_agent : str
-        User agent string for HTTP requests (required by OpenAlex API).
-    contact_email : str
-        Contact email address for API requests (required by OpenAlex API).
-    config : HarvesterConfig | None, optional
-        Optional configuration object. If None, uses default HarvesterConfig.
-        Defaults to None.
+    Notes
+    -----
+    Time O(1) for initialization; subsequent operations depend on network I/O
+    and API response times. Creates output directory structure if missing.
+    Thread-safe for concurrent downloads when using separate instances.
     """
 
     def __init__(
@@ -85,16 +87,28 @@ class OpenAccessHarvester:
         contact_email: str,
         config: HarvesterConfig | None = None,
     ) -> None:
-        """Initialize harvester.
+        """Initialize harvester with API credentials and configuration.
 
         Parameters
         ----------
         user_agent : str
-            User agent string for API requests.
+            User agent string for HTTP requests. Required by OpenAlex API
+            terms of service. Should identify the application making requests.
         contact_email : str
-            Contact email address for API requests (required by OpenAlex API).
+            Contact email address for API requests. Required by OpenAlex API
+            terms of service. Used for rate limit notifications and API
+            communication.
         config : HarvesterConfig | None, optional
-            Optional configuration object. If None, uses default HarvesterConfig.
+            Optional configuration object specifying API endpoints and output
+            directory. If None, uses default HarvesterConfig with standard
+            OpenAlex/Unpaywall endpoints and "/data/pdfs" output directory.
+            Defaults to None.
+
+        Notes
+        -----
+        Initializes HTTP session with proper headers and creates output
+        directory structure if it doesn't exist. Configuration is validated
+        and normalized (trailing slashes removed from URLs).
         """
         cfg = config or HarvesterConfig()
         self.ua = user_agent

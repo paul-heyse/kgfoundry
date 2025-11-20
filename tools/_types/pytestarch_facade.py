@@ -85,10 +85,33 @@ class EvaluableArchitectureProtocol(Protocol):
 
 
 def _import(name: str) -> ModuleType:
+    """Dynamically import module by name.
+
+    Parameters
+    ----------
+    name : str
+        Module name to import.
+
+    Returns
+    -------
+    ModuleType
+        Imported module object.
+
+    Raises
+    ------
+    ImportError
+        If module cannot be imported.
+    """
     return import_module(name)
 
 
 class _PytestarchModule(Protocol):
+    """Protocol for pytestarch module interface.
+
+    Defines interface for modules that provide get_evaluable_architecture
+    method for architecture analysis.
+    """
+
     def get_evaluable_architecture(
         self,
         *args: object,

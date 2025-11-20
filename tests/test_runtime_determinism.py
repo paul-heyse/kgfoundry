@@ -54,11 +54,12 @@ def _require_callable(value: object, label: str) -> Callable[..., object]:
 
     Raises
     ------
-    pytest.Failed
+    TypeError
         If value is not callable.
     """
     if not _is_callable(value):
-        pytest.fail(f"{label} is not callable")
+        message = f"{label} is not callable"
+        raise TypeError(message)
     return value
 
 

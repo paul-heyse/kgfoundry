@@ -11,7 +11,6 @@ from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 
 from tests._helpers import assertions
-from tests._helpers.adapters import InMemoryHistoryAdapter
 from tests._helpers.integration import IntegrationHarness, build_async_adapters_harness
 
 pytestmark = pytest.mark.skipif(
@@ -23,6 +22,11 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture
 def harness(tmp_path: Path) -> IntegrationHarness:
     """Harness with async history adapter and seeded files for load tests.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
 
     Returns
     -------
@@ -82,14 +86,7 @@ async def test_concurrent_blame_range(harness: IntegrationHarness) -> None:
     num_concurrent = 50
     session_id = "test-session-load"
 
-    history_adapter = harness.history_adapter
-    assertions.expect_true(
-        history_adapter is not None, reason="history adapter should be available"
-    )
-    if history_adapter is None:  # pragma: no cover - defensive
-        pytest.fail("history adapter not initialized")
-        return
-    hist_adapter: InMemoryHistoryAdapter = history_adapter
+    history_adapter = harness.require_history_adapter()
 
     async def blame_task(task_id: int) -> dict:
         """Single blame_range task.
@@ -106,24 +103,19 @@ async def test_concurrent_blame_range(harness: IntegrationHarness) -> None:
         """
         session_id_var.set(session_id)
         file_num = task_id % 10  # Cycle through first 10 files
-        return await history_adapter.blame_range(
-            harness.context,
+        blame_rows = await history_adapter.blame_range(
             path=f"src/file_{file_num}.py",
             start_line=1,
             end_line=5,
         )
+        return {"blame": blame_rows}
 
     tasks = [blame_task(i) for i in range(num_concurrent)]
     results = await asyncio.gather(*tasks)
 
     assertions.expect_equal(len(results), num_concurrent)
     assertions.expect_true(all("blame" in result or "error" in result for result in results))
-    history_adapter = harness.history_adapter
-    assertions.expect_true(
-        history_adapter is not None, reason="history adapter should be available"
-    )
-    if history_adapter is not None:
-        assertions.expect_equal(history_adapter.blame_calls, num_concurrent)
+    assertions.expect_equal(history_adapter.blame_calls, num_concurrent)
 
 
 @pytest.mark.load
@@ -138,13 +130,7 @@ async def test_mixed_concurrent_operations(harness: IntegrationHarness) -> None:
     num_blame = 50
     session_id = "test-session-load"
 
-    history_adapter = harness.history_adapter
-    assertions.expect_true(
-        history_adapter is not None, reason="history adapter should be available"
-    )
-    if history_adapter is None:  # pragma: no cover - defensive
-        pytest.fail("history adapter not initialized")
-        return
+    history_adapter = harness.require_history_adapter()
     base_blame_calls = history_adapter.blame_calls
 
     async def list_paths_task() -> dict:
@@ -173,12 +159,12 @@ async def test_mixed_concurrent_operations(harness: IntegrationHarness) -> None:
         """
         session_id_var.set(session_id)
         file_num = task_id % 10
-        return await history_adapter.blame_range(
-            harness.context,
+        blame_rows = await history_adapter.blame_range(
             path=f"src/file_{file_num}.py",
             start_line=1,
             end_line=3,
         )
+        return {"blame": blame_rows}
 
     list_tasks = [list_paths_task() for _ in range(num_list_paths)]
     blame_tasks = [blame_task(i) for i in range(num_blame)]
@@ -187,12 +173,7 @@ async def test_mixed_concurrent_operations(harness: IntegrationHarness) -> None:
     results = await asyncio.gather(*all_tasks)
 
     assertions.expect_equal(len(results), num_list_paths + num_blame)
-    history_adapter = harness.history_adapter
-    assertions.expect_true(
-        history_adapter is not None, reason="history adapter should be available"
-    )
-    if history_adapter is not None:
-        assertions.expect_equal(history_adapter.blame_calls, base_blame_calls + num_blame)
+    assertions.expect_equal(history_adapter.blame_calls, base_blame_calls + num_blame)
 
 
 @pytest.mark.load

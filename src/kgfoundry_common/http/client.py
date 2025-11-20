@@ -80,34 +80,45 @@ class RequestOptions:
 class HttpClient:
     """HTTP client with configurable retry strategies.
 
+    Extended Summary
+    ----------------
     This client supports per-method retry policies and enforces idempotency
-    key requirements for non-idempotent methods when configured.
+    key requirements for non-idempotent methods when configured. Provides a
+    unified interface for making HTTP requests with configurable timeouts,
+    retry logic, and error handling.
 
-    Parameters
-    ----------
-    settings : HttpSettings
-        Client configuration settings including base URL, timeouts, and other
-        HTTP client configuration options.
-    retry_strategy : RetryStrategy | None, optional
-        Retry strategy to use for handling transient failures. If None, requests
-        will be attempted only once without retries. Defaults to None.
+    The client integrates with the retry strategy system to handle transient
+    failures automatically, supporting both idempotent and non-idempotent
+    operations with appropriate safeguards.
 
     Notes
     -----
     The underlying HTTP client (httpx, requests, etc.) is not yet initialized.
     This is a placeholder implementation that raises NotImplementedError when
     requests are made. See the `request` method for implementation status.
+    Thread-safe for concurrent requests when using separate instances.
     """
 
     def __init__(self, settings: HttpSettings, retry_strategy: RetryStrategy | None = None) -> None:
-        """Initialize HTTP client.
+        """Initialize HTTP client with configuration and retry strategy.
 
         Parameters
         ----------
         settings : HttpSettings
-            HTTP client configuration settings.
+            Client configuration settings including base URL, timeouts, and
+            other HTTP client configuration options. Must be a valid
+            HttpSettings instance with required fields populated.
         retry_strategy : RetryStrategy | None, optional
-            Optional retry strategy. If None, requests are single-attempt only.
+            Retry strategy to use for handling transient failures. If None,
+            requests will be attempted only once without retries. When
+            provided, the strategy determines retry count, backoff, and
+            which exceptions trigger retries. Defaults to None.
+
+        Notes
+        -----
+        Stores settings and retry strategy as instance attributes. No I/O
+        performed during initialization. The retry_strategy may be None for
+        single-attempt requests without automatic retries.
         """
         self.s = settings
         self.retry_strategy = retry_strategy  # may be None for single-attempt

@@ -311,19 +311,36 @@ class _MethodStrategy(RetryStrategy[object]):
 class TenacityRetryStrategy(RetryStrategy[object]):
     """Retry strategy implementation using tenacity library.
 
-    Parameters
-    ----------
-    policy : RetryPolicyDoc
-        Retry policy configuration.
+    Extended Summary
+    ----------------
+    Implements the RetryStrategy protocol using the tenacity library for
+    configurable retry logic. Wraps tenacity's Retrying class with policy
+    configuration for stop conditions, wait strategies, and retry predicates.
+
+    Notes
+    -----
+    Time O(1) for initialization; O(n) for run() where n is the number of
+    retry attempts. Memory O(1) aside from policy storage. No I/O during
+    initialization. Thread-safe for separate instances. The policy is stored
+    as an instance attribute and used to configure the tenacity Retrying instance.
     """
 
     def __init__(self, policy: RetryPolicyDoc) -> None:
-        """Initialize retry strategy.
+        """Initialize retry strategy with policy configuration.
 
         Parameters
         ----------
         policy : RetryPolicyDoc
-            Retry policy configuration.
+            Retry policy configuration specifying stop conditions, wait strategies,
+            retry predicates, and other tenacity parameters. The policy is stored
+            as an instance attribute and used to configure the underlying tenacity
+            Retrying instance when run() is called.
+
+        Notes
+        -----
+        Stores the policy for use in run() method. The actual tenacity Retrying
+        instance is created lazily when run() is first called, configured according
+        to the policy parameters.
         """
         self.policy = policy
 

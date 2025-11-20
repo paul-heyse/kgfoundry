@@ -580,6 +580,11 @@ class _OperationDescriptor:
     short_help: str = field(init=False)
 
     def __post_init__(self) -> None:
+        """Normalize and derive fields from command metadata.
+
+        Processes raw_tokens, command params, and help text to populate
+        normalized fields for OpenAPI generation.
+        """
         tokens = list(self.raw_tokens) or [self.command.name or "run"]
         object.__setattr__(self, "tokens", tuple(tokens))
         raw_params = getattr(self.command, "params", ())
@@ -862,7 +867,7 @@ def _augment_document_tags(document: dict[str, object], referenced_tags: set[str
 class _RegistryOperationEntry:
     """Immutable entry for registry-based operation.
 
-    Parameters
+    Attributes
     ----------
     path : str
         OpenAPI path string.
@@ -884,7 +889,7 @@ class _RegistryOperationEntry:
 class _OperationDocumentParams:
     """Parameters for building registry operation document.
 
-    Parameters
+    Attributes
     ----------
     operation_id : str
         Operation ID.
@@ -915,7 +920,7 @@ class _OperationDocumentParams:
 class _InterfaceOperationContext:
     """Context for building registry interface operations.
 
-    Parameters
+    Attributes
     ----------
     interface : RegistryInterfaceModel
         Interface metadata model.

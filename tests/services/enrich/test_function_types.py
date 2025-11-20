@@ -8,6 +8,12 @@ from decimal import Decimal
 import libcst as cst
 from codeintel_rev.services.enrich.function_types import build_function_types
 
+from tests._helpers import assertions
+
+EXPECTED_PARAM_COUNT = 2
+EXPECTED_ANNOTATED_PARAMS = 2
+EXPECTED_METHOD_PARAMS = 1
+
 
 def test_function_types_flags_typedness_states() -> None:
     """Verify typedness buckets and counts derive from annotations."""
@@ -34,19 +40,19 @@ class Foo:
     )
     indexed = {row.qualname: row for row in rows}
     annotated = indexed["annotated"]
-    assert annotated.total_params == 2
-    assert annotated.annotated_params == 2
-    assert annotated.has_return_annotation is True
-    assert annotated.fully_typed is True
-    assert annotated.typedness_bucket == "typed"
+    assertions.expect_equal(annotated.total_params, EXPECTED_PARAM_COUNT)
+    assertions.expect_equal(annotated.annotated_params, EXPECTED_ANNOTATED_PARAMS)
+    assertions.expect_true(annotated.has_return_annotation)
+    assertions.expect_true(annotated.fully_typed)
+    assertions.expect_equal(annotated.typedness_bucket, "typed")
     partial = indexed["partial"]
-    assert partial.annotated_params == 1
-    assert partial.has_return_annotation is False
-    assert partial.partial_typed is True
-    assert partial.typedness_bucket == "partial"
+    assertions.expect_equal(partial.annotated_params, 1)
+    assertions.expect_false(partial.has_return_annotation)
+    assertions.expect_true(partial.partial_typed)
+    assertions.expect_equal(partial.typedness_bucket, "partial")
     method = indexed["Foo.method"]
-    assert method.total_params == 1
-    assert method.annotated_params == 1
-    assert method.param_types["self"] is None
-    assert method.return_type_source == "annotation"
-    assert isinstance(method.function_goid_h128, Decimal)
+    assertions.expect_equal(method.total_params, EXPECTED_METHOD_PARAMS)
+    assertions.expect_equal(method.annotated_params, EXPECTED_METHOD_PARAMS)
+    assertions.expect_true(method.param_types["self"] is None)
+    assertions.expect_equal(method.return_type_source, "annotation")
+    assertions.expect_true(isinstance(method.function_goid_h128, Decimal))

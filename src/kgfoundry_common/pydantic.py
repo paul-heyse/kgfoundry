@@ -11,22 +11,16 @@ if TYPE_CHECKING:
     class BaseModel:
         """Typing-friendly stub that mirrors Pydantic's ``BaseModel``.
 
-        Populates the model from keyword arguments.
-
-        Parameters
-        ----------
-        **data : object
-            Keyword arguments accepted by the Pydantic model.
+        Extended Summary
+        ----------------
+        Populates the model from keyword arguments. This is a typing stub
+        that provides type hints compatible with Pydantic's BaseModel API
+        without requiring Pydantic at runtime when TYPE_CHECKING is False.
 
         Attributes
         ----------
         model_config : ClassVar[object]
             Pydantic model configuration dictionary.
-
-        Raises
-        ------
-        NotImplementedError
-            This is a stub implementation.
         """
 
         model_config: ClassVar[object]
@@ -37,12 +31,15 @@ if TYPE_CHECKING:
             Parameters
             ----------
             **data : object
-                Model field values.
+                Keyword arguments accepted by the Pydantic model. Model field
+                values are passed as keyword arguments and validated/assigned
+                according to the Pydantic model schema.
 
             Raises
             ------
             NotImplementedError
-                This is a stub implementation.
+                This is a stub implementation. The actual Pydantic BaseModel
+                is used at runtime when TYPE_CHECKING is False.
             """
             raise NotImplementedError
 

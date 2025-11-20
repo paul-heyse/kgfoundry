@@ -21,6 +21,11 @@ def _prepare_repo(tmp_path: Path) -> tuple[Path, Path]:
     -------
     tuple[Path, Path]
         Tuple of (repo_path, out_dir_path).
+
+    Notes
+    -----
+    Time O(1); creates directory structure and writes sample files.
+    No I/O beyond filesystem operations. Thread-safe for concurrent test execution.
     """
     repo = tmp_path / "repo"
     repo.mkdir(parents=True, exist_ok=True)

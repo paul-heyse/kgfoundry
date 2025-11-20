@@ -6,7 +6,15 @@ from __future__ import annotations
 from decimal import Decimal
 
 import libcst as cst
+from codeintel_rev.ids.goid import RepoSnapshot
 from codeintel_rev.services.enrich.function_metrics import build_function_metrics
+
+from tests._helpers import assertions
+
+EXPECTED_POS_PARAMS = 2
+EXPECTED_KEYWORD_ONLY_PARAMS = 1
+MIN_COMPLEXITY = 3
+MIN_NESTING = 2
 
 
 def test_function_metrics_capture_control_flow() -> None:
@@ -29,8 +37,7 @@ class Container:
 """
     module = cst.parse_module(code)
     rows = build_function_metrics(
-        repo="repo",
-        commit="commit",
+        snapshot=RepoSnapshot(repo="repo", commit="commit"),
         rel_path="pkg/mod.py",
         module=module,
         code=code,
@@ -38,18 +45,18 @@ class Container:
     )
     indexed = {row.qualname: row for row in rows}
     outer = indexed["outer"]
-    assert outer.kind == "function"
-    assert outer.return_count == 1
-    assert outer.yield_count == 1
-    assert outer.raise_count == 1
-    assert outer.is_generator is True
-    assert outer.positional_params == 2
-    assert outer.keyword_only_params == 1
-    assert outer.cyclomatic_complexity >= 3
-    assert outer.max_nesting_depth >= 2
-    assert outer.has_docstring is True
-    assert isinstance(outer.function_goid_h128, Decimal)
+    assertions.expect_equal(outer.kind, "function")
+    assertions.expect_equal(outer.return_count, 1)
+    assertions.expect_equal(outer.yield_count, 1)
+    assertions.expect_equal(outer.raise_count, 1)
+    assertions.expect_true(outer.is_generator)
+    assertions.expect_equal(outer.positional_params, EXPECTED_POS_PARAMS)
+    assertions.expect_equal(outer.keyword_only_params, EXPECTED_KEYWORD_ONLY_PARAMS)
+    assertions.expect_true(outer.cyclomatic_complexity >= MIN_COMPLEXITY)
+    assertions.expect_true(outer.max_nesting_depth >= MIN_NESTING)
+    assertions.expect_true(outer.has_docstring)
+    assertions.expect_true(isinstance(outer.function_goid_h128, Decimal))
     run_method = indexed["Container.run"]
-    assert run_method.kind == "method"
-    assert run_method.return_count == 1
-    assert run_method.keyword_only_params == 0
+    assertions.expect_equal(run_method.kind, "method")
+    assertions.expect_equal(run_method.return_count, 1)
+    assertions.expect_equal(run_method.keyword_only_params, 0)

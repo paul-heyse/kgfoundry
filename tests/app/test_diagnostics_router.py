@@ -20,6 +20,11 @@ _DISABLED_DETAIL = "Diagnostics endpoints disabled - observability removed"
 def diagnostics_app(tmp_path: Path) -> FastAPI:
     """Return a FastAPI app with the diagnostics router mounted.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+
     Returns
     -------
     FastAPI

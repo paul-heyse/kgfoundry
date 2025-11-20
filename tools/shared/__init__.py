@@ -39,6 +39,25 @@ if TYPE_CHECKING:
 
 
 def _load_submodule(name: str) -> ModuleType:
+    """Dynamically load submodule and register in sys.modules.
+
+    Parameters
+    ----------
+    name : str
+        Submodule name to load.
+
+    Returns
+    -------
+    ModuleType
+        Loaded module object.
+
+    Raises
+    ------
+    KeyError
+        If submodule name is not in _SUBMODULES mapping.
+    ImportError
+        If module cannot be imported.
+    """
     module = import_module(_SUBMODULES[name])
     sys.modules.setdefault(f"{__name__}.{name}", module)
     return module

@@ -39,6 +39,13 @@ DOC_COUNT = constants.BATCH_SIZES.minimal
 def _make_app_config(repo_root: Path, bm25_threads: int | None = None) -> AppConfig:
     """Return AppConfig for the synthetic repository.
 
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory for configuration paths.
+    bm25_threads : int | None, optional
+        Optional BM25 thread count override, by default None.
+
     Returns
     -------
     AppConfig
@@ -112,6 +119,13 @@ def _make_app_config(repo_root: Path, bm25_threads: int | None = None) -> AppCon
 
 def _bootstrap_repo(tmp_path: Path, *, bm25_threads: int | None = None) -> tuple[Path, AppConfig]:
     """Initialize a fake repository layout and return configured AppConfig.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+    bm25_threads : int | None, optional
+        Optional BM25 thread count override, by default None.
 
     Returns
     -------

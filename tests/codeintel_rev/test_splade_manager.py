@@ -51,6 +51,11 @@ from tests._helpers import assertions
 def _make_app_config(repo_root: Path) -> AppConfig:
     """Return an AppConfig populated with repo-relative defaults.
 
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory for configuration paths.
+
     Returns
     -------
     AppConfig
@@ -124,6 +129,11 @@ def _make_app_config(repo_root: Path) -> AppConfig:
 
 def _bootstrap_repo(tmp_path: Path) -> tuple[Path, AppConfig]:
     """Prepare a synthetic repository layout and corresponding AppConfig.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
 
     Returns
     -------

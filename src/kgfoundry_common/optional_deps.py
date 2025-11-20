@@ -64,23 +64,6 @@ class OptionalDependencyError(ArtifactDependencyError):
     and Problem Details mapping from ArtifactDependencyError. Automatically
     adds module_name and correlation_id to context for tracking and remediation.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the missing dependency
-        (e.g., "Module griffe not found").
-    module_name : str, optional
-        Name of the missing module (e.g., "griffe", "autoapi", "sphinx").
-        Added to context["module_name"] for Problem Details. Defaults to "".
-    extra : Mapping[str, object] | None, optional
-        Additional context fields for Problem Details (e.g., install_command,
-        remediation guidance). Merged with module_name and correlation_id into
-        context. Defaults to None.
-    cause : Exception | None, optional
-        Underlying exception that caused the import failure (e.g., ImportError
-        from missing module). Stored as exception cause for chained exception
-        handling. Defaults to None.
-
     Notes
     -----
     Time O(1); memory O(1) aside from message and context storage. No I/O,
@@ -117,7 +100,29 @@ class OptionalDependencyError(ArtifactDependencyError):
     ) -> None:
         """Initialize exception with message, module name, and optional context.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the missing dependency
+            (e.g., "Module griffe not found"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        module_name : str, optional
+            Name of the missing module (e.g., "griffe", "autoapi", "sphinx").
+            Added to context["module_name"] for Problem Details. Defaults to "".
+        extra : Mapping[str, object] | None, optional
+            Additional context fields for Problem Details (e.g., install_command,
+            remediation guidance). Merged with module_name and correlation_id into
+            context. Defaults to None.
+        cause : Exception | None, optional
+            Underlying exception that caused the import failure (e.g., ImportError
+            from missing module). Stored as exception cause for chained exception
+            handling. Defaults to None.
+
+        Notes
+        -----
+        Automatically generates a UUID correlation_id and adds it along with
+        module_name to the context dictionary. Delegates to parent
+        ArtifactDependencyError constructor with the combined context.
         """
         context = dict(extra or {})
         context["module_name"] = module_name

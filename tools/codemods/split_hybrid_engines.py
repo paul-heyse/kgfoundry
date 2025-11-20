@@ -21,6 +21,13 @@ class SplitHybridEnginesCommand(VisitorBasedCodemodCommand):
     ) -> cst.CSTNode:
         """Rewrite relevant nodes when leaving them during traversal.
 
+        Parameters
+        ----------
+        _original_node : cst.CSTNode
+            Original node before transformation (unused).
+        updated_node : cst.CSTNode
+            Updated node after child transformations.
+
         Returns
         -------
         cst.CSTNode
@@ -50,6 +57,18 @@ class SplitHybridEnginesCommand(VisitorBasedCodemodCommand):
 
     @staticmethod
     def _module_name(node: cst.ImportFrom) -> str | None:
+        """Extract full module name from ImportFrom node.
+
+        Parameters
+        ----------
+        node : cst.ImportFrom
+            ImportFrom CST node to extract module name from.
+
+        Returns
+        -------
+        str | None
+            Full module name string, or None if module is None or cannot be resolved.
+        """
         if node.module is None:
             return None
         try:
@@ -65,6 +84,27 @@ class SplitHybridEnginesCommand(VisitorBasedCodemodCommand):
         new_module: str,
         new_symbol: str,
     ) -> cst.ImportFrom:
+        """Rewrite import statement to use new module and symbol names.
+
+        Removes old symbol import and adds new symbol import, preserving
+        other imports from the same module.
+
+        Parameters
+        ----------
+        node : cst.ImportFrom
+            ImportFrom node to rewrite.
+        symbol : str
+            Old symbol name to replace.
+        new_module : str
+            New module name to import from.
+        new_symbol : str
+            New symbol name to import.
+
+        Returns
+        -------
+        cst.ImportFrom
+            Rewritten ImportFrom node with updated imports.
+        """
         module_name = self._module_name(node)
         names = node.names
         if isinstance(names, cst.ImportStar):

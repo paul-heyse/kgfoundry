@@ -122,6 +122,15 @@ def observe_tool_run(
         Call ``observation.success()`` or ``observation.failure(reason)`` to record
         the outcome before the context exits.
 
+    Raises
+    ------
+    Exception
+        Any exception raised during tool execution is caught, recorded via
+        ``observation.failure("exception")``, and then re-raised to preserve
+        the original exception type and stack trace. Common exception types
+        include subprocess.CalledProcessError, subprocess.TimeoutExpired,
+        FileNotFoundError, PermissionError, and OSError.
+
     Notes
     -----
     Performance & Side Effects:

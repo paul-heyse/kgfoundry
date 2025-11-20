@@ -36,7 +36,7 @@ def _assert_settings(module: object, settings: CLIToolSettings) -> None:
 
     Parameters
     ----------
-    module
+    module : object
         Module object containing CLI_INTERFACE_ID and CLI_TITLE attributes.
     settings : CLIToolSettings
         Settings object to validate.

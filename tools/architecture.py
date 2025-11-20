@@ -140,6 +140,22 @@ def _load_tooling_architecture(
     list[str],
     EvaluableArchitecture,
 ]:
+    """Load tooling architecture from repository root.
+
+    Builds layered architecture and categorizes modules into domain,
+    adapter, and I/O layers from the evaluable architecture.
+
+    Parameters
+    ----------
+    root : Path | None, optional
+        Repository root path. Defaults to REPO_ROOT if None.
+
+    Returns
+    -------
+    tuple[LayeredArchitectureProtocol, list[str], list[str], list[str], EvaluableArchitecture]
+        Tuple containing architecture protocol, domain modules list,
+        adapter modules list, I/O modules list, and evaluable architecture.
+    """
     project_root = root or REPO_ROOT
     evaluable = get_evaluable_architecture(
         str(project_root),
@@ -157,6 +173,27 @@ def _collect_violations(
     targets: Sequence[str],
     message: str,
 ) -> list[str]:
+    """Collect architecture violations for source-to-target dependencies.
+
+    Finds all dependencies from source modules to target modules and
+    formats violation messages.
+
+    Parameters
+    ----------
+    evaluable : EvaluableArchitecture
+        Evaluable architecture instance to query dependencies from.
+    sources : Sequence[str]
+        Source module names to check dependencies from.
+    targets : Sequence[str]
+        Target module names that should not be imported by sources.
+    message : str
+        Violation message prefix for each violation.
+
+    Returns
+    -------
+    list[str]
+        List of violation message strings.
+    """
     if not sources or not targets:
         return []
     dependencies = evaluable.get_dependencies(

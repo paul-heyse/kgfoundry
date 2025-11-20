@@ -34,10 +34,17 @@ class ReplaceTypingGateImports(VisitorBasedCodemodCommand):
     ) -> cst.ImportFrom | RemovalSentinel:
         """Rewrite gate_import imports to the runtime helper.
 
+        Parameters
+        ----------
+        original_node : cst.ImportFrom
+            Original ImportFrom node before transformation.
+        updated_node : cst.ImportFrom
+            Updated ImportFrom node after child transformations.
+
         Returns
         -------
-        cst.BaseStatement
-            Updated import statement.
+        cst.ImportFrom | RemovalSentinel
+            Updated import statement or RemovalSentinel if all imports removed.
         """
         del original_node
         module_name = self._module_name(updated_node.module)
@@ -74,6 +81,18 @@ class ReplaceTypingGateImports(VisitorBasedCodemodCommand):
 
     @staticmethod
     def _module_name(node: cst.BaseExpression | None) -> str | None:
+        """Extract full module name from CST expression node.
+
+        Parameters
+        ----------
+        node : cst.BaseExpression | None
+            CST expression node representing module name.
+
+        Returns
+        -------
+        str | None
+            Full module name string, or None if node is None or cannot be resolved.
+        """
         if node is None:
             return None
         try:
@@ -83,6 +102,18 @@ class ReplaceTypingGateImports(VisitorBasedCodemodCommand):
 
 
 def _alias_name_value(asname: cst.AsName | MaybeSentinel | None) -> str | None:
+    """Extract alias name value from import alias node.
+
+    Parameters
+    ----------
+    asname : cst.AsName | MaybeSentinel | None
+        Import alias 'as' clause node.
+
+    Returns
+    -------
+    str | None
+        Alias name string if present, None otherwise.
+    """
     if isinstance(asname, cst.AsName) and isinstance(asname.name, cst.Name):
         return asname.name.value
     return None

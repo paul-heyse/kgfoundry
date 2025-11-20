@@ -39,6 +39,13 @@ class _StubSession:
     ) -> list[np.ndarray]:
         """Return synthetic logits for the encoder under test.
 
+        Parameters
+        ----------
+        output_names : Sequence[str] | None
+            Output tensor names (ignored in stub implementation).
+        feeds : Mapping[str, object]
+            Input feed dictionary (ignored in stub implementation).
+
         Returns
         -------
         list[np.ndarray]

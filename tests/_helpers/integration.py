@@ -216,6 +216,36 @@ class IntegrationHarness:
         for callback in reversed(self.cleanup_callbacks):
             callback()
 
+    def require_history_adapter(self) -> InMemoryHistoryAdapter:
+        """Return the attached history adapter or raise if missing.
+
+        Returns
+        -------
+        InMemoryHistoryAdapter
+            Initialized history adapter.
+
+        Raises
+        ------
+        RuntimeError
+            If the harness was constructed without a history adapter.
+        """
+        adapter = self.history_adapter
+        if adapter is None:
+            message = "history adapter not initialized on harness"
+            raise RuntimeError(message)
+        return adapter
+
+
+@dataclass(slots=True)
+class AdapterSeedConfig:
+    """Configuration for building harnesses with seeded adapters."""
+
+    blame_map: dict[str, list[tuple[InMemoryCommit, list[int]]]] | None = None
+    history_map: dict[str, list[InMemoryCommit]] | None = None
+    history_delay: float = 0.0
+    populate_repo: bool = False
+    populate_repo_on_disk: bool = True
+
 
 @dataclass
 class FakeFAISSManager:
@@ -235,21 +265,21 @@ class FakeFAISSManager:
     def search(self, *_: object, **__: object) -> list[Any]:
         """Return pre-configured search results or raise side effect exception.
 
-        Parameters
-        ----------
-        *_ : Any
-            Positional arguments (ignored).
-        **__ : Any
-            Keyword arguments (ignored).
-
         Returns
         -------
         list[Any]
             List of pre-configured search results.
 
+        Raises
+        ------
+        Exception
+            If search_side_effect is set, raises that exception instead of returning results.
+
         Notes
         -----
-        If search_side_effect is set, raises that exception instead of returning results.
+        Time O(1); memory O(1) aside from result list. No I/O, no global state.
+        Thread-safe for concurrent searches. Side effect exception is raised via
+        instance variable (self.search_side_effect), not directly.
         """
         if self.search_side_effect is not None:
             raise self.search_side_effect
@@ -261,7 +291,7 @@ class FakeFAISSManager:
 
         Returns
         -------
-        _Runtime
+        FakeRuntimeProtocol
             Runtime instance with get_runtime_tuning and set_runtime_tuning methods.
         """
 
@@ -493,9 +523,7 @@ def build_harness_with_adapters(
     base_dir: Path,
     *,
     files: dict[str, str],
-    blame_map: dict[str, list[tuple[InMemoryCommit, list[int]]]] | None = None,
-    history_map: dict[str, list[InMemoryCommit]] | None = None,
-    history_delay: float = 0.0,
+    seed_config: AdapterSeedConfig | None = None,
 ) -> IntegrationHarness:
     """Build harness with in-memory file/history adapters pre-seeded.
 
@@ -505,37 +533,39 @@ def build_harness_with_adapters(
         Temporary base directory.
     files : dict[str, str]
         Mapping of relative path -> content to seed adapters (and optionally disk).
-    blame_map : dict[str, list[tuple[object, list[int]]]] | None, optional
-        Optional blame mapping to seed history adapter.
-    history_map : dict[str, list[object]] | None, optional
-        Optional history mapping to seed history adapter.
-    history_delay : float, optional
-        Optional artificial delay (seconds) for history adapter operations.
+    seed_config : AdapterSeedConfig | None, optional
+        Adapter seeding configuration. Defaults to empty config when omitted.
 
     Returns
     -------
     IntegrationHarness
         Harness with context plus in-memory adapters attached.
     """
+    config = seed_config or AdapterSeedConfig()
+
     file_adapter = InMemoryFileAdapter()
     for rel_path, content in files.items():
         file_adapter.add_file(rel_path, content)
 
-    history_adapter = InMemoryHistoryAdapter(delay_seconds=history_delay)
-    if blame_map:
-        for rel_path, entries in blame_map.items():
+    history_adapter = InMemoryHistoryAdapter(delay_seconds=config.history_delay)
+    if config.blame_map:
+        for rel_path, entries in config.blame_map.items():
             history_adapter.set_blame(
                 rel_path,
                 cast("list[tuple[InMemoryCommit, Sequence[int]]]", entries),
             )
-    if history_map:
-        for rel_path, commits in history_map.items():
+    if config.history_map:
+        for rel_path, commits in config.history_map.items():
             history_adapter.set_history(rel_path, commits)
 
     harness = build_integration_harness(
-        base_dir, populate_repo=False, file_adapter=file_adapter, history_adapter=history_adapter
+        base_dir,
+        populate_repo=config.populate_repo,
+        file_adapter=file_adapter,
+        history_adapter=history_adapter,
     )
-    seed_repo_files(harness.repo_root, files=files)
+    if config.populate_repo_on_disk:
+        seed_repo_files(harness.repo_root, files=files)
     return harness
 
 
@@ -545,6 +575,15 @@ def generate_concurrent_file_set(
     suffix: str = ".py",
 ) -> dict[str, str]:
     """Generate deterministic file payloads for concurrency adapter tests.
+
+    Parameters
+    ----------
+    count : int, optional
+        Number of files to generate, by default 100.
+    prefix : str, optional
+        Filename prefix, by default "src/file".
+    suffix : str, optional
+        Filename suffix, by default ".py".
 
     Returns
     -------
@@ -563,6 +602,15 @@ def build_async_adapters_harness(
     history_delay: float = 0.0,
 ) -> IntegrationHarness:
     """Build harness tailored for async adapter concurrency/benchmark tests.
+
+    Parameters
+    ----------
+    base_dir : Path
+        Base directory for the harness.
+    file_count : int, optional
+        Number of files to generate, by default 200.
+    history_delay : float, optional
+        Delay for history operations, by default 0.0.
 
     Returns
     -------
@@ -584,11 +632,13 @@ def build_async_adapters_harness(
     harness = build_harness_with_adapters(
         base_dir,
         files=files,
-        history_map=history_map,
-        blame_map=blame_map,
-        populate_repo_on_disk=True,
-        populate_repo=False,
-        history_delay=history_delay,
+        seed_config=AdapterSeedConfig(
+            history_map=history_map,
+            blame_map=blame_map,
+            populate_repo_on_disk=True,
+            populate_repo=False,
+            history_delay=history_delay,
+        ),
     )
     if harness.history_adapter is not None:
         harness.context = harness.context.with_overrides(async_git_client=harness.history_adapter)

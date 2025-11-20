@@ -8,6 +8,11 @@ from typing import Any
 def normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Return a deterministically ordered completeness payload.
 
+    Parameters
+    ----------
+    payload : dict[str, Any]
+        Raw completeness payload dictionary to normalize.
+
     Returns
     -------
     dict[str, Any]

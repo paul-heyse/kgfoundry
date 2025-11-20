@@ -192,12 +192,46 @@ def render_schema(
 
 
 def _ensure_metadata_path(destination: Path, metadata_path: Path | None) -> Path:
+    """Resolve metadata file path for schema destination.
+
+    Returns provided metadata_path if given, otherwise derives path
+    by appending .metadata.json suffix to destination path.
+
+    Parameters
+    ----------
+    destination : Path
+        Schema file destination path.
+    metadata_path : Path | None
+        Optional explicit metadata file path.
+
+    Returns
+    -------
+    Path
+        Resolved metadata file path.
+    """
     if metadata_path is not None:
         return metadata_path
     return destination.with_suffix(destination.suffix + ".metadata.json")
 
 
 def _write_json(destination: Path, payload: Mapping[str, object]) -> str:
+    """Write JSON payload to file with pretty formatting.
+
+    Creates parent directories if needed and writes JSON with 2-space
+    indentation and trailing newline.
+
+    Parameters
+    ----------
+    destination : Path
+        File path to write JSON to.
+    payload : Mapping[str, object]
+        JSON-serializable payload to write.
+
+    Returns
+    -------
+    str
+        JSON text that was written to file.
+    """
     destination.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(payload, indent=2, ensure_ascii=False)
     destination.write_text(text + "\n", encoding="utf-8")

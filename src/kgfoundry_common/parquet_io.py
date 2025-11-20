@@ -72,18 +72,12 @@ ROW_GROUP_SIZE = 4096
 class ParquetVectorWriter:
     """Writer for embedding vectors in Parquet format.
 
+    Extended Summary
+    ----------------
     Provides utilities for writing dense and sparse (SPLADE) embedding vectors
     to Parquet files with Hive-style partitioning. Supports partitioning by
-    model, run_id, and shard for efficient querying.
-
-    Initializes the Parquet vector writer with root directory.
-
-    Parameters
-    ----------
-    root : str
-        Root directory path for Parquet output. Converted to Path object
-        and stored for use by write methods. Vectors will be written to
-        subdirectories partitioned by model, run_id, and shard.
+    model, run_id, and shard for efficient querying. Uses PyArrow for schema
+    definition and Parquet file writing with ZSTD compression.
 
     Notes
     -----
@@ -91,7 +85,9 @@ class ParquetVectorWriter:
     ``root/model={model}/run_id={run_id}/shard={shard:05d}/part-00000.parquet``
 
     Files are compressed with ZSTD compression (level 6) and use a row group
-    size of 4096 bytes for optimal read performance.
+    size of 4096 bytes for optimal read performance. Time O(n) for writing
+    where n is the number of records; memory O(1) aside from buffered writes.
+    Thread-safe for separate instances writing to different paths.
     """
 
     @staticmethod
@@ -126,12 +122,21 @@ class ParquetVectorWriter:
         )
 
     def __init__(self, root: str) -> None:
-        """Initialize vector writer.
+        """Initialize vector writer with root directory.
 
         Parameters
         ----------
         root : str
-            Root directory path for Parquet output.
+            Root directory path for Parquet output. Converted to Path object
+            and stored for use by write methods. Vectors will be written to
+            subdirectories partitioned by model, run_id, and shard. The directory
+            structure is created automatically when writing.
+
+        Notes
+        -----
+        Converts root to a Path object and stores it as an instance attribute.
+        No directory creation or validation is performed during initialization;
+        directories are created on-demand when write methods are called.
         """
         self.root = Path(root)
 
@@ -292,22 +297,12 @@ class ParquetVectorWriter:
 class ParquetChunkWriter:
     """Writer for document chunks in Parquet format.
 
+    Extended Summary
+    ----------------
     Provides utilities for writing document chunks (text segments with metadata)
     to Parquet files with Hive-style partitioning. Supports chunk text, character
-    offsets, section information, and optional doctags spans.
-
-    Initializes the Parquet chunk writer with root directory and partitioning parameters.
-
-    Parameters
-    ----------
-    root : str
-        Root directory path for Parquet output. Converted to Path object
-        and combined with model and run_id partitioning. Chunks will be written to
-        subdirectories partitioned by model and run_id.
-    model : str, optional
-        Model identifier used for partitioning. Defaults to "docling_hybrid".
-    run_id : str, optional
-        Run identifier used for partitioning. Defaults to "dev".
+    offsets, section information, and optional doctags spans. Uses PyArrow for
+    schema definition and Parquet file writing with ZSTD compression.
 
     Notes
     -----
@@ -315,7 +310,9 @@ class ParquetChunkWriter:
     ``root/model={model}/run_id={run_id}/shard=00000/part-00000.parquet``
 
     Files are compressed with ZSTD compression (level 6) and use a row group
-    size of 4096 bytes for optimal read performance.
+    size of 4096 bytes for optimal read performance. Time O(n) for writing where
+    n is the number of chunks; memory O(1) aside from buffered writes. Thread-safe
+    for separate instances writing to different paths.
     """
 
     @staticmethod
@@ -353,16 +350,27 @@ class ParquetChunkWriter:
         return pa.schema(chunk_fields)
 
     def __init__(self, root: str, model: str = "docling_hybrid", run_id: str = "dev") -> None:
-        """Initialize chunk writer.
+        """Initialize chunk writer with root directory and partitioning parameters.
 
         Parameters
         ----------
         root : str
-            Root directory path for Parquet output.
+            Root directory path for Parquet output. Converted to Path object
+            and combined with model and run_id partitioning. Chunks will be written to
+            subdirectories partitioned by model and run_id. The directory structure
+            is created automatically during initialization.
         model : str, optional
-            Model identifier for partitioning. Defaults to "docling_hybrid".
+            Model identifier used for partitioning. Included in the directory path
+            as "model={model}". Defaults to "docling_hybrid".
         run_id : str, optional
-            Run identifier for partitioning. Defaults to "dev".
+            Run identifier used for partitioning. Included in the directory path
+            as "run_id={run_id}". Defaults to "dev".
+
+        Notes
+        -----
+        Creates the partitioned directory structure immediately during initialization.
+        The full path is stored as self.root for use by write() method. Directory
+        creation uses mkdir(parents=True, exist_ok=True) to handle existing paths.
         """
         self.root = Path(root) / f"model={model}" / f"run_id={run_id}" / "shard=00000"
         self.root.mkdir(parents=True, exist_ok=True)

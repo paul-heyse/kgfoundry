@@ -178,21 +178,6 @@ class KgFoundryError(Exception):
     Resolves configuration from either a structured config object or legacy
     keyword arguments, ensuring type safety and mutual exclusivity.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the failure condition.
-    config : KgFoundryErrorConfig | None, optional
-        Structured configuration object containing code, http_status,
-        log_level, cause, and context fields. When provided, legacy_kwargs
-        must be empty. Defaults to None, which triggers legacy keyword
-        argument resolution.
-    **legacy_kwargs : object
-        Backwards-compatible keyword arguments mirroring KgFoundryErrorConfig
-        fields (code, http_status, log_level, cause, context). Cannot be
-        combined with config parameter. Allowed keys are validated against
-        known configuration fields.
-
     Notes
     -----
     Time O(1); memory O(1) aside from message and context storage. No I/O,
@@ -228,7 +213,36 @@ class KgFoundryError(Exception):
     ) -> None:
         """Initialize exception with message and configuration.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the failure condition.
+            This message is stored as the exception message and may be used
+            in logs, user-facing error displays, and Problem Details responses.
+        config : KgFoundryErrorConfig | None, optional
+            Structured configuration object containing code, http_status,
+            log_level, cause, and context fields. When provided, legacy_kwargs
+            must be empty. Defaults to None, which triggers legacy keyword
+            argument resolution. Mutually exclusive with legacy_kwargs.
+        **legacy_kwargs : object
+            Backwards-compatible keyword arguments mirroring KgFoundryErrorConfig
+            fields (code, http_status, log_level, cause, context). Cannot be
+            combined with config parameter. Allowed keys are validated against
+            known configuration fields. Mutually exclusive with config parameter.
+
+        Notes
+        -----
+        Resolves configuration through _coerce_error_config() which validates
+        mutual exclusivity and normalizes legacy keyword arguments into a
+        KgFoundryErrorConfig object. Default values are applied if neither config
+        nor legacy_kwargs provide specific fields.
+
+        The _coerce_error_config() helper may raise TypeError if both config and
+        legacy_kwargs are provided, if legacy_kwargs contains unknown keys, or if
+        config fields have invalid types (e.g., code is not an ErrorCode, http_status
+        is not an int, context is not a Mapping when provided, cause is not an
+        Exception when provided). This exception is not documented in Raises because
+        it is raised indirectly by the helper function, not directly by __init__.
         """
         resolved_config = _coerce_error_config(config, dict(legacy_kwargs))
         self.message = message
@@ -315,19 +329,6 @@ class DownloadError(KgFoundryError):
     DOWNLOAD_FAILED and HTTP status 503 (Service Unavailable). Inherits
     structured error handling and Problem Details mapping from KgFoundryError.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the download failure (e.g.,
-        "Failed to fetch resource from URL").
-    cause : Exception | None, optional
-        Underlying exception that caused the download failure (e.g., IOError,
-        ConnectionError, TimeoutError). Stored as exception cause for
-        chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., URL, retry count,
-        response headers). Merged into Problem Details extensions. Defaults to None.
-
     Notes
     -----
     Time O(1); memory O(1) aside from message and context storage. No I/O,
@@ -353,7 +354,25 @@ class DownloadError(KgFoundryError):
     ) -> None:
         """Initialize exception with message, optional cause, and context.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the download failure (e.g.,
+            "Failed to fetch resource from URL"). Stored as the exception
+            message and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the download failure (e.g., IOError,
+            ConnectionError, TimeoutError). Stored as exception cause for
+            chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., URL, retry count,
+            response headers). Merged into Problem Details extensions. Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        DOWNLOAD_FAILED and HTTP status 503. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -374,20 +393,6 @@ class UnsupportedMIMEError(KgFoundryError):
     code UNSUPPORTED_MIME and HTTP status 415 (Unsupported Media Type).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the unsupported MIME type
-        (e.g., "application/x-unknown is not supported").
-    cause : Exception | None, optional
-        Underlying exception that caused the error (e.g., ValueError from
-        MIME type detection). Stored as exception cause for chained exception
-        handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., detected MIME
-        type, file path, supported types list). Merged into Problem Details
-        extensions. Defaults to None.
 
     Notes
     -----
@@ -413,7 +418,26 @@ class UnsupportedMIMEError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the unsupported MIME type
+            (e.g., "application/x-unknown is not supported"). Stored as the
+            exception message and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the error (e.g., ValueError from
+            MIME type detection). Stored as exception cause for chained exception
+            handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., detected MIME
+            type, file path, supported types list). Merged into Problem Details
+            extensions. Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        UNSUPPORTED_MIME and HTTP status 415. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -433,20 +457,6 @@ class DoclingError(KgFoundryError):
     Raised when document processing operations fail in Docling. Uses error
     code DOCLING_ERROR and HTTP status 422 (Unprocessable Entity). Inherits
     structured error handling and Problem Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the processing failure
-        (e.g., "Failed to parse document structure").
-    cause : Exception | None, optional
-        Underlying exception that caused the processing failure (e.g., ValueError
-        from invalid format, IOError from file access). Stored as exception cause
-        for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., document path,
-        processing stage, format type). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -473,7 +483,26 @@ class DoclingError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the processing failure
+            (e.g., "Failed to parse document structure"). Stored as the
+            exception message and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the processing failure (e.g., ValueError
+            from invalid format, IOError from file access). Stored as exception cause
+            for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., document path,
+            processing stage, format type). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        DOCLING_ERROR and HTTP status 422. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -494,20 +523,6 @@ class OCRTimeoutError(KgFoundryError):
     timeout limit. Uses error code OCR_TIMEOUT and HTTP status 504 (Gateway Timeout).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the timeout (e.g., "OCR timed
-        out after 30s").
-    cause : Exception | None, optional
-        Underlying exception that caused the timeout (e.g., TimeoutError from
-        OCR backend). Stored as exception cause for chained exception handling.
-        Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., timeout_seconds,
-        document_path, processing stage). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -534,7 +549,26 @@ class OCRTimeoutError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the timeout (e.g., "OCR timed
+            out after 30s"). Stored as the exception message and used in logs
+            and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the timeout (e.g., TimeoutError from
+            OCR backend). Stored as exception cause for chained exception handling.
+            Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., timeout_seconds,
+            document_path, processing stage). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        OCR_TIMEOUT and HTTP status 504. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -554,20 +588,6 @@ class ChunkingError(KgFoundryError):
     Raised when text chunking operations fail. Uses error code CHUNKING_ERROR
     and HTTP status 422 (Unprocessable Entity). Inherits structured error
     handling and Problem Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the chunking failure (e.g.,
-        "Failed to chunk document").
-    cause : Exception | None, optional
-        Underlying exception that caused the chunking failure (e.g., ValueError
-        from empty text, IndexError from invalid chunk size). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., chunk_size,
-        document_length, chunking_strategy). Merged into Problem Details
-        extensions. Defaults to None.
 
     Notes
     -----
@@ -594,7 +614,26 @@ class ChunkingError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the chunking failure (e.g.,
+            "Failed to chunk document"). Stored as the exception message and used
+            in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the chunking failure (e.g., ValueError
+            from empty text, IndexError from invalid chunk size). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., chunk_size,
+            document_length, chunking_strategy). Merged into Problem Details
+            extensions. Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        CHUNKING_ERROR and HTTP status 422. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -614,20 +653,6 @@ class EmbeddingError(KgFoundryError):
     Raised when embedding generation operations fail. Uses error code
     EMBEDDING_ERROR and HTTP status 503 (Service Unavailable). Inherits
     structured error handling and Problem Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the embedding failure (e.g.,
-        "Failed to generate embeddings").
-    cause : Exception | None, optional
-        Underlying exception that caused the embedding failure (e.g., RuntimeError
-        from backend unavailable, MemoryError from OOM). Stored as exception cause
-        for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., model_name,
-        input_length, backend_type). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -656,7 +681,26 @@ class EmbeddingError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the embedding failure (e.g.,
+            "Failed to generate embeddings"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the embedding failure (e.g., RuntimeError
+            from backend unavailable, MemoryError from OOM). Stored as exception cause
+            for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., model_name,
+            input_length, backend_type). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        EMBEDDING_ERROR and HTTP status 503. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -677,20 +721,6 @@ class SpladeOOMError(KgFoundryError):
     available memory. Uses error code SPLADE_OOM and HTTP status 507
     (Insufficient Storage). Inherits structured error handling and Problem
     Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the out-of-memory condition
-        (e.g., "SPLADE OOM during inference").
-    cause : Exception | None, optional
-        Underlying exception that caused the OOM (e.g., MemoryError from Python
-        runtime, OSError from system memory exhaustion). Stored as exception cause
-        for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., input_length,
-        memory_limit_bytes, batch_size). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -717,7 +747,26 @@ class SpladeOOMError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the out-of-memory condition
+            (e.g., "SPLADE OOM during inference"). Stored as the exception
+            message and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the OOM (e.g., MemoryError from Python
+            runtime, OSError from system memory exhaustion). Stored as exception cause
+            for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., input_length,
+            memory_limit_bytes, batch_size). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        SPLADE_OOM and HTTP status 507. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -738,20 +787,6 @@ class IndexBuildError(KgFoundryError):
     Uses error code INDEX_BUILD_ERROR and HTTP status 500 (Internal Server Error).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the index build failure
-        (e.g., "Failed to build FAISS index").
-    cause : Exception | None, optional
-        Underlying exception that caused the build failure (e.g., IOError from
-        disk full, ValueError from invalid parameters). Stored as exception cause
-        for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., index_type,
-        vector_count, index_path). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -778,7 +813,26 @@ class IndexBuildError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the index build failure
+            (e.g., "Failed to build FAISS index"). Stored as the exception
+            message and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the build failure (e.g., IOError from
+            disk full, ValueError from invalid parameters). Stored as exception cause
+            for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., index_type,
+            vector_count, index_path). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        INDEX_BUILD_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -799,20 +853,6 @@ class OntologyParseError(KgFoundryError):
     Uses error code ONTOLOGY_PARSE_ERROR and HTTP status 422 (Unprocessable Entity).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the parsing failure (e.g.,
-        "Failed to parse OWL file").
-    cause : Exception | None, optional
-        Underlying exception that caused the parsing failure (e.g., XMLSyntaxError
-        from invalid XML, SyntaxError from malformed OWL). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., ontology_path,
-        format_type, line_number). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -839,7 +879,26 @@ class OntologyParseError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the parsing failure (e.g.,
+            "Failed to parse OWL file"). Stored as the exception message and used
+            in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the parsing failure (e.g., XMLSyntaxError
+            from invalid XML, SyntaxError from malformed OWL). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., ontology_path,
+            format_type, line_number). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        ONTOLOGY_PARSE_ERROR and HTTP status 422. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -860,20 +919,6 @@ class LinkerCalibrationError(KgFoundryError):
     LINKER_CALIBRATION_ERROR and HTTP status 500 (Internal Server Error).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the calibration failure
-        (e.g., "Calibration failed").
-    cause : Exception | None, optional
-        Underlying exception that caused the calibration failure (e.g., ValueError
-        from invalid parameters, RuntimeError from convergence failure). Stored as
-        exception cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., calibration_stage,
-        parameter_values, iteration_count). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -900,7 +945,26 @@ class LinkerCalibrationError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the calibration failure
+            (e.g., "Calibration failed"). Stored as the exception message and
+            used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the calibration failure (e.g., ValueError
+            from invalid parameters, RuntimeError from convergence failure). Stored as
+            exception cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., calibration_stage,
+            parameter_values, iteration_count). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        LINKER_CALIBRATION_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -920,20 +984,6 @@ class Neo4jError(KgFoundryError):
     Raised when Neo4j database operations fail. Uses error code NEO4J_ERROR
     and HTTP status 503 (Service Unavailable). Inherits structured error
     handling and Problem Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the Neo4j operation failure
-        (e.g., "Neo4j query failed").
-    cause : Exception | None, optional
-        Underlying exception that caused the Neo4j failure (e.g., ConnectionError
-        from database unreachable, QueryError from Cypher syntax error). Stored as
-        exception cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., query_text,
-        operation_type, node_count). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -960,7 +1010,26 @@ class Neo4jError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the Neo4j operation failure
+            (e.g., "Neo4j query failed"). Stored as the exception message and
+            used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the Neo4j failure (e.g., ConnectionError
+            from database unreachable, QueryError from Cypher syntax error). Stored as
+            exception cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., query_text,
+            operation_type, node_count). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        NEO4J_ERROR and HTTP status 503. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -981,20 +1050,6 @@ class ConfigurationError(KgFoundryError):
     CONFIGURATION_ERROR and HTTP status 500 (Internal Server Error) with
     CRITICAL log level. Inherits structured error handling and Problem Details
     mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the configuration failure
-        (e.g., "Missing required env var: KGFOUNDRY_API_KEY").
-    cause : Exception | None, optional
-        Underlying exception that caused the configuration failure (e.g., ValueError
-        from invalid value, KeyError from missing key). Stored as exception cause
-        for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., config_file_path,
-        env_var_name, validation_errors). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1021,7 +1076,26 @@ class ConfigurationError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the configuration failure
+            (e.g., "Missing required env var: KGFOUNDRY_API_KEY"). Stored as the
+            exception message and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the configuration failure (e.g., ValueError
+            from invalid value, KeyError from missing key). Stored as exception cause
+            for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., config_file_path,
+            env_var_name, validation_errors). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        CONFIGURATION_ERROR, HTTP status 500, and log level CRITICAL. All parameters
+        are passed through to the parent constructor.
         """
         super().__init__(
             message,
@@ -1088,24 +1162,6 @@ class SettingsError(KgFoundryError):
     and Problem Details mapping from KgFoundryError. Merges validation errors
     into context if provided.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the settings validation failure
-        (e.g., "Settings validation failed").
-    errors : list[dict[str, object]] | None, optional
-        List of validation error dictionaries with field/issue details. Each
-        dictionary should contain keys like "field", "issue", and optionally
-        "hint". Merged into context["validation_errors"]. Defaults to None.
-    cause : Exception | None, optional
-        Underlying exception that caused the validation failure (e.g., ValueError
-        from invalid type, ValidationError from Pydantic). Stored as exception cause
-        for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., settings_file_path,
-        validated_fields). Merged with validation_errors into Problem Details
-        extensions. Defaults to None.
-
     Notes
     -----
     Time O(n) where n is the number of validation errors; memory O(n) for error
@@ -1136,7 +1192,31 @@ class SettingsError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the settings validation failure
+            (e.g., "Settings validation failed"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        errors : list[dict[str, object]] | None, optional
+            List of validation error dictionaries with field/issue details. Each
+            dictionary should contain keys like "field", "issue", and optionally
+            "hint". Merged into context["validation_errors"]. Defaults to None.
+        cause : Exception | None, optional
+            Underlying exception that caused the validation failure (e.g., ValueError
+            from invalid type, ValidationError from Pydantic). Stored as exception cause
+            for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., settings_file_path,
+            validated_fields). Merged with validation_errors into Problem Details
+            extensions. Defaults to None.
+
+        Notes
+        -----
+        Combines errors and context into a single context dictionary, with
+        validation_errors key containing the errors list. Delegates to parent
+        KgFoundryError constructor with fixed error code CONFIGURATION_ERROR and
+        HTTP status 500.
         """
         combined_context: dict[str, object] = dict(context or {})
         if errors:
@@ -1164,20 +1244,6 @@ class SerializationError(KgFoundryError):
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the serialization failure
-        (e.g., "Schema validation failed").
-    cause : Exception | None, optional
-        Underlying exception that caused the serialization failure (e.g., ValueError
-        from invalid type, TypeError from non-serializable object). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., schema_path,
-        object_type, field_name). Merged into Problem Details extensions.
-        Defaults to None.
-
     Notes
     -----
     Time O(1); memory O(1) aside from message and context storage. No I/O,
@@ -1203,7 +1269,26 @@ class SerializationError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the serialization failure
+            (e.g., "Schema validation failed"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the serialization failure (e.g., ValueError
+            from invalid type, TypeError from non-serializable object). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., schema_path,
+            object_type, field_name). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        SERIALIZATION_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1223,20 +1308,6 @@ class RegistryError(KgFoundryError):
     Raised when registry or DuckDB database operations fail. Uses error code
     REGISTRY_ERROR and HTTP status 500 (Internal Server Error). Inherits
     structured error handling and Problem Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the registry operation failure
-        (e.g., "Failed to write to registry").
-    cause : Exception | None, optional
-        Underlying exception that caused the registry failure (e.g., DatabaseError
-        from DuckDB, IOError from file access). Stored as exception cause for
-        chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., registry_path,
-        operation_type, table_name). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1264,7 +1335,26 @@ class RegistryError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the registry operation failure
+            (e.g., "Failed to write to registry"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the registry failure (e.g., DatabaseError
+            from DuckDB, IOError from file access). Stored as exception cause for
+            chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., registry_path,
+            operation_type, table_name). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        REGISTRY_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1285,21 +1375,6 @@ class DeserializationError(KgFoundryError):
     fails. Uses error code DESERIALIZATION_ERROR and HTTP status 500 (Internal Server Error).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the deserialization failure
-        (e.g., "Checksum mismatch").
-    cause : Exception | None, optional
-        Underlying exception that caused the deserialization failure (e.g., ValueError
-        from corrupted data, JSONDecodeError from invalid JSON, ValidationError from
-        schema mismatch). Stored as exception cause for chained exception handling.
-        Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., expected_checksum,
-        actual_checksum, schema_path). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1326,7 +1401,27 @@ class DeserializationError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the deserialization failure
+            (e.g., "Checksum mismatch"). Stored as the exception message and used
+            in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the deserialization failure (e.g., ValueError
+            from corrupted data, JSONDecodeError from invalid JSON, ValidationError from
+            schema mismatch). Stored as exception cause for chained exception handling.
+            Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., expected_checksum,
+            actual_checksum, schema_path). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        DESERIALIZATION_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1348,24 +1443,6 @@ class SchemaValidationError(KgFoundryError):
     (Unprocessable Entity). Inherits structured error handling and Problem
     Details mapping from KgFoundryError. Merges validation errors into context
     if provided.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the validation failure
-        (e.g., "Invalid schema").
-    errors : list[str] | None, optional
-        List of validation error messages with path and constraint details
-        (e.g., ["Missing field: name", "Field 'age' must be >= 0"]). Merged
-        into context["validation_errors"]. Defaults to None.
-    cause : Exception | None, optional
-        Underlying exception that caused the validation failure (e.g., ValidationError
-        from jsonschema, ValueError from constraint violation). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., schema_path,
-        validated_object_type). Merged with validation_errors into Problem Details
-        extensions. Defaults to None.
 
     Notes
     -----
@@ -1395,7 +1472,31 @@ class SchemaValidationError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the validation failure
+            (e.g., "Invalid schema"). Stored as the exception message and used
+            in logs and Problem Details responses.
+        errors : list[str] | None, optional
+            List of validation error messages with path and constraint details
+            (e.g., ["Missing field: name", "Field 'age' must be >= 0"]). Merged
+            into context["validation_errors"]. Defaults to None.
+        cause : Exception | None, optional
+            Underlying exception that caused the validation failure (e.g., ValidationError
+            from jsonschema, ValueError from constraint violation). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., schema_path,
+            validated_object_type). Merged with validation_errors into Problem Details
+            extensions. Defaults to None.
+
+        Notes
+        -----
+        Combines errors and context into a single context dictionary, with
+        validation_errors key containing the errors list. Delegates to parent
+        KgFoundryError constructor with fixed error code SCHEMA_VALIDATION_ERROR
+        and HTTP status 422.
         """
         combined_context: dict[str, object] = dict(context or {})
         if errors:
@@ -1421,28 +1522,6 @@ class RetryExhaustedError(KgFoundryError):
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError. Stores retry metadata (operation, attempts, retry_after_seconds)
     as instance attributes for Problem Details conversion.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the retry exhaustion
-        (e.g., "Retry attempts exhausted").
-    operation : str | None, optional
-        Name of the operation that failed (e.g., "http_request", "database_query").
-        Stored as instance attribute and included in Problem Details extensions.
-        Defaults to None.
-    attempts : int | None, optional
-        Number of retry attempts that were made. Must be >= 0 if provided.
-        Stored as instance attribute and included in Problem Details extensions.
-        Defaults to None.
-    last_error : Exception | None, optional
-        The last exception that occurred before retries were exhausted. Stored
-        as instance attribute for debugging. Not automatically chained as cause.
-        Defaults to None.
-    retry_after_seconds : int | None, optional
-        Suggested retry delay in seconds. Must be >= 0 if provided. Stored as
-        instance attribute and included in Problem Details extensions as
-        "retry_after_seconds". Defaults to None.
 
     Notes
     -----
@@ -1477,7 +1556,34 @@ class RetryExhaustedError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the retry exhaustion
+            (e.g., "Retry attempts exhausted"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        operation : str | None, optional
+            Name of the operation that failed (e.g., "http_request", "database_query").
+            Stored as instance attribute and included in Problem Details extensions.
+            Defaults to None.
+        attempts : int | None, optional
+            Number of retry attempts that were made. Must be >= 0 if provided.
+            Stored as instance attribute and included in Problem Details extensions.
+            Defaults to None.
+        last_error : Exception | None, optional
+            The last exception that occurred before retries were exhausted. Stored
+            as instance attribute for debugging. Not automatically chained as cause.
+            Defaults to None.
+        retry_after_seconds : int | None, optional
+            Suggested retry delay in seconds. Must be >= 0 if provided. Stored as
+            instance attribute and included in Problem Details extensions as
+            "retry_after_seconds". Defaults to None.
+
+        Notes
+        -----
+        Calls parent constructor with fixed error code RETRY_EXHAUSTED, HTTP status
+        503, and log level ERROR. Stores retry metadata as instance attributes for
+        use in to_problem_details() override.
         """
         super().__init__(
             message,
@@ -1542,20 +1648,6 @@ class VectorSearchError(KgFoundryError):
     and HTTP status 503 (Service Unavailable). Inherits structured error handling
     and Problem Details mapping from KgFoundryError.
 
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the search failure (e.g.,
-        "Search failed").
-    cause : Exception | None, optional
-        Underlying exception that caused the search failure (e.g., RuntimeError
-        from index not loaded, ValueError from invalid query vector). Stored as
-        exception cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., index_type,
-        query_dimension, top_k). Merged into Problem Details extensions.
-        Defaults to None.
-
     Notes
     -----
     Time O(1); memory O(1) aside from message and context storage. No I/O,
@@ -1581,7 +1673,26 @@ class VectorSearchError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the search failure (e.g.,
+            "Search failed"). Stored as the exception message and used in logs
+            and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the search failure (e.g., RuntimeError
+            from index not loaded, ValueError from invalid query vector). Stored as
+            exception cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., index_type,
+            query_dimension, top_k). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        VECTOR_SEARCH_ERROR and HTTP status 503. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1602,20 +1713,6 @@ class AgentCatalogSearchError(KgFoundryError):
     AGENT_CATALOG_SEARCH_ERROR and HTTP status 503 (Service Unavailable).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the catalog search failure
-        (e.g., "Catalog search failed").
-    cause : Exception | None, optional
-        Underlying exception that caused the catalog search failure (e.g., RuntimeError
-        from index not loaded, ValueError from invalid query). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., catalog_path,
-        query_string, search_type). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1644,7 +1741,26 @@ class AgentCatalogSearchError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the catalog search failure
+            (e.g., "Catalog search failed"). Stored as the exception message and
+            used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the catalog search failure (e.g., RuntimeError
+            from index not loaded, ValueError from invalid query). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., catalog_path,
+            query_string, search_type). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        AGENT_CATALOG_SEARCH_ERROR and HTTP status 503. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1665,20 +1781,6 @@ class CatalogSessionError(KgFoundryError):
     spawning). Uses error code SESSION_ERROR and HTTP status 500 (Internal Server Error).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the session operation failure
-        (e.g., "Session spawn failed").
-    cause : Exception | None, optional
-        Underlying exception that caused the session failure (e.g., OSError from
-        command not found, ProcessError from subprocess failure). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., command_path,
-        session_id, operation_type). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1705,7 +1807,26 @@ class CatalogSessionError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the session operation failure
+            (e.g., "Session spawn failed"). Stored as the exception message and
+            used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the session failure (e.g., OSError from
+            command not found, ProcessError from subprocess failure). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., command_path,
+            session_id, operation_type). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        SESSION_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1725,20 +1846,6 @@ class CatalogLoadError(KgFoundryError):
     Raised when catalog payload loading or parsing fails. Uses error code
     CATALOG_LOAD_ERROR and HTTP status 422 (Unprocessable Entity). Inherits
     structured error handling and Problem Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the catalog load failure
-        (e.g., "Failed to parse catalog JSON").
-    cause : Exception | None, optional
-        Underlying exception that caused the catalog load failure (e.g., JSONDecodeError
-        from invalid JSON, FileNotFoundError from missing file). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., catalog_path,
-        file_format, line_number). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1767,7 +1874,26 @@ class CatalogLoadError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the catalog load failure
+            (e.g., "Failed to parse catalog JSON"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the catalog load failure (e.g., JSONDecodeError
+            from invalid JSON, FileNotFoundError from missing file). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., catalog_path,
+            file_format, line_number). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        CATALOG_LOAD_ERROR and HTTP status 422. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1788,20 +1914,6 @@ class SymbolAttachmentError(KgFoundryError):
     code SYMBOL_ATTACHMENT_ERROR and HTTP status 500 (Internal Server Error).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the symbol attachment failure
-        (e.g., "Failed to attach symbols to module").
-    cause : Exception | None, optional
-        Underlying exception that caused the attachment failure (e.g., DatabaseError
-        from database error, AttributeError from missing module). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., module_name,
-        symbol_count, attachment_stage). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1830,7 +1942,26 @@ class SymbolAttachmentError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the symbol attachment failure
+            (e.g., "Failed to attach symbols to module"). Stored as the exception
+            message and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the attachment failure (e.g., DatabaseError
+            from database error, AttributeError from missing module). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., module_name,
+            symbol_count, attachment_stage). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        SYMBOL_ATTACHMENT_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1850,20 +1981,6 @@ class ArtifactModelError(KgFoundryError):
     Raised when artifact model loading or validation fails. Uses error code
     ARTIFACT_MODEL_ERROR and HTTP status 500 (Internal Server Error). Inherits
     structured error handling and Problem Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the model loading failure
-        (e.g., "Failed to load artifact model").
-    cause : Exception | None, optional
-        Underlying exception that caused the model loading failure (e.g., FileNotFoundError
-        from missing file, ImportError from missing dependency). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., model_path,
-        model_type, version). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1892,7 +2009,26 @@ class ArtifactModelError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the model loading failure
+            (e.g., "Failed to load artifact model"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the model loading failure (e.g., FileNotFoundError
+            from missing file, ImportError from missing dependency). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., model_path,
+            model_type, version). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        ARTIFACT_MODEL_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1912,20 +2048,6 @@ class ArtifactValidationError(KgFoundryError):
     Raised when artifact validation fails. Uses error code ARTIFACT_VALIDATION_ERROR
     and HTTP status 422 (Unprocessable Entity). Inherits structured error handling
     and Problem Details mapping from KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the validation failure
-        (e.g., "Artifact validation failed").
-    cause : Exception | None, optional
-        Underlying exception that caused the validation failure (e.g., JSONDecodeError
-        from invalid JSON, ValidationError from schema mismatch). Stored as exception
-        cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., artifact_type,
-        validation_rules, field_path). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -1954,7 +2076,26 @@ class ArtifactValidationError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the validation failure
+            (e.g., "Artifact validation failed"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the validation failure (e.g., JSONDecodeError
+            from invalid JSON, ValidationError from schema mismatch). Stored as exception
+            cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., artifact_type,
+            validation_rules, field_path). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        ARTIFACT_VALIDATION_ERROR and HTTP status 422. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -1975,20 +2116,6 @@ class ArtifactSerializationError(KgFoundryError):
     ARTIFACT_SERIALIZATION_ERROR and HTTP status 500 (Internal Server Error).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the serialization failure
-        (e.g., "Failed to serialize artifact").
-    cause : Exception | None, optional
-        Underlying exception that caused the serialization failure (e.g., TypeError
-        from non-serializable object, JSONEncodeError from encoding error). Stored
-        as exception cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., artifact_type,
-        serialization_format, field_name). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -2017,7 +2144,26 @@ class ArtifactSerializationError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the serialization failure
+            (e.g., "Failed to serialize artifact"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the serialization failure (e.g., TypeError
+            from non-serializable object, JSONEncodeError from encoding error). Stored
+            as exception cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., artifact_type,
+            serialization_format, field_name). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        ARTIFACT_SERIALIZATION_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -2038,20 +2184,6 @@ class ArtifactDeserializationError(KgFoundryError):
     ARTIFACT_DESERIALIZATION_ERROR and HTTP status 500 (Internal Server Error).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the deserialization failure
-        (e.g., "Failed to deserialize artifact").
-    cause : Exception | None, optional
-        Underlying exception that caused the deserialization failure (e.g., JSONDecodeError
-        from invalid JSON, ValueError from corrupted data). Stored as exception cause
-        for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., artifact_type,
-        deserialization_format, data_source). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -2080,7 +2212,26 @@ class ArtifactDeserializationError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the deserialization failure
+            (e.g., "Failed to deserialize artifact"). Stored as the exception message
+            and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the deserialization failure (e.g., JSONDecodeError
+            from invalid JSON, ValueError from corrupted data). Stored as exception cause
+            for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., artifact_type,
+            deserialization_format, data_source). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        ARTIFACT_DESERIALIZATION_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,
@@ -2101,20 +2252,6 @@ class ArtifactDependencyError(KgFoundryError):
     ARTIFACT_DEPENDENCY_ERROR and HTTP status 500 (Internal Server Error).
     Inherits structured error handling and Problem Details mapping from
     KgFoundryError.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the dependency resolution failure
-        (e.g., "Failed to resolve artifact dependency").
-    cause : Exception | None, optional
-        Underlying exception that caused the dependency resolution failure (e.g., ImportError
-        from missing module, VersionConflictError from incompatible versions). Stored as
-        exception cause for chained exception handling. Defaults to None.
-    context : Mapping[str, object] | None, optional
-        Additional context dictionary for error details (e.g., dependency_name,
-        required_version, available_versions). Merged into Problem Details extensions.
-        Defaults to None.
 
     Notes
     -----
@@ -2143,7 +2280,26 @@ class ArtifactDependencyError(KgFoundryError):
     ) -> None:
         """Initialize exception with message and optional parameters.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        message : str
+            Human-readable error message describing the dependency resolution failure
+            (e.g., "Failed to resolve artifact dependency"). Stored as the exception
+            message and used in logs and Problem Details responses.
+        cause : Exception | None, optional
+            Underlying exception that caused the dependency resolution failure (e.g., ImportError
+            from missing module, VersionConflictError from incompatible versions). Stored as
+            exception cause for chained exception handling. Defaults to None.
+        context : Mapping[str, object] | None, optional
+            Additional context dictionary for error details (e.g., dependency_name,
+            required_version, available_versions). Merged into Problem Details extensions.
+            Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent KgFoundryError constructor with fixed error code
+        ARTIFACT_DEPENDENCY_ERROR and HTTP status 500. All parameters are passed through
+        to the parent constructor.
         """
         super().__init__(
             message,

@@ -487,3 +487,140 @@ Use the reference lists to trace blast radius for configuration changes and join
 | `has_errors`     | bool | True when `total_errors` > 0. |
 
 These rows complement `typedness.jsonl` and hotspots to prioritize files with static analysis issues.
+
+## 20. Line Coverage (`coverage_lines.*`)
+
+**Purpose**: Fine-grained line-level coverage captured from coverage.py runs. Use to locate uncovered regions and to join line spans to GOIDs via `goid_xwalk`.
+
+**Origin**: `codeintel_rev.cli.enrich_analytics coverage-detailed` reads the `.coverage` database (with dynamic contexts enabled) and writes `enriched/analytics/coverage/coverage_lines.{parquet,jsonl}`.
+
+**Columns**
+
+| Column          | Type   | Description |
+|-----------------|--------|-------------|
+| `repo`          | string | Repository identifier from `repo_map.json`. |
+| `commit`        | string | Commit SHA from `repo_map.json`. |
+| `rel_path`      | string | Repo-relative path of the measured file. |
+| `line`          | int    | 1-based line number. |
+| `is_executable` | bool   | True when coverage marked the line as a statement. |
+| `is_covered`    | bool   | True when the line executed at least once. |
+| `hits`          | int    | Hit count best-effort (1 when covered, 0 otherwise). |
+| `context_count` | int    | Number of distinct coverage contexts that touched the line. |
+| `created_at`    | string | ISO-8601 timestamp of extraction. |
+
+## 21. Function Coverage (`coverage_functions.*`)
+
+**Purpose**: Per-function coverage derived by grouping `coverage_lines` over GOID spans. Primary join point for “is this function tested?” queries.
+
+**Origin**: Aggregated by `coverage-detailed`, uses GOID spans from `goids.parquet` and lines from `coverage_lines.jsonl`.
+
+**Columns**
+
+| Column                | Type   | Description |
+|-----------------------|--------|-------------|
+| `function_goid_h128`  | string | GOID hash for the function/method. |
+| `urn`                 | string | GOID URN. |
+| `repo`                | string | Repository identifier. |
+| `commit`              | string | Commit SHA. |
+| `rel_path`            | string | Repo-relative path of the function. |
+| `language`            | string | Language tag (`python`). |
+| `kind`                | string | `function` or `method`. |
+| `qualname`            | string | Qualified name within the file. |
+| `start_line`          | int    | Function start line. |
+| `end_line`            | int    | Function end line. |
+| `executable_lines`    | int    | Executable statement count within the span. |
+| `covered_lines`       | int    | Executed statement count within the span. |
+| `coverage_ratio`      | float? | `covered_lines / executable_lines`, null when no executable lines. |
+| `tested`              | bool   | True when `covered_lines > 0`. |
+| `untested_reason`     | string | `no_executable_code`, `no_tests`, or empty string. |
+| `created_at`          | string | ISO-8601 timestamp of extraction. |
+
+## 22. Test Catalog (`test_catalog.*`)
+
+**Purpose**: Canonical list of pytest tests (functions/methods/parametrized cases) with metadata needed for impact analysis.
+
+**Origin**: `codeintel_rev.cli.enrich_analytics test-analytics` reads a pytest JSON report (from `pytest-json-report`) and attaches GOID matches when available.
+
+**Columns**
+
+| Column           | Type        | Description |
+|------------------|-------------|-------------|
+| `test_id`        | string      | Pytest nodeid (e.g., `tests/test_app.py::TestFoo::test_bar[param]`). |
+| `test_goid_h128` | string?     | GOID for the test callable when matched. |
+| `urn`            | string?     | GOID URN when matched. |
+| `repo`           | string      | Repository identifier. |
+| `commit`         | string      | Commit SHA. |
+| `rel_path`       | string      | Repo-relative path of the test file. |
+| `qualname`       | string?     | Qualified name within the file. |
+| `kind`           | string      | `parametrized_case` or `function`. |
+| `status`         | string      | Test outcome (`passed`, `failed`, `error`, `skipped`, etc.). |
+| `duration_ms`    | float       | Duration in milliseconds. |
+| `markers`        | array       | Pytest markers/keywords. |
+| `parametrized`   | bool        | True when nodeid includes parameters. |
+| `flaky`          | bool        | True when `flaky` marker is present. |
+| `created_at`     | string      | ISO-8601 timestamp of extraction. |
+
+## 23. Test Coverage Edges (`test_coverage_edges.*`)
+
+**Purpose**: Bipartite edges linking tests to the functions they executed, derived from coverage contexts.
+
+**Origin**: `test-analytics` reads the `.coverage` database (with `dynamic_context = test_function`) and `test_catalog.jsonl`, producing `enriched/analytics/tests/test_coverage_edges.{parquet,jsonl}`.
+
+**Columns**
+
+| Column              | Type   | Description |
+|---------------------|--------|-------------|
+| `test_id`           | string | Pytest nodeid. |
+| `test_goid_h128`    | string?| GOID for the test when matched. |
+| `function_goid_h128`| string | Target function GOID exercised by the test. |
+| `urn`               | string | Target GOID URN. |
+| `repo`              | string | Repository identifier. |
+| `commit`            | string | Commit SHA. |
+| `rel_path`          | string | Target file path. |
+| `qualname`          | string | Target function qualname. |
+| `covered_lines`     | int    | Lines in the target executed by this test. |
+| `executable_lines`  | int    | Total executable lines in the target span. |
+| `coverage_ratio`    | float? | Per-edge coverage ratio. |
+| `last_status`       | string | Status of the test in the referenced run. |
+| `created_at`        | string | ISO-8601 timestamp of extraction. |
+
+## 24. GOID Risk Factors (`goid_risk_factors.*`)
+
+**Purpose**: Aggregated risk signals per function GOID combining coverage, tests, complexity, typedness, hotspots, and static diagnostics.
+
+**Origin**: `codeintel_rev.cli.enrich_analytics risk-factors` joins analytics tables under `enriched/analytics/` (function metrics/types, coverage, tests, hotspots, typedness, static_diagnostics).
+
+**Columns (selected)**
+
+| Column               | Type    | Description |
+|----------------------|---------|-------------|
+| `function_goid_h128` | string  | GOID hash. |
+| `urn`                | string  | GOID URN. |
+| `repo`               | string  | Repository identifier. |
+| `commit`             | string  | Commit SHA. |
+| `rel_path`           | string  | File path. |
+| `language`           | string  | Language tag. |
+| `kind`               | string  | Entity kind (`function`/`method`). |
+| `qualname`           | string  | Qualified name. |
+| `loc`                | int?    | Physical lines of code (from function_metrics). |
+| `logical_loc`        | int?    | Logical LOC. |
+| `cyclomatic_complexity` | int? | Cyclomatic complexity. |
+| `complexity_bucket`  | string? | Derived complexity bucket. |
+| `typedness_bucket`   | string? | Annotation bucket (`typed`/`partial`/`untyped`). |
+| `typedness_source`   | string? | Annotation source metadata. |
+| `hotspot_score`      | float?  | File-level hotspot score. |
+| `file_typed_ratio`   | float?  | File-level annotation ratio. |
+| `static_error_count` | int?    | File-level static error count. |
+| `has_static_errors`  | bool?   | True when static errors are present. |
+| `executable_lines`   | int?    | Executable line count (coverage). |
+| `covered_lines`      | int?    | Covered line count (coverage). |
+| `coverage_ratio`     | float?  | Coverage ratio. |
+| `tested`             | bool?   | True when covered lines > 0. |
+| `test_count`         | int     | Distinct tests touching the function. |
+| `failing_test_count` | int     | Distinct failing tests. |
+| `last_test_status`   | string  | Last test status seen (`all_passing`/`some_failing`/`untested`/`unknown`). |
+| `risk_score`         | float   | Heuristic 0–1 risk score. |
+| `risk_level`         | string  | Risk bucket (`low`/`medium`/`high`). |
+| `tags`               | list    | Tags from module metadata. |
+| `owners`             | list    | Owners when available. |
+| `created_at`         | string  | ISO-8601 timestamp of aggregation. |

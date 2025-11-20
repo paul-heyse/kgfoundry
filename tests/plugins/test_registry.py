@@ -75,11 +75,6 @@ def test_registry_discovers_entry_points(tmp_path: Path) -> None:
     def _factory(_: ChannelContext) -> _ToyChannel:
         """Create toy channel ignoring context.
 
-        Parameters
-        ----------
-        _ : ChannelContext
-            Context (ignored).
-
         Returns
         -------
         _ToyChannel

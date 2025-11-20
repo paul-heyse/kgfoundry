@@ -130,6 +130,11 @@ def seed_initial_commit(repo_root: Path) -> None:
 def write_scip_index(repo_root: Path) -> Path:
     """Materialize a minimal SCIP index for the ``repo_root`` modules.
 
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+
     Returns
     -------
     Path
@@ -164,6 +169,11 @@ def write_scip_index(repo_root: Path) -> Path:
 
 def bootstrap_sample_repo(base_dir: Path) -> SampleRepo:
     """Create a git repo with sample modules and a SCIP index.
+
+    Parameters
+    ----------
+    base_dir : Path
+        Base directory for creating the repository.
 
     Returns
     -------

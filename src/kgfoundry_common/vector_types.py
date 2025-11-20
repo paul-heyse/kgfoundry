@@ -56,25 +56,38 @@ VectorId = NewType("VectorId", str)
 class VectorValidationError(ValueError):
     """Raised when vector payloads fail dtype, shape, or schema validation.
 
-    Initializes validation error with message and optional error details.
+    Extended Summary
+    ----------------
+    Raised when vector payloads fail validation checks for data type, shape,
+    or schema conformance. Used to signal validation failures during vector
+    processing operations, providing detailed error information for debugging.
 
-    Parameters
-    ----------
-    message : str
-        Error message describing the validation failure.
-    errors : Sequence[str] | None, optional
-        List of validation error messages. Defaults to None.
+    Notes
+    -----
+    Time O(1); memory O(1) aside from message and errors storage. No I/O,
+    no global state. Thread-safe. Inherits from ValueError for compatibility
+    with standard Python error handling patterns.
     """
 
     def __init__(self, message: str, *, errors: Sequence[str] | None = None) -> None:
-        """Initialize vector validation error.
+        """Initialize vector validation error with message and optional error details.
 
         Parameters
         ----------
         message : str
-            Error message describing the validation failure.
+            Error message describing the validation failure. Stored as the
+            exception message via parent ValueError constructor.
         errors : Sequence[str] | None, optional
-            List of validation error messages.
+            List of validation error messages with specific failure details
+            (e.g., dtype mismatches, shape violations, schema constraint failures).
+            Stored as instance attribute for programmatic error handling.
+            Defaults to None.
+
+        Notes
+        -----
+        Calls parent ValueError constructor with message. Stores errors as
+        instance attribute if provided. The errors list can be used to provide
+        detailed validation feedback to callers.
         """
         super().__init__(message)
         self.errors: tuple[str, ...] = tuple(errors or (message,))

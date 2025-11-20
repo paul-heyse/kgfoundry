@@ -44,6 +44,18 @@ class PathlibArgs:
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> PathlibArgs:
+    """Parse command-line arguments for pathlib codemod.
+
+    Parameters
+    ----------
+    argv : Sequence[str] | None, optional
+        Command-line arguments to parse. Defaults to sys.argv if None.
+
+    Returns
+    -------
+    PathlibArgs
+        Parsed arguments containing targets, dry_run flag, and log path.
+    """
     parser = argparse.ArgumentParser(
         description="Convert os.path operations to pathlib.Path",
     )
@@ -72,6 +84,20 @@ def _parse_args(argv: Sequence[str] | None = None) -> PathlibArgs:
 
 
 def _is_os_call(expression: cst.BaseExpression, *, name: str) -> bool:
+    """Check if expression is an os module call (e.g., os.makedirs).
+
+    Parameters
+    ----------
+    expression : cst.BaseExpression
+        CST expression node to check.
+    name : str
+        Attribute name to match (e.g., "makedirs").
+
+    Returns
+    -------
+    bool
+        True if expression is os.{name} call, False otherwise.
+    """
     return (
         isinstance(expression, cst.Attribute)
         and isinstance(expression.value, cst.Name)
@@ -81,6 +107,20 @@ def _is_os_call(expression: cst.BaseExpression, *, name: str) -> bool:
 
 
 def _is_os_path_call(expression: cst.BaseExpression, *, name: str) -> bool:
+    """Check if expression is an os.path module call (e.g., os.path.join).
+
+    Parameters
+    ----------
+    expression : cst.BaseExpression
+        CST expression node to check.
+    name : str
+        Function name to match (e.g., "join", "exists", "dirname").
+
+    Returns
+    -------
+    bool
+        True if expression is os.path.{name} call, False otherwise.
+    """
     return (
         isinstance(expression, cst.Attribute)
         and isinstance(expression.value, cst.Attribute)
@@ -92,6 +132,20 @@ def _is_os_path_call(expression: cst.BaseExpression, *, name: str) -> bool:
 
 
 def _is_name(node: cst.BaseExpression, value: str) -> bool:
+    """Check if node is a Name expression with specific value.
+
+    Parameters
+    ----------
+    node : cst.BaseExpression
+        CST expression node to check.
+    value : str
+        Expected name value.
+
+    Returns
+    -------
+    bool
+        True if node is a Name with matching value, False otherwise.
+    """
     return isinstance(node, cst.Name) and node.value == value
 
 
@@ -99,6 +153,21 @@ MIN_PATH_PARTS = 2
 
 
 def _path_join_expression(arguments: Sequence[cst.Arg]) -> cst.BaseExpression | None:
+    """Convert os.path.join() arguments to Path / operator expression.
+
+    Transforms positional arguments from os.path.join() into a Path
+    constructor followed by division operators (Path / "part1" / "part2").
+
+    Parameters
+    ----------
+    arguments : Sequence[cst.Arg]
+        Function call arguments from os.path.join().
+
+    Returns
+    -------
+    cst.BaseExpression | None
+        Path / operator expression, or None if insufficient arguments.
+    """
     pos_args = [arg for arg in arguments if arg.keyword is None]
     if len(pos_args) < MIN_PATH_PARTS:
         return None
@@ -187,6 +256,18 @@ class PathlibTransformer(WithTransformerMixin, cst.CSTTransformer):
         return self._transform_with(original_node, updated_node)
 
     def _transform_makedirs(self, node: cst.Call) -> cst.BaseExpression | None:
+        """Transform os.makedirs() call to Path.mkdir(parents=True).
+
+        Parameters
+        ----------
+        node : cst.Call
+            os.makedirs() call node to transform.
+
+        Returns
+        -------
+        cst.BaseExpression | None
+            Path.mkdir() expression if transformation applies, None otherwise.
+        """
         if not (
             isinstance(node.func, cst.Attribute)
             and _is_os_call(node.func, name="makedirs")
@@ -225,6 +306,18 @@ class PathlibTransformer(WithTransformerMixin, cst.CSTTransformer):
         )
 
     def _transform_path_join(self, node: cst.Call) -> cst.BaseExpression | None:
+        """Transform os.path.join() call to Path / operator expression.
+
+        Parameters
+        ----------
+        node : cst.Call
+            os.path.join() call node to transform.
+
+        Returns
+        -------
+        cst.BaseExpression | None
+            Path / operator expression if transformation applies, None otherwise.
+        """
         if not (isinstance(node.func, cst.Attribute) and _is_os_path_call(node.func, name="join")):
             return None
         join_expr = _path_join_expression(node.args)
@@ -235,6 +328,18 @@ class PathlibTransformer(WithTransformerMixin, cst.CSTTransformer):
         return join_expr
 
     def _transform_exists(self, node: cst.Call) -> cst.BaseExpression | None:
+        """Transform os.path.exists() call to Path().exists().
+
+        Parameters
+        ----------
+        node : cst.Call
+            os.path.exists() call node to transform.
+
+        Returns
+        -------
+        cst.BaseExpression | None
+            Path().exists() expression if transformation applies, None otherwise.
+        """
         if not (
             isinstance(node.func, cst.Attribute)
             and _is_os_path_call(node.func, name="exists")
@@ -254,6 +359,18 @@ class PathlibTransformer(WithTransformerMixin, cst.CSTTransformer):
         )
 
     def _transform_dirname(self, node: cst.Call) -> cst.BaseExpression | None:
+        """Transform os.path.dirname() call to Path().parent.
+
+        Parameters
+        ----------
+        node : cst.Call
+            os.path.dirname() call node to transform.
+
+        Returns
+        -------
+        cst.BaseExpression | None
+            Path().parent expression if transformation applies, None otherwise.
+        """
         if not (
             isinstance(node.func, cst.Attribute)
             and _is_os_path_call(node.func, name="dirname")
@@ -361,6 +478,21 @@ class PathlibTransformer(WithTransformerMixin, cst.CSTTransformer):
 
 
 def _iter_simple_bodies(module: cst.Module) -> Sequence[cst.CSTNode]:
+    """Extract all simple statement nodes from module body.
+
+    Collects all nodes from SimpleStatementLine statements (imports,
+    assignments, etc.) into a flat sequence.
+
+    Parameters
+    ----------
+    module : cst.Module
+        CST module node to extract statements from.
+
+    Returns
+    -------
+    Sequence[cst.CSTNode]
+        Flat sequence of simple statement nodes.
+    """
     items: list[cst.CSTNode] = []
     for statement in module.body:
         if isinstance(statement, cst.SimpleStatementLine):
@@ -369,6 +501,20 @@ def _iter_simple_bodies(module: cst.Module) -> Sequence[cst.CSTNode]:
 
 
 def _module_has_pathlib(module: cst.Module) -> bool:
+    """Check if module already imports pathlib.
+
+    Scans simple statements for import pathlib or from pathlib imports.
+
+    Parameters
+    ----------
+    module : cst.Module
+        CST module node to check.
+
+    Returns
+    -------
+    bool
+        True if pathlib import found, False otherwise.
+    """
     for node in _iter_simple_bodies(module):
         imports_pathlib = isinstance(node, cst.Import) and any(
             isinstance(alias.name, cst.Name) and alias.name.value == "pathlib"
@@ -385,6 +531,21 @@ def _module_has_pathlib(module: cst.Module) -> bool:
 
 
 def _insertion_index(module: cst.Module) -> int:
+    """Find insertion point for import after __future__ imports.
+
+    Locates the position after __future__ imports where new imports
+    should be inserted to maintain import ordering conventions.
+
+    Parameters
+    ----------
+    module : cst.Module
+        CST module node to analyze.
+
+    Returns
+    -------
+    int
+        Index position for inserting imports after __future__ statements.
+    """
     index_after_future = 0
     for position, statement in enumerate(module.body):
         if not isinstance(statement, cst.SimpleStatementLine):
@@ -403,6 +564,13 @@ PathlibTransformer.leave_Call = PathlibTransformer.leave_call
 
 
 def _pathlib_import_statement() -> cst.SimpleStatementLine:
+    """Create CST node for 'import pathlib' statement.
+
+    Returns
+    -------
+    cst.SimpleStatementLine
+        CST node representing 'import pathlib' statement.
+    """
     return cst.SimpleStatementLine(
         body=[
             cst.Import(

@@ -37,6 +37,11 @@ def _seed_files(repo_root: Path) -> None:
 def harness(tmp_path: Path) -> Iterator[IntegrationHarness]:
     """Integration harness with seeded files and scope store.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+
     Yields
     ------
     IntegrationHarness

@@ -13,7 +13,11 @@ from codeintel_rev.mcp_server.adapters.history import blame_range, file_history
 
 from tests._helpers import assertions
 from tests._helpers.adapters import InMemoryCommit
-from tests._helpers.integration import IntegrationHarness, build_harness_with_adapters
+from tests._helpers.integration import (
+    AdapterSeedConfig,
+    IntegrationHarness,
+    build_harness_with_adapters,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -33,6 +37,11 @@ def _seed_commits() -> list[InMemoryCommit]:
 def harness(tmp_path: Path) -> Iterator[IntegrationHarness]:
     """Harness with in-memory history adapter and seeded repo.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+
     Yields
     ------
     IntegrationHarness
@@ -43,8 +52,10 @@ def harness(tmp_path: Path) -> Iterator[IntegrationHarness]:
     harness = build_harness_with_adapters(
         tmp_path,
         files=files,
-        history_map={"src/main.py": commits},
-        blame_map={"src/main.py": [(commits[0], [1, 2, 3])]},
+        seed_config=AdapterSeedConfig(
+            history_map={"src/main.py": commits},
+            blame_map={"src/main.py": [(commits[0], [1, 2, 3])]},
+        ),
     )
     async_client = harness.history_adapter
     if async_client is not None:

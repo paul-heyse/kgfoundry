@@ -82,6 +82,21 @@ MODULE_SPECS: tuple[ModuleSpec, ...] = (
 
 
 def _inspect_module(spec: ModuleSpec) -> DriftResult:
+    """Inspect module for stub drift by comparing expected vs actual symbols.
+
+    Imports module and compares expected symbols from spec against actual
+    module attributes to detect missing or unexpected symbols.
+
+    Parameters
+    ----------
+    spec : ModuleSpec
+        Module specification with expected symbols.
+
+    Returns
+    -------
+    DriftResult
+        Result containing missing and unexpected symbols, or error if import fails.
+    """
     try:
         module = importlib.import_module(spec.name)
     except ModuleNotFoundError as exc:  # pragma: no cover - import guard
@@ -100,6 +115,20 @@ def _inspect_module(spec: ModuleSpec) -> DriftResult:
 
 
 def _format_section(title: str, values: Iterable[str]) -> str:
+    """Format section title and values as indented list item.
+
+    Parameters
+    ----------
+    title : str
+        Section title.
+    values : Iterable[str]
+        Values to join and display.
+
+    Returns
+    -------
+    str
+        Formatted string with title and comma-separated values.
+    """
     joined = ", ".join(values)
     return f"  - {title}: {joined if joined else 'none'}"
 

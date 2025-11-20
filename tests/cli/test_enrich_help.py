@@ -62,6 +62,14 @@ def test_analytics_cli_help_lists_global_options() -> None:
     _assert_legacy_global_options(enrich_analytics.app)
 
 
+def test_analytics_test_analytics_help_smoke() -> None:
+    """Smoke test that test-analytics help renders and exposes options."""
+    result = invoke(enrich_analytics.app, ["test-analytics", "--help"], catch_exceptions=False)
+    assertions.expect_equal(result.exit_code, 0, reason=result.output)
+    for option in ("--coverage-file", "--pytest-report"):
+        assertions.expect_in(option, result.stdout)
+
+
 def test_overlays_cli_help_lists_global_options() -> None:
     """Overlay CLI still exposes the legacy global options."""
     _assert_legacy_global_options(enrich_overlays.app)

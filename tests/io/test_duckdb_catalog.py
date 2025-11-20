@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import duckdb
-import pytest
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogOptions
 
 from tests._helpers import assertions
@@ -118,12 +117,13 @@ def _fetch_single_value(conn: duckdb.DuckDBPyConnection, sql: str, *, reason: st
 
     Raises
     ------
-    pytest.fail
+    AssertionError
         If query returns no rows.
     """
     row = conn.execute(sql).fetchone()
     if row is None:
-        pytest.fail(f"{reason}: query returned no rows")
+        message = f"{reason}: query returned no rows"
+        raise AssertionError(message)
     return int(row[0])
 
 

@@ -149,13 +149,6 @@ class PolicyRegistry:
     files in a directory. Policies are loaded on-demand via the get() method.
     Supports dependency injection of the root directory for testing.
 
-    Parameters
-    ----------
-    root : Path
-        Root directory containing policy YAML files. Must exist and be readable.
-        Policy files are expected to have .yaml extension and follow the retry
-        policy schema.
-
     Notes
     -----
     Time O(1) for initialization; O(1) for get() after first load (with caching).
@@ -176,7 +169,15 @@ class PolicyRegistry:
         Parameters
         ----------
         root : Path
-            Directory containing policy YAML files.
+            Root directory containing policy YAML files. Must exist and be readable.
+            Policy files are expected to have .yaml extension and follow the retry
+            policy schema. The directory path is stored as an instance attribute
+            for use in get() method when loading policies.
+
+        Notes
+        -----
+        No validation is performed on the root directory during initialization.
+        Directory existence and readability are checked when get() is called.
         """
         self.root = root
 

@@ -35,7 +35,7 @@ class _StaticCatalogContext:
 
             Yields
             ------
-            Iterator[DuckDBCatalog]
+            DuckDBCatalog
                 Catalog instance.
             """
             self._catalog.open()

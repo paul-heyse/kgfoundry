@@ -117,30 +117,32 @@ class FaissConfig(BaseSettings):
 class RuntimeSettings(BaseSettings):
     """Aggregate runtime configuration loaded from environment variables.
 
+    Extended Summary
+    ----------------
     Initialises settings with fail-fast validation. Settings are loaded from
     environment variables with the KGFOUNDRY_ prefix and validated according
-    to the nested configuration schemas.
-
-    Parameters
-    ----------
-    **overrides : object
-        Settings overrides to apply during initialization.
+    to the nested configuration schemas. Combines search, sparse embedding,
+    and FAISS configuration into a single settings object for dependency injection.
 
     Attributes
     ----------
     model_config : ClassVar[SettingsConfigDict]
-        Pydantic model configuration dictionary (class variable).
+        Pydantic model configuration dictionary (class variable). Configures
+        environment variable prefix (KGFOUNDRY_), nested delimiter (__), and
+        validation behavior (extra="forbid", case_sensitive=False).
     search : SearchConfig
-        Search service configuration.
+        Search service configuration with default values.
     sparse_embedding : SparseEmbeddingConfig
-        Sparse embedding configuration.
+        Sparse embedding configuration with default values.
     faiss : FaissConfig
-        FAISS index configuration.
+        FAISS index configuration with default values.
 
-    Raises
-    ------
-    SettingsError
-        If settings validation fails.
+    Notes
+    -----
+    Time O(1) for initialization; memory O(1) aside from configuration storage.
+    No I/O during initialization (environment variables are read by Pydantic).
+    Thread-safe for separate instances. Validation errors are converted to
+    SettingsError with Problem Details context for consistent error handling.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
@@ -165,12 +167,23 @@ class RuntimeSettings(BaseSettings):
         Parameters
         ----------
         **overrides : object
-            Field name to value mappings to override defaults.
+            Settings overrides to apply during initialization. Field name to value
+            mappings that override defaults and environment variables. Overrides are
+            validated according to the nested configuration schemas. Keys must match
+            field names (search, sparse_embedding, faiss) or nested field paths.
 
         Raises
         ------
         SettingsError
-            If configuration validation fails.
+            If configuration validation fails. Pydantic validation errors are
+            converted to SettingsError with Problem Details context, including
+            the original exception as cause and validation error details in context.
+
+        Notes
+        -----
+        Delegates to parent Pydantic BaseSettings constructor with cast overrides.
+        Catches all exceptions from Pydantic validation and converts them to
+        SettingsError for consistent error handling across the application.
         """
         try:
             cast_overrides: dict[str, Any] = {

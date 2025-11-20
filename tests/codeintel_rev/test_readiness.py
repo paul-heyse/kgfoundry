@@ -67,11 +67,12 @@ class _FakeHttpClient:
 
         Raises
         ------
-        Exception
-            If side_effect is set.
+        RuntimeError
+            If a side effect is configured, wrapped around the provided exception.
         """
         if self._side_effect is not None:
-            raise self._side_effect
+            message = "Injected HTTP client side effect"
+            raise RuntimeError(message) from self._side_effect
         response = Mock()
         response.is_success = self._is_success
         response.status_code = 200 if self._is_success else 503

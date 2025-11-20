@@ -208,23 +208,12 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 class SPLADEv3Encoder:
     """SPLADE-v3 encoder for generating sparse embeddings.
 
+    Extended Summary
+    ----------------
     Provides an interface for encoding text into SPLADE sparse embeddings.
-    Currently a skeleton implementation that raises NotImplementedError.
-
-    Initializes the SPLADE-v3 encoder with model configuration and device settings.
-
-    Parameters
-    ----------
-    model_id : str, optional
-        Hugging Face model identifier for the SPLADE encoder. Defaults to
-        "naver/splade-v3-distilbert".
-    device : str, optional
-        Device to run inference on ("cuda" or "cpu"). Defaults to "cuda".
-    topk : int, optional
-        Number of top-k vocabulary tokens to retain in sparse representation.
-        Defaults to 256.
-    max_seq_len : int, optional
-        Maximum sequence length for tokenization. Defaults to 512.
+    Currently a skeleton implementation that raises NotImplementedError. When
+    implemented, will use Hugging Face transformers to generate sparse lexical
+    and expansion embeddings for semantic search.
 
     Attributes
     ----------
@@ -232,11 +221,12 @@ class SPLADEv3Encoder:
         Encoder name identifier ("SPLADE-v3-distilbert"). This is a class
         variable set to the model identifier string.
 
-
     Notes
     -----
     This is a placeholder implementation. For production use, consider using
     LuceneImpactIndex which integrates with Pyserini's Lucene impact search.
+    Time O(1) for initialization; memory O(1) aside from configuration storage.
+    Thread-safe for separate instances.
     """
 
     name: ClassVar[str] = "SPLADE-v3-distilbert"
@@ -248,18 +238,30 @@ class SPLADEv3Encoder:
         topk: int = 256,
         max_seq_len: int = 512,
     ) -> None:
-        """Initialize in-memory SPLADE encoder.
+        """Initialize SPLADE-v3 encoder with model configuration and device settings.
 
         Parameters
         ----------
         model_id : str, optional
-            Hugging Face model identifier. Defaults to "naver/splade-v3-distilbert".
+            Hugging Face model identifier for the SPLADE encoder. Used to load
+            the model and tokenizer when encode() is implemented. Defaults to
+            "naver/splade-v3-distilbert".
         device : str, optional
-            Device to run model on ("cuda" or "cpu"). Defaults to "cuda".
+            Device to run inference on ("cuda" for GPU or "cpu" for CPU).
+            Determines where model computations are performed. Defaults to "cuda".
         topk : int, optional
-            Number of top-k tokens to retain in sparse vectors. Defaults to 256.
+            Number of top-k vocabulary tokens to retain in sparse representation.
+            Higher values increase recall but also increase memory usage and
+            computation time. Must be > 0. Defaults to 256.
         max_seq_len : int, optional
-            Maximum sequence length for tokenization. Defaults to 512.
+            Maximum sequence length for tokenization. Longer sequences are truncated.
+            Must be > 0. Typical values are 128-512. Defaults to 512.
+
+        Notes
+        -----
+        Stores configuration parameters as instance attributes. Model loading
+        and initialization would occur when encode() is implemented. Currently
+        this is a skeleton that raises NotImplementedError.
         """
         self.model_id = model_id
         self.device = device
@@ -314,32 +316,36 @@ class SPLADEv3Encoder:
 class PureImpactIndex:
     """Pure Python SPLADE impact index implementation.
 
+    Extended Summary
+    ----------------
     Implements SPLADE (Sparse Lexical and Expansion) sparse retrieval using
     Python dictionaries and lists. Suitable for small to medium-sized indexes
-    that fit in memory.
-
-    Initializes the SPLADE impact index with an index directory.
-
-    Parameters
-    ----------
-    index_dir : str
-        Directory path where index metadata will be stored. Created if it
-        doesn't exist.
+    that fit in memory. Initializes empty data structures for term frequencies,
+    document frequencies, and postings lists.
 
     Notes
     -----
     The implementation uses in-memory data structures and is suitable for
     indexes that fit in RAM. For larger indexes, consider using LuceneImpactIndex
-    which uses Pyserini's disk-backed Lucene impact search.
+    which uses Pyserini's disk-backed Lucene impact search. Time O(1) for
+    initialization; memory O(n) where n is the number of documents indexed.
+    Thread-safe for separate instances reading from the same index directory.
     """
 
     def __init__(self, index_dir: str) -> None:
-        """Initialize in-memory SPLADE impact index.
+        """Initialize SPLADE impact index with index directory.
 
         Parameters
         ----------
         index_dir : str
-            Directory path containing the SPLADE impact index files.
+            Directory path where index metadata will be stored. Created if it
+            doesn't exist. Used for loading and saving index data structures
+            (impact.json with schema validation and checksum verification).
+
+        Notes
+        -----
+        Initializes empty data structures (df, postings) and sets document count
+        (N) to zero. The directory is created on-demand when build() is called.
         """
         self.index_dir = index_dir
         self.df: dict[str, int] = {}
@@ -538,37 +544,41 @@ class PureImpactIndex:
 class LuceneImpactIndex:
     """Lucene-backed SPLADE impact index implementation.
 
+    Extended Summary
+    ----------------
     Provides SPLADE sparse retrieval using Apache Lucene via Pyserini's impact
     search. Suitable for large indexes that benefit from disk-backed storage
-    and optimized search performance.
-
-    Initializes the Lucene impact index with an index directory and optional query encoder.
-
-    Parameters
-    ----------
-    index_dir : str
-        Directory path where the Lucene impact index is stored. Must exist
-        and contain a valid Lucene index.
-    query_encoder : str, optional
-        Hugging Face model identifier for query encoding. Defaults to
-        "naver/splade-v3-distilbert".
+    and optimized search performance. Wraps Pyserini's LuceneImpactSearcher
+    with SPLADE query encoding.
 
     Notes
     -----
     Requires the optional ``pyserini`` dependency. Import errors propagate as
     :class:`RuntimeError` when helper factories are loaded. The searcher is
     lazy-initialized on first search call to avoid unnecessary index loading.
+    Time O(1) for initialization; memory O(1) aside from configuration storage.
+    Thread-safe for separate instances reading from the same index directory.
     """
 
     def __init__(self, index_dir: str, query_encoder: str = "naver/splade-v3-distilbert") -> None:
-        """Initialize Lucene-backed SPLADE impact searcher.
+        """Initialize Lucene impact index with index directory and optional query encoder.
 
         Parameters
         ----------
         index_dir : str
-            Directory path containing the Lucene SPLADE impact index.
+            Directory path where the Lucene impact index is stored. Must exist
+            and contain a valid Lucene index created via external tools or Pyserini.
+            Used for loading the searcher when search() is called.
         query_encoder : str, optional
-            Hugging Face model identifier for query encoding. Defaults to "naver/splade-v3-distilbert".
+            Hugging Face model identifier for query encoding. Used by Pyserini's
+            LuceneImpactSearcher to encode text queries into SPLADE sparse vectors.
+            Defaults to "naver/splade-v3-distilbert".
+
+        Notes
+        -----
+        Stores configuration parameters as instance attributes. The searcher is
+        created lazily via _ensure() when search() is first called. This avoids
+        loading the index and model until they are actually needed.
         """
         self.index_dir = index_dir
         self.query_encoder = query_encoder

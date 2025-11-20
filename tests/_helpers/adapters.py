@@ -123,19 +123,16 @@ class InMemoryGitRepo:
         ----------
         path : str
             File path to get blame for.
-        *_ : Any
-            Additional positional arguments (ignored).
-        **__ : Any
-            Additional keyword arguments (ignored).
 
         Returns
         -------
         Iterable[tuple[object, Sequence[int]]]
             List of (commit, line_numbers) tuples.
 
-        Notes
-        -----
-        If set_blame_error was called for this path, raises the configured exception.
+        Raises
+        ------
+        Exception
+            If set_blame_error was called for this path, raises the configured exception.
         """
         if path in self._blame_errors:
             raise self._blame_errors[path]
@@ -166,9 +163,10 @@ class InMemoryGitRepo:
         Iterable[object]
             List of commit objects from configured history.
 
-        Notes
-        -----
-        If set_history_error was called for any of the paths, raises the configured exception.
+        Raises
+        ------
+        Exception
+            If set_history_error was called for any of the paths, raises the configured exception.
         """
         _ = rev
         key: str | None = None
@@ -351,23 +349,24 @@ class InMemoryFAISSManager:
         self.search_calls = 0
         self.runtime = _InMemoryFAISSRuntime()
         self.vec_dim = 128
+        self.search_side_effect: Exception | None = None
 
     def search(self, *_: object, **__: object) -> list[Any]:
         """Return pre-configured search results and increment call counter.
-
-        Parameters
-        ----------
-        *_ : Any
-            Positional arguments (ignored).
-        **__ : Any
-            Keyword arguments (ignored).
 
         Returns
         -------
         list[Any]
             List of pre-configured search results.
+
+        Raises
+        ------
+        Exception
+            If search_side_effect is set, raises the configured exception.
         """
         self.search_calls += 1
+        if self.search_side_effect is not None:
+            raise self.search_side_effect
         return self._results
 
 
@@ -412,6 +411,15 @@ class InMemoryFileAdapter:
     ) -> dict[str, object]:
         """Return file content and metadata.
 
+        Parameters
+        ----------
+        rel_path : str
+            Relative file path to read.
+        start_line : int | None, optional
+            Optional starting line number (1-indexed) for partial file reads.
+        end_line : int | None, optional
+            Optional ending line number (1-indexed) for partial file reads.
+
         Returns
         -------
         dict[str, object]
@@ -452,6 +460,17 @@ class InMemoryFileAdapter:
         max_results: int | None = None,
     ) -> list[dict[str, object]]:
         """Return metadata for files matching glob/language filters.
+
+        Parameters
+        ----------
+        root : str | None, optional
+            Optional root directory prefix to filter paths.
+        include_globs : list[str] | None, optional
+            Optional list of glob patterns to include.
+        exclude_globs : list[str] | None, optional
+            Optional list of glob patterns to exclude.
+        max_results : int | None, optional
+            Optional maximum number of results to return.
 
         Returns
         -------

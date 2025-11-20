@@ -89,6 +89,11 @@ class _StubProvider:
 def _indexctl_context(tmp_path: Path) -> IndexctlCliContext:
     """Provide an indexctl CLI context with deterministic embedding provider.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+
     Returns
     -------
     IndexctlCliContext
@@ -235,6 +240,13 @@ def test_embeddings_validate_passes_with_stub(
 
 def _app_config_with_duckdb(repo_root: Path, duckdb_path: Path) -> AppConfig:
     """Return minimal AppConfig whose DuckDB path points at ``duckdb_path``.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory for configuration paths.
+    duckdb_path : Path
+        Path to DuckDB catalog file.
 
     Returns
     -------

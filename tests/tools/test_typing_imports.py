@@ -23,8 +23,15 @@ TOOLS_DIRS = [
 ]
 
 
-def _is_in_type_checking_block(tree: ast.AST, target_node: ast.AST) -> bool:
+def _is_in_type_checking_block(target_node: ast.AST, tree: ast.AST) -> bool:
     """Return True if ``target_node`` resides within an ``if TYPE_CHECKING`` guard.
+
+    Parameters
+    ----------
+    target_node : ast.AST
+        AST node to search for.
+    tree : ast.AST
+        AST tree to search within.
 
     Returns
     -------

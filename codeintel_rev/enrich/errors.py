@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=False)
 class StageError(Exception):
     """Base error describing a failed enrichment stage.
 

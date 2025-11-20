@@ -120,18 +120,18 @@ class ExceptionProblemDetailsParams:
 class ProblemDetailsValidationError(Exception):
     """Raised when Problem Details payload fails schema validation.
 
+    Extended Summary
+    ----------------
     This exception is raised when a Problem Details dictionary does not conform
     to the RFC 9457 schema or fails validation against the canonical JSON Schema.
+    Used to signal validation failures during Problem Details construction or
+    deserialization, providing detailed error information for debugging.
 
-    Initializes the validation error with message and optional validation error details.
-
-    Parameters
-    ----------
-    message : str
-        Human-readable error message describing the validation failure.
-    validation_errors : list[str] | None, optional
-        List of specific validation error messages from the schema validator.
-        Provides detailed path and constraint information. Defaults to None.
+    Notes
+    -----
+    Time O(1); memory O(1) aside from message and validation_errors storage.
+    No I/O, no global state. Thread-safe. The validation_errors list is
+    normalized to empty list if None is provided.
 
     Examples
     --------
@@ -148,8 +148,16 @@ class ProblemDetailsValidationError(Exception):
         ----------
         message : str
             Human-readable error message describing the validation failure.
+            Stored as the exception message and used in logs and error displays.
         validation_errors : list[str] | None, optional
             List of specific validation error messages from the schema validator.
+            Provides detailed path and constraint information for debugging.
+            Normalized to empty list if None. Defaults to None.
+
+        Notes
+        -----
+        Stores validation_errors as instance attribute, normalizing None to
+        empty list. The message is passed to parent Exception constructor.
         """
         super().__init__(message)
         self.validation_errors = validation_errors or []

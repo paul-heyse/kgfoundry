@@ -20,6 +20,11 @@ GOLDEN_MODULES = Path("tests/golden/enrich/completeness/modules.jsonl")
 def _prepare_repo(dst: Path) -> Path:
     """Copy the completeness fixture repo into ``dst``.
 
+    Parameters
+    ----------
+    dst : Path
+        Destination directory for the copied repository.
+
     Returns
     -------
     Path

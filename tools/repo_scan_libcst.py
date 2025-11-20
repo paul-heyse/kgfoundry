@@ -28,6 +28,23 @@ else:  # pragma: no cover - typing-only shim
 
 
 class _CollectorInstance(Protocol):
+    """Protocol for import/export collector instances.
+
+    Defines interface for collectors that track imports and exports
+    from Python modules.
+
+    Attributes
+    ----------
+    imports : set[str]
+        Set of runtime import module names.
+    type_checking_imports : set[str]
+        Set of TYPE_CHECKING-guarded import module names.
+    star_imports : set[str]
+        Set of star import module names.
+    exports : set[str]
+        Set of exported symbol names.
+    """
+
     imports: set[str]
     type_checking_imports: set[str]
     star_imports: set[str]
@@ -82,6 +99,13 @@ if cst is not None:
         """Collect imports/exports from a LibCST module."""
 
         def __init__(self, module_name: str) -> None:
+            """Initialize import collector for module.
+
+            Parameters
+            ----------
+            module_name : str
+                Name of module being analyzed.
+            """
             self.module_name = module_name
             self.imports: set[str] = set()
             self.type_checking_imports: set[str] = set()
@@ -91,6 +115,18 @@ if cst is not None:
 
         @staticmethod
         def _is_type_check_guard(test: libcst_types.BaseExpression) -> bool:
+            """Check if expression is TYPE_CHECKING guard condition.
+
+            Parameters
+            ----------
+            test : libcst_types.BaseExpression
+                Expression to check.
+
+            Returns
+            -------
+            bool
+                True if expression is TYPE_CHECKING or typing.TYPE_CHECKING.
+            """
             if m is None:
                 return False
             return bool(

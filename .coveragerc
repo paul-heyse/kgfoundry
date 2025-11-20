@@ -1,0 +1,5 @@
+[run]
+dynamic_context = test_function
+source =
+    codeintel_rev
+    src

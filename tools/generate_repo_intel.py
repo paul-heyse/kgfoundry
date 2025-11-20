@@ -625,6 +625,23 @@ def collect_ctags_symbols() -> None:
 
 
 def _collect_edges_with_grimp(packages: list[str], excludes: set[str]) -> set[tuple[str, str]]:
+    """Collect import graph edges using Grimp library.
+
+    Builds import dependency graph for each package and collects all
+    module-to-module import edges, excluding modules matching exclude patterns.
+
+    Parameters
+    ----------
+    packages : list[str]
+        Package names to analyze.
+    excludes : set[str]
+        Module name patterns to exclude from graph.
+
+    Returns
+    -------
+    set[tuple[str, str]]
+        Set of (source_module, target_module) import edges.
+    """
     grimp = importlib.import_module("grimp")
     edges: set[tuple[str, str]] = set()
     for pkg in packages:
@@ -639,6 +656,21 @@ def _collect_edges_with_grimp(packages: list[str], excludes: set[str]) -> set[tu
 
 
 def _collect_edges_fallback(excludes: set[str]) -> set[tuple[str, str]]:
+    """Collect import edges by parsing Python files with regex.
+
+    Fallback method when Grimp is unavailable. Scans Python files and
+    extracts import statements using regex patterns.
+
+    Parameters
+    ----------
+    excludes : set[str]
+        Module name patterns to exclude from graph.
+
+    Returns
+    -------
+    set[tuple[str, str]]
+        Set of (source_module, target_module) import edges.
+    """
     py_files = filter_paths(git_ls_files("*.py"), excludes)
     edges: set[tuple[str, str]] = set()
     for path in py_files:
@@ -654,6 +686,15 @@ def _collect_edges_fallback(excludes: set[str]) -> set[tuple[str, str]]:
 
 
 def _write_import_graph(edges: set[tuple[str, str]]) -> None:
+    """Write import dependency graph to Graphviz DOT file.
+
+    Generates DOT format graph file from import edges for visualization.
+
+    Parameters
+    ----------
+    edges : set[tuple[str, str]]
+        Set of (source_module, target_module) import edges to write.
+    """
     dot_lines = ["digraph G {"]
     for source, target in sorted(edges):
         dot_lines.append(f'  "{source}" -> "{target}";')

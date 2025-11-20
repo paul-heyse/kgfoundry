@@ -94,8 +94,9 @@ class BaseFunctionVisitor(cst.CSTVisitor):
         """Track nesting for class scopes."""
         self._class_stack.append(node.name.value)
 
-    def leave_ClassDef(self, node: cst.ClassDef) -> None:  # noqa: N802
+    def leave_ClassDef(self, original_node: cst.ClassDef) -> None:  # noqa: N802
         """Pop class scope on exit."""
+        _ = original_node
         self._class_stack.pop()
 
     def visit_FunctionDef(self, node: cst.FunctionDef) -> None:  # noqa: N802
@@ -104,8 +105,9 @@ class BaseFunctionVisitor(cst.CSTVisitor):
         self.process_function(info)
         self._function_stack.append(node.name.value)
 
-    def leave_FunctionDef(self, node: cst.FunctionDef) -> None:  # noqa: N802
+    def leave_FunctionDef(self, original_node: cst.FunctionDef) -> None:  # noqa: N802
         """Pop function scope on exit."""
+        _ = original_node
         self._function_stack.pop()
 
     def process_function(self, info: FunctionInfo) -> None:

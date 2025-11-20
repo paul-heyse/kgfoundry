@@ -349,6 +349,18 @@ class TypeGateVisitor(ast.NodeVisitor):
 
 
 def _format_install_hint(module_root: str) -> str | None:
+    """Format pip install command hint for missing module.
+
+    Parameters
+    ----------
+    module_root : str
+        Root module name to generate install hint for.
+
+    Returns
+    -------
+    str | None
+        Formatted pip install command string, or None if no hint available.
+    """
     hint = _EXTRAS_HINT.get(module_root)
     if not hint:
         return None

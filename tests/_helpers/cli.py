@@ -151,11 +151,12 @@ def orchestration_cli_context(
     ----------
     uuid_factory : Callable[[], str] | None, optional
         Custom UUID factory used for deterministic IDs in tests.
-    bm25_builder : Callable[[object, logging.Logger], tuple[str, int]] | None, optional
-        Optional BM25 builder override. Accepts the same signature as production.
-    faiss_runner : Callable[[object], dict[str, object]] | None, optional
-        Optional FAISS runner override returning deterministic metadata.
-    artifact_fs : object | None, optional
+    bm25_builder : Callable[[BM25BuildConfig, logging.Logger], tuple[str, int]] | None, optional
+        Optional BM25 builder override. Accepts BM25BuildConfig and Logger, returns
+        tuple of (index_path, document_count).
+    faiss_runner : Callable[[IndexCliConfig], dict[str, object]] | None, optional
+        Optional FAISS runner override accepting IndexCliConfig, returning deterministic metadata.
+    artifact_fs : OrchestrationArtifactFS | None, optional
         Optional ArtifactFS implementation. Defaults to the production filesystem.
 
     Returns
@@ -214,6 +215,7 @@ def cli_registry_context(
     tmp_path: Path,
     *,
     uuid_value: str = "registry-uuid",
+    command: str = "test-cli",
 ) -> dict[str, object]:
     """Build deterministic registry context inputs for CLI registry tests.
 
@@ -223,11 +225,13 @@ def cli_registry_context(
         Temporary directory provided by pytest.
     uuid_value : str, optional
         Stable UUID value for deterministic command keys.
+    command : str, optional
+        Command name used for registry entries.
 
     Returns
     -------
     dict[str, object]
-        Mapping containing augment/registry paths, uuid_factory, and an ArtifactFS stub.
+        Mapping containing augment/registry paths, uuid_factory, command, and an ArtifactFS stub.
     """
     augment_path = tmp_path / "augment.yaml"
     registry_path = tmp_path / "registry.yaml"
@@ -238,4 +242,5 @@ def cli_registry_context(
         "registry_path": registry_path,
         "uuid_factory": lambda: uuid_value,
         "artifact_fs": _StubArtifactFS(),
+        "command": command,
     }

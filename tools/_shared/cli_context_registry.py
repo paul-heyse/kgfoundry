@@ -373,10 +373,9 @@ class CLIContextRegistry:
 
         Raises
         ------
-        ValueError
-            If key is empty or whitespace-only after cleaning.
         KeyError
-            If key is not registered in the registry.
+            If key is not registered in the registry (after cleaning).
+            Also propagates ValueError from _clean_key if key is empty or whitespace-only.
         """
         key = self._clean_key(key)
         if key not in self._definitions:

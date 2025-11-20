@@ -101,26 +101,32 @@ _ALLOWED_TYPES = frozenset(
 class UnsafeSerializationError(ValueError):
     """Raised when serialization validation fails.
 
-    Initializes unsafe serialization error with message and optional reason.
+    Extended Summary
+    ----------------
+    Raised when pickle serialization validation detects unsafe or disallowed
+    types or when signature verification fails. Used to prevent deserialization
+    of potentially malicious pickle data by validating allowed types and
+    cryptographic signatures.
 
-    Parameters
-    ----------
-    message : str
-        Error description.
-    reason : str | None, optional
-        Specific reason (e.g., "signature_mismatch", "disallowed_type").
-        Defaults to None.
+    Notes
+    -----
+    Time O(1); memory O(1) aside from message storage. No I/O, no global state.
+    Thread-safe. The reason attribute provides specific failure details for
+    debugging and error handling.
     """
 
     def __init__(self, message: str, reason: str | None = None) -> None:
-        """Initialize safe pickle error.
+        """Initialize unsafe serialization error with message and optional reason.
 
         Parameters
         ----------
         message : str
-            Error description.
+            Error description explaining why serialization validation failed.
+            Stored as the exception message.
         reason : str | None, optional
-            Specific reason (e.g., "signature_mismatch", "disallowed_type").
+            Specific reason code for the validation failure (e.g., "signature_mismatch",
+            "disallowed_type", "missing_signature"). Stored as instance attribute
+            for programmatic error handling. Defaults to None.
         """
         super().__init__(message)
         self.reason = reason
@@ -129,21 +135,18 @@ class UnsafeSerializationError(ValueError):
 class _UnpicklerProtocol(Protocol):
     """Protocol for unpickler interface used by safe pickle implementation.
 
+    Extended Summary
+    ----------------
     This protocol defines the interface for unpickler instances that can
-    deserialize pickle streams with allow-list validation.
+    deserialize pickle streams with allow-list validation. Implementations
+    must support the same initialization signature as stdlib pickle.Unpickler
+    for compatibility with safe pickle wrappers.
 
-    Parameters
-    ----------
-    file : BinaryIO
-        Binary file handle to read from.
-    fix_imports : bool, optional
-        Whether to fix imports for Python 2 compatibility.
-    encoding : str, optional
-        Text encoding for Python 2 compatibility.
-    errors : str, optional
-        Error handling mode for encoding.
-    buffers : object | None, optional
-        Buffer protocol support.
+    Notes
+    -----
+    This is a typing Protocol used for structural subtyping. Implementations
+    should match the stdlib pickle.Unpickler API for file-based deserialization
+    with optional Python 2 compatibility parameters.
     """
 
     def __init__(
@@ -160,15 +163,26 @@ class _UnpicklerProtocol(Protocol):
         Parameters
         ----------
         file : BinaryIO
-            Binary file handle to read pickle data from.
+            Binary file handle to read pickle data from. Must be opened in
+            binary mode and positioned at the start of pickle data.
         fix_imports : bool, optional
-            Whether to fix imports for Python 2 compatibility.
+            Whether to fix imports for Python 2 compatibility. When True,
+            maps old Python 2 module names to Python 3 equivalents.
+            Defaults to False.
         encoding : str, optional
-            Text encoding for Python 2 compatibility.
+            Text encoding for Python 2 compatibility. Used when unpickling
+            Python 2 string objects. Defaults to "ASCII".
         errors : str, optional
-            Error handling mode for encoding.
+            Error handling mode for encoding. Controls how encoding errors
+            are handled during Python 2 string unpickling. Defaults to "strict".
         buffers : object | None, optional
-            Buffer protocol support.
+            Buffer protocol support for zero-copy deserialization. Optional
+            buffer objects for efficient data transfer. Defaults to None.
+
+        Notes
+        -----
+        This is a Protocol method signature. Implementations must match this
+        signature to be compatible with safe pickle wrappers.
         """
         ...
 
@@ -251,18 +265,17 @@ if TYPE_CHECKING:
     class _StdlibUnpickler(_UnpicklerProtocol):
         """Static typing shim for the stdlib Unpickler.
 
-        Parameters
-        ----------
-        file : BinaryIO
-            Binary file handle to read from.
-        fix_imports : bool, optional
-            Whether to fix imports for Python 2 compatibility.
-        encoding : str, optional
-            Text encoding for Python 2 compatibility.
-        errors : str, optional
-            Error handling mode for encoding.
-        buffers : object | None, optional
-            Buffer protocol support.
+        Extended Summary
+        ----------------
+        Static typing shim that provides type hints for stdlib pickle.Unpickler
+        when TYPE_CHECKING is True. At runtime, this is replaced with the actual
+        stdlib Unpickler class. Used for type checking compatibility with safe
+        pickle wrappers.
+
+        Notes
+        -----
+        This is a typing-only class used during static analysis. At runtime,
+        _StdlibUnpickler is assigned to the actual stdlib pickle.Unpickler class.
         """
 
         def __init__(
@@ -276,7 +289,28 @@ if TYPE_CHECKING:
         ) -> None:
             """Initialize stdlib unpickler shim with file handle and options.
 
-            See class docstring for detailed parameter documentation.
+            Parameters
+            ----------
+            file : BinaryIO
+                Binary file handle to read pickle data from. Must be opened in
+                binary mode and positioned at the start of pickle data.
+            fix_imports : bool, optional
+                Whether to fix imports for Python 2 compatibility. When True,
+                maps old Python 2 module names to Python 3 equivalents.
+            encoding : str, optional
+                Text encoding for Python 2 compatibility. Used when unpickling
+                Python 2 string objects. Defaults to "ASCII".
+            errors : str, optional
+                Error handling mode for encoding. Controls how encoding errors
+                are handled during Python 2 string unpickling. Defaults to "strict".
+            buffers : object | None, optional
+                Buffer protocol support for zero-copy deserialization. Optional
+                buffer objects for efficient data transfer.
+
+            Notes
+            -----
+            This is a typing stub method. The actual implementation is provided
+            by stdlib pickle.Unpickler at runtime.
             """
             ...
 
@@ -328,23 +362,19 @@ else:  # pragma: no cover - runtime import keeps Ruff S403 quiet
 class _SafeUnpickler(_StdlibUnpickler):
     """Unpickler enforcing allow-list of safe types.
 
-    This prevents arbitrary code execution by restricting deserialization to primitive types and
-    basic containers.
+    Extended Summary
+    ----------------
+    This prevents arbitrary code execution by restricting deserialization to
+    primitive types and basic containers. Overrides find_class() to enforce
+    an allow-list of safe types, raising UnsafeSerializationError when
+    disallowed types are encountered.
 
-    Initializes safe unpickler with file handle.
-
-    Parameters
-    ----------
-    file : BinaryIO
-        Binary file handle to read from.
-    fix_imports : bool, optional
-        Whether to fix imports for Python 2 compatibility. Defaults to True.
-    encoding : str, optional
-        Text encoding for Python 2 compatibility. Defaults to "ASCII".
-    errors : str, optional
-        Error handling mode for encoding. Defaults to "strict".
-    buffers : object | None, optional
-        Buffer protocol support. Defaults to None.
+    Notes
+    -----
+    Time O(n) where n is the number of classes referenced in the pickle stream;
+    memory O(1) aside from the unpickled object. No I/O beyond file reading,
+    no global state. Thread-safe for separate instances. The allow-list is
+    defined by _ALLOWED_TYPES module constant.
     """
 
     def __init__(
@@ -358,7 +388,29 @@ class _SafeUnpickler(_StdlibUnpickler):
     ) -> None:
         """Initialize safe unpickler with file handle and options.
 
-        See class docstring for detailed parameter documentation.
+        Parameters
+        ----------
+        file : BinaryIO
+            Binary file handle to read pickle data from. Must be opened in
+            binary mode and positioned at the start of pickle data.
+        fix_imports : bool, optional
+            Whether to fix imports for Python 2 compatibility. When True,
+            maps old Python 2 module names to Python 3 equivalents.
+            Defaults to True.
+        encoding : str, optional
+            Text encoding for Python 2 compatibility. Used when unpickling
+            Python 2 string objects. Defaults to "ASCII".
+        errors : str, optional
+            Error handling mode for encoding. Controls how encoding errors
+            are handled during Python 2 string unpickling. Defaults to "strict".
+        buffers : object | None, optional
+            Buffer protocol support for zero-copy deserialization. Optional
+            buffer objects for efficient data transfer. Defaults to None.
+
+        Notes
+        -----
+        Delegates to parent _StdlibUnpickler constructor with the provided
+        parameters. The allow-list enforcement happens in find_class() override.
         """
         super().__init__(
             file,
@@ -479,15 +531,19 @@ def _validate_object(obj: object, depth: int = 0) -> None:
 class SignedPickleWrapper:
     """HMAC-signed pickle with allow-list validation.
 
+    Extended Summary
+    ----------------
     Combines class allow-listing with HMAC-SHA256 signatures to prevent
-    both arbitrary code execution and payload tampering.
+    both arbitrary code execution and payload tampering. Provides dump()
+    and load() methods that validate object types before serialization and
+    verify signatures before deserialization.
 
-    Initializes wrapper with signing key.
-
-    Parameters
-    ----------
-    signing_key : bytes
-        HMAC signing key (≥32 bytes recommended).
+    Notes
+    -----
+    Time O(n) for serialization/deserialization where n is object size;
+    memory O(n) for the serialized payload. Uses HMAC-SHA256 for signature
+    generation and verification. Thread-safe for separate instances. Warns
+    if signing_key is shorter than _MIN_SIGNING_KEY_BYTES (32 bytes).
 
     Examples
     --------
@@ -504,12 +560,21 @@ class SignedPickleWrapper:
     """
 
     def __init__(self, signing_key: bytes) -> None:
-        """Initialize signed pickle wrapper.
+        """Initialize signed pickle wrapper with signing key.
 
         Parameters
         ----------
         signing_key : bytes
-            HMAC signing key for pickle integrity verification.
+            HMAC signing key for pickle integrity verification. Should be
+            at least 32 bytes for strong security. Keys shorter than
+            _MIN_SIGNING_KEY_BYTES will trigger a warning but are still
+            accepted. Stored as instance attribute for use in dump() and load().
+
+        Notes
+        -----
+        Validates signing key length and logs a warning if the key is shorter
+        than the recommended minimum. The key is stored for use in HMAC
+        signature generation and verification during dump() and load() operations.
         """
         self.signing_key = signing_key
         if len(signing_key) < _MIN_SIGNING_KEY_BYTES:

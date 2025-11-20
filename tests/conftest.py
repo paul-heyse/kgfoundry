@@ -165,6 +165,11 @@ def _networking_test_app(tmp_path: Path) -> FastAPI:
     lightweight stubs so HTTPX-based tests can exercise streaming and
     capability refresh logic without touching heavy FAISS runtimes.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+
     Returns
     -------
     FastAPI
@@ -393,6 +398,11 @@ def structured_log_asserter() -> Callable[[logging.LogRecord, set[str]], None]:
 def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
     """Return a factory for constructing ``ScanInputs`` instances.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+
     Returns
     -------
     Callable[..., ScanInputs]
@@ -458,6 +468,11 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
 @pytest.fixture(name="overlay_context_builder")
 def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., OverlayContext]:
     """Provide a factory for building ``OverlayContext`` instances.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
 
     Returns
     -------
@@ -745,6 +760,11 @@ def fixture_sample_repo_builder(
 ) -> Callable[[str | None], SampleRepo]:
     """Return a builder that bootstraps sample repositories for CLI tests.
 
+    Parameters
+    ----------
+    tmp_path_factory : pytest.TempPathFactory
+        Pytest fixture factory for creating temporary directories.
+
     Returns
     -------
     Callable[[str | None], SampleRepo]
@@ -776,6 +796,11 @@ def fixture_sample_repo(
 ) -> SampleRepo:
     """Provide a ready-to-use sample repository rooted in a temporary directory.
 
+    Parameters
+    ----------
+    sample_repo_builder : Callable[[str | None], SampleRepo]
+        Builder function for creating sample repositories.
+
     Returns
     -------
     SampleRepo
@@ -787,6 +812,11 @@ def fixture_sample_repo(
 @pytest.fixture(name="repo_scan_invoker")
 def fixture_repo_scan_invoker(tmp_path: Path) -> Callable[..., tuple[dict[str, Any], Path, Path]]:
     """Return a helper that runs repo_scan with explicit arguments.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
 
     Returns
     -------

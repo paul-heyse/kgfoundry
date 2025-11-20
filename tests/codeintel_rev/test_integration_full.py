@@ -46,6 +46,11 @@ _EXPECTED_STARTUP_TIME_WITH_PRELOAD_SECONDS = 40.0
 def test_repo(tmp_path: Path) -> RepoHandle:
     """Set up a minimal test repository environment and FastAPI test app.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for test artifacts.
+
     Returns
     -------
     RepoHandle

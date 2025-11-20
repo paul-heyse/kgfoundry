@@ -425,6 +425,26 @@ runtime-evaluated-base-classes = [
 # DOC502: _hash_executable raises FileNotFoundError/PermissionError via file I/O
 # DOC502: _spawn raises TimeoutExpired/FileNotFoundError via subprocess.run()
 "tools/_shared/process.py" = ["DOC502"]
+# DOC502: _import raises ImportError via import_module
+"tools/_types/pytestarch_facade.py" = ["DOC502"]
+# DOC502: _load_submodule raises KeyError/ImportError via import_module and dict access
+"tools/shared/__init__.py" = ["DOC502"]
+# DOC502: Test helpers raise exceptions indirectly (pytest.fail() raises pytest.Failed, raise self._side_effect raises BaseException)
+"tests/codeintel_rev/test_readiness.py" = ["DOC502"]
+"tests/io/test_duckdb_catalog.py" = ["DOC502"]
+"tests/test_runtime_determinism.py" = ["DOC502"]
+# DOC502: observe_tool_run and cli_run catch Exception and re-raise it, but Ruff doesn't recognize the re-raise pattern
+"tools/_shared/metrics.py" = ["DOC502"]
+"tools/_shared/cli_runtime.py" = ["DOC502"]
+# DOC502: fake_run raises VectorValidationError via variable (error), not directly
+"tests/orchestration/test_cli_envelopes.py" = ["DOC502"]
+# DOC502: _require_json_object raises TypeError via isinstance check, not directly
+"tests/search_api/test_client_idempotency.py" = ["DOC502"]
+# DOC502: Test adapter methods raise exceptions via instance variables (self._blame_errors[path], self._commit_error, self.search_side_effect)
+# These are valid exceptions being raised, but Ruff's static analysis cannot detect them
+"tests/_helpers/adapters.py" = ["DOC502"]
+# DOC502: FakeFAISSManager.search raises Exception via instance variable (self.search_side_effect), not directly
+"tests/_helpers/integration.py" = ["DOC502"]
 
 
 [tool.ruff.lint.isort]
@@ -590,12 +610,15 @@ emit-build-options    = true  # include only/no-binary flags if you use them
 
 [tool.pydoclint]
 exclude = "codeintel_rev/patches|codeintel_rev/cli/telemetry.py|codeintel_rev/diagnostics/report_cli.py"
+allow-init-docstring = true  # Project policy: document constructor parameters in __init__ docstrings
+ignore-underscore-args = true  # Ignore underscore args (*_, **__) in docstring checks
 # DOC105: `**_` parameter type annotation limitation in Click decorators
 # The type annotation matches the signature, but pydoclint cannot parse underscore-prefixed kwargs
 # DOC105: Typer CLI commands use Annotated types for argument parsing, but docstrings document underlying types
 # This is correct - docstrings should document the actual types users interact with, not Annotated wrappers
 # DOC301: __init__ methods should have docstrings per PEP 257. We document constructor parameters in __init__
 # docstrings rather than class docstrings for clarity and consistency with Python conventions.
+# This is a project-wide policy - all __init__ methods have docstrings documenting constructor parameters.
 # DOC503: RuntimeCell.get_or_initialize raises exceptions via variable (cooldown_error), not directly
 # DOC501/DOC502: _load_augment, _load_registry, _read_yaml raise exceptions via helper functions
 # (_registry_error, _validation_error) that return exception instances. Docstrings correctly

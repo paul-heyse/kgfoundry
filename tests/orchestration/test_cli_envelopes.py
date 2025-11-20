@@ -128,9 +128,10 @@ def test_index_faiss_records_validation_failure(
         config : orchestration_cli.IndexCliConfig
             Index configuration to validate.
 
-        Notes
-        -----
-        Always raises VectorValidationError with pre-configured error from outer scope.
+        Raises
+        ------
+        VectorValidationError
+            Always raised with pre-configured error from outer scope.
         """
         assertions.expect_true(
             isinstance(config, orchestration_cli.IndexCliConfig),

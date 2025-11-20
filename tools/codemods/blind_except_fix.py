@@ -43,6 +43,18 @@ class BlindExceptArgs:
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> BlindExceptArgs:
+    """Parse command-line arguments for blind-except codemod.
+
+    Parameters
+    ----------
+    argv : Sequence[str] | None, optional
+        Command-line arguments to parse. Defaults to sys.argv if None.
+
+    Returns
+    -------
+    BlindExceptArgs
+        Parsed arguments containing targets, dry_run flag, and log path.
+    """
     parser = argparse.ArgumentParser(
         description="Transform blind except blocks to add TODOs and exception variables",
     )

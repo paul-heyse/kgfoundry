@@ -37,14 +37,18 @@ class ValidationErrorProtocol(Protocol):
 class Draft202012ValidatorProtocol(Protocol):
     """Typed facade for :class:`jsonschema.validators.Draft202012Validator`.
 
-    Parameters
-    ----------
-    schema : Mapping[str, object]
-        JSON Schema document to validate against.
-    *args : object
-        Additional positional arguments passed to validator.
-    **kwargs : object
-        Additional keyword arguments passed to validator.
+    Extended Summary
+    ----------------
+    Typing Protocol that provides type hints compatible with jsonschema's
+    Draft202012Validator API. Used for structural subtyping to ensure
+    validator implementations match the expected interface. Supports
+    schema validation, error iteration, and schema checking.
+
+    Notes
+    -----
+    This is a typing Protocol used for structural subtyping. Implementations
+    should match the jsonschema.validators.Draft202012Validator API for
+    JSON Schema 2020-12 validation.
     """
 
     def __init__(self, schema: Mapping[str, object], *args: object, **kwargs: object) -> None:
@@ -53,11 +57,20 @@ class Draft202012ValidatorProtocol(Protocol):
         Parameters
         ----------
         schema : Mapping[str, object]
-            JSON Schema document to validate against.
+            JSON Schema document to validate against. Must conform to JSON Schema
+            2020-12 meta-schema. The schema is stored and used for all validation
+            operations performed by this validator instance.
         *args : object
-            Additional positional arguments passed to validator.
+            Additional positional arguments passed to the underlying validator
+            constructor. Specific arguments depend on the validator implementation.
         **kwargs : object
-            Additional keyword arguments passed to validator.
+            Additional keyword arguments passed to the underlying validator
+            constructor. Common options include format_checker, resolver, etc.
+
+        Notes
+        -----
+        This is a Protocol method signature. Implementations must match this
+        signature to be compatible with Draft202012Validator API.
         """
         ...
 

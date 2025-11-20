@@ -22,6 +22,13 @@ from tests.app._context_factory import build_application_context
 def _mock_module(name: str, **attrs: object) -> ModuleType:
     """Create a mock module with the given attributes.
 
+    Parameters
+    ----------
+    name : str
+        Module name.
+    **attrs : object
+        Attributes to set on the module.
+
     Returns
     -------
     ModuleType

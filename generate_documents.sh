@@ -117,6 +117,39 @@ uv run python -m codeintel_rev.cli.enrich dfg \
   --out-dir "$ENRICH_OUT" \
   --no-ingest
 
+echo "==> Building coverage and test analytics (best-effort)..."
+COVERAGE_FILE="$REPO_ROOT/.coverage"
+PYTEST_REPORT="$REPO_ROOT/.cache/pytest-report.json"
+if [ -f "$COVERAGE_FILE" ]; then
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --out "$ENRICH_OUT" \
+    coverage-detailed \
+    --coverage-file "$COVERAGE_FILE"
+else
+  echo "⚠️  No .coverage found; skipping coverage analytics" >&2
+fi
+
+if [ -f "$COVERAGE_FILE" ] && [ -f "$PYTEST_REPORT" ]; then
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --out "$ENRICH_OUT" \
+    test-analytics \
+    --coverage-file "$COVERAGE_FILE" \
+    --pytest-report "$PYTEST_REPORT"
+else
+  echo "⚠️  Missing .coverage or pytest JSON report; skipping test analytics" >&2
+fi
+
+if [ -f "$ENRICH_OUT/analytics/coverage/coverage_functions.jsonl" ]; then
+  uv run python -m codeintel_rev.cli.enrich_analytics \
+    --root codeintel_rev \
+    --out "$ENRICH_OUT" \
+    risk-factors
+else
+  echo "⚠️  Coverage analytics missing; skipping risk factor computation" >&2
+fi
+
 echo "==> Building CST dataset..."
 uv run python -m codeintel_rev.cst_build.cst_cli \
   --root codeintel_rev \
@@ -144,6 +177,16 @@ cp "$ENRICH_OUT/repo_map.json" "$DOC_OUT/repo_map.json"
 cp "$ENRICH_OUT/modules/modules.jsonl" "$DOC_OUT/modules.jsonl"
 cp "$ENRICH_OUT/ast/ast_nodes.jsonl" "$DOC_OUT/ast_nodes.jsonl"
 cp "$CST_OUT/cst_nodes.jsonl" "$DOC_OUT/cst_nodes.jsonl"
+copy_if_exists "$ENRICH_OUT/analytics/coverage/coverage_lines.parquet" "$DOC_OUT/coverage_lines.parquet"
+convert_parquet_to_jsonl "$DOC_OUT/coverage_lines.parquet" "$DOC_OUT/coverage_lines.jsonl"
+copy_if_exists "$ENRICH_OUT/analytics/coverage/coverage_functions.parquet" "$DOC_OUT/coverage_functions.parquet"
+convert_parquet_to_jsonl "$DOC_OUT/coverage_functions.parquet" "$DOC_OUT/coverage_functions.jsonl"
+copy_if_exists "$ENRICH_OUT/analytics/tests/test_catalog.parquet" "$DOC_OUT/test_catalog.parquet"
+convert_parquet_to_jsonl "$DOC_OUT/test_catalog.parquet" "$DOC_OUT/test_catalog.jsonl"
+copy_if_exists "$ENRICH_OUT/analytics/tests/test_coverage_edges.parquet" "$DOC_OUT/test_coverage_edges.parquet"
+convert_parquet_to_jsonl "$DOC_OUT/test_coverage_edges.parquet" "$DOC_OUT/test_coverage_edges.jsonl"
+copy_if_exists "$ENRICH_OUT/analytics/risk/goid_risk_factors.parquet" "$DOC_OUT/goid_risk_factors.parquet"
+convert_parquet_to_jsonl "$DOC_OUT/goid_risk_factors.parquet" "$DOC_OUT/goid_risk_factors.jsonl"
 
 echo "==> Exporting GOID / Call Graph / CFG / DFG datasets..."
 GOID_PARQUET="$ENRICH_OUT/goid/goids.parquet"
