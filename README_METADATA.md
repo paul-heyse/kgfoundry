@@ -160,3 +160,176 @@ Downstream consumers can therefore:
 - Join any dataset on `goid_h128`/`goid` to relate nodes, edges, and crosswalk entries.
 - Use JSONL files as streaming corpora for LLM context windows.
 - Re-run `generate_documents.sh` after code changes to refresh the datasets with new analyses.
+
+## 8. AST Metrics (`ast_metrics.jsonl`)
+
+**Purpose**: Per-file aggregate metrics computed during AST extraction (e.g., node counts, average nesting depth). Useful for heuristic scoring and selecting files that warrant deeper analysis.
+
+**Origin**: Produced by `codeintel_rev.enrich.ast_indexer.AstIndexer` while writing `ast_nodes.*`. Metrics are emitted via `codeintel_rev.enrich.analytics.ast_metrics`.
+
+**Fields**
+
+| Field            | Type    | Description |
+|------------------|---------|-------------|
+| `rel_path`       | string  | Repo-relative file path. |
+| `node_count`     | int     | Total AST nodes parsed. |
+| `function_count` | int     | Number of function/method defs. |
+| `class_count`    | int     | Number of class defs. |
+| `avg_depth`      | float   | Average AST depth. |
+| `max_depth`      | int     | Maximum depth observed. |
+| `complexity`     | float   | Heuristic complexity score (sum of decision points). |
+| `generated_at`   | string  | ISO timestamp of extraction. |
+
+## 9. AST Nodes (`ast_nodes.jsonl`)
+
+**Purpose**: Raw AST node rows capturing file path, node type, qualname, spans, and parent relationships. Serves as the canonical source for GOID generation, analytics, and CFG/CallGraph builders.
+
+**Origin**: `codeintel_rev.enrich.ast_indexer.AstIndexer` (LibCST-based AST extraction). Written under `enriched/ast/ast_nodes.*`, duplicated to the doc root for convenience.
+
+**Fields**
+
+| Field          | Type    | Description |
+|----------------|---------|-------------|
+| `path`         | string  | Repo-relative file path. |
+| `node_type`    | string  | LibCST node type (`FunctionDef`, `ClassDef`, etc.). |
+| `name`         | string  | Symbol name (if applicable). |
+| `qualname`     | string  | Fully qualified name. |
+| `lineno`       | int     | Start line. |
+| `end_lineno`   | int     | End line. |
+| `col_offset`   | int     | Start column. |
+| `end_col_offset` | int   | End column. |
+| `parent_qualname` | string | Qualified name of the parent scope. |
+| `decorators`   | list    | Decorator names (if any). |
+| `docstring`    | string/null | Extracted docstring. |
+| `hash`         | string  | Content hash (used for dedupe). |
+
+## 10. AST Metrics Analytics (`hotspots.jsonl`, `typedness.jsonl`)
+
+### 10a. Hotspots (`hotspots.jsonl`)
+
+**Purpose**: Summaries of files considered “hotspots” based on change history, churn, and complexity metrics.
+
+**Origin**: `codeintel_rev.services.enrich.analytics.hotspots`. Combines git history (commits, authors) with AST metrics.
+
+**Fields**
+
+| Field             | Type   | Description |
+|-------------------|--------|-------------|
+| `rel_path`        | string | File path. |
+| `commit_count`    | int    | Commits touching the file within the configured window. |
+| `author_count`    | int    | Distinct authors in the same window. |
+| `lines_added`     | int    | Net lines added. |
+| `lines_deleted`   | int    | Net lines removed. |
+| `complexity`      | float  | Derived from AST metrics. |
+| `score`           | float  | Composite hotspot score used for ranking. |
+
+### 10b. Typedness (`typedness.jsonl`)
+
+**Purpose**: Tracks the extent of type annotation coverage per file/function. Provides signal for type migration work.
+
+**Origin**: `codeintel_rev.services.enrich.analytics.typedness` during the pipeline’s analytics stage.
+
+**Fields**
+
+| Field              | Type   | Description |
+|--------------------|--------|-------------|
+| `rel_path`         | string | File path. |
+| `function_count`   | int    | Total functions encountered. |
+| `typed_functions`  | int    | Functions with full type hints. |
+| `partial_functions`| int    | Functions with partial hints. |
+| `untyped_functions`| int    | Functions lacking hints. |
+| `typed_ratio`      | float  | `typed_functions / function_count`. |
+
+## 11. Tags Index (`tags_index.yaml`)
+
+**Purpose**: Canonical index of tagging rules applied to the codebase—mapping files/modules to semantic tags (e.g., “infra”, “ml”, “api”).
+
+**Origin**: `codeintel_rev.enrich.tags` when the pipeline runs with tagging enabled. The YAML file summarizes rule definitions and their matched targets.
+
+**Structure**
+
+```yaml
+- tag: "api"
+  description: "Public HTTP entrypoints"
+  includes:
+    - "codeintel_rev/app/routes/*"
+  excludes:
+    - "codeintel_rev/app/routes/tests/*"
+  matches:
+    - "codeintel_rev/app/routes/catalog_read.py"
+    - ...
+```
+
+Each entry lists the resolved matches (files) for downstream consumption. Tools can use this to seed filtered analyses or to understand ownership boundaries.
+
+## 12. SCIP Index (`index.scip.json`)
+
+**Purpose**: Language-agnostic symbol graph produced by `scip-python`, capturing symbol definitions, references, and documentation. Serves as the canonical interface for cross-language tooling (search, jump-to-def, etc.).
+
+**Origin**: Generated via `scip-python index ../src` and exported to JSON using `scip print --json`. Stored at `Document Output/index.scip.json`.
+
+**Structure**: JSON array of documents, each containing:
+- `relative_path`: File path.
+- `occurrences`: Symbol occurrences with ranges, roles (definition/reference), and symbol IDs.
+- `symbols`: Symbol metadata (signature, documentation, kind) keyed by SCIP symbol strings.
+
+Consumers can join SCIP symbols with GOIDs via the crosswalk’s `scip_symbol` column.
+
+## 13. Modules Registry (`modules.jsonl`)
+
+**Purpose**: Mapping of module metadata produced during enrichment. Each row summarizes module path, repo metadata, and aggregated stats used by tagging and analytics.
+
+**Origin**: `codeintel_rev.enrich.pipeline_helpers.build_module_row`, emitted under `enriched/modules/modules.jsonl`.
+
+**Fields**
+
+| Field        | Type   | Description |
+|--------------|--------|-------------|
+| `module`     | string | Dotted module name. |
+| `path`       | string | Repo-relative path. |
+| `repo`       | string | Repo identifier. |
+| `commit`     | string | Commit SHA. |
+| `language`   | string | Language tag. |
+| `tags`       | list   | Tags applied to the module. |
+| `owners`     | list   | Owners inferred from tagging rules (if enabled). |
+
+## 14. Repo Map (`repo_map.json`)
+
+**Purpose**: High-level repository metadata containing module-to-path mappings, checksum info, and overlay configuration used by downstream tooling.
+
+**Origin**: Emitted by `codeintel_rev.services.enrich.scan` after scanning files. Lives at `enriched/repo_map.json`, duplicated to the doc root.
+
+**Structure**
+
+```json
+{
+  "repo": "kgfoundry",
+  "commit": "deadbeef",
+  "modules": {
+    "codeintel_rev.app.routes.catalog_read": "codeintel_rev/app/routes/catalog_read.py",
+    ...
+  },
+  "overlays": {...},
+  "generated_at": "2024-01-01T00:00:00Z"
+}
+```
+
+## 15. CST Nodes (`cst_nodes.jsonl`)
+
+**Purpose**: Raw CST (Concrete Syntax Tree) nodes captured by the CST build pipeline. Complementary to AST nodes, preserving full syntax (including whitespace/comments) for tools that require exact source spans.
+
+**Origin**: `codeintel_rev.cst_build.cst_cli`. After emitting `cst_nodes.jsonl.gz`, the document generation script normalizes it to `cst_nodes.jsonl`.
+
+**Fields**
+
+| Field          | Type   | Description |
+|----------------|--------|-------------|
+| `path`         | string | Repo-relative file path. |
+| `node_id`      | string | Stable identifier for the CST node. |
+| `kind`         | string | Concrete syntax kind (Token, Module, FunctionDef, etc.). |
+| `span`         | object | `{ "start": [line, col], "end": [line, col] }` capturing exact offsets. |
+| `text_preview` | string | Snippet of the underlying source. |
+| `parents`      | list   | Stack of parent node kinds/IDs. |
+| `qnames`       | list   | Qualified names provided when applicable. |
+
+The CST nodes can be joined with GOID crosswalk entries via future `cst_node_id` fields, enabling precise mapping between GOIDs and concrete syntax.

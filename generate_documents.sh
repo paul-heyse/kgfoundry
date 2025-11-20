@@ -33,6 +33,33 @@ con.execute(
 PY
 }
 
+copy_mapping_artifact() {
+  local source_parquet="$1"
+  local base_name="$2"
+
+  if [ ! -f "$source_parquet" ]; then
+    echo "⚠️  Missing source parquet $source_parquet; skipping copy" >&2
+    return
+  fi
+
+  local parquet_dest="$MAPPINGS_DIR/${base_name}.parquet"
+  local json_dest="$MAPPINGS_DIR/${base_name}.jsonl"
+
+  cp "$source_parquet" "$parquet_dest"
+  convert_parquet_to_jsonl "$parquet_dest" "$json_dest"
+  cp "$json_dest" "$DOC_OUT/${base_name}.jsonl"
+}
+
+copy_if_exists() {
+  local src="$1"
+  local dest="$2"
+  if [ -f "$src" ]; then
+    cp "$src" "$dest"
+  else
+    echo "⚠️  Missing artifact $src; skipping copy" >&2
+  fi
+}
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 pushd "$REPO_ROOT" >/dev/null
 
@@ -42,6 +69,7 @@ SCIP_JSON="$SCIP_DIR/index.scip.json"
 ENRICH_OUT="$SCIP_DIR/io/ENRICHED"
 CST_OUT="$SCIP_DIR/io/CST"
 DOC_OUT="$REPO_ROOT/Document Output"
+MAPPINGS_DIR="$DOC_OUT/mappings"
 
 echo "==> Ensuring required directories/config exist..."
 mkdir -p "$REPO_ROOT/config" \
@@ -103,6 +131,7 @@ gzip -dc "$CST_OUT/cst_nodes.jsonl.gz" > "$CST_OUT/cst_nodes.jsonl"
 echo "==> Copying artifacts into \"$DOC_OUT\"..."
 rm -rf "$DOC_OUT"
 mkdir -p "$DOC_OUT"
+mkdir -p "$MAPPINGS_DIR"
 cp -R "$ENRICH_OUT" "$DOC_OUT/enriched"
 cp -R "$CST_OUT" "$DOC_OUT/cst"
 mkdir -p "$DOC_OUT/scip"
@@ -125,21 +154,19 @@ CFG_BLOCKS_PARQUET="$ENRICH_OUT/graphs/cfg_blocks.parquet"
 CFG_EDGES_PARQUET="$ENRICH_OUT/graphs/cfg_edges.parquet"
 DFG_EDGES_PARQUET="$ENRICH_OUT/graphs/dfg_edges.parquet"
 
-cp "$GOID_PARQUET" "$DOC_OUT/goids.parquet"
-cp "$GOID_CROSSWALK_PARQUET" "$DOC_OUT/goid_crosswalk.parquet"
-cp "$CALL_NODES_PARQUET" "$DOC_OUT/call_graph_nodes.parquet"
-cp "$CALL_EDGES_PARQUET" "$DOC_OUT/call_graph_edges.parquet"
-cp "$CFG_BLOCKS_PARQUET" "$DOC_OUT/cfg_blocks.parquet"
-cp "$CFG_EDGES_PARQUET" "$DOC_OUT/cfg_edges.parquet"
-cp "$DFG_EDGES_PARQUET" "$DOC_OUT/dfg_edges.parquet"
+copy_mapping_artifact "$GOID_PARQUET" "goids"
+copy_mapping_artifact "$GOID_CROSSWALK_PARQUET" "goid_crosswalk"
+copy_mapping_artifact "$CALL_NODES_PARQUET" "call_graph_nodes"
+copy_mapping_artifact "$CALL_EDGES_PARQUET" "call_graph_edges"
+copy_mapping_artifact "$CFG_BLOCKS_PARQUET" "cfg_blocks"
+copy_mapping_artifact "$CFG_EDGES_PARQUET" "cfg_edges"
+copy_mapping_artifact "$DFG_EDGES_PARQUET" "dfg_edges"
 
-convert_parquet_to_jsonl "$GOID_PARQUET" "$DOC_OUT/goids.jsonl"
-convert_parquet_to_jsonl "$GOID_CROSSWALK_PARQUET" "$DOC_OUT/goid_crosswalk.jsonl"
-convert_parquet_to_jsonl "$CALL_NODES_PARQUET" "$DOC_OUT/call_graph_nodes.jsonl"
-convert_parquet_to_jsonl "$CALL_EDGES_PARQUET" "$DOC_OUT/call_graph_edges.jsonl"
-convert_parquet_to_jsonl "$CFG_BLOCKS_PARQUET" "$DOC_OUT/cfg_blocks.jsonl"
-convert_parquet_to_jsonl "$CFG_EDGES_PARQUET" "$DOC_OUT/cfg_edges.jsonl"
-convert_parquet_to_jsonl "$DFG_EDGES_PARQUET" "$DOC_OUT/dfg_edges.jsonl"
+echo "==> Promoting key analytics artifacts to Document Output root..."
+copy_if_exists "$DOC_OUT/enriched/analytics/hotspots.jsonl" "$DOC_OUT/hotspots.jsonl"
+copy_if_exists "$DOC_OUT/enriched/analytics/typedness.jsonl" "$DOC_OUT/typedness.jsonl"
+copy_if_exists "$DOC_OUT/enriched/ast/ast_metrics.jsonl" "$DOC_OUT/ast_metrics.jsonl"
+copy_if_exists "$DOC_OUT/enriched/tags/tags_index.yaml" "$DOC_OUT/tags_index.yaml"
 
 echo "Document generation complete."
 echo "Outputs available under: $DOC_OUT"
