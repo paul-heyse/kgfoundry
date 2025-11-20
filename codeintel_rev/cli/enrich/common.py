@@ -69,6 +69,14 @@ TAGS_OPTION = typer.Option(
     dir_okay=False,
     readable=True,
 )
+OVERLAY_RULES_OPTION = typer.Option(
+    None,
+    "--overlay-rules",
+    help="Optional overlay heuristics JSON/YAML.",
+    exists=True,
+    dir_okay=False,
+    readable=True,
+)
 COVERAGE_OPTION = typer.Option(
     Path("coverage.xml"),
     "--coverage-xml",
@@ -176,6 +184,7 @@ _GLOBAL_VALUE_FLAGS = {
     "--out",
     "--pyrefly-json",
     "--tags-yaml",
+    "--overlay-rules",
     "--coverage-xml",
     "--only",
     "--max-file-bytes",
@@ -243,6 +252,7 @@ def shared_options(  # noqa: PLR0913, PLR0917
     out: Path = OUT_OPTION,
     pyrefly_json: Path | None = PYREFLY_OPTION,
     tags_yaml: Path | None = TAGS_OPTION,
+    overlay_rules: Path | None = OVERLAY_RULES_OPTION,
     coverage_xml: Path = COVERAGE_OPTION,
     only: list[str] | None = ONLY_OPTION,
     max_file_bytes: int = MAX_FILE_BYTES_OPTION,
@@ -269,6 +279,7 @@ def shared_options(  # noqa: PLR0913, PLR0917
         out=out.resolve(),
         pyrefly_json=pyrefly_json.resolve() if pyrefly_json else None,
         tags_yaml=tags_yaml.resolve() if tags_yaml else None,
+        overlay_rules=overlay_rules.resolve() if overlay_rules else None,
         coverage_xml=coverage_xml.resolve(),
         only=tuple(only or ()),
         max_file_bytes=max_file_bytes,
@@ -383,6 +394,7 @@ __all__ = [
     "OUT_OPTION",
     "OVERLAYS_CONFIG_OPTION",
     "OVERLAYS_SET_OPTION",
+    "OVERLAY_RULES_OPTION",
     "OWNERS_OPTION",
     "PYREFLY_OPTION",
     "ROOT_OPTION",

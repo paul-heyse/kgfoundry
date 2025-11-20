@@ -11,7 +11,7 @@ from codeintel_rev.app.readiness import raise_on_errors, validate_paths
 from codeintel_rev.cli.enrich import app
 from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.services.enrich.analytics import basic_stats
-from codeintel_rev.services.enrich.context import PipelineContext
+from codeintel_rev.services.enrich.context import PipelineContext, PipelineInitOptions
 from codeintel_rev.services.enrich.scan import scan_repo
 
 REPO_ROOT_OPTION = typer.Option(".", "--repo-root", help="Repository root")
@@ -33,6 +33,6 @@ def analytics(
     """Compute and print summary analytics for a scan."""
     paths = resolve_application_paths({"BASE_DIR": repo_root, "DATA_DIR": out_dir})
     raise_on_errors(validate_paths(paths))
-    ctx = PipelineContext.from_paths(paths)
+    ctx = PipelineContext.from_paths(paths, options=PipelineInitOptions())
     stats = basic_stats(ctx, scan_repo(ctx))
     typer.echo(json.dumps(stats, indent=2 if pretty else None))

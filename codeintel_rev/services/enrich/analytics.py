@@ -16,29 +16,26 @@ from codeintel_rev.enrich.scip_reader import SCIPIndex
 from codeintel_rev.export_resolver import build_module_name_map, resolve_exports
 from codeintel_rev.risk_hotspots import compute_hotspot_score
 from codeintel_rev.services.enrich.context import (
-    OVERLAY_ERROR_THRESHOLD,
-    OVERLAY_FAN_IN_THRESHOLD,
-    OVERLAY_PARAM_THRESHOLD,
     AnalyticsArtifacts,
     ConfigReferenceState,
-    LegacyPipelineContext,
+    OverlayHeuristics,
     PipelineContext,
     StageMeta,
     _stage,
 )
-from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
+from codeintel_rev.services.enrich.record_view import as_record_view
 from codeintel_rev.uses_builder import UseGraph, build_use_graph
 
 
 def compute_pipeline_analytics(
-    ctx: LegacyPipelineContext,
+    ctx: PipelineContext,
     module_rows: list[ModuleRecord],
 ) -> AnalyticsArtifacts:
     """Compute analytics artifacts for module rows.
 
     Parameters
     ----------
-    ctx : LegacyPipelineContext
+    ctx : PipelineContext
         Pipeline context containing SCIP index, config records, tagging rules,
         and package prefix.
     module_rows : list[ModuleRecord]
@@ -50,13 +47,23 @@ def compute_pipeline_analytics(
     AnalyticsArtifacts
         Aggregated graphs and tabular analytics including import graph, use
         graph, config index, coverage rows, hotspot rows, and tag index.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when SCIP index resources are unavailable.
     """
+    if ctx.scip_index is None:
+        message = "SCIP index is required to compute analytics."
+        raise RuntimeError(message)
+    ctx.require("scip_index")
     with _stage(StageMeta("analytics", {"modules": len(module_rows)})) as meta:
         import_graph, use_graph, config_index = augment_module_rows(
             module_rows,
             ctx.scip_index,
             ctx.package_prefix,
             config_records=ctx.config_records,
+            overlay_heuristics=ctx.overlay_heuristics,
         )
         coverage_rows = build_coverage_rows(module_rows)
         hotspot_rows = build_hotspot_rows(module_rows)
@@ -111,6 +118,7 @@ def augment_module_rows(
     package_prefix: str | None,
     *,
     config_records: list[dict[str, Any]] | None = None,
+    overlay_heuristics: OverlayHeuristics | None = None,
 ) -> tuple[ImportGraph, UseGraph, list[dict[str, Any]]]:
     """Attach graph/usage/export metadata and emit module artifacts.
 
@@ -128,6 +136,9 @@ def augment_module_rows(
     config_records : list[dict[str, Any]] | None, optional
         Optional list of config record dictionaries for reference tracking.
         If None, uses empty list.
+    overlay_heuristics : OverlayHeuristics | None, optional
+        Optional overlay threshold overrides used when flagging overlay-needed
+        modules. Defaults to built-in thresholds when not provided.
 
     Returns
     -------
@@ -140,43 +151,82 @@ def augment_module_rows(
     config_state = prepare_config_state(config_records)
 
     for row in module_rows:
-        exports_resolved, reexports = resolve_exports(
-            row,
-            module_name_map,
-            package_prefix=package_prefix,
-        )
-        if exports_resolved:
-            row["exports_resolved"] = exports_resolved
-        if reexports:
-            row["reexports"] = reexports
-        path = str(row.get("path"))
-        row["fan_in"] = import_graph.fan_in.get(path, 0)
-        row["fan_out"] = import_graph.fan_out.get(path, 0)
-        row["cycle_group"] = import_graph.cycle_group.get(path, -1)
-        internal_imports = sorted(import_graph.edges.get(path, set()))
-        if internal_imports:
-            row["imports_internal"] = internal_imports
-            row["imports_intra_repo"] = internal_imports
-        uses = use_graph.uses_by_file.get(path, set()) or set()
-        row["used_by_files"] = len(uses)
-        row["used_by_symbols"] = use_graph.symbol_usage.get(path, 0)
-        refs = config_refs_for_row(path, config_state.by_dir)
-        row["config_refs"] = refs
-        for ref in refs:
-            config_state.references.setdefault(ref, set()).add(path)
-        overlay_needed = should_mark_overlay(row)
-        row["overlay_needed"] = overlay_needed
-        if overlay_needed:
-            current_tags = row.get("tags")
-            tag_list = current_tags if isinstance(current_tags, list) else []
-            tag_set = {str(tag) for tag in tag_list}
-            tag_set.add("overlay-needed")
-            row["tags"] = sorted(tag_set)
+        path = row.path
+        _attach_exports(row, module_name_map, package_prefix)
+        _attach_import_graph_metrics(row, import_graph, path)
+        _attach_usage_metrics(row, use_graph, path)
+        _attach_config_refs(row, config_state, path)
+        _mark_overlay(row, overlay_heuristics)
         row["hotspot_score"] = compute_hotspot_score(row)
-    for record in config_state.records:
-        referenced = config_state.references.get(record["path"], set())
-        record["references"] = sorted(referenced)
+    _finalize_config_references(config_state)
     return import_graph, use_graph, config_state.records
+
+
+def _attach_exports(
+    row: ModuleRecord,
+    module_name_map: Mapping[str, Mapping[str, Any]],
+    package_prefix: str | None,
+) -> None:
+    exports_resolved, reexports = resolve_exports(
+        row,
+        module_name_map,
+        package_prefix=package_prefix,
+    )
+    if exports_resolved:
+        row["exports_resolved"] = exports_resolved
+    if reexports:
+        row["reexports"] = reexports
+
+
+def _attach_import_graph_metrics(
+    row: ModuleRecord,
+    import_graph: ImportGraph,
+    path: str,
+) -> None:
+    row["fan_in"] = import_graph.fan_in.get(path, 0)
+    row["fan_out"] = import_graph.fan_out.get(path, 0)
+    row["cycle_group"] = import_graph.cycle_group.get(path, -1)
+    internal_imports = sorted(import_graph.edges.get(path, ()))
+    if internal_imports:
+        row["imports_internal"] = internal_imports
+        row["imports_intra_repo"] = internal_imports
+
+
+def _attach_usage_metrics(row: ModuleRecord, use_graph: UseGraph, path: str) -> None:
+    uses = use_graph.uses_by_file.get(path, set()) or set()
+    row["used_by_files"] = len(uses)
+    row["used_by_symbols"] = use_graph.symbol_usage.get(path, 0)
+
+
+def _attach_config_refs(
+    row: ModuleRecord,
+    config_state: ConfigReferenceState,
+    path: str,
+) -> None:
+    refs = config_refs_for_row(path, config_state.by_dir)
+    row["config_refs"] = refs
+    for ref in refs:
+        config_state.references.setdefault(ref, set()).add(path)
+
+
+def _mark_overlay(row: ModuleRecord, heuristics: OverlayHeuristics | None) -> None:
+    overlay_needed = should_mark_overlay(row, heuristics)
+    row["overlay_needed"] = overlay_needed
+    if not overlay_needed:
+        return
+    tags = list(row.tags)
+    tag_set = {str(tag) for tag in tags}
+    tag_set.add("overlay-needed")
+    row["tags"] = sorted(tag_set)
+
+
+def _finalize_config_references(config_state: ConfigReferenceState) -> None:
+    for record in config_state.records:
+        path = record.get("path")
+        if not isinstance(path, str):
+            continue
+        referenced = config_state.references.get(path, set())
+        record["references"] = sorted(referenced)
 
 
 def build_tag_index(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
@@ -276,7 +326,7 @@ def build_hotspot_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]
 
 def basic_stats(
     ctx: PipelineContext,
-    records: list[SimpleModuleRecord],
+    records: list[ModuleRecord],
 ) -> Mapping[str, Any]:
     """Return simple analytics for the refactored CLI commands.
 
@@ -284,7 +334,7 @@ def basic_stats(
     ----------
     ctx : PipelineContext
         Pipeline context containing logger for analytics logging.
-    records : list[SimpleModuleRecord]
+    records : list[ModuleRecord]
         List of module records to compute statistics for.
 
     Returns
@@ -293,9 +343,10 @@ def basic_stats(
         Summary containing ``files`` (file count), ``loc_total`` (total lines
         of code), and ``tags`` (tag frequency dictionary).
     """
-    file_count = len(records)
-    loc_total = sum(record.loc for record in records)
-    tags = Counter(tag for record in records for tag in record.tags)
+    views = [as_record_view(record) for record in records]
+    file_count = len(views)
+    loc_total = sum(view.loc for view in views)
+    tags = Counter(tag for view in views for tag in view.tags)
     ctx.logger.info(
         "Analytics summary: files=%d loc=%d distinct_tags=%d",
         file_count,
@@ -407,7 +458,10 @@ def dir_key_from_path(path: Path) -> str:
     return rendered.replace("\\", "/")
 
 
-def should_mark_overlay(row: Mapping[str, Any]) -> bool:
+def should_mark_overlay(
+    row: Mapping[str, Any],
+    heuristics: OverlayHeuristics | None = None,
+) -> bool:
     """Return True if row should be marked overlay-needed.
 
     Parameters
@@ -415,15 +469,18 @@ def should_mark_overlay(row: Mapping[str, Any]) -> bool:
     row : Mapping[str, Any]
         Module record dictionary containing type error counts, fan-in metrics,
         and parameter counts.
+    heuristics : OverlayHeuristics | None
+        Optional threshold overrides for overlay heuristics. Defaults to module
+        constants when not provided.
 
     Returns
     -------
     bool
         ``True`` when overlay heuristics deem the module a candidate based on
         type error count, fan-in, or parameter thresholds (as defined by
-        OVERLAY_ERROR_THRESHOLD, OVERLAY_FAN_IN_THRESHOLD, and
-        OVERLAY_PARAM_THRESHOLD constants).
+        the provided heuristics or default threshold constants).
     """
+    thresholds = heuristics or OverlayHeuristics()
     type_errors = int(row.get("type_errors") or row.get("type_error_count") or 0)
     if type_errors == 0:
         return False
@@ -442,14 +499,16 @@ def should_mark_overlay(row: Mapping[str, Any]) -> bool:
         bool(exports) or bool(reexports) or (isinstance(tags, list) and "public-api" in tags)
     )
     needs_annotations = (
-        (params_ratio < OVERLAY_PARAM_THRESHOLD)
-        or (returns_ratio < OVERLAY_PARAM_THRESHOLD)
+        (params_ratio < thresholds.param_threshold)
+        or (returns_ratio < thresholds.param_threshold)
         or (untyped_defs > 0)
     )
     return bool(
         is_public
         and needs_annotations
-        and (fan_in >= OVERLAY_FAN_IN_THRESHOLD or type_errors >= OVERLAY_ERROR_THRESHOLD)
+        and (
+            fan_in >= thresholds.fan_in_threshold or type_errors >= thresholds.error_threshold
+        )
     )
 
 

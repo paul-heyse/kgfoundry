@@ -131,42 +131,12 @@ uv run python -m codeintel_rev.cli.enrich_analytics \
   "${ONLY_ARGS[@]}" \
   hotspots
 
-echo "==> Building AST artifacts from modules.jsonl..."
-uv run python - <<PY
-import json
-from pathlib import Path
-
-from codeintel_rev.enrich.ast_indexer import write_ast_parquet
-from codeintel_rev.services.enrich.io import collect_ast_artifacts, write_ast_jsonl
-
-repo_root = Path("$REPO_ROOT")
-modules_path = Path("$ENRICH_OUT") / "modules" / "modules.jsonl"
-if not modules_path.is_file():
-    raise SystemExit(f"modules.jsonl not found at {modules_path}")
-
-files = []
-with modules_path.open(encoding="utf-8") as handle:
-    for line in handle:
-        if not line.strip():
-            continue
-        data = json.loads(line)
-        rel = data.get("path")
-        if not rel:
-            continue
-        path = (repo_root / rel).resolve()
-        if ".venv" in path.parts:
-            continue
-        if not path.is_file():
-            continue
-        files.append(path)
-
-node_rows, metric_rows = collect_ast_artifacts(repo_root, files)
-ast_dir = Path("$ENRICH_OUT") / "ast"
-ast_dir.mkdir(parents=True, exist_ok=True)
-write_ast_jsonl(ast_dir / "ast_nodes.jsonl", node_rows)
-write_ast_jsonl(ast_dir / "ast_metrics.jsonl", metric_rows)
-write_ast_parquet(node_rows, metric_rows, out_dir=ast_dir)
-PY
+echo "==> Building AST artifacts..."
+uv run python -m codeintel_rev.cli.enrich ast \
+  --repo-root "$REPO_ROOT" \
+  --out-dir "$ENRICH_OUT" \
+  "${INCLUDE_ARGS[@]}" \
+  "${EXCLUDE_ARGS[@]}"
 
 echo "==> Ensuring tags_index.yaml is present..."
 python - <<PY
@@ -203,18 +173,26 @@ echo "==> Building GOID / call graph / CFG / DFG artifacts..."
 uv run python -m codeintel_rev.cli.enrich goids \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
+  "${INCLUDE_ARGS[@]}" \
+  "${EXCLUDE_ARGS[@]}" \
   --no-ingest
 uv run python -m codeintel_rev.cli.enrich callgraph \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
+  "${INCLUDE_ARGS[@]}" \
+  "${EXCLUDE_ARGS[@]}" \
   --no-ingest
 uv run python -m codeintel_rev.cli.enrich cfg \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
+  "${INCLUDE_ARGS[@]}" \
+  "${EXCLUDE_ARGS[@]}" \
   --no-ingest
 uv run python -m codeintel_rev.cli.enrich dfg \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
+  "${INCLUDE_ARGS[@]}" \
+  "${EXCLUDE_ARGS[@]}" \
   --no-ingest
 
 echo "==> Building coverage and test analytics (best-effort)..."
@@ -293,23 +271,35 @@ copy_if_exists "$ENRICH_OUT/analytics/risk/goid_risk_factors.parquet" "$DOC_OUT/
 convert_parquet_to_jsonl "$DOC_OUT/goid_risk_factors.parquet" "$DOC_OUT/goid_risk_factors.jsonl"
 
 echo "==> Exporting GOID / Call Graph / CFG / DFG datasets..."
-GOID_PARQUET="$ENRICH_OUT/goid/goids.parquet"
-GOID_CROSSWALK_PARQUET="$ENRICH_OUT/goid/goid_xwalk.parquet"
-CALL_NODES_PARQUET="$ENRICH_OUT/graphs/call_nodes.parquet"
-CALL_EDGES_PARQUET="$ENRICH_OUT/graphs/call_edges.parquet"
-CFG_BLOCKS_PARQUET="$ENRICH_OUT/graphs/cfg_blocks.parquet"
-CFG_EDGES_PARQUET="$ENRICH_OUT/graphs/cfg_edges.parquet"
-DFG_EDGES_PARQUET="$ENRICH_OUT/graphs/dfg_edges.parquet"
-IMPORT_GRAPH_EDGES_PARQUET="$ENRICH_OUT/graphs/import_graph_edges.parquet"
-SYMBOL_USE_EDGES_PARQUET="$ENRICH_OUT/graphs/symbol_use_edges.parquet"
+ARTIFACT_ROOT="$ENRICH_OUT"
+GOID_PARQUET="$ARTIFACT_ROOT/goid/goids.parquet"
+GOID_CROSSWALK_PARQUET="$ARTIFACT_ROOT/goid/goid_xwalk.parquet"
+CALL_NODES_PARQUET="$ARTIFACT_ROOT/graphs/call_nodes.parquet"
+CALL_EDGES_PARQUET="$ARTIFACT_ROOT/graphs/call_edges.parquet"
+CFG_BLOCKS_PARQUET="$ARTIFACT_ROOT/graphs/cfg_blocks.parquet"
+CFG_EDGES_PARQUET="$ARTIFACT_ROOT/graphs/cfg_edges.parquet"
+DFG_EDGES_PARQUET="$ARTIFACT_ROOT/graphs/dfg_edges.parquet"
+IMPORT_GRAPH_EDGES_PARQUET="$ARTIFACT_ROOT/graphs/import_graph_edges.parquet"
+SYMBOL_USE_EDGES_PARQUET="$ARTIFACT_ROOT/graphs/symbol_use_edges.parquet"
 
-# Ensure new graph outputs exist; fall back to legacy names if needed.
-if [ ! -f "$IMPORT_GRAPH_EDGES_PARQUET" ] && [ -f "$ENRICH_OUT/graphs/imports.parquet" ]; then
-  cp "$ENRICH_OUT/graphs/imports.parquet" "$IMPORT_GRAPH_EDGES_PARQUET"
+# Promote legacy aliases for import/use graphs when needed.
+if [ ! -f "$IMPORT_GRAPH_EDGES_PARQUET" ] && [ -f "$ARTIFACT_ROOT/graphs/imports.parquet" ]; then
+  cp "$ARTIFACT_ROOT/graphs/imports.parquet" "$IMPORT_GRAPH_EDGES_PARQUET"
 fi
-if [ ! -f "$SYMBOL_USE_EDGES_PARQUET" ] && [ -f "$ENRICH_OUT/graphs/uses.parquet" ]; then
-  cp "$ENRICH_OUT/graphs/uses.parquet" "$SYMBOL_USE_EDGES_PARQUET"
+if [ ! -f "$SYMBOL_USE_EDGES_PARQUET" ] && [ -f "$ARTIFACT_ROOT/graphs/uses.parquet" ]; then
+  cp "$ARTIFACT_ROOT/graphs/uses.parquet" "$SYMBOL_USE_EDGES_PARQUET"
 fi
+
+echo "==> Normalizing graph artifacts (aliases + JSONL sidecars)..."
+ARTIFACT_ROOT="$ENRICH_OUT" uv run python - <<'PY'
+from pathlib import Path
+import os
+
+from codeintel_rev.services.enrich.artifact_writer import process_artifact_dir
+
+root = Path(os.environ["ARTIFACT_ROOT"])
+process_artifact_dir(root)
+PY
 
 # Generate missing graph/analytics artifacts via targeted CLI commands.
 if [ ! -f "$IMPORT_GRAPH_EDGES_PARQUET" ] || [ ! -f "$SYMBOL_USE_EDGES_PARQUET" ]; then

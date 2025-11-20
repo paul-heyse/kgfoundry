@@ -4,14 +4,26 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from fnmatch import fnmatch
+from dataclasses import dataclass
 from pathlib import Path
 
 from codeintel_rev.services.enrich.context import PipelineContext
-from codeintel_rev.services.enrich.python_files import iter_python_files
+from codeintel_rev.services.enrich.python_files import (
+    DEFAULT_EXCLUDE_GLOBS,
+    PythonFileDiscovery,
+)
 from kgfoundry_common.subprocess_utils import SubprocessError, run_subprocess
 
-DEFAULT_EXCLUDES: tuple[str, ...] = ("**/.venv/**", "**/build/**", "**/dist/**")
+DEFAULT_EXCLUDES: tuple[str, ...] = DEFAULT_EXCLUDE_GLOBS
+
+
+@dataclass(frozen=True, slots=True)
+class FileDiscoverySettings:
+    """Inclusion/exclusion filters shared by graph artifact builders."""
+
+    include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = DEFAULT_EXCLUDES
+    max_file_bytes: int | None = None
 
 
 def detect_commit(repo_root: Path) -> str:
@@ -40,6 +52,8 @@ def detect_commit(repo_root: Path) -> str:
 def collect_python_files(
     ctx: PipelineContext,
     include: Sequence[str] | None = None,
+    exclude: Sequence[str] | None = None,
+    max_file_bytes: int | None = None,
 ) -> list[Path]:
     """Collect Python files subject to the pipeline's include/exclude filters.
 
@@ -49,6 +63,10 @@ def collect_python_files(
         Pipeline context providing repo root information.
     include : Sequence[str] | None, optional
         Optional include glob patterns relative to the repo root.
+    exclude : Sequence[str] | None, optional
+        Optional exclude globs overriding the default exclusion list.
+    max_file_bytes : int | None, optional
+        Optional size threshold; files larger than this are skipped.
 
     Returns
     -------
@@ -56,15 +74,15 @@ def collect_python_files(
         Absolute paths to Python files that should be analyzed.
     """
     include_globs = tuple(include or ())
+    exclude_globs = tuple(exclude or DEFAULT_EXCLUDES)
     repo_root = ctx.paths.repo_root
-    excludes = DEFAULT_EXCLUDES
-    files: list[Path] = []
-    for file_path in iter_python_files(repo_root, include_globs):
-        rel = file_path.relative_to(repo_root).as_posix()
-        if excludes and any(fnmatch(rel, pattern) for pattern in excludes):
-            continue
-        files.append(file_path)
-    return files
+    discovery = PythonFileDiscovery(
+        root=repo_root,
+        include=include_globs,
+        exclude=exclude_globs,
+        max_file_bytes=max_file_bytes,
+    )
+    return discovery.discover()
 
 
 __all__ = ["DEFAULT_EXCLUDES", "collect_python_files", "detect_commit"]

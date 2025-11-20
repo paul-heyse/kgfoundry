@@ -8,7 +8,7 @@ from pathlib import Path
 from codeintel_rev.app.readiness import raise_on_errors, validate_paths
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogOptions
-from codeintel_rev.services.enrich.context import PipelineContext
+from codeintel_rev.services.enrich.context import PipelineContext, PipelineInitOptions
 from codeintel_rev.services.enrich.graph_support import (
     DEFAULT_EXCLUDES,
     collect_python_files,
@@ -40,7 +40,8 @@ def resolve_paths(repo_root: Path, out_dir: Path) -> tuple[ResolvedPaths, Pipeli
     """
     paths = resolve_application_paths({"BASE_DIR": repo_root, "DATA_DIR": out_dir})
     raise_on_errors(validate_paths(paths))
-    ctx = PipelineContext.from_paths(paths)
+    options = PipelineInitOptions(commit=detect_commit(paths.repo_root))
+    ctx = PipelineContext.from_paths(paths, options=options)
     return paths, ctx
 
 

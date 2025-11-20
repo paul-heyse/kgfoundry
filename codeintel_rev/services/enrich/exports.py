@@ -15,6 +15,7 @@ import libcst as cst
 
 from codeintel_rev.enrich.ast_indexer import write_ast_parquet
 from codeintel_rev.enrich.graph_builder import write_import_graph
+from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.output_writers import (
     write_json,
     write_jsonl,
@@ -26,6 +27,12 @@ from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
 from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
 from codeintel_rev.ids.goid import RepoSnapshot
 from codeintel_rev.services.enrich.analytics import prepare_config_state
+from codeintel_rev.services.enrich.artifact_schemas import (
+    ConfigRecordModel,
+    CoverageRowModel,
+    HotspotRowModel,
+    TagIndexModel,
+)
 from codeintel_rev.services.enrich.config_values import build_config_value_rows
 from codeintel_rev.services.enrich.context import (
     PipelineContext,
@@ -60,7 +67,7 @@ from codeintel_rev.services.enrich.io import (
     write_jsonl as simple_write_jsonl,
 )
 from codeintel_rev.services.enrich.models import ExportResult
-from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
+from codeintel_rev.services.enrich.record_view import as_record_view
 from codeintel_rev.services.enrich.static_diagnostics import (
     STATIC_DIAGNOSTICS_SCHEMA,
     build_static_diagnostics_rows,
@@ -117,6 +124,7 @@ def write_exports_outputs(result: PipelineResult, out: Path) -> None:
         write_modules_json(out, result.module_rows)
         write_markdown_modules(out, result.module_rows)
         write_repo_map(out, result)
+        TagIndexModel.model_validate(result.tag_index)
         write_tag_index(out, result.tag_index)
         meta["tag_groups"] = len(result.tag_index)
 
@@ -465,7 +473,8 @@ def write_coverage_output(result: PipelineResult, out: Path) -> None:
     out : Path
         Output directory where coverage analytics parquet file will be written.
     """
-    write_tabular_records(out / "analytics" / "coverage.parquet", result.coverage_rows)
+    rows = [CoverageRowModel.model_validate(row).model_dump() for row in result.coverage_rows]
+    write_tabular_records(out / "analytics" / "coverage.parquet", rows)
 
 
 def write_static_diagnostics_output(result: PipelineResult, out: Path) -> None:
@@ -500,10 +509,11 @@ def write_config_output(result: PipelineResult, out: Path) -> None:
     """
     analytics_dir = out / "analytics"
     analytics_dir.mkdir(parents=True, exist_ok=True)
-    write_json(analytics_dir / "config_index.json", result.config_index)
-    if not result.config_index:
+    config_rows = [ConfigRecordModel.model_validate(row).model_dump() for row in result.config_index]
+    write_json(analytics_dir / "config_index.json", config_rows)
+    if not config_rows:
         return
-    state = prepare_config_state(result.config_index)
+    state = prepare_config_state(config_rows)
     rows = build_config_value_rows(state, result.module_rows)
     analytics_path = analytics_dir / "config_values.parquet"
     write_parquet(analytics_path, rows)
@@ -520,7 +530,8 @@ def write_hotspot_output(result: PipelineResult, out: Path) -> None:
     out : Path
         Output directory where hotspot analytics parquet file will be written.
     """
-    write_tabular_records(out / "analytics" / "hotspots.parquet", result.hotspot_rows)
+    rows = [HotspotRowModel.model_validate(row).model_dump() for row in result.hotspot_rows]
+    write_tabular_records(out / "analytics" / "hotspots.parquet", rows)
 
 
 def write_ast_outputs(result: PipelineResult, out: Path, *, emit_ast: bool) -> None:
@@ -579,12 +590,12 @@ def write_repo_map(out: Path, result: PipelineResult) -> None:
     )
 
 
-def record_to_json(record: SimpleModuleRecord) -> Mapping[str, Any]:
+def record_to_json(record: ModuleRecord) -> Mapping[str, Any]:
     """Convert a service-level ModuleRecord to a JSON-compatible mapping.
 
     Parameters
     ----------
-    record : SimpleModuleRecord
+    record : ModuleRecord
         Module record to convert to JSON-compatible format.
 
     Returns
@@ -593,24 +604,27 @@ def record_to_json(record: SimpleModuleRecord) -> Mapping[str, Any]:
         JSON-serializable representation of the record containing path, module,
         language, loc, tags, and meta fields.
     """
+    path = str(record.get("path", ""))
+    meta = record.get("meta") or {}
+    complexity = record.get("complexity") or {}
     return {
-        "path": str(record.path),
-        "module": record.module,
-        "language": record.language,
-        "loc": record.loc,
-        "tags": list(record.tags),
-        "meta": dict(record.meta),
+        "path": path,
+        "module": record.get("module_name") or record.get("module") or path,
+        "language": meta.get("language", "python"),
+        "loc": int(record.get("loc", complexity.get("loc", 0))),
+        "tags": list(record.get("tags") or []),
+        "meta": dict(meta),
     }
 
 
-def emit_modules_jsonl(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
+def emit_modules_jsonl(ctx: PipelineContext, records: Iterable[ModuleRecord]) -> Path:
     """Write modules.jsonl for the refactored CLI.
 
     Parameters
     ----------
     ctx : PipelineContext
         Pipeline context containing output directory path.
-    records : Iterable[SimpleModuleRecord]
+    records : Iterable[ModuleRecord]
         Iterable of module records to write to JSONL format.
 
     Returns
@@ -622,17 +636,20 @@ def emit_modules_jsonl(ctx: PipelineContext, records: Iterable[SimpleModuleRecor
     target.parent.mkdir(parents=True, exist_ok=True)
     count = simple_write_jsonl(target, (record_to_json(r) for r in records))
     ctx.logger.info("Wrote %d module rows to %s", count, target)
+    alias = ctx.paths.data_dir / "modules.jsonl"
+    if not alias.exists():
+        alias.write_bytes(target.read_bytes())
     return target
 
 
-def emit_repo_map(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
+def emit_repo_map(ctx: PipelineContext, records: Iterable[ModuleRecord]) -> Path:
     """Emit a lightweight repo_map.json file.
 
     Parameters
     ----------
     ctx : PipelineContext
         Pipeline context containing repository paths and output directory.
-    records : Iterable[SimpleModuleRecord]
+    records : Iterable[ModuleRecord]
         Iterable of module records used to compute summary statistics.
 
     Returns
@@ -642,22 +659,23 @@ def emit_repo_map(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -
     """
     by_pkg: dict[str, list[str]] = {}
     for record in records:
-        pkg = record.module.split(".")[0] if "." in record.module else record.module
-        by_pkg.setdefault(pkg, []).append(record.module)
+        view = as_record_view(record)
+        pkg = view.module.split(".")[0] if "." in view.module else view.module
+        by_pkg.setdefault(pkg, []).append(view.module)
     target = ctx.paths.data_dir / "repo_map.json"
     atomic_write_text(target, json.dumps(by_pkg, indent=2))
     ctx.logger.info("Wrote repo map to %s", target)
     return target
 
 
-def emit_tag_index(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
+def emit_tag_index(ctx: PipelineContext, records: Iterable[ModuleRecord]) -> Path:
     """Emit a tag->count mapping for module tags.
 
     Parameters
     ----------
     ctx : PipelineContext
         Pipeline context containing output directory path.
-    records : Iterable[SimpleModuleRecord]
+    records : Iterable[ModuleRecord]
         Iterable of module records containing tags to index.
 
     Returns
@@ -667,7 +685,8 @@ def emit_tag_index(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) 
     """
     tag_counts: dict[str, int] = {}
     for record in records:
-        for tag in record.tags:
+        view = as_record_view(record)
+        for tag in view.tags:
             tag_counts[tag] = tag_counts.get(tag, 0) + 1
     target = ctx.paths.data_dir / "tag_index.json"
     atomic_write_text(target, json.dumps(tag_counts, indent=2))
@@ -675,14 +694,14 @@ def emit_tag_index(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) 
     return target
 
 
-def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[SimpleModuleRecord]) -> Path:
+def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[ModuleRecord]) -> Path:
     """Emit Markdown sheets summarizing each module.
 
     Parameters
     ----------
     ctx : PipelineContext
         Pipeline context containing output directory path.
-    records : Iterable[SimpleModuleRecord]
+    records : Iterable[ModuleRecord]
         Iterable of module records to write as Markdown files.
 
     Returns
@@ -693,26 +712,27 @@ def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[SimpleModuleRec
     md_dir = ctx.paths.data_dir / "sheets"
     md_dir.mkdir(parents=True, exist_ok=True)
     for record in records:
-        slug = record.module.replace(".", "-")
+        view = as_record_view(record)
+        slug = view.module.replace(".", "-")
         body = (
-            f"# {record.module}\n\n"
-            f"- Path: `{record.path}`\n"
-            f"- LOC: {record.loc}\n"
-            f"- Tags: {', '.join(record.tags) or '—'}\n"
+            f"# {view.module}\n\n"
+            f"- Path: `{view.path}`\n"
+            f"- LOC: {view.loc}\n"
+            f"- Tags: {', '.join(view.tags) or '—'}\n"
         )
         atomic_write_text(md_dir / f"{slug}.md", body)
     ctx.logger.info("Wrote markdown sheets to %s", md_dir)
     return md_dir
 
 
-def run_all_exports(ctx: PipelineContext, records: list[SimpleModuleRecord]) -> ExportResult:
+def run_all_exports(ctx: PipelineContext, records: list[ModuleRecord]) -> ExportResult:
     """Emit all enrich artifacts for the simplified CLI.
 
     Parameters
     ----------
     ctx : PipelineContext
         Pipeline context containing output directory and configuration.
-    records : list[SimpleModuleRecord]
+    records : list[ModuleRecord]
         List of module records to export in various formats.
 
     Returns

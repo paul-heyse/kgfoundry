@@ -5,6 +5,7 @@ from __future__ import annotations
 # Import subcommands for registration side-effects.
 from codeintel_rev.cli.enrich import analytics as _analytics  # noqa: F401
 from codeintel_rev.cli.enrich import app
+from codeintel_rev.cli.enrich import ast as _ast  # noqa: F401
 from codeintel_rev.cli.enrich import audit as _audit  # noqa: F401
 from codeintel_rev.cli.enrich import callgraph as _callgraph  # noqa: F401
 from codeintel_rev.cli.enrich import cfg as _cfg  # noqa: F401

@@ -11,6 +11,7 @@ from typing import Any
 
 import typer
 
+from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.scip_reader import SCIPIndex
 from codeintel_rev.enrich.stubs_overlay import (
     OverlayInputs,
@@ -24,7 +25,7 @@ from codeintel_rev.services.enrich.context import (
     PipelineContext,
     PipelineOptions,
 )
-from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
+from codeintel_rev.services.enrich.record_view import as_record_view
 from codeintel_rev.typedness import collect_type_signals
 
 try:  # pragma: no cover - optional dependency
@@ -506,23 +507,23 @@ def _load_overlay_file(path: Path) -> dict[str, dict[str, Any]]:
 
 def apply_overlays(
     ctx: PipelineContext,
-    records: list[SimpleModuleRecord],
+    records: list[ModuleRecord],
     overlay_files: Iterable[Path],
-) -> list[SimpleModuleRecord]:
+) -> list[ModuleRecord]:
     """Merge overlay metadata into scanned records.
 
     Parameters
     ----------
     ctx : PipelineContext
         Pipeline context for logging and configuration.
-    records : list[SimpleModuleRecord]
+    records : list[ModuleRecord]
         Module records to merge overlay metadata into.
     overlay_files : Iterable[Path]
         Paths to overlay files (JSON or JSONL format).
 
     Returns
     -------
-    list[SimpleModuleRecord]
+    list[ModuleRecord]
         Updated module records containing overlay metadata.
     """
     merged_overlays: dict[str, dict[str, Any]] = {}
@@ -535,21 +536,14 @@ def apply_overlays(
             continue
         for module, payload in data.items():
             merged_overlays.setdefault(module, {}).update(payload)
-    enriched: list[SimpleModuleRecord] = []
+    enriched: list[ModuleRecord] = []
     for record in records:
-        meta = dict(record.meta)
-        if record.module in merged_overlays:
-            meta.update(merged_overlays[record.module])
-        enriched.append(
-            SimpleModuleRecord(
-                path=record.path,
-                module=record.module,
-                language=record.language,
-                loc=record.loc,
-                tags=record.tags,
-                meta=meta,
-            )
-        )
+        view = as_record_view(record)
+        meta = dict(record.get("meta") or {})
+        if view.module in merged_overlays:
+            meta.update(merged_overlays[view.module])
+        record["meta"] = meta
+        enriched.append(record)
     ctx.logger.info("Applied overlays from %d file(s)", len(files))
     return enriched
 

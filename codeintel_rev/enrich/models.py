@@ -274,6 +274,22 @@ class ModuleRecord(MutableMapping[str, Any]):
         """
         return len(self._FIELD_ORDER) + len(self._extra)
 
+    @property
+    def module(self) -> str:
+        """Return a module-like identifier compatible with legacy call sites."""
+        return self.module_name or self.repo_path or self.path
+
+    @property
+    def loc(self) -> int:
+        """Return line count derived from stored complexity metrics."""
+        return int(self.complexity.get("loc", 0))
+
+    @property
+    def meta(self) -> dict[str, object]:
+        """Return normalized meta dictionary if present."""
+        raw = self._extra.get("meta", {})
+        return dict(raw) if isinstance(raw, dict) else {}
+
     def add_error(self, error: StageError | str) -> None:
         """Append a structured error token and flag ``parse_ok`` as False."""
         token = error.token() if isinstance(error, StageError) else str(error)

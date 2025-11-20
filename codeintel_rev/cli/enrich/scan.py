@@ -9,7 +9,7 @@ import typer
 from codeintel_rev.app.readiness import raise_on_errors, validate_paths
 from codeintel_rev.cli.enrich import app
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
-from codeintel_rev.services.enrich.context import PipelineContext
+from codeintel_rev.services.enrich.context import PipelineContext, PipelineInitOptions
 from codeintel_rev.services.enrich.scan import scan_repo
 
 REPO_ROOT_OPTION = typer.Option(".", "--repo-root", help="Repository root")
@@ -58,7 +58,7 @@ def scan(
     paths = resolve_application_paths({"BASE_DIR": repo_root, "DATA_DIR": out_dir})
     raise_on_errors(validate_paths(paths))
     _prepare_outputs(paths)
-    ctx = PipelineContext.from_paths(paths)
+    ctx = PipelineContext.from_paths(paths, options=PipelineInitOptions())
     include_globs = tuple(include or ())
     exclude_globs = tuple(exclude or EXCLUDE_DEFAULT)
     records = scan_repo(

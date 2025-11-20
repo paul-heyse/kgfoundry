@@ -8,60 +8,13 @@ from pathlib import Path
 from codeintel_rev.cli.enrich.__main__ import app  # noqa: PLC2701
 from typer.testing import CliRunner
 
-
-def _prepare_repo(tmp_path: Path) -> tuple[Path, Path]:
-    """Prepare test repository with required directories and sample code.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory for test repository.
-
-    Returns
-    -------
-    tuple[Path, Path]
-        Tuple of (repo_path, out_dir_path).
-
-    Notes
-    -----
-    Time O(1); creates directory structure and writes sample files.
-    No I/O beyond filesystem operations. Thread-safe for concurrent test execution.
-    """
-    repo = tmp_path / "repo"
-    repo.mkdir(parents=True, exist_ok=True)
-    for required in (
-        "config",
-        "logs",
-        ".cache",
-        ".tmp",
-        "plugins",
-        "data",
-        "data/faiss",
-        "data/vectors",
-    ):
-        (repo / required).mkdir(parents=True, exist_ok=True)
-    (repo / "config" / "app.yml").write_text("", encoding="utf-8")
-    package = repo / "pkg"
-    package.mkdir(parents=True, exist_ok=True)
-    (package / "__init__.py").write_text("", encoding="utf-8")
-    (package / "mod.py").write_text(
-        "def callee() -> int:\n"
-        "    value = 1\n"
-        "    return value\n\n"
-        "def caller() -> int:\n"
-        "    total = callee()\n"
-        "    return total\n",
-        encoding="utf-8",
-    )
-    out_dir = repo / ".out"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    return repo, out_dir
+from tests.cli.enrich._graph_fixture import prepare_graph_repo
 
 
 def test_goids_callgraph_cfg_cli_commands(tmp_path: Path) -> None:
     """CLI graph commands should emit artifacts and update DuckDB when requested."""
     runner = CliRunner()
-    repo, out_dir = _prepare_repo(tmp_path)
+    repo, out_dir = prepare_graph_repo(tmp_path)
 
     result_goids = runner.invoke(
         app,

@@ -18,14 +18,15 @@ from codeintel_rev.coverage_ingest import collect_coverage
 from codeintel_rev.enrich.errors import TaggingError, TypeSignalError
 from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.pathnorm import detect_repo_root
-from codeintel_rev.enrich.pipeline_helpers import build_module_row
+from codeintel_rev.enrich.pipeline_helpers import build_module_row, stable_id_for_path
 from codeintel_rev.enrich.scip_reader import SCIPIndex
 from codeintel_rev.enrich.tagging import load_rules
 from codeintel_rev.enrich.validators import ModuleRecordModel
 from codeintel_rev.services.enrich.analytics import compute_pipeline_analytics
+from codeintel_rev.services.enrich.artifact_writer import process_artifact_dir
 from codeintel_rev.services.enrich.context import (
-    LegacyPipelineContext,
     PipelineContext,
+    PipelineInitOptions,
     PipelineOptions,
     PipelineResult,
     PreparedPipeline,
@@ -39,7 +40,7 @@ from codeintel_rev.services.enrich.graph_steps import (
     build_cfg_artifacts,
     build_goid_artifacts,
 )
-from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
+from codeintel_rev.services.enrich.graph_support import FileDiscoverySettings, detect_commit
 from codeintel_rev.services.enrich.python_files import (
     iter_python_files,
 )
@@ -238,22 +239,26 @@ def prepare_pipeline(pipeline: PipelineOptions) -> PreparedPipeline:
     coverage_lookup = collect_coverage_map(root_resolved, pipeline.coverage_xml)
     config_records = index_config_records(root_resolved)
     tagging_rules = load_tagging_rules(pipeline.tags_yaml)
-    ctx = LegacyPipelineContext(
+    paths = resolve_application_paths({"BASE_DIR": repo_root, "DATA_DIR": pipeline.out})
+    options = PipelineInitOptions(
         root=root_resolved,
-        repo_root=repo_root,
+        commit=detect_commit(paths.repo_root),
         scip_index=scip_index,
         scip_ctx=scip_ctx,
         type_signals=type_signal_lookup,
         coverage_map=coverage_lookup,
         config_records=config_records,
         tagging_rules=tagging_rules,
+        tagging_rules_path=pipeline.tags_yaml,
+        overlay_rules_path=pipeline.overlay_rules,
         package_prefix=root_resolved.name or None,
     )
+    ctx = PipelineContext.from_paths(paths, options=options)
     return PreparedPipeline(context=ctx, files=files)
 
 
 def scan_modules(
-    ctx: LegacyPipelineContext,
+    ctx: PipelineContext,
     pipeline: PipelineOptions,
     files: Sequence[Path],
 ) -> tuple[list[ModuleRecord], list[tuple[str, str]]]:
@@ -261,7 +266,7 @@ def scan_modules(
 
     Parameters
     ----------
-    ctx : LegacyPipelineContext
+    ctx : PipelineContext
         Pipeline context containing SCIP index, type signals, coverage data,
         and tagging rules.
     pipeline : PipelineOptions
@@ -273,7 +278,15 @@ def scan_modules(
     -------
     tuple[list[ModuleRecord], list[tuple[str, str]]]
         Materialized module rows and symbol edge tuples.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when SCIP context resources are unavailable.
     """
+    if ctx.scip_ctx is None:
+        message = "SCIP context is required for scanning modules."
+        raise RuntimeError(message)
     scan_inputs = ScanInputs(
         scip_ctx=ctx.scip_ctx,
         type_signals=ctx.type_signals,
@@ -289,10 +302,6 @@ def scan_modules(
         for fp in files:
             row_dict, edges = build_module_row(fp, ctx.root, scan_inputs)
             ModuleRecordModel.model_validate(row_dict)
-            if not row_dict.get("meta"):
-                LOGGER.warning(
-                    "Module record missing meta payload", extra={"path": row_dict.get("path")}
-                )
             module_rows.append(row_dict)
             symbol_edges.extend(edges)
         meta["modules"] = len(module_rows)
@@ -334,14 +343,14 @@ def run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
     )
 
 
-def _run_requested_graph_steps(ctx: LegacyPipelineContext, pipeline: PipelineOptions) -> None:
+def _run_requested_graph_steps(ctx: PipelineContext, pipeline: PipelineOptions) -> None:
     """Execute GOID/callgraph/CFG/DFG steps when requested via pipeline options."""
     if not (
         pipeline.build_goids or pipeline.build_callgraph or pipeline.build_cfg or pipeline.build_dfg
     ):
         return
     include_globs = tuple(pipeline.only or ())
-    include_arg: tuple[str, ...] | None = include_globs if include_globs else None
+    filters = FileDiscoverySettings(include=include_globs)
     pipeline_ctx, resolved_paths = _build_graph_context(ctx.repo_root, pipeline.out)
     try:
         if pipeline.build_goids:
@@ -349,14 +358,14 @@ def _run_requested_graph_steps(ctx: LegacyPipelineContext, pipeline: PipelineOpt
                 pipeline_ctx,
                 out_dir=resolved_paths.data_dir,
                 ingest=True,
-                include=include_arg,
+                filters=filters,
             )
         if pipeline.build_callgraph:
             build_callgraph_artifacts(
                 pipeline_ctx,
                 out_dir=resolved_paths.data_dir,
                 ingest=True,
-                include=include_arg,
+                filters=filters,
             )
         if pipeline.build_cfg or pipeline.build_dfg:
             build_cfg_artifacts(
@@ -364,8 +373,9 @@ def _run_requested_graph_steps(ctx: LegacyPipelineContext, pipeline: PipelineOpt
                 out_dir=resolved_paths.data_dir,
                 ingest_cfg=pipeline.build_cfg,
                 ingest_dfg=pipeline.build_dfg,
-                include=include_arg,
+                filters=filters,
             )
+        process_artifact_dir(resolved_paths.data_dir)
     finally:
         pipeline_ctx.close()
 
@@ -375,7 +385,8 @@ def _build_graph_context(repo_root: Path, out_dir: Path) -> tuple[PipelineContex
     paths = resolve_application_paths(mapping)
     raise_on_errors(validate_paths(paths))
     paths.data_dir.mkdir(parents=True, exist_ok=True)
-    ctx = PipelineContext.from_paths(paths)
+    options = PipelineInitOptions(commit=detect_commit(paths.repo_root))
+    ctx = PipelineContext.from_paths(paths, options=options)
     return ctx, paths
 
 
@@ -455,7 +466,7 @@ def scan_repo(
     include: tuple[str, ...] = (),
     exclude: tuple[str, ...] = ("**/.venv/**", "**/build/**", "**/dist/**"),
     infer_tags: bool = True,
-) -> list[SimpleModuleRecord]:
+) -> list[ModuleRecord]:
     """Scan the repository and return lightweight module records.
 
     Parameters
@@ -474,11 +485,11 @@ def scan_repo(
 
     Returns
     -------
-    list[SimpleModuleRecord]
+    list[ModuleRecord]
         Sorted list of module records discovered under ``repo_root``.
     """
     ctx.logger.info("Scanning repo at %s", ctx.paths.repo_root)
-    records: list[SimpleModuleRecord] = []
+    records: list[ModuleRecord] = []
     for file_path in _iter_source_files(ctx.paths.repo_root, include, exclude):
         text = file_path.read_text(encoding="utf-8", errors="ignore")
         try:
@@ -492,14 +503,16 @@ def scan_repo(
                 tags.add("cli")
             if "tests" in file_path.parts:
                 tags.add("test")
+        rel_str = file_path.relative_to(ctx.paths.repo_root).as_posix()
         records.append(
-            SimpleModuleRecord(
-                path=file_path.relative_to(ctx.paths.repo_root),
-                module=_py_module_name(ctx.paths.repo_root, file_path),
-                language="python",
-                loc=_loc(text),
-                tags=tuple(sorted(tags)),
-                meta={"mtime": file_path.stat().st_mtime},
+            ModuleRecord(
+                path=rel_str,
+                repo_path=rel_str,
+                module_name=_py_module_name(ctx.paths.repo_root, file_path),
+                stable_id=stable_id_for_path(rel_str),
+                tags=sorted(tags),
+                complexity={"loc": _loc(text)},
+                _extra={"meta": {"mtime": file_path.stat().st_mtime, "language": "python"}},
             )
         )
     ctx.logger.info("Scan complete: %d modules", len(records))

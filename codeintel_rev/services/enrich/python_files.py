@@ -3,13 +3,103 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
 
 from codeintel_rev.enrich.pipeline_helpers import normalized_rel_path
 
 EXCLUDED_SCAN_SEGMENTS = {"stubs", "overlays"}
+DEFAULT_EXCLUDE_GLOBS: tuple[str, ...] = ("**/.venv/**", "**/build/**", "**/dist/**")
+
+
+@dataclass(frozen=True, slots=True)
+class PythonFileDiscovery:
+    """Deterministic Python file discovery with include/exclude and size filters."""
+
+    root: Path
+    include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = DEFAULT_EXCLUDE_GLOBS
+    max_file_bytes: int | None = None
+
+    def iter_paths(self) -> Iterator[Path]:
+        """Yield Python files honoring include/exclude globs and hidden/segment skips.
+
+        Yields
+        ------
+        Iterator[Path]
+            Python file candidates that pass skip, exclude, and include filters.
+        """
+        for candidate in self._iter_candidates():
+            if not self.should_consider(candidate):
+                continue
+            yield candidate
+
+    def discover(self) -> list[Path]:
+        """Return a sorted list of Python files that pass filters.
+
+        Returns
+        -------
+        list[Path]
+            Sorted Python file paths relative to ``root`` that pass all filters.
+        """
+        return sorted(self.iter_paths())
+
+    def should_consider(self, candidate: Path) -> bool:
+        """Return True when ``candidate`` passes skip/exclude/include filters.
+
+        Parameters
+        ----------
+        candidate : Path
+            File path to evaluate against skip, exclude, and include rules.
+
+        Returns
+        -------
+        bool
+            True when the candidate should be processed; False otherwise.
+        """
+        return (
+            not self._should_skip(candidate)
+            and not self._should_exclude(candidate)
+            and self._should_include(candidate)
+        )
+
+    def _iter_candidates(self) -> Iterator[Path]:
+        return self.root.rglob("*.py")
+
+    def _should_skip(self, candidate: Path) -> bool:
+        if any(part.startswith(".") for part in candidate.parts):
+            return True
+        try:
+            rel_parts = candidate.relative_to(self.root).parts
+        except ValueError:  # pragma: no cover - defensive
+            rel_parts = candidate.parts
+        lowered = {part.lower() for part in rel_parts}
+        if lowered & EXCLUDED_SCAN_SEGMENTS:
+            return True
+        if self.max_file_bytes is not None and candidate.is_file():
+            try:
+                if candidate.stat().st_size > self.max_file_bytes:
+                    return True
+            except OSError:  # pragma: no cover - best effort skip on stat failure
+                return True
+        return False
+
+    def _should_exclude(self, candidate: Path) -> bool:
+        if not self.exclude:
+            return False
+        try:
+            rel = candidate.relative_to(self.root).as_posix()
+        except ValueError:  # pragma: no cover - defensive
+            rel = candidate.as_posix()
+        return any(fnmatch(rel, pattern) for pattern in self.exclude)
+
+    def _should_include(self, candidate: Path) -> bool:
+        if not self.include:
+            return True
+        rel = normalized_rel_path(candidate, self.root)
+        return any(fnmatch(rel, pattern) for pattern in self.include)
 
 
 def iter_python_files(
@@ -32,13 +122,12 @@ def iter_python_files(
         Path objects for Python files that match inclusion patterns and do not
         violate exclusion rules (e.g., files in stubs/ or overlays/ directories).
     """
-    normalized_patterns = tuple(patterns or ())
-    for candidate in root.rglob("*.py"):
-        if should_skip_candidate(candidate, root):
-            continue
-        if normalized_patterns and not _matches_any(candidate, root, normalized_patterns):
-            continue
-        yield candidate
+    discovery = PythonFileDiscovery(
+        root=root,
+        include=tuple(patterns or ()),
+        exclude=DEFAULT_EXCLUDE_GLOBS,
+    )
+    yield from discovery.iter_paths()
 
 
 def should_skip_candidate(candidate: Path, root: Path) -> bool:
@@ -54,17 +143,12 @@ def should_skip_candidate(candidate: Path, root: Path) -> bool:
     Returns
     -------
     bool
-        True if the candidate should be skipped (contains hidden directories,
-        is in excluded segments like stubs/ or overlays/), False otherwise.
+        True if the candidate should be skipped (hidden paths, excluded
+        segments like stubs/overlays, excluded globs, or size limits),
+        False otherwise.
     """
-    if any(part.startswith(".") for part in candidate.parts):
-        return True
-    try:
-        rel_parts = candidate.relative_to(root).parts
-    except ValueError:  # pragma: no cover - defensive
-        rel_parts = candidate.parts
-    lowered = {part.lower() for part in rel_parts}
-    return bool(lowered & EXCLUDED_SCAN_SEGMENTS)
+    discovery = PythonFileDiscovery(root=root)
+    return not discovery.should_consider(candidate)
 
 
 def _matches_any(candidate: Path, root: Path, patterns: tuple[str, ...]) -> bool:
@@ -72,4 +156,10 @@ def _matches_any(candidate: Path, root: Path, patterns: tuple[str, ...]) -> bool
     return any(fnmatch(rel, pattern) for pattern in patterns)
 
 
-__all__ = ["EXCLUDED_SCAN_SEGMENTS", "iter_python_files", "should_skip_candidate"]
+__all__ = [
+    "DEFAULT_EXCLUDE_GLOBS",
+    "EXCLUDED_SCAN_SEGMENTS",
+    "PythonFileDiscovery",
+    "iter_python_files",
+    "should_skip_candidate",
+]

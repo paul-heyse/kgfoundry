@@ -38,6 +38,14 @@ try:  # pragma: no cover - optional dependency
     import yaml as yaml_module
 except ImportError:  # pragma: no cover - optional dependency
     yaml_module = None
+try:  # pragma: no cover - optional dependency
+    import duckdb as duckdb_module
+except ImportError:  # pragma: no cover - optional dependency
+    duckdb_module = None
+try:  # pragma: no cover - optional dependency
+    import pandas as pd
+except ImportError:  # pragma: no cover - optional dependency
+    pd = None
 
 
 class _YamlDumpKwargs(TypedDict, total=False):
@@ -66,6 +74,13 @@ class _YamlDumpFn(Protocol):
         data: Mapping[str, list[str]],
         **kwargs: Unpack[_YamlDumpKwargs],
     ) -> str: ...
+
+
+class DuckDBConnectionFactory(Protocol):
+    """Factory protocol for constructing DuckDB connections."""
+
+    def __call__(self, database: str) -> object:
+        """Return a connected DuckDB instance for ``database``."""
 
 
 def _row_payload(row: ModuleRecord | Mapping[str, Any]) -> dict[str, Any]:
@@ -301,9 +316,46 @@ def write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> int:
     return count
 
 
+def write_parquet_to_jsonl(parquet_path: Path, jsonl_path: Path) -> None:
+    """Convert Parquet to JSONL using pandas if available."""
+    if pd is None:
+        LOGGER.warning("pandas is not available; skipping JSONL promotion for %s", parquet_path)
+        return
+    jsonl_path.unlink(missing_ok=True)
+    df = pd.read_parquet(parquet_path)
+    jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_json(jsonl_path, orient="records", lines=True)
+
+
+def default_duckdb_factory(database: str) -> object:
+    """Return a DuckDB connection using a late import to ease testing.
+
+    Parameters
+    ----------
+    database : str
+        Path to the DuckDB database file to connect to.
+
+    Returns
+    -------
+    object
+        Connected DuckDB handle.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when DuckDB is not installed.
+    """
+    if duckdb_module is None:  # pragma: no cover - optional dependency
+        message = "DuckDB not installed; install with the duckdb extra."
+        raise RuntimeError(message)
+    return duckdb_module.connect(database)
+
+
 __all__ = [
+    "DuckDBConnectionFactory",
     "atomic_write_text",
     "collect_ast_artifacts",
+    "default_duckdb_factory",
     "write_ast_jsonl",
     "write_jsonl",
     "write_markdown_modules",

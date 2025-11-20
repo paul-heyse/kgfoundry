@@ -2,39 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-
-@dataclass(frozen=True, slots=True)
-class ModuleRecord:
-    """Lightweight module metadata emitted by the CLI commands.
-
-    Attributes
-    ----------
-    path : Path
-        File path relative to repository root.
-    module : str
-        Python module name (e.g., "module.submodule").
-    language : str
-        Programming language identifier (e.g., "python", "typescript").
-    loc : int
-        Lines of code count for this module. Must be non-negative.
-    tags : tuple[str, ...]
-        Tuple of tags inferred for this module (e.g., ("cli", "test")).
-    meta : Mapping[str, Any], optional
-        Additional metadata dictionary. Empty dictionary if no additional
-        metadata. Defaults to empty dictionary.
-    """
-
-    path: Path
-    module: str
-    language: str
-    loc: int
-    tags: tuple[str, ...]
-    meta: Mapping[str, Any] = field(default_factory=dict)
+from codeintel_rev.enrich.models import ModuleRecord
 
 
 @dataclass(frozen=True, slots=True)

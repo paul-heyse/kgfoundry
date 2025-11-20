@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,6 +25,11 @@ try:  # pragma: no cover - optional dependency
     import duckdb
 except ImportError:  # pragma: no cover - optional dependency
     duckdb = None
+
+try:  # pragma: no cover - optional dependency
+    import yaml as yaml_module
+except ImportError:  # pragma: no cover - optional dependency
+    yaml_module = None
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from duckdb import DuckDBPyConnection
@@ -50,6 +56,48 @@ DEFAULT_OWNER_HISTORY_DAYS = 90
 DEFAULT_COMMITS_WINDOW = 50
 DEFAULT_ENABLE_OWNERS = True
 DEFAULT_EMIT_SLICES_FLAG = False
+
+
+@dataclass(frozen=True, slots=True)
+class OverlayHeuristics:
+    """Thresholds controlling overlay-needed tagging."""
+
+    error_threshold: int = OVERLAY_ERROR_THRESHOLD
+    fan_in_threshold: int = OVERLAY_FAN_IN_THRESHOLD
+    param_threshold: float = OVERLAY_PARAM_THRESHOLD
+
+
+def _overlay_heuristics_from_rules(rules: Mapping[str, Any] | None) -> OverlayHeuristics:
+    return OverlayHeuristics(
+        error_threshold=int(rules.get("error_threshold", OVERLAY_ERROR_THRESHOLD))
+        if rules
+        else OVERLAY_ERROR_THRESHOLD,
+        fan_in_threshold=int(rules.get("fan_in_threshold", OVERLAY_FAN_IN_THRESHOLD))
+        if rules
+        else OVERLAY_FAN_IN_THRESHOLD,
+        param_threshold=float(rules.get("param_threshold", OVERLAY_PARAM_THRESHOLD))
+        if rules
+        else OVERLAY_PARAM_THRESHOLD,
+    )
+
+
+def _load_rules_file(path: Path) -> Mapping[str, Any]:
+    text = path.read_text(encoding="utf-8")
+    suffix = path.suffix.lower()
+    if suffix in {".yaml", ".yml"}:
+        if yaml_module is None:
+            return {}
+        loaded = yaml_module.safe_load(text)
+        if not isinstance(loaded, Mapping):
+            return {}
+        return dict(loaded)
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, Mapping):
+        return {}
+    return dict(payload)
 
 
 def _format_stage_meta(metadata: Mapping[str, object]) -> str:
@@ -196,6 +244,10 @@ class PipelineOptions:
     tags_yaml : Path | None, optional
         Optional path to tags YAML file. None if tags file is not available.
         Defaults to None.
+    overlay_rules : Path | None, optional
+        Optional path to overlay heuristic rules JSON/YAML.
+    tagging_rules : Path | None, optional
+        Alias for ``tags_yaml`` to allow explicit override of tagging rules.
     coverage_xml : Path, optional
         Path to coverage XML file. Defaults to "coverage.xml".
     only : tuple[str, ...], optional
@@ -219,6 +271,7 @@ class PipelineOptions:
     out: Path = Path("codeintel_rev/io/ENRICHED")
     pyrefly_json: Path | None = None
     tags_yaml: Path | None = None
+    overlay_rules: Path | None = None
     coverage_xml: Path = Path("coverage.xml")
     only: tuple[str, ...] = ()
     max_file_bytes: int = DEFAULT_MAX_FILE_BYTES
@@ -271,6 +324,27 @@ class CLIContextState:
 
     pipeline: PipelineOptions = field(default_factory=PipelineOptions)
     analytics: AnalyticsOptions = field(default_factory=AnalyticsOptions)
+
+@dataclass(slots=True, frozen=True)
+class PipelineInitOptions:
+    """Optional resources and toggles used when instantiating PipelineContext."""
+
+    root: Path | None = None
+    config: Mapping[str, Any] | None = None
+    commit: str | None = None
+    scip_index: SCIPIndex | None = None
+    scip_ctx: ScipContext | None = None
+    type_signals: Mapping[str, FileTypeSignals] | None = None
+    coverage_map: Mapping[str, Mapping[str, float]] | None = None
+    config_records: list[dict[str, Any]] | None = None
+    tagging_rules: Mapping[str, Any] | None = None
+    tagging_rules_path: Path | None = None
+    overlay_rules: Mapping[str, Any] | None = None
+    overlay_rules_path: Path | None = None
+    package_prefix: str | None = None
+    enable_db: bool = False
+    duckdb_path: str | None = None
+    duckdb_factory: Callable[[str], DuckDBPyConnection] | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -403,43 +477,6 @@ class ScanInputs:
 
 
 @dataclass(slots=True, frozen=True)
-class LegacyPipelineContext:
-    """Aggregated context derived from CLI inputs and repo state.
-
-    Attributes
-    ----------
-    root : Path
-        Working directory root path.
-    repo_root : Path
-        Repository root directory path.
-    scip_index : SCIPIndex
-        SCIP symbol index instance.
-    scip_ctx : ScipContext
-        SCIP context containing symbol index and document cache.
-    type_signals : Mapping[str, FileTypeSignals]
-        Dictionary mapping file paths to type signal metadata.
-    coverage_map : Mapping[str, Mapping[str, float]]
-        Dictionary mapping file paths to coverage metrics dictionaries.
-    config_records : list[dict[str, Any]]
-        List of configuration reference records.
-    tagging_rules : Mapping[str, Any]
-        Dictionary of tagging rules for module classification.
-    package_prefix : str | None
-        Optional package prefix for module name resolution. None if no prefix.
-    """
-
-    root: Path
-    repo_root: Path
-    scip_index: SCIPIndex
-    scip_ctx: ScipContext
-    type_signals: Mapping[str, FileTypeSignals]
-    coverage_map: Mapping[str, Mapping[str, float]]
-    config_records: list[dict[str, Any]]
-    tagging_rules: Mapping[str, Any]
-    package_prefix: str | None
-
-
-@dataclass(slots=True, frozen=True)
 class PipelineResult:
     """Aggregate artifact bundle produced by a pipeline run.
 
@@ -488,13 +525,13 @@ class PreparedPipeline:
 
     Attributes
     ----------
-    context : LegacyPipelineContext
+    context : PipelineContext
         Resolved pipeline context with all dependencies.
     files : list[Path]
         List of file paths to process.
     """
 
-    context: LegacyPipelineContext
+    context: PipelineContext
     files: list[Path]
 
 
@@ -547,24 +584,22 @@ class ConfigReferenceState:
 
 @dataclass(slots=True, frozen=True)
 class PipelineContext:
-    """Thin context used by the refactored enrich CLI.
-
-    Attributes
-    ----------
-    paths : ResolvedPaths
-        Resolved filesystem paths for enrichment operations.
-    config : Mapping[str, Any]
-        Configuration dictionary.
-    logger : logging.Logger
-        Logger instance for enrichment operations.
-    db : DuckDBPyConnection | None, optional
-        Optional DuckDB database connection. None if database is not enabled.
-        Defaults to None.
-    """
+    """Execution context shared by enrichment services and CLIs."""
 
     paths: ResolvedPaths
+    root: Path
+    repo_root: Path
     config: Mapping[str, Any]
     logger: logging.Logger
+    commit: str | None = None
+    scip_index: SCIPIndex | None = None
+    scip_ctx: ScipContext | None = None
+    type_signals: Mapping[str, FileTypeSignals] = field(default_factory=dict)
+    coverage_map: Mapping[str, Mapping[str, float]] = field(default_factory=dict)
+    config_records: list[dict[str, Any]] = field(default_factory=list)
+    tagging_rules: Mapping[str, Any] = field(default_factory=dict)
+    overlay_heuristics: OverlayHeuristics = field(default_factory=OverlayHeuristics)
+    package_prefix: str | None = None
     db: DuckDBPyConnection | None = None
 
     @classmethod
@@ -572,53 +607,84 @@ class PipelineContext:
         cls,
         paths: ResolvedPaths,
         *,
-        config: Mapping[str, Any] | None = None,
-        enable_db: bool = False,
-        duckdb_path: str | None = None,
+        options: PipelineInitOptions | None = None,
     ) -> PipelineContext:
         """Build a context from resolved application paths.
-
-        Parameters
-        ----------
-        paths : ResolvedPaths
-            Resolved filesystem paths for enrichment operations.
-        config : Mapping[str, Any] | None, optional
-            Optional configuration dictionary. None means use empty dict.
-            Defaults to None.
-        enable_db : bool, optional
-            Whether to enable DuckDB database connection. Defaults to False.
-        duckdb_path : str | None, optional
-            Optional path to DuckDB database file. None means use default.
-            Defaults to None.
 
         Returns
         -------
         PipelineContext
-            Newly constructed context.
+            Initialized context carrying repository paths, optional SCIP/type
+            resources, and optional DuckDB handle.
 
         Raises
         ------
         RuntimeError
-            Raised when ``enable_db`` is ``True`` but DuckDB is unavailable.
+            Raised when DuckDB is requested but unavailable.
         """
+        opts = options or PipelineInitOptions()
         logger = logging.getLogger("enrich")
         if not logger.handlers:
             handler = logging.StreamHandler()
             handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
             logger.addHandler(handler)
+        tagging_rules = opts.tagging_rules
+        if tagging_rules is None and opts.tagging_rules_path is not None:
+            tagging_rules = _load_rules_file(opts.tagging_rules_path)
+        overlay_rules = opts.overlay_rules
+        if overlay_rules is None and opts.overlay_rules_path is not None:
+            overlay_rules = _load_rules_file(opts.overlay_rules_path)
         conn = None
-        if enable_db:
+        if opts.enable_db:
             if duckdb is None:  # pragma: no cover - optional dependency
                 message = "DuckDB not available; install the duckdb extra."
                 raise RuntimeError(message)
-            target = duckdb_path or str(paths.data_dir / "enrich.duckdb")
-            conn = duckdb.connect(target)
-        return cls(paths=paths, config=config or {}, logger=logger, db=conn)
+            target = opts.duckdb_path or str(paths.data_dir / "enrich.duckdb")
+            if opts.duckdb_factory is not None:
+                conn = opts.duckdb_factory(target)
+            else:
+                conn = duckdb.connect(target)
+        root_path = opts.root or paths.repo_root
+        return cls(
+            paths=paths,
+            root=root_path,
+            repo_root=paths.repo_root,
+            config=opts.config or {},
+            logger=logger,
+            commit=opts.commit,
+            scip_index=opts.scip_index,
+            scip_ctx=opts.scip_ctx,
+            type_signals=opts.type_signals or {},
+            coverage_map=opts.coverage_map or {},
+            config_records=opts.config_records or [],
+            tagging_rules=tagging_rules or {},
+            package_prefix=opts.package_prefix,
+            overlay_heuristics=_overlay_heuristics_from_rules(overlay_rules),
+            db=conn,
+        )
 
     def close(self) -> None:
         """Close the optional DuckDB connection."""
         if self.db is not None:
             self.db.close()
+
+    def require(self, *attrs: str) -> None:
+        """Assert that the given attributes are present (non-None), else raise RuntimeError.
+
+        Raises
+        ------
+        RuntimeError
+            Raised when any requested attribute is absent.
+        """
+        missing = [name for name in attrs if getattr(self, name) is None]
+        if missing:
+            joined = ", ".join(missing)
+            message = f"Pipeline context missing required resource(s): {joined}"
+            raise RuntimeError(message)
+
+
+# Backward compatibility while consolidating contexts.
+LegacyPipelineContext = PipelineContext
 
 
 __all__ = [
@@ -646,7 +712,9 @@ __all__ = [
     "LegacyPipelineContext",
     "OverlayCLIOptions",
     "OverlayContext",
+    "OverlayHeuristics",
     "PipelineContext",
+    "PipelineInitOptions",
     "PipelineOptions",
     "PipelineResult",
     "PreparedPipeline",

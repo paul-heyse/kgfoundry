@@ -602,7 +602,7 @@ The `generate_documents.sh` script orchestrates the full metadata generation pip
 1. **Scan Repository** (`scan_repo`)
    - Discover Python files matching include/exclude globs (default excludes: `.venv`, `build`, `dist`)
    - Parse each file to validate syntax (via `ast.parse`)
-   - Create lightweight `SimpleModuleRecord` objects with path, module name, LOC, inferred tags
+   - Create lightweight `ModuleRecord` objects with path, module name, LOC, inferred tags
    - Compute module name from file path: `_py_module_name()` handles `__init__.py` → package name
 
 2. **Run All Exports** (`run_all_exports`)
@@ -863,7 +863,7 @@ Pipeline preparation and module scanning: loads SCIP index, type signals, covera
 - `prepare_pipeline()`: Materialize `PreparedPipeline` with context and file list
 - `scan_modules()`: Scan Python files and return `ModuleRecord` rows + symbol edges
 - `run_pipeline()`: Execute full pipeline and return `PipelineResult`
-- `scan_repo()`: Lightweight repository scan returning `SimpleModuleRecord` list
+- `scan_repo()`: Lightweight repository scan returning `ModuleRecord` list
 
 **Dependencies**
 

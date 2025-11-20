@@ -7,8 +7,9 @@ import json
 from pathlib import Path
 
 from codeintel_rev.enrich.duckdb_store import DuckConn, ingest_modules_jsonl
+from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.services.enrich.context import PipelineContext
-from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
+from codeintel_rev.services.enrich.record_view import as_record_view
 
 
 def load_modules_jsonl(modules_jsonl: Path, db_path: Path) -> int:
@@ -48,7 +49,7 @@ def _quote_identifier(name: str) -> str:
 
 def write_to_duckdb(
     ctx: PipelineContext,
-    records: list[SimpleModuleRecord],
+    records: list[ModuleRecord],
     *,
     table: str = "modules",
     replace: bool = True,
@@ -60,7 +61,7 @@ def write_to_duckdb(
     ctx : PipelineContext
         Pipeline context containing DuckDB connection. Must have been created
         with ``enable_db=True``.
-    records : list[SimpleModuleRecord]
+    records : list[ModuleRecord]
         List of module records to write to the database.
     table : str, optional
         Table name to write records to. Defaults to "modules".
@@ -91,17 +92,19 @@ def write_to_duckdb(
         )
         """
     )
-    rows = [
-        (
-            str(record.path),
-            record.module,
-            record.language,
-            int(record.loc),
-            json.dumps(list(record.tags)),
-            json.dumps(record.meta),
+    rows = []
+    for record in records:
+        view = as_record_view(record)
+        rows.append(
+            (
+                view.path,
+                view.module,
+                str(view.meta.get("language", "python")),
+                int(view.loc),
+                json.dumps(view.tags),
+                json.dumps(view.meta),
+            )
         )
-        for record in records
-    ]
     cur.executemany(f"INSERT INTO {quoted_table} VALUES (?, ?, ?, ?, ?, ?)", rows)  # noqa: S608
     ctx.db.commit()
 

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from codeintel_rev.app.readiness import raise_on_errors, validate_paths
 from codeintel_rev.config.paths import resolve_application_paths
-from codeintel_rev.services.enrich.context import PipelineContext
+from codeintel_rev.services.enrich.context import PipelineContext, PipelineInitOptions
 from codeintel_rev.services.enrich.scan import scan_repo
 from codeintel_rev.services.enrich.to_duckdb import write_to_duckdb
 
@@ -45,9 +45,8 @@ def test_write_to_duckdb(tmp_path: Path) -> None:
     paths = resolve_application_paths({"BASE_DIR": repo, "DATA_DIR": out_dir})
     paths.data_dir.mkdir(parents=True, exist_ok=True)
     raise_on_errors(validate_paths(paths))
-    ctx = PipelineContext.from_paths(
-        paths, enable_db=True, duckdb_path=str(out_dir / "enrich.duckdb")
-    )
+    options = PipelineInitOptions(enable_db=True, duckdb_path=str(out_dir / "enrich.duckdb"))
+    ctx = PipelineContext.from_paths(paths, options=options)
     records = scan_repo(ctx)
     write_to_duckdb(ctx, records, table="modules", replace=True)
     assert ctx.db is not None
