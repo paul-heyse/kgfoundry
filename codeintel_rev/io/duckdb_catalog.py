@@ -118,18 +118,62 @@ class CallGraphQuery:
 
 
 class SpanDict(TypedDict, total=False):
+    """File span location dictionary for API responses.
+
+    Attributes
+    ----------
+    file_path : str
+        Repository-relative file path.
+    start_line : int | None
+        Starting line number (1-indexed).
+    end_line : int | None
+        Ending line number (1-indexed).
+    """
+
     file_path: str
     start_line: int | None
     end_line: int | None
 
 
 class CallGraphNodeDict(TypedDict, total=False):
+    """Call graph node representation dictionary.
+
+    Attributes
+    ----------
+    goid : str
+        GOID URN of the function/node.
+    label : str
+        Display label (typically AST qualname or GOID).
+    file_path : str | None
+        Repository-relative file path where node is defined.
+    """
+
     goid: str
     label: str
     file_path: str | None
 
 
 class CallGraphEdgeDict(TypedDict):
+    """Call graph edge representation dictionary.
+
+    Attributes
+    ----------
+    caller : str
+        GOID URN of the calling function.
+    callee : str
+        GOID URN of the called function (empty if unresolved).
+    callsite : SpanDict | None
+        Location of the call site in source code.
+    resolved : bool
+        Whether the callee was successfully resolved.
+    kind : str
+        Edge type (e.g., "direct", "indirect").
+    confidence : float | Decimal | None
+        Resolution confidence score (0.0-1.0).
+    updated_at : str | None
+        ISO 8601 timestamp of last update.
+    """
+
     caller: str
     callee: str
     callsite: SpanDict | None
@@ -140,6 +184,20 @@ class CallGraphEdgeDict(TypedDict):
 
 
 class CallGraphFilterMeta(TypedDict):
+    """Call graph query filter metadata dictionary.
+
+    Attributes
+    ----------
+    lang : str | None
+        Programming language filter.
+    include_unresolved : bool
+        Whether unresolved edges are included.
+    include_third_party : bool
+        Whether third-party library calls are included.
+    path_prefix : str | None
+        Path prefix filter for call sites.
+    """
+
     lang: str | None
     include_unresolved: bool
     include_third_party: bool
@@ -147,6 +205,20 @@ class CallGraphFilterMeta(TypedDict):
 
 
 class CallGraphMetaDict(TypedDict):
+    """Call graph query metadata dictionary.
+
+    Attributes
+    ----------
+    depth : int
+        Maximum traversal depth applied.
+    direction : str
+        Traversal direction ("out", "in", or "both").
+    filters : CallGraphFilterMeta
+        Applied filter options.
+    format : str
+        Response format identifier.
+    """
+
     depth: int
     direction: str
     filters: CallGraphFilterMeta
@@ -154,6 +226,22 @@ class CallGraphMetaDict(TypedDict):
 
 
 class CallGraphResult(TypedDict):
+    """Call graph query result dictionary.
+
+    Attributes
+    ----------
+    nodes : list[CallGraphNodeDict]
+        List of node dictionaries in the graph.
+    edges : list[CallGraphEdgeDict]
+        List of edge dictionaries connecting nodes.
+    truncated : bool
+        Whether results were truncated due to max_nodes limit.
+    meta : CallGraphMetaDict
+        Query metadata including depth, direction, filters, and format.
+    next_cursor : str | None
+        Pagination cursor for next page (None if final page).
+    """
+
     nodes: list[CallGraphNodeDict]
     edges: list[CallGraphEdgeDict]
     truncated: bool
@@ -162,6 +250,34 @@ class CallGraphResult(TypedDict):
 
 
 class GOIDRowDict(TypedDict):
+    """GOID crosswalk row dictionary for API responses.
+
+    Attributes
+    ----------
+    goid : str
+        GOID URN identifier.
+    lang : str
+        Programming language code.
+    module_path : str | None, optional
+        Module import path.
+    file_path : str | None, optional
+        Repository-relative file path.
+    span : SpanDict | None, optional
+        Source code span location.
+    scip_symbol : str | None, optional
+        SCIP symbol identifier.
+    ast_qualname : str | None, optional
+        AST qualified name.
+    cst_node_id : str | None, optional
+        CST node identifier.
+    chunk_id : int | None, optional
+        Chunk identifier.
+    symbol_id : str | None, optional
+        Symbol identifier.
+    updated_at : str | None, optional
+        ISO 8601 timestamp of last update.
+    """
+
     goid: str
     lang: str
     module_path: NotRequired[str | None]
@@ -176,29 +292,89 @@ class GOIDRowDict(TypedDict):
 
 
 class GOIDQueryResult(TypedDict):
+    """GOID query result dictionary with pagination.
+
+    Attributes
+    ----------
+    rows : list[GOIDRowDict]
+        List of GOID crosswalk row dictionaries.
+    next_cursor : str | None
+        Pagination cursor for next page (None if final page).
+    """
+
     rows: list[GOIDRowDict]
     next_cursor: str | None
 
 
 class CFGBlockDict(TypedDict):
+    """CFG basic block dictionary.
+
+    Attributes
+    ----------
+    id : str
+        Block identifier (typically block_idx as string).
+    label : str
+        Block label/kind (e.g., "entry", "exit", "fallthrough").
+    span : SpanDict | None, optional
+        Source code span for the block.
+    """
+
     id: str
     label: str
     span: NotRequired[SpanDict | None]
 
 
 class CFGEdgeDict(TypedDict):
+    """CFG edge dictionary connecting basic blocks.
+
+    Attributes
+    ----------
+    src : str
+        Source block identifier.
+    dst : str
+        Destination block identifier.
+    label : str | None, optional
+        Edge label/type (e.g., "fallthrough", "branch", "exception").
+    """
+
     src: str
     dst: str
     label: NotRequired[str | None]
 
 
 class CFGResult(TypedDict):
+    """CFG query result dictionary.
+
+    Attributes
+    ----------
+    function_goid : str
+        GOID URN of the function this CFG represents.
+    blocks : list[CFGBlockDict]
+        List of basic block dictionaries.
+    edges : list[CFGEdgeDict]
+        List of edge dictionaries connecting blocks.
+    """
+
     function_goid: str
     blocks: list[CFGBlockDict]
     edges: list[CFGEdgeDict]
 
 
 class DFGNodeDict(TypedDict):
+    """DFG node dictionary representing data flow variables.
+
+    Attributes
+    ----------
+    id : str
+        Node identifier (typically symbol name or generated ID).
+    kind : str
+        Node kind (e.g., "def", "use", "phi").
+    symbol : str | None, optional
+        Symbol name associated with the node.
+    span : SpanDict | None, optional
+        Source code span where the node is defined/used.
+    """
+
     id: str
     kind: str
     symbol: NotRequired[str | None]
@@ -206,12 +382,36 @@ class DFGNodeDict(TypedDict):
 
 
 class DFGEdgeDict(TypedDict):
+    """DFG edge dictionary connecting data flow nodes.
+
+    Attributes
+    ----------
+    src : str
+        Source node identifier.
+    dst : str
+        Destination node identifier.
+    label : str | None, optional
+        Edge label/type (e.g., "def-use", "phi").
+    """
+
     src: str
     dst: str
     label: NotRequired[str | None]
 
 
 class DFGResult(TypedDict):
+    """DFG query result dictionary.
+
+    Attributes
+    ----------
+    function_goid : str
+        GOID URN of the function this DFG represents.
+    nodes : list[DFGNodeDict]
+        List of data flow node dictionaries.
+    edges : list[DFGEdgeDict]
+        List of edge dictionaries connecting nodes.
+    """
+
     function_goid: str
     nodes: list[DFGNodeDict]
     edges: list[DFGEdgeDict]
@@ -1309,6 +1509,26 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         )
         self._install_parquet_view(conn, "ast_nodes", self._data_root / "ast/ast_nodes.parquet")
         self._install_parquet_view(conn, "cst_nodes", self._data_root / "cst/cst_nodes.parquet")
+        self._install_parquet_view(
+            conn,
+            "import_graph_edges",
+            self._data_root / "graphs/import_graph_edges.parquet",
+        )
+        self._install_parquet_view(
+            conn,
+            "symbol_use_edges",
+            self._data_root / "graphs/symbol_use_edges.parquet",
+        )
+        self._install_parquet_view(
+            conn,
+            "config_values",
+            self._data_root / "analytics/config_values.parquet",
+        )
+        self._install_parquet_view(
+            conn,
+            "static_diagnostics",
+            self._data_root / "analytics/static_diagnostics.parquet",
+        )
         self._install_chunk_symbols_view(conn)
 
     def _install_parquet_view(

@@ -496,8 +496,7 @@ def get_cfg(
             for block in cfg_blocks
         ],
         edges=[
-            CFGEdge(src=edge["src"], dst=edge["dst"], label=edge.get("label"))
-            for edge in cfg_edges
+            CFGEdge(src=edge["src"], dst=edge["dst"], label=edge.get("label")) for edge in cfg_edges
         ],
     )
 
@@ -552,8 +551,7 @@ def get_dfg(
             for node in dfg_nodes
         ],
         edges=[
-            DFGEdge(src=edge["src"], dst=edge["dst"], label=edge.get("label"))
-            for edge in dfg_edges
+            DFGEdge(src=edge["src"], dst=edge["dst"], label=edge.get("label")) for edge in dfg_edges
         ],
     )
 

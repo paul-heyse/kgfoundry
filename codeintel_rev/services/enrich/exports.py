@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from codeintel_rev.enrich.ast_indexer import write_ast_parquet
 from codeintel_rev.enrich.graph_builder import write_import_graph
@@ -20,7 +21,13 @@ from codeintel_rev.enrich.output_writers import (
 )
 from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
 from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
-from codeintel_rev.services.enrich.context import PipelineContext, PipelineResult, StageMeta, _stage
+from codeintel_rev.services.enrich.config_values import build_config_value_rows
+from codeintel_rev.services.enrich.context import (
+    PipelineContext,
+    PipelineResult,
+    StageMeta,
+    _stage,
+)
 from codeintel_rev.services.enrich.io import (
     atomic_write_text,
     collect_ast_artifacts,
@@ -36,7 +43,43 @@ from codeintel_rev.services.enrich.io import (
 )
 from codeintel_rev.services.enrich.models import ExportResult
 from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
+from codeintel_rev.services.enrich.static_diagnostics import build_static_diagnostics_rows
+from codeintel_rev.typedness import FileTypeSignals
 from codeintel_rev.uses_builder import write_use_graph
+
+LOGGER = logging.getLogger(__name__)
+
+
+def _module_by_path(rows: Sequence[Mapping[str, Any]]) -> dict[str, str]:
+    """Build a mapping from repo-relative paths to module names.
+
+    Parameters
+    ----------
+    rows : Sequence[Mapping[str, Any]]
+        Database rows with path and module_name/module fields.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping from file paths to module names (falls back to path if module missing).
+    """
+    mapping: dict[str, str] = {}
+    for row in rows:
+        path = row.get("path")
+        module_name = row.get("module_name") or row.get("module")
+        if isinstance(path, str):
+            mapping[path] = module_name if isinstance(module_name, str) else path
+    return mapping
+
+
+def _mirror_artifact(source: Path, alias: Path) -> None:
+    """Copy artifact to a legacy alias if needed."""
+    if source == alias:
+        return
+    if not source.exists():
+        return
+    alias.parent.mkdir(parents=True, exist_ok=True)
+    alias.write_bytes(source.read_bytes())
 
 
 def write_exports_outputs(result: PipelineResult, out: Path) -> None:
@@ -67,10 +110,23 @@ def write_graph_outputs(result: PipelineResult, out: Path) -> None:
     out : Path
         Output directory where graph files will be written.
     """
+    module_lookup = _module_by_path(result.module_rows)
     with _stage(StageMeta("write-graphs", {"symbols": len(result.symbol_edges)})) as meta:
+        graphs_dir = out / "graphs"
+        graphs_dir.mkdir(parents=True, exist_ok=True)
         write_symbol_graph(out, result.symbol_edges)
-        write_import_graph(result.import_graph, out / "graphs" / "imports.parquet")
+        import_path = graphs_dir / "import_graph_edges.parquet"
+        import_jsonl = graphs_dir / "import_graph_edges.jsonl"
+        used_import = write_import_graph(
+            result.import_graph,
+            import_path,
+            jsonl_fallback=import_jsonl,
+            module_by_path=module_lookup,
+        )
         meta["imports"] = sum(len(edges) for edges in result.import_graph.edges.values())
+        legacy_import = graphs_dir / "imports.parquet"
+        _mirror_artifact(used_import, legacy_import)
+        _mirror_artifact(import_jsonl, graphs_dir / "imports.jsonl")
 
 
 def write_uses_output(result: PipelineResult, out: Path) -> None:
@@ -84,7 +140,17 @@ def write_uses_output(result: PipelineResult, out: Path) -> None:
         Output directory where use graph files will be written.
     """
     with _stage(StageMeta("write-uses", {"files": len(result.use_graph.uses_by_file)})) as meta:
-        write_use_graph(result.use_graph, out / "graphs" / "uses.parquet")
+        graphs_dir = out / "graphs"
+        graphs_dir.mkdir(parents=True, exist_ok=True)
+        jsonl_path = graphs_dir / "symbol_use_edges.jsonl"
+        used_path = write_use_graph(
+            result.use_graph,
+            graphs_dir / "symbol_use_edges.parquet",
+            jsonl_fallback=jsonl_path,
+            module_by_path=_module_by_path(result.module_rows),
+        )
+        _mirror_artifact(used_path, graphs_dir / "uses.parquet")
+        _mirror_artifact(jsonl_path, graphs_dir / "uses.jsonl")
         meta["edges"] = sum(len(paths) for paths in result.use_graph.uses_by_file.values())
 
 
@@ -213,7 +279,7 @@ def write_slices_output(
 
 
 def write_typedness_output(result: PipelineResult, out: Path) -> None:
-    """Write typedness analytics datasets.
+    """Write typedness analytics datasets and static diagnostics.
 
     Parameters
     ----------
@@ -233,6 +299,7 @@ def write_typedness_output(result: PipelineResult, out: Path) -> None:
         for row in result.module_rows
     ]
     write_tabular_records(out / "analytics" / "typedness.parquet", rows)
+    write_static_diagnostics_output(result, out)
 
 
 def write_doc_output(result: PipelineResult, out: Path) -> None:
@@ -272,6 +339,21 @@ def write_coverage_output(result: PipelineResult, out: Path) -> None:
     write_tabular_records(out / "analytics" / "coverage.parquet", result.coverage_rows)
 
 
+def write_static_diagnostics_output(result: PipelineResult, out: Path) -> None:
+    """Persist static diagnostics summary derived from type signals."""
+    signals = getattr(result, "type_signals", None)
+    if not isinstance(signals, Mapping):
+        LOGGER.info("No static diagnostics to write")
+        return
+    analytics_dir = out / "analytics"
+    analytics_dir.mkdir(parents=True, exist_ok=True)
+    typed_signals = cast("Mapping[str, FileTypeSignals]", signals)
+    rows = build_static_diagnostics_rows(typed_signals)
+    parquet_path = analytics_dir / "static_diagnostics.parquet"
+    write_parquet(parquet_path, rows)
+    simple_write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
+
+
 def write_config_output(result: PipelineResult, out: Path) -> None:
     """Persist config index with references.
 
@@ -282,7 +364,15 @@ def write_config_output(result: PipelineResult, out: Path) -> None:
     out : Path
         Output directory where config index JSON file will be written.
     """
-    write_json(out / "analytics" / "config_index.json", result.config_index)
+    analytics_dir = out / "analytics"
+    analytics_dir.mkdir(parents=True, exist_ok=True)
+    write_json(analytics_dir / "config_index.json", result.config_index)
+    if not result.config_index:
+        return
+    rows = build_config_value_rows(result.config_index, result.module_rows)
+    analytics_path = analytics_dir / "config_values.parquet"
+    write_parquet(analytics_path, rows)
+    simple_write_jsonl(analytics_path.with_suffix(".jsonl"), rows)
 
 
 def write_hotspot_output(result: PipelineResult, out: Path) -> None:
@@ -525,6 +615,7 @@ __all__ = [
     "write_ownership_output",
     "write_repo_map",
     "write_slices_output",
+    "write_static_diagnostics_output",
     "write_typedness_output",
     "write_uses_output",
 ]

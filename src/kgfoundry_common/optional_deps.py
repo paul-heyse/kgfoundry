@@ -150,7 +150,25 @@ def _safe_import_dependency(
     *,
     importer: ImporterCallable,
 ) -> object:
-    """Import ``module_name`` using ``importer`` or raise OptionalDependencyError."""
+    """Import ``module_name`` using ``importer`` or raise OptionalDependencyError.
+
+    Parameters
+    ----------
+    module_name : str
+        Name of the module to import.
+    importer : ImporterCallable
+        Import function to use (typically __import__ or test double).
+
+    Returns
+    -------
+    object
+        The imported module object.
+
+    Raises
+    ------
+    OptionalDependencyError
+        If the module cannot be imported, with Problem Details and remediation guidance.
+    """
     correlation_id = str(uuid.uuid4())
     try:
         return importer(module_name)
@@ -192,20 +210,20 @@ def safe_import_griffe(
 ) -> object:
     """Safely import Griffe with Problem Details on failure.
 
+    Parameters
+    ----------
+    importer : Callable[[str], object] | None, optional
+        Alternative import resolver used for dependency injection in tests.
+
     Returns
     -------
     object
         The griffe module.
 
-    Raises
-    ------
-    OptionalDependencyError
-        If Griffe is not installed or cannot be imported.
-
-    Parameters
-    ----------
-    importer : Callable[[str], object] | None, optional
-        Alternative import resolver used for dependency injection in tests.
+    Notes
+    -----
+    Raises OptionalDependencyError (via _safe_import_dependency) if Griffe
+    is not installed or cannot be imported, with Problem Details and remediation guidance.
 
     Examples
     --------
@@ -226,20 +244,20 @@ def safe_import_autoapi(
 ) -> object:
     """Safely import AutoAPI with Problem Details on failure.
 
+    Parameters
+    ----------
+    importer : Callable[[str], object] | None, optional
+        Alternative import resolver used for dependency injection in tests.
+
     Returns
     -------
     object
         The autoapi module.
 
-    Raises
-    ------
-    OptionalDependencyError
-        If AutoAPI is not installed or cannot be imported.
-
-    Parameters
-    ----------
-    importer : Callable[[str], object] | None, optional
-        Alternative import resolver used for dependency injection in tests.
+    Notes
+    -----
+    Raises OptionalDependencyError (via _safe_import_dependency) if AutoAPI
+    is not installed or cannot be imported, with Problem Details and remediation guidance.
 
     Examples
     --------
@@ -260,20 +278,20 @@ def safe_import_sphinx(
 ) -> object:
     """Safely import Sphinx with Problem Details on failure.
 
+    Parameters
+    ----------
+    importer : Callable[[str], object] | None, optional
+        Alternative import resolver used for dependency injection in tests.
+
     Returns
     -------
     object
         The sphinx module.
 
-    Raises
-    ------
-    OptionalDependencyError
-        If Sphinx is not installed or cannot be imported.
-
-    Parameters
-    ----------
-    importer : Callable[[str], object] | None, optional
-        Alternative import resolver used for dependency injection in tests.
+    Notes
+    -----
+    Raises OptionalDependencyError (via _safe_import_dependency) if Sphinx
+    is not installed or cannot be imported, with Problem Details and remediation guidance.
 
     Examples
     --------

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -74,6 +75,7 @@ def write_use_graph(
     path: str | Path,
     *,
     jsonl_fallback: Path | None = None,
+    module_by_path: Mapping[str, str] | None = None,
 ) -> Path:
     """Persist use graph edges to disk and return the output path.
 
@@ -86,17 +88,21 @@ def write_use_graph(
     jsonl_fallback : Path | None, optional
         Optional fallback JSONL path if Parquet is unavailable.
         Defaults to None.
+    module_by_path : Mapping[str, str] | None, optional
+        Optional mapping from repo-relative paths to module names. Used to
+        compute the ``same_module`` flag for each edge. Defaults to None.
 
     Returns
     -------
     Path
         The actual path used for writing (Parquet or JSONL fallback).
     """
-    records = (
-        {"def_path": def_path, "use_path": use_path, "symbol": symbol}
-        for def_path, use_path, symbol in use_graph.edges
+    return write_use_edges(
+        use_graph,
+        path,
+        jsonl_fallback=jsonl_fallback,
+        module_by_path=module_by_path,
     )
-    return write_use_edges(records, path, jsonl_fallback=jsonl_fallback)
 
 
 def _is_definition(roles: list[str]) -> bool:

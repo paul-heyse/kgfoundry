@@ -26,11 +26,8 @@ from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
 from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.cli.bm25 import BM25CliContext
-from codeintel_rev.cli.enrich_pipeline import OverlayContext, ScanInputs, ScipContext
 from codeintel_rev.cli.splade import SpladeCliContext
 from codeintel_rev.config.paths import ResolvedPaths
-from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
-from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
 from codeintel_rev.io.bm25_manager import BM25IndexManager
 from codeintel_rev.io.faiss_compat import load_faiss_module
 from codeintel_rev.io.splade_manager import (
@@ -57,6 +54,8 @@ if TYPE_CHECKING:
 
     from _pytest.logging import LogCaptureFixture
     from codeintel_rev.config.api import AppConfig
+    from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
+    from codeintel_rev.enrich.stubs_overlay import OverlayPolicy
 
     from kgfoundry_common.problem_details import JsonValue
 else:
@@ -370,7 +369,7 @@ def structured_log_asserter() -> Callable[[logging.LogRecord, set[str]], None]:
 
 
 @pytest.fixture(name="scan_inputs_builder")
-def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
+def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., Any]:
     """Return a factory for constructing ``ScanInputs`` instances.
 
     Returns
@@ -390,7 +389,7 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
         tagging_rules: Mapping[str, object] | None = None,
         max_file_bytes: int = 10_000,
         package_prefix: str | None = None,
-    ) -> ScanInputs:
+    ) -> Any:
         """Build ScanInputs instance with optional overrides.
 
         Parameters
@@ -419,6 +418,9 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
         """
         root = repo_root or (tmp_path / "repo")
         root.mkdir(parents=True, exist_ok=True)
+        from codeintel_rev.cli.enrich_pipeline import ScanInputs, ScipContext
+        from codeintel_rev.enrich.scip_reader import SCIPIndex
+
         scip = scip_index or SCIPIndex()
         context = ScipContext(index=scip, by_file=scip_by_file or {})
         return ScanInputs(
@@ -435,7 +437,7 @@ def fixture_scan_inputs_builder(tmp_path: Path) -> Callable[..., ScanInputs]:
 
 
 @pytest.fixture(name="overlay_context_builder")
-def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., OverlayContext]:
+def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., Any]:
     """Provide a factory for building ``OverlayContext`` instances.
 
     Returns
@@ -453,7 +455,7 @@ def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., OverlayCont
         policy: OverlayPolicy | None = None,
         scip_index: SCIPIndex | None = None,
         overlay_paths: frozenset[str] | None = None,
-    ) -> OverlayContext:
+    ) -> Any:
         """Build OverlayContext instance with optional overrides.
 
         Parameters
@@ -483,6 +485,10 @@ def fixture_overlay_context_builder(tmp_path: Path) -> Callable[..., OverlayCont
         stubs = stubs_root or (tmp_path / "stubs")
         for path in (root, overlays, stubs):
             path.mkdir(parents=True, exist_ok=True)
+        from codeintel_rev.cli.enrich_pipeline import OverlayContext
+        from codeintel_rev.enrich.scip_reader import SCIPIndex
+        from codeintel_rev.enrich.stubs_overlay import OverlayInputs, OverlayPolicy
+
         scip = scip_index or SCIPIndex()
         resolved_policy = policy or OverlayPolicy(
             overlays_root=overlays,

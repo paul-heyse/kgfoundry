@@ -56,7 +56,18 @@ def mock_commit() -> Mock:
 
 @pytest.fixture
 def repo_factory(mock_repo: Mock) -> RecordingRepoFactory:
-    """Factory that records repo construction calls for assertions."""
+    """Create factory that records repo construction calls for assertions.
+
+    Parameters
+    ----------
+    mock_repo : Mock
+        Mock Git repository object to return from factory.
+
+    Returns
+    -------
+    RecordingRepoFactory
+        Factory instance that records calls and returns mock_repo.
+    """
     return RecordingRepoFactory(mock_repo)
 
 
@@ -68,6 +79,8 @@ def git_client(tmp_path: Path, repo_factory: RecordingRepoFactory) -> GitClient:
     ----------
     tmp_path : Path
         Temporary directory path.
+    repo_factory : RecordingRepoFactory
+        Factory that records repo construction calls for assertions.
 
     Returns
     -------

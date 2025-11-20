@@ -6,10 +6,8 @@ import asyncio
 from http import HTTPStatus
 from pathlib import Path
 from typing import cast
-from unittest.mock import MagicMock
 
 from codeintel_rev.app.routers import index_admin
-from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from fastapi.testclient import TestClient
 
@@ -43,12 +41,6 @@ def test_admin_tuning_updates_context(tmp_path: Path) -> None:
 def test_admin_faiss_runtime_status_endpoint(tmp_path: Path) -> None:
     """Test that GET /admin/index/tuning/faiss returns current FAISS runtime tuning status."""
     ctx = build_application_context(tmp_path)
-    manager = MagicMock()
-    manager.runtime = MagicMock()
-    manager.runtime.get_runtime_tuning.return_value = {"active": {"nprobe": 32}}
-    manager.vec_dim = ctx.app_config.index.vec_dim
-
-    ctx.seed_runtime_cells_for_tests(coderank_faiss=cast("FAISSManager", manager))
     app = build_test_app(ctx)
     app.include_router(index_admin.router)
     app.dependency_overrides[_REQUIRE_ADMIN_DEP] = lambda: None
@@ -78,7 +70,9 @@ def test_admin_faiss_runtime_session_override(tmp_path: Path) -> None:
 def test_admin_faiss_runtime_reset_session(tmp_path: Path) -> None:
     """Test that DELETE /admin/index/tuning/faiss removes session-specific FAISS tuning."""
     ctx = build_application_context(tmp_path)
-    asyncio.run(ctx.scope_store.set("abc", {"faiss_tuning": {"nprobe": 64}, "languages": ["python"]}))
+    asyncio.run(
+        ctx.scope_store.set("abc", {"faiss_tuning": {"nprobe": 64}, "languages": ["python"]})
+    )
     app = build_test_app(ctx)
     app.include_router(index_admin.router)
     app.dependency_overrides[_REQUIRE_ADMIN_DEP] = lambda: None

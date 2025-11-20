@@ -2,13 +2,55 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from decimal import Decimal
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from codeintel_rev.enrich.graph.builders import ImportGraph
 from codeintel_rev.enrich.output_writers import write_parquet_or_jsonl
 from codeintel_rev.ids.goid import GOID, CrosswalkRow
+
+try:  # pragma: no cover - optional dependency
+    import pyarrow as pa
+except ImportError:  # pragma: no cover - optional dependency
+    pa = None
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from pyarrow import Schema
+
+    from codeintel_rev.uses_builder import UseGraph
+else:  # pragma: no cover - runtime fallback
+    Schema = Any
+    UseGraph = Any
+
+IMPORT_EDGES_SCHEMA: Schema | None = (
+    pa.schema(
+        [
+            pa.field("src_module", pa.string()),
+            pa.field("dst_module", pa.string()),
+            pa.field("src_fan_out", pa.int32()),
+            pa.field("dst_fan_in", pa.int32()),
+            pa.field("cycle_group", pa.int32()),
+        ]
+    )
+    if pa is not None
+    else None
+)
+
+USE_EDGES_SCHEMA: Schema | None = (
+    pa.schema(
+        [
+            pa.field("symbol", pa.string()),
+            pa.field("def_path", pa.string()),
+            pa.field("use_path", pa.string()),
+            pa.field("same_file", pa.bool_()),
+            pa.field("same_module", pa.bool_()),
+        ]
+    )
+    if pa is not None
+    else None
+)
 
 
 def _as_decimal(value: object) -> object:
@@ -22,6 +64,7 @@ def write_import_edges(
     path: str | Path,
     *,
     jsonl_fallback: Path | None = None,
+    module_by_path: Mapping[str, str] | None = None,
 ) -> Path:
     """Write import graph edges to Parquet or JSONL file.
 
@@ -34,6 +77,10 @@ def write_import_edges(
     jsonl_fallback : Path | None, optional
         Optional explicit fallback JSONL path. If None, uses path with .jsonl
         extension. Defaults to None.
+    module_by_path : Mapping[str, str] | None, optional
+        Optional mapping from repo-relative paths to module names. When
+        provided, edge endpoints are rendered using module names; otherwise
+        raw paths are used.
 
     Returns
     -------
@@ -42,30 +89,56 @@ def write_import_edges(
     """
     target = Path(path)
     fallback = jsonl_fallback or target.with_suffix(".jsonl")
-    records = [
-        {"src_path": src, "dst_path": dst} for src, dests in graph.edges.items() for dst in dests
-    ]
-    used_path, _ = write_parquet_or_jsonl(target, fallback, records)
+
+    def _module_for(path_key: str) -> str:
+        if module_by_path is None:
+            return path_key
+        mapped = module_by_path.get(path_key)
+        return mapped or path_key
+
+    def _rows() -> Iterator[Mapping[str, object]]:
+        for src, dests in graph.edges.items():
+            src_fan_out = graph.fan_out.get(src, 0)
+            cycle_group = graph.cycle_group.get(src, -1)
+            for dst in dests:
+                yield {
+                    "src_module": _module_for(src),
+                    "dst_module": _module_for(dst),
+                    "src_fan_out": src_fan_out,
+                    "dst_fan_in": graph.fan_in.get(dst, 0),
+                    "cycle_group": cycle_group,
+                }
+
+    used_path, _ = write_parquet_or_jsonl(
+        target,
+        fallback,
+        _rows(),
+        schema=IMPORT_EDGES_SCHEMA,
+    )
     return used_path
 
 
 def write_use_edges(
-    edges: Iterable[Mapping[str, str]],
+    graph: UseGraph,
     path: str | Path,
     *,
     jsonl_fallback: Path | None = None,
+    module_by_path: Mapping[str, str] | None = None,
 ) -> Path:
-    """Write use edges to Parquet or JSONL file.
+    """Write def-use edges to Parquet or JSONL file.
 
     Parameters
     ----------
-    edges : Iterable[Mapping[str, str]]
-        Iterable of edge dictionaries to serialize.
+    graph : UseGraph
+        Use graph instance containing definition-to-use edges.
     path : str | Path
         Target output file path (prefer Parquet, fallback to JSONL).
     jsonl_fallback : Path | None, optional
         Optional explicit fallback JSONL path. If None, uses path with .jsonl
         extension. Defaults to None.
+    module_by_path : Mapping[str, str] | None, optional
+        Optional mapping from repo-relative paths to module names to compute the
+        ``same_module`` flag. Defaults to None.
 
     Returns
     -------
@@ -74,7 +147,26 @@ def write_use_edges(
     """
     target = Path(path)
     fallback = jsonl_fallback or target.with_suffix(".jsonl")
-    used_path, _ = write_parquet_or_jsonl(target, fallback, edges)
+    module_lookup = module_by_path or {}
+
+    def _rows() -> Iterator[Mapping[str, object]]:
+        for def_path, use_path, symbol in graph.edges:
+            def_module = module_lookup.get(def_path)
+            use_module = module_lookup.get(use_path)
+            yield {
+                "symbol": symbol,
+                "def_path": def_path,
+                "use_path": use_path,
+                "same_file": def_path == use_path,
+                "same_module": bool(def_module and def_module == use_module),
+            }
+
+    used_path, _ = write_parquet_or_jsonl(
+        target,
+        fallback,
+        _rows(),
+        schema=USE_EDGES_SCHEMA,
+    )
     return used_path
 
 

@@ -48,6 +48,7 @@ write_config_output = export_service.write_config_output
 write_hotspot_output = export_service.write_hotspot_output
 write_exports_outputs = export_service.write_exports_outputs
 write_ast_outputs = export_service.write_ast_outputs
+write_static_diagnostics_output = export_service.write_static_diagnostics_output
 write_slices_output = export_service.write_slices_output
 apply_ownership = export_service.apply_ownership
 load_overlay_options = overlay_service.load_overlay_options
@@ -128,6 +129,7 @@ __all__ = [
     "write_graph_outputs",
     "write_hotspot_output",
     "write_slices_output",
+    "write_static_diagnostics_output",
     "write_typedness_output",
     "write_uses_output",
 ]

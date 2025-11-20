@@ -330,6 +330,7 @@ def run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
         coverage_rows=analytics.coverage_rows,
         hotspot_rows=analytics.hotspot_rows,
         tag_index=analytics.tag_index,
+        type_signals=ctx.type_signals,
     )
 
 

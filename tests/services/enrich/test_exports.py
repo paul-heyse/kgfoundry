@@ -38,6 +38,7 @@ def _build_result(tmp_path: Path) -> PipelineResult:
         coverage_rows=[],
         hotspot_rows=[],
         tag_index={"demo": ["pkg/app.py"]},
+        type_signals={},
     )
 
 

@@ -145,7 +145,12 @@ class ReadinessProbe:
     - ``_last_checks``: Cache of most recent check results keyed by resource name
     """
 
-    def __init__(self, context: ApplicationContext) -> None:
+    def __init__(
+        self,
+        context: ApplicationContext,
+        *,
+        http_client_factory: Callable[[], Any] | None = None,
+    ) -> None:
         """Initialize readiness probe.
 
         Parameters are documented in the class docstring.
@@ -153,6 +158,7 @@ class ReadinessProbe:
         self._context = context
         self._lock = asyncio.Lock()
         self._last_checks: dict[str, CheckResult] = {}
+        self._http_client_factory = http_client_factory
 
     async def initialize(self) -> None:
         """Prime readiness state on application startup.
@@ -590,8 +596,7 @@ class ReadinessProbe:
             )
         return CheckResult(healthy=True)
 
-    @staticmethod
-    def _check_vllm_http(base_url: str) -> CheckResult:
+    def _check_vllm_http(self, base_url: str) -> CheckResult:
         """Validate HTTP vLLM endpoint reachability.
 
         Extended Summary
@@ -629,8 +634,9 @@ class ReadinessProbe:
                 healthy=False,
                 detail=f"Invalid vLLM endpoint URL: {base_url}",
             )
+        factory = self._http_client_factory or (lambda: httpx.Client(timeout=HTTP_HEALTH_TIMEOUT_S))
         try:
-            with httpx.Client(timeout=HTTP_HEALTH_TIMEOUT_S) as client:
+            with factory() as client:
                 response = client.get(f"{base_url}/health", follow_redirects=True)
                 if response.is_success:
                     return CheckResult(healthy=True)

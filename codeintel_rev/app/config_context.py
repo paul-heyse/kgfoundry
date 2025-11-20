@@ -2147,6 +2147,8 @@ def merge_paths_with_app_config(paths: ResolvedPaths, app_config: AppConfig) -> 
         duckdb_path=app_config.duckdb.database,
         faiss_index=app_config.faiss.index_path,
     )
+
+
 class CatalogContext(Protocol):
     """Protocol describing contexts that expose ``open_catalog``."""
 

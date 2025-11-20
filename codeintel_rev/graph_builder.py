@@ -42,6 +42,7 @@ def write_import_graph(
     path: str | Path,
     *,
     jsonl_fallback: Path | None = None,
+    module_by_path: Mapping[str, str] | None = None,
 ) -> Path:
     """Write import graph edges to Parquet or JSONL file.
 
@@ -54,10 +55,18 @@ def write_import_graph(
     jsonl_fallback : Path | None, optional
         Optional explicit fallback JSONL path. If None, uses path with .jsonl
         extension. Defaults to None.
+    module_by_path : Mapping[str, str] | None, optional
+        Optional mapping from repo-relative paths to module names. When
+        provided, exported edges use module names instead of raw paths.
 
     Returns
     -------
     Path
         Path to the file that was actually written (Parquet or JSONL).
     """
-    return write_import_edges(graph, path, jsonl_fallback=jsonl_fallback)
+    return write_import_edges(
+        graph,
+        path,
+        jsonl_fallback=jsonl_fallback,
+        module_by_path=module_by_path,
+    )

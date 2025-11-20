@@ -32,7 +32,34 @@ def _expect_mapping(value: object, label: str) -> Mapping[str, Any]:
 
 
 def _successful_importer(result: object, calls: list[str]) -> Callable[[str], object]:
+    """Create an importer that succeeds and records calls.
+
+    Parameters
+    ----------
+    result : object
+        Object to return for all import requests.
+    calls : list[str]
+        List to append module names to when imported.
+
+    Returns
+    -------
+    Callable[[str], object]
+        Import function that returns result and records calls.
+    """
+
     def importer(name: str) -> object:
+        """Record import call and return result.
+
+        Parameters
+        ----------
+        name : str
+            Module name being imported.
+
+        Returns
+        -------
+        object
+            Pre-configured result object.
+        """
         calls.append(name)
         return result
 
@@ -40,7 +67,32 @@ def _successful_importer(result: object, calls: list[str]) -> Callable[[str], ob
 
 
 def _failing_importer(calls: list[str]) -> Callable[[str], object]:
+    """Create an importer that fails and records calls.
+
+    Parameters
+    ----------
+    calls : list[str]
+        List to append module names to when import attempted.
+
+    Returns
+    -------
+    Callable[[str], object]
+        Import function that raises ImportError and records calls.
+    """
+
     def importer(name: str) -> object:
+        """Record import call and raise ImportError.
+
+        Parameters
+        ----------
+        name : str
+            Module name being imported.
+
+        Raises
+        ------
+        ImportError
+            Always raised with message "No module named '{name}'".
+        """
         calls.append(name)
         raise ImportError(f"No module named '{name}'")
 
@@ -138,9 +190,7 @@ def test_correlation_id_in_problem_details() -> None:
 
     err = exc_info.value
     context = _expect_mapping(err.context, "context")
-    assertions.expect_true(
-        "correlation_id" in context, reason="context should have correlation_id"
-    )
+    assertions.expect_true("correlation_id" in context, reason="context should have correlation_id")
 
 
 def test_safe_import_autoapi_success() -> None:

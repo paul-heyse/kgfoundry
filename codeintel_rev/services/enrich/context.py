@@ -273,7 +273,7 @@ class CLIContextState:
     analytics: AnalyticsOptions = field(default_factory=AnalyticsOptions)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class OverlayCLIOptions:
     """Mutable overlay generation options parsed from CLI/config.
 
@@ -465,6 +465,8 @@ class PipelineResult:
         List of hotspot metric dictionaries.
     tag_index : dict[str, list[str]]
         Dictionary mapping tag names to lists of file paths.
+    type_signals : Mapping[str, FileTypeSignals]
+        Mapping of repo-relative paths to aggregated type signals.
     """
 
     root: Path
@@ -477,6 +479,7 @@ class PipelineResult:
     coverage_rows: list[dict[str, Any]]
     hotspot_rows: list[dict[str, Any]]
     tag_index: dict[str, list[str]]
+    type_signals: Mapping[str, FileTypeSignals]
 
 
 @dataclass(slots=True, frozen=True)
@@ -542,7 +545,7 @@ class ConfigReferenceState:
     references: dict[str, set[str]]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PipelineContext:
     """Thin context used by the refactored enrich CLI.
 

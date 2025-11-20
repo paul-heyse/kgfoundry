@@ -30,13 +30,51 @@ class _DictScopeStore:
         self._data: dict[str, ScopeIn] = {}
 
     async def get(self, name: str) -> ScopeIn | None:
+        """Get scope dictionary for session ID.
+
+        Parameters
+        ----------
+        name : str
+            Session ID to look up.
+
+        Returns
+        -------
+        ScopeIn | None
+            Scope dictionary if found, None otherwise.
+        """
         return self._data.get(name)
 
     async def set(self, name: str, value: ScopeIn) -> bool:
+        """Set scope dictionary for session ID.
+
+        Parameters
+        ----------
+        name : str
+            Session ID to store scope for.
+        value : ScopeIn
+            Scope dictionary to store.
+
+        Returns
+        -------
+        bool
+            Always True on success.
+        """
         self._data[name] = value
         return True
 
     async def delete(self, name: str) -> int:
+        """Delete scope dictionary for session ID.
+
+        Parameters
+        ----------
+        name : str
+            Session ID to delete scope for.
+
+        Returns
+        -------
+        int
+            1 if scope was deleted, 0 if not found.
+        """
         return 1 if self._data.pop(name, None) is not None else 0
 
 
@@ -74,8 +112,21 @@ def mock_context(tmp_path: Path) -> Mock:
 
 
 @pytest.fixture
-def text_search_session_factory(mock_context: Mock) -> Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]:
-    """Return a factory that seeds scopes and activates session IDs."""
+def text_search_session_factory(
+    mock_context: Mock,
+) -> Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]:
+    """Return a factory that seeds scopes and activates session IDs.
+
+    Parameters
+    ----------
+    mock_context : Mock
+        Mock application context containing scope_store.
+
+    Returns
+    -------
+    Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+        Factory function that creates FakeTextSearchSession with seeded scope.
+    """
 
     def _build(scope: ScopeIn | None, session_id: str) -> ml.FakeTextSearchSession:
         session = ml.FakeTextSearchSession(session_id=session_id)
@@ -113,20 +164,20 @@ def _run_search(
         Mock application context for search execution.
     options : TextSearchOptions
         Search configuration options (query, filters, etc.).
-
     runner : SubprocessRunner
         Subprocess runner used to simulate ripgrep/grep output.
 
     Returns
     -------
     dict
-        Search result payload.
+        Search result payload dictionary with matches and metadata.
     """
     return asyncio.run(search_text(context, options.query, options=options, runner=runner))
 
 
 def test_search_text_scope_include_and_exclude(
-    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+    mock_context: Mock,
+    text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession],
 ) -> None:
     """Scope include/exclude globs are forwarded as ripgrep ``--iglob`` options."""
     repo_root = mock_context.paths.repo_root
@@ -185,7 +236,8 @@ def test_search_text_scope_include_and_exclude(
 
 
 def test_search_text_explicit_paths_override_scope(
-    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+    mock_context: Mock,
+    text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession],
 ) -> None:
     """Explicit paths suppress scope include globs while keeping excludes."""
     repo_root = mock_context.paths.repo_root
@@ -250,7 +302,8 @@ def test_search_text_explicit_paths_override_scope(
 
 
 def test_search_text_explicit_globs_override_scope(
-    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+    mock_context: Mock,
+    text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession],
 ) -> None:
     """Explicit include/exclude globs override scope-provided filters."""
     repo_root = mock_context.paths.repo_root
@@ -320,7 +373,8 @@ def test_search_text_explicit_globs_override_scope(
 
 
 def test_search_text_timeout_error(
-    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+    mock_context: Mock,
+    text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession],
 ) -> None:
     """Test search_text raises VectorSearchError on timeout."""
     scope: ScopeIn = {}
@@ -362,7 +416,8 @@ def test_search_text_timeout_error(
 
 
 def test_search_text_subprocess_error(
-    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+    mock_context: Mock,
+    text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession],
 ) -> None:
     """Test search_text raises VectorSearchError on subprocess error."""
     scope: ScopeIn = {}
@@ -404,7 +459,8 @@ def test_search_text_subprocess_error(
 
 
 def test_search_text_value_error(
-    mock_context: Mock, text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession]
+    mock_context: Mock,
+    text_search_session_factory: Callable[[ScopeIn | None, str], ml.FakeTextSearchSession],
 ) -> None:
     """Test search_text raises VectorSearchError on ValueError."""
     scope: ScopeIn = {}

@@ -1071,22 +1071,10 @@ def resolve_duck_path(
     override : Path | None
         Optional explicit path override. If provided, this path takes precedence
         over version directory and AppConfig defaults.
-
-    Parameters
-    ----------
-    paths : ResolvedPaths
-        Canonicalized filesystem paths derived from AppConfig. When neither override
-        nor version_dir is provided, the DuckDB catalog path falls back to the
-        resolved default.
-    version_dir : Path | None
-        Optional version directory path. If provided and override is None, the
-        catalog path is resolved as version_dir / "catalog.duckdb".
-    override : Path | None
-        Optional explicit path override. If provided, this path takes precedence
-        over version directory and AppConfig defaults.
     app_config : AppConfig | None, optional
-        Explicit AppConfig object to use when computing the default DuckDB path.
-        Primarily used by tests; production callers can omit and rely on ``paths``.
+        Application configuration object. If provided and override/version_dir are None,
+        used to resolve default DuckDB catalog path. Primarily used by tests; production
+        callers can omit and rely on ``paths``.
 
     Returns
     -------

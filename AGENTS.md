@@ -911,82 +911,6 @@ Example `PATH_MAP`:
 
 ---
 
-## Agent Catalog & STDIO API (session‑scoped, no daemon)
-
-- **Artifacts:**
-  - Ground truth: navigation artifacts under `docs/_build/`
-  - Portal: `site/_build/agent/index.html`
-- **Session API (JSON over stdio):**
-  ```json
-  {"id":"1","method":"capabilities","params":{}}
-  {"id":"2","method":"search","params":{"q":"vector store","k":10}}
-  {"id":"3","method":"open_anchor","params":{"symbol_id":"py:kg.index.faiss.build_index","mode":"editor"}}
-  {"id":"4","method":"find_callers","params":{"symbol_id":"py:kg.doc.parse.Parser.parse"}}
-  {"id":"5","method":"find_callees","params":{"symbol_id":"py:kg.index.faiss.build_index"}}
-  ```
-- **Lifecycle:**
-  - Editor spawns: `python -m tools.docs.stdio_api`
-  - First call is `capabilities`; one request at a time (MVP)
-  - Process exits when stdin closes
-
----
-
-## Task Playbooks (feature / refactor / bugfix)
-
-### A) New Feature
-1. Read the spec/proposal; write the **4‑item design note**.
-2. Define/update **JSON Schema** for any boundary payloads.
-3. Implement **typed** public API; write pure logic first, I/O later.
-4. Add **parametrized tests** (happy paths, edges, negative cases).
-5. Run quality gates (format → lint → pyright → pyrefly → pytest).
-
-
-**Done when:** all gates green; PR includes design note, schemas, and runnable examples.
-
-### B) Safe Refactor (no behavior change)
-1. Prove parity with tests/fixtures **before** changes.
-2. Extract pure functions; reduce complexity; improve names & docs.
-3. Maintain public signatures; add deprecations if needed (warn + doc).
-4. Run full gates; add a “refactor proof” note in the PR (tests proving equivalence).
-
-### C) Bugfix
-1. Reproduce with a failing **parametrized** test.
-2. Fix with smallest diff; explain root cause in PR.
-3. Add a **regression test**.
-4. Run full gates; link issue/ticket in commit.
-
----
-
-## PR Template & Checklist
-
-**Use this PR template:**
-
-- **Title:** `<area>: <short imperative>`
-- **Summary:** one paragraph describing the change and why.
-- **Public API:** list symbols & **typed** signatures that changed/added.
-- **Data Contracts:** link to JSON Schema/OpenAPI diff (if any).
-- **Test Plan:** commands + what they prove.
-- **Impact:** migration notes / deprecations.
-
-**Checklist (paste outputs):**
-```
-[ ] uv run ruff format && uv run ruff check --fix
-[ ] uv run pyright --warnings --pythonversion=3.13
-[ ] uv run pyrefly check
-[ ] uv run pytest -q
-[ ] python tools/check_new_suppressions.py src
-[ ] python tools/check_imports.py
-[ ] uv run pip-audit
-[ ] OpenAPI spec lints clean (if applicable)
-```
-
-**Problem Details Example:**
-- Canonical example: `schema/examples/problem_details/search-missing-index.json`
-- All HTTP error responses must conform to RFC 9457 Problem Details format
-- See `src/kgfoundry_common/errors/` for exception taxonomy and Problem Details helpers
-
----
-
 ## Quick Commands (copy/paste)
 
 ```bash
@@ -1000,10 +924,6 @@ uv run pyrefly check
 # Tests (incl. doctests/xdoctest via pytest.ini)
 uv run pytest -q
 
-
-# Architectural boundaries & suppression guard
-python tools/check_new_suppressions.py src
-python tools/check_imports.py
 
 # Dead code
 uv run vulture src tools stubs --min-confidence 90

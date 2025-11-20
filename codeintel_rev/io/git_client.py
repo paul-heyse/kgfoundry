@@ -54,7 +54,18 @@ if TYPE_CHECKING:
 
 
 def _default_repo_factory(repo_path: Path) -> git.Repo:
-    """Return a GitPython Repo initialized with parent directory search."""
+    """Return a GitPython Repo initialized with parent directory search.
+
+    Parameters
+    ----------
+    repo_path : Path
+        Repository root or subdirectory path.
+
+    Returns
+    -------
+    git.Repo
+        GitPython Repo instance, searching parent directories for .git.
+    """
     return git.Repo(repo_path, search_parent_directories=True)
 
 

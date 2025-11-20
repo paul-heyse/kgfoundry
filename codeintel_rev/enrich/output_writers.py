@@ -41,8 +41,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     import pyarrow as pa_typing
 
     PaTable = pa_typing.Table
+    PaSchema = pa_typing.Schema
 else:  # pragma: no cover - runtime guard
     PaTable = Any
+    PaSchema = Any
 
 RowMapping = Mapping[str, object]
 LOGGER = logging.getLogger(__name__)
@@ -370,6 +372,8 @@ def write_parquet_or_jsonl(
     parquet_path: str | Path,
     jsonl_path: str | Path,
     rows: Iterable[RowMapping],
+    *,
+    schema: PaSchema | None = None,
 ) -> tuple[Path, int]:
     """Write rows to Parquet when possible, falling back to JSONL.
 
@@ -381,6 +385,10 @@ def write_parquet_or_jsonl(
         Fallback output path for JSONL format when Parquet is unavailable.
     rows : Iterable[RowMapping]
         Iterable of row dictionaries to write.
+    schema : PaSchema | None, optional
+        Optional PyArrow schema used when writing Parquet to enforce column
+        ordering and types. Ignored when PyArrow is unavailable. Defaults to
+        None.
 
     Returns
     -------
@@ -396,7 +404,7 @@ def write_parquet_or_jsonl(
         return fallback, 0
     if pa is not None and pq is not None:
         try:
-            table = pa.Table.from_pylist(materialized)
+            table = pa.Table.from_pylist(materialized, schema=schema)
             target.parent.mkdir(parents=True, exist_ok=True)
             pq.write_table(table, str(target))
             return target, len(materialized)

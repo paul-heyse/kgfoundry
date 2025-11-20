@@ -12,7 +12,8 @@ from pathlib import Path
 
 from orchestration import cli as cli_module
 from orchestration.cli import IndexCliConfig, index_faiss, run_index_faiss
-from tests._helpers import assertions, cli as cli_helpers
+from tests._helpers import assertions
+from tests._helpers import cli as cli_helpers
 
 _MIN_DOCSTRING_LENGTH = 120
 
@@ -29,6 +30,18 @@ class _RecordingFaissRunner:
         return dict(self.metadata)
 
     def latest(self) -> IndexCliConfig:
+        """Return the most recent FAISS runner invocation config.
+
+        Returns
+        -------
+        IndexCliConfig
+            Most recent configuration passed to the runner.
+
+        Raises
+        ------
+        AssertionError
+            If the runner was never invoked.
+        """
         if not self.calls:
             message = "FAISS runner was not invoked"
             raise AssertionError(message)

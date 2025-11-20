@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import replace as dc_replace
 from http import HTTPStatus
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import duckdb
 import httpx
@@ -19,6 +19,27 @@ from fastapi import FastAPI
 
 from tests._helpers import assertions
 from tests._helpers.http import build_test_app
+
+
+class _FakeHttpClient:
+    def __init__(self, *, is_success: bool = True, side_effect: Exception | None = None) -> None:
+        self._is_success = is_success
+        self._side_effect = side_effect
+
+    def __enter__(self) -> _FakeHttpClient:
+        return self
+
+    def __exit__(self, exc_type, exc: BaseException | None, tb: object | None) -> None:
+        _ = exc_type, exc, tb
+
+    def get(self, *_: object, **__: object) -> Mock:
+        if self._side_effect is not None:
+            raise self._side_effect
+        response = Mock()
+        response.is_success = self._is_success
+        response.status_code = 200 if self._is_success else 503
+        response.text = "error" if not self._is_success else "ok"
+        return response
 
 
 def _materialized_app_config(app_config: AppConfig, *, enabled: bool) -> AppConfig:
@@ -266,15 +287,14 @@ async def test_readiness_probe_vllm_unreachable(
         mock_application_context,
         app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
     )
-    probe = ReadinessProbe(context)
+    probe = ReadinessProbe(
+        context,
+        http_client_factory=lambda: _FakeHttpClient(
+            is_success=False, side_effect=httpx.HTTPError("Connection refused")
+        ),
+    )
 
-    # Act - mock httpx to raise HTTPError
-    with patch("httpx.Client") as mock_client:
-        mock_instance = Mock()
-        mock_instance.get.side_effect = httpx.HTTPError("Connection refused")
-        mock_client.return_value.__enter__.return_value = mock_instance
-
-        results = await probe.refresh()
+    results = await probe.refresh()
 
     # Assert
     assertions.expect_false(
@@ -431,17 +451,12 @@ def test_readiness_probe_check_vllm_success(mock_application_context: Applicatio
         mock_application_context,
         app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
     )
-    probe = ReadinessProbe(context)
+    probe = ReadinessProbe(
+        context,
+        http_client_factory=lambda: _FakeHttpClient(is_success=True),
+    )
 
-    # Act - mock successful HTTP response
-    with patch("httpx.Client") as mock_client:
-        mock_response = Mock()
-        mock_response.is_success = True
-        mock_instance = Mock()
-        mock_instance.get.return_value = mock_response
-        mock_client.return_value.__enter__.return_value = mock_instance
-
-        result = probe.check_vllm_connection()
+    result = probe.check_vllm_connection()
 
     # Assert
     assertions.expect_true(result.healthy, reason="vllm should be healthy when connection succeeds")
@@ -456,15 +471,14 @@ def test_readiness_probe_check_vllm_http_error(
         mock_application_context,
         app_config=_http_vllm_app_config(mock_application_context, "http://localhost:8001/v1"),
     )
-    probe = ReadinessProbe(context)
+    probe = ReadinessProbe(
+        context,
+        http_client_factory=lambda: _FakeHttpClient(
+            is_success=False, side_effect=httpx.HTTPError("Connection refused")
+        ),
+    )
 
-    # Act - mock HTTP error
-    with patch("httpx.Client") as mock_client:
-        mock_instance = Mock()
-        mock_instance.get.side_effect = httpx.HTTPError("Connection refused")
-        mock_client.return_value.__enter__.return_value = mock_instance
-
-        result = probe.check_vllm_connection()
+    result = probe.check_vllm_connection()
 
     # Assert
     assertions.expect_false(result.healthy, reason="vllm should be unhealthy on HTTP error")

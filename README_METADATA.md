@@ -333,3 +333,76 @@ Consumers can join SCIP symbols with GOIDs via the crosswalk’s `scip_symbol` c
 | `qnames`       | list   | Qualified names provided when applicable. |
 
 The CST nodes can be joined with GOID crosswalk entries via future `cst_node_id` fields, enabling precise mapping between GOIDs and concrete syntax.
+
+## 16. Import Graph Edges (`import_graph_edges.*`)
+
+**Purpose**: Normalized module import graph capturing directed edges between modules along with degree metadata and cycle grouping.
+
+**Origin**: Built from LibCST import metadata during `write_graph_outputs` via `codeintel_rev.enrich.graph.io.write_import_edges`. Stored under `enriched/graphs/import_graph_edges.parquet` and mirrored to JSONL during document generation.
+
+**Columns**
+
+| Column        | Type   | Description |
+|---------------|--------|-------------|
+| `src_module`  | string | Source module name (derived from module path). |
+| `dst_module`  | string | Target module imported by the source. |
+| `src_fan_out` | int    | Out-degree of the source module. |
+| `dst_fan_in`  | int    | In-degree of the destination module. |
+| `cycle_group` | int    | Strongly connected component identifier from Tarjan SCC. |
+
+Edges can be joined to modules (by `src_module`/`dst_module`) and to per-module analytics such as hotspots and typedness.
+
+## 17. Symbol Use Edges (`symbol_use_edges.*`)
+
+**Purpose**: SCIP-based def→use relationships linking where symbols are defined and where they are referenced across the codebase.
+
+**Origin**: Derived from the SCIP index by `codeintel_rev.uses_builder.build_use_graph` and exported via `write_uses_output`. Lives at `enriched/graphs/symbol_use_edges.parquet`.
+
+**Columns**
+
+| Column        | Type   | Description |
+|---------------|--------|-------------|
+| `symbol`      | string | SCIP symbol identifier. |
+| `def_path`    | string | Repo-relative path where the symbol is defined. |
+| `use_path`    | string | Repo-relative path where the symbol is referenced. |
+| `same_file`   | bool   | True when definition and use share the same file. |
+| `same_module` | bool   | True when both paths map to the same module. |
+
+Join `symbol` to `index.scip.json` or GOID crosswalk SCIP symbols to enrich with semantic metadata.
+
+## 18. Config Values (`config_values.*`)
+
+**Purpose**: Per-key view of discovered configuration files, showing where each config key is referenced in code.
+
+**Origin**: Flattened from the config indexer output (`index_config_files`) and enrichment references (`prepare_config_state`), exported via `write_config_output` to `enriched/analytics/config_values.parquet`.
+
+**Columns**
+
+| Column              | Type   | Description |
+|---------------------|--------|-------------|
+| `config_path`       | string | Repo-relative path to the config file. |
+| `format`            | string | Detected format (`yaml`, `toml`, `json`, `ini`, `env`, `other`). |
+| `key`               | string | Normalized config key path (e.g., `service.database.host`). |
+| `reference_paths`   | list   | Sorted list of files referencing this config file/key. |
+| `reference_modules` | list   | Corresponding module names for `reference_paths`. |
+| `reference_count`   | int    | Number of distinct referencing files. |
+
+Use the reference lists to trace blast radius for configuration changes and join to modules for richer metadata.
+
+## 19. Static Diagnostics (`static_diagnostics.*`)
+
+**Purpose**: Per-file counts of static type-checker errors aggregated from Pyrefly and Pyright runs.
+
+**Origin**: Produced from `FileTypeSignals` captured during pipeline preparation and emitted via `write_static_diagnostics_output` to `enriched/analytics/static_diagnostics.parquet`.
+
+**Columns**
+
+| Column           | Type | Description |
+|------------------|------|-------------|
+| `rel_path`       | string | Repo-relative file path. |
+| `pyrefly_errors` | int  | Error count reported by Pyrefly. |
+| `pyright_errors` | int  | Error count reported by Pyright. |
+| `total_errors`   | int  | Sum of Pyrefly and Pyright errors. |
+| `has_errors`     | bool | True when `total_errors` > 0. |
+
+These rows complement `typedness.jsonl` and hotspots to prioritize files with static analysis issues.
