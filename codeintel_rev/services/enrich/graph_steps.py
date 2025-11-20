@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -45,6 +46,7 @@ def build_goid_artifacts(
     *,
     out_dir: Path | None = None,
     ingest: bool = False,
+    include: Sequence[str] | None = None,
 ) -> GOIDArtifactsResult:
     """Build GOID registry and crosswalk artifacts.
 
@@ -54,7 +56,7 @@ def build_goid_artifacts(
         Paths to the emitted GOID registry and crosswalk datasets.
     """
     target = _ensure_output_dir(out_dir or ctx.paths.data_dir)
-    files = collect_python_files(ctx)
+    files = collect_python_files(ctx, include=include)
     builder = GOIDBuilder(repo=str(ctx.paths.repo_root), commit=detect_commit(ctx.paths.repo_root))
     with _stage(StageMeta("build-goids", {"files": len(files)})) as meta:
         node_rows, _ = collect_ast_artifacts(ctx.paths.repo_root, files)
@@ -74,6 +76,7 @@ def build_callgraph_artifacts(
     *,
     out_dir: Path | None = None,
     ingest: bool = False,
+    include: Sequence[str] | None = None,
 ) -> CallGraphArtifactsResult:
     """Build call graph nodes and edges.
 
@@ -83,7 +86,7 @@ def build_callgraph_artifacts(
         Paths to node and edge Parquet files.
     """
     target = _ensure_output_dir(out_dir or ctx.paths.data_dir)
-    files = collect_python_files(ctx)
+    files = collect_python_files(ctx, include=include)
     builder = CallGraphBuilder(
         repo_root=ctx.paths.repo_root,
         repo=str(ctx.paths.repo_root),
@@ -109,6 +112,7 @@ def build_cfg_artifacts(
     out_dir: Path | None = None,
     ingest_cfg: bool = False,
     ingest_dfg: bool = False,
+    include: Sequence[str] | None = None,
 ) -> CFGArtifactsResult:
     """Build CFG and DFG artifacts for Python functions.
 
@@ -122,6 +126,8 @@ def build_cfg_artifacts(
         When True, upsert CFG blocks/edges and GOIDs into DuckDB.
     ingest_dfg : bool, optional
         When True, upsert DFG edges (and GOIDs if needed) into DuckDB.
+    include : Sequence[str] | None, optional
+        Optional tuple of include globs restricting which files are analyzed.
 
     Returns
     -------
@@ -129,7 +135,7 @@ def build_cfg_artifacts(
         Paths to CFG block, CFG edge, and DFG edge Parquet files.
     """
     target = _ensure_output_dir(out_dir or ctx.paths.data_dir)
-    files = collect_python_files(ctx)
+    files = collect_python_files(ctx, include=include)
     builder = CFGBuilder(
         repo_root=ctx.paths.repo_root,
         repo=str(ctx.paths.repo_root),

@@ -1,0 +1,421 @@
+openapi: 3.1.0
+info:
+  title: CodeIntel Catalog Read APIs
+  version: "0.1.0"
+  description: |
+    Read-only HTTP APIs for navigating the CodeIntel metadata catalog backed by DuckDB.
+    Primary resources:
+      - **GOID Cross‑walks** — resolve Global Object IDs across SCIP/AST/CST/chunk/file spaces
+      - **Call Graph** — query directed call edges with expansion and streaming
+      - **CFG/DFG** — per-function Control/Data Flow Graphs, typed nodes/edges
+    
+    These APIs are designed to sit alongside the existing MCP tools and use the
+    same readiness/capability model and Problem Details error envelope.
+
+    Key integration points in the current code base:
+      - DuckDB access via `codeintel_rev.io.duckdb_catalog` and `DuckDBManager` (per-request connections)
+      - HTTP app in `codeintel_rev.app.main` (FastAPI) for mounting new routes
+      - Error and capability patterns match MCP adapters
+    
+    See Architecture Narrative sections 1.3 Use Cases (B,E), 4.2 Outbound Dependencies,
+    and 7.* Data & Metadata for context and table ownership.
+servers:
+  - url: https://api.yourdomain.com
+    description: Production
+  - url: http://localhost:8080
+    description: Local dev
+tags:
+  - name: GOID
+    description: Global Object ID cross‑walks
+  - name: Graph
+    description: Call graph queries
+  - name: Flow
+    description: Control/Data Flow Graphs
+
+paths:
+  /v1/catalog/goids:
+    get:
+      tags: [GOID]
+      operationId: listOrResolveGOIDs
+      summary: Resolve GOIDs and/or list cross‑walk rows
+      description: |
+        Flexible GET for both enumeration and resolution. If one or more locator parameters
+        are provided, the service resolves them to a canonical **GOID** and returns a cross‑walk
+        row per linked identifier. Without locators, supports pagination over all rows.
+        
+        A **GOID** (Global Object ID) is a canonical, stable identifier for any code object
+        (module, class, function, method, variable). It cross‑links: scip symbol, AST qualname,
+        LibCST node id, chunk id, file path + span, module path, language.
+      parameters:
+        - $ref: '#/components/parameters/pageLimit'
+        - $ref: '#/components/parameters/pageCursor'
+        - $ref: '#/components/parameters/sort'
+        # Locators (any combination allowed)
+        - name: scip_symbol
+          in: query
+          description: Exact SCIP symbol string to resolve
+          schema: { type: string }
+        - name: ast_qualname
+          in: query
+          description: Fully‑qualified Python name (module:qualname)
+          schema: { type: string }
+        - name: path
+          in: query
+          description: Source file path relative to repo root
+          schema: { type: string }
+        - name: start_line
+          in: query
+          description: 1‑based start line (when path provided)
+          schema: { type: integer, minimum: 1 }
+        - name: end_line
+          in: query
+          description: 1‑based end line (inclusive; when path provided)
+          schema: { type: integer, minimum: 1 }
+        - name: chunk_id
+          in: query
+          description: Internal chunk identifier
+          schema: { type: integer }
+        - name: symbol_id
+          in: query
+          description: Internal symbol id (DuckDB `symbols.id` or equivalent)
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GOIDListResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /v1/graph/call:
+    get:
+      tags: [Graph]
+      operationId: queryCallGraph
+      summary: Query directed call graph edges (expandable)
+      description: |
+        Returns directed call edges. Supports outward/inward expansion from a root GOID, depth‑limited traversal,
+        filtering by language, path prefix, and inclusion of unresolved/dynamic calls. Streaming mode available via
+        `Accept: application/x-ndjson` (one JSON edge per line).
+      parameters:
+        - name: root_goid
+          in: query
+          required: true
+          description: Root function/method GOID to expand from
+          schema: { type: string }
+        - name: direction
+          in: query
+          description: Edge direction
+          schema:
+            type: string
+            enum: [out, in, both]
+            default: out
+        - name: depth
+          in: query
+          description: Max expansion depth (0 = only root edges)
+          schema: { type: integer, minimum: 0, maximum: 10, default: 1 }
+        - name: max_nodes
+          in: query
+          description: Safety cap on returned vertices
+          schema: { type: integer, minimum: 1, maximum: 100000, default: 10000 }
+        - name: lang
+          in: query
+          description: Language filter (e.g., 'python')
+          schema: { type: string }
+        - name: include_unresolved
+          in: query
+          description: Include dynamic/unresolved call edges
+          schema: { type: boolean, default: false }
+        - name: include_third_party
+          in: query
+          description: Keep calls into site‑packages/vendor code
+          schema: { type: boolean, default: false }
+        - name: path_prefix
+          in: query
+          description: Restrict to files under this path prefix
+          schema: { type: string }
+        - name: format
+          in: query
+          description: Response format
+          schema:
+            type: string
+            enum: [edge_list, adjacency, cytoscape]
+            default: edge_list
+        - $ref: '#/components/parameters/pageLimit'
+        - $ref: '#/components/parameters/pageCursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CallGraphResponse' }
+            application/x-ndjson:
+              schema:
+                type: string
+                description: One JSON edge per line (streamed)
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /v1/flow/cfg/{function_goid}:
+    get:
+      tags: [Flow]
+      operationId: getCFG
+      summary: Get the Control Flow Graph (CFG) for a function/method
+      parameters:
+        - name: function_goid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: format
+          in: query
+          description: Graph serialization format
+          schema:
+            type: string
+            enum: [json, graphml, cytoscape]
+            default: json
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CFGResponse' }
+            application/xml:
+              schema:
+                type: string
+                description: GraphML (when format=graphml)
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /v1/flow/dfg/{function_goid}:
+    get:
+      tags: [Flow]
+      operationId: getDFG
+      summary: Get the Data Flow Graph (DFG) for a function/method
+      parameters:
+        - name: function_goid
+          in: path
+          required: true
+          schema: { type: string }
+        - name: format
+          in: query
+          description: Graph serialization format
+          schema:
+            type: string
+            enum: [json, graphml, cytoscape]
+            default: json
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DFGResponse' }
+            application/xml:
+              schema:
+                type: string
+                description: GraphML (when format=graphml)
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+components:
+  parameters:
+    pageLimit:
+      name: page[limit]
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+    pageCursor:
+      name: page[cursor]
+      in: query
+      schema: { type: string }
+    sort:
+      name: sort
+      in: query
+      description: Sort expression, e.g. '-updated_at,goid'
+      schema: { type: string, default: '-updated_at' }
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Not Found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ServerError:
+      description: Internal Server Error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri, default: "about:blank" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    GOIDRow:
+      type: object
+      required: [goid, lang]
+      properties:
+        goid: { type: string, description: Canonical Global Object ID }
+        lang: { type: string, example: python }
+        module_path: { type: string, nullable: true }
+        file_path: { type: string, nullable: true }
+        span:
+          type: object
+          nullable: true
+          properties:
+            start_line: { type: integer }
+            end_line: { type: integer }
+        scip_symbol: { type: string, nullable: true }
+        ast_qualname: { type: string, nullable: true }
+        cst_node_id: { type: string, nullable: true }
+        chunk_id: { type: integer, nullable: true }
+        symbol_id: { type: string, nullable: true }
+        updated_at: { type: string, format: date-time }
+
+    GOIDListResponse:
+      type: object
+      required: [data, meta, links]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/GOIDRow' }
+        meta:
+          type: object
+          properties:
+            page:
+              type: object
+              properties:
+                limit: { type: integer }
+            match_count: { type: integer }
+        links:
+          type: object
+          properties:
+            self: { type: string, format: uri }
+            next: { type: string, format: uri, nullable: true }
+            prev: { type: string, format: uri, nullable: true }
+
+    CallEdge:
+      type: object
+      required: [caller, callee]
+      properties:
+        caller: { type: string, description: GOID of caller }
+        callee: { type: string, description: GOID of callee }
+        callsite:
+          type: object
+          properties:
+            file_path: { type: string }
+            start_line: { type: integer }
+            end_line: { type: integer }
+        resolved: { type: boolean, description: True if target resolved statically }
+        kind:
+          type: string
+          enum: [direct, indirect, dynamic]
+        confidence: { type: number, format: float, minimum: 0, maximum: 1 }
+        updated_at: { type: string, format: date-time }
+
+    CallGraphResponse:
+      type: object
+      required: [nodes, edges]
+      properties:
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              goid: { type: string }
+              label: { type: string }
+              file_path: { type: string, nullable: true }
+        edges:
+          type: array
+          items: { $ref: '#/components/schemas/CallEdge' }
+        truncated:
+          type: boolean
+        meta:
+          type: object
+          properties:
+            depth: { type: integer }
+            direction: { type: string }
+            filters:
+              type: object
+              additionalProperties: true
+
+    BasicBlock:
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        span:
+          type: object
+          nullable: true
+          properties:
+            file_path: { type: string }
+            start_line: { type: integer }
+            end_line: { type: integer }
+
+    CFGEdge:
+      type: object
+      required: [src, dst]
+      properties:
+        src: { type: string }
+        dst: { type: string }
+        label: { type: string, nullable: true }
+
+    CFGResponse:
+      type: object
+      required: [function_goid, blocks, edges]
+      properties:
+        function_goid: { type: string }
+        blocks:
+          type: array
+          items: { $ref: '#/components/schemas/BasicBlock' }
+        edges:
+          type: array
+          items: { $ref: '#/components/schemas/CFGEdge' }
+
+    DFGNode:
+      type: object
+      required: [id, kind]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [def, use, phi, constant, call] }
+        symbol: { type: string, nullable: true }
+        span:
+          type: object
+          nullable: true
+          properties:
+            file_path: { type: string }
+            start_line: { type: integer }
+            end_line: { type: integer }
+
+    DFGEdge:
+      type: object
+      required: [src, dst]
+      properties:
+        src: { type: string }
+        dst: { type: string }
+        label: { type: string, nullable: true }
+
+    DFGResponse:
+      type: object
+      required: [function_goid, nodes, edges]
+      properties:
+        function_goid: { type: string }
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/DFGNode' }
+        edges:
+          type: array
+          items: { $ref: '#/components/schemas/DFGEdge' }

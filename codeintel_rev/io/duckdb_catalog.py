@@ -9,13 +9,16 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Any, ClassVar, NotRequired, Self, TypedDict, Unpack, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.duckdb_dao import (
@@ -38,9 +41,15 @@ from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.duckdb_schema import (
     SQL_CREATE_CALL_EDGES_TABLE,
     SQL_CREATE_CALL_NODES_TABLE,
+    SQL_CREATE_CATALOG_CALL_EDGES_VIEW,
+    SQL_CREATE_CATALOG_CFG_BLOCKS_VIEW,
+    SQL_CREATE_CATALOG_CFG_EDGES_VIEW,
+    SQL_CREATE_CATALOG_DFG_EDGES_VIEW,
+    SQL_CREATE_CATALOG_DFG_NODES_VIEW,
     SQL_CREATE_CFG_BLOCKS_TABLE,
     SQL_CREATE_CFG_EDGES_TABLE,
     SQL_CREATE_DFG_EDGES_TABLE,
+    SQL_CREATE_GOID_CROSSWALK_VIEW,
     SQL_CREATE_GOID_XWALK_TABLE,
     SQL_CREATE_GOIDS_TABLE,
     SQL_CREATE_V_GOID_BY_SYMBOL,
@@ -73,6 +82,140 @@ else:
 
 LOGGER = logging.getLogger(__name__)
 _PARQUET_MAGIC = b"PAR1"
+
+
+@dataclass(slots=True)
+class GOIDQuery:
+    """Normalized GOID query options."""
+
+    scip_symbol: str | None = None
+    ast_qualname: str | None = None
+    path: str | None = None
+    start_line: int | None = None
+    end_line: int | None = None
+    chunk_id: int | None = None
+    symbol_id: str | None = None
+    limit: int = 200
+    cursor: str | None = None
+    sort: str = "-updated_at"
+
+
+@dataclass(slots=True)
+class CallGraphQuery:
+    """Call graph traversal and filter options."""
+
+    root_goid: str
+    direction: str = "out"
+    depth: int = 1
+    max_nodes: int = 10_000
+    lang: str | None = None
+    include_unresolved: bool = False
+    include_third_party: bool = False
+    path_prefix: str | None = None
+    limit: int = 200
+    cursor: str | None = None
+    fmt: str = "edge_list"
+
+
+class SpanDict(TypedDict, total=False):
+    file_path: str
+    start_line: int | None
+    end_line: int | None
+
+
+class CallGraphNodeDict(TypedDict, total=False):
+    goid: str
+    label: str
+    file_path: str | None
+
+
+class CallGraphEdgeDict(TypedDict):
+    caller: str
+    callee: str
+    callsite: SpanDict | None
+    resolved: bool
+    kind: str
+    confidence: float | Decimal | None
+    updated_at: str | None
+
+
+class CallGraphFilterMeta(TypedDict):
+    lang: str | None
+    include_unresolved: bool
+    include_third_party: bool
+    path_prefix: str | None
+
+
+class CallGraphMetaDict(TypedDict):
+    depth: int
+    direction: str
+    filters: CallGraphFilterMeta
+    format: str
+
+
+class CallGraphResult(TypedDict):
+    nodes: list[CallGraphNodeDict]
+    edges: list[CallGraphEdgeDict]
+    truncated: bool
+    meta: CallGraphMetaDict
+    next_cursor: str | None
+
+
+class GOIDRowDict(TypedDict):
+    goid: str
+    lang: str
+    module_path: NotRequired[str | None]
+    file_path: NotRequired[str | None]
+    span: NotRequired[SpanDict | None]
+    scip_symbol: NotRequired[str | None]
+    ast_qualname: NotRequired[str | None]
+    cst_node_id: NotRequired[str | None]
+    chunk_id: NotRequired[int | None]
+    symbol_id: NotRequired[str | None]
+    updated_at: NotRequired[str | None]
+
+
+class GOIDQueryResult(TypedDict):
+    rows: list[GOIDRowDict]
+    next_cursor: str | None
+
+
+class CFGBlockDict(TypedDict):
+    id: str
+    label: str
+    span: NotRequired[SpanDict | None]
+
+
+class CFGEdgeDict(TypedDict):
+    src: str
+    dst: str
+    label: NotRequired[str | None]
+
+
+class CFGResult(TypedDict):
+    function_goid: str
+    blocks: list[CFGBlockDict]
+    edges: list[CFGEdgeDict]
+
+
+class DFGNodeDict(TypedDict):
+    id: str
+    kind: str
+    symbol: NotRequired[str | None]
+    span: NotRequired[SpanDict | None]
+
+
+class DFGEdgeDict(TypedDict):
+    src: str
+    dst: str
+    label: NotRequired[str | None]
+
+
+class DFGResult(TypedDict):
+    function_goid: str
+    nodes: list[DFGNodeDict]
+    edges: list[DFGEdgeDict]
+
 
 _SQL_INSERT_GOIDS = """
 INSERT OR REPLACE INTO "goids"(
@@ -988,7 +1131,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
 
     def open(self) -> None:
         """Ensure catalog views are initialized."""
-        self._ensure_ready()
+        self.initialize_read_views()
 
     def close(self) -> None:
         """No-op for compatibility; connections are per-use via the manager."""
@@ -1103,6 +1246,28 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         self._install_optional_views(conn)
         self._ensure_faiss_idmap_view(conn, None)
         self._ensure_faiss_join_view(conn)
+        self._ensure_catalog_read_views(conn)
+
+    def initialize_read_views(self) -> None:
+        """Idempotently ensure catalog read views exist."""
+        self._ensure_ready()
+
+    @staticmethod
+    def _ensure_catalog_read_views(conn: duckdb.DuckDBPyConnection) -> None:
+        """Ensure GOID, call graph, and CFG/DFG views exist for read APIs."""
+        conn.execute(SQL_CREATE_GOIDS_TABLE)
+        conn.execute(SQL_CREATE_GOID_XWALK_TABLE)
+        conn.execute(SQL_CREATE_CALL_NODES_TABLE)
+        conn.execute(SQL_CREATE_CALL_EDGES_TABLE)
+        conn.execute(SQL_CREATE_CFG_BLOCKS_TABLE)
+        conn.execute(SQL_CREATE_CFG_EDGES_TABLE)
+        conn.execute(SQL_CREATE_DFG_EDGES_TABLE)
+        conn.execute(SQL_CREATE_GOID_CROSSWALK_VIEW)
+        conn.execute(SQL_CREATE_CATALOG_CALL_EDGES_VIEW)
+        conn.execute(SQL_CREATE_CATALOG_CFG_BLOCKS_VIEW)
+        conn.execute(SQL_CREATE_CATALOG_CFG_EDGES_VIEW)
+        conn.execute(SQL_CREATE_CATALOG_DFG_NODES_VIEW)
+        conn.execute(SQL_CREATE_CATALOG_DFG_EDGES_VIEW)
 
     def _install_chunks_view(self, conn: duckdb.DuckDBPyConnection) -> None:
         """Install the chunks view from Parquet files if it doesn't exist.
@@ -2124,7 +2289,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
         if not scip_symbol:
             return []
         with self.readonly_connection() as conn:
-            conn.execute(SQL_CREATE_V_GOID_BY_SYMBOL)
             relation = conn.execute(
                 """
                 SELECT go.*
@@ -2461,6 +2625,296 @@ class DuckDBCatalog(_DuckDBQueryMixin):  # noqa: PLR0904 - rich API surface
             nodes = self.catalog_payload(node_relation, query_name="callgraph-subgraph-nodes")
             return nodes, edges
 
+    def query_goids(self, query: GOIDQuery) -> GOIDQueryResult:
+        """Return paginated GOID crosswalk rows based on ``query`` options.
+
+        Parameters
+        ----------
+        query : GOIDQuery
+            Normalized GOID query options with filters, pagination, and sort.
+
+        Returns
+        -------
+        tuple[list[dict[str, object]], str | None]
+            Tuple of rows and the next cursor string (``None`` if final page).
+        """
+        offset = _parse_offset_cursor(query.cursor)
+        limit = max(1, min(query.limit, 1000))
+        order_sql = _resolve_goid_sort(query.sort)
+        filters, params = _build_goid_filters(query)
+        sql_parts = [
+            """
+            SELECT
+                goid,
+                lang,
+                module_path,
+                file_path,
+                start_line,
+                end_line,
+                scip_symbol,
+                ast_qualname,
+                cst_node_id,
+                chunk_id,
+                symbol_id,
+                updated_at
+            FROM goid_crosswalk
+            """
+        ]
+        if filters:
+            sql_parts.append("WHERE " + " AND ".join(filters))
+        sql_parts.append(f"ORDER BY {order_sql}")
+        sql_parts.append("LIMIT ?")
+        sql_parts.append("OFFSET ?")
+        query_sql = "\n".join(sql_parts)
+        rows: list[GOIDRowDict] = []
+        next_cursor: str | None = None
+        with self.readonly_connection() as conn:
+            relation = conn.execute(query_sql, [*params, limit, offset])
+            payload = self.catalog_payload(relation, query_name="catalog-goids")
+            rows = [_serialize_goid_row(row) for row in payload]
+        if len(rows) == limit:
+            next_cursor = str(offset + limit)
+        return {"rows": rows, "next_cursor": next_cursor}
+
+    def query_callgraph(self, query: CallGraphQuery) -> CallGraphResult:
+        """Return call graph slice for ``query.root_goid``.
+
+        Parameters
+        ----------
+        query : CallGraphQuery
+            Normalized call graph query options with root, traversal, filters, and pagination.
+
+        Returns
+        -------
+        dict[str, object]
+            Call graph payload containing nodes, edges, metadata, and cursor.
+        """
+        offset = _parse_offset_cursor(query.cursor)
+        limit = max(1, query.limit)
+        query.direction = (query.direction or "out").lower()
+        if query.direction not in {"out", "in", "both"}:
+            query.direction = "out"
+        result: CallGraphResult = {
+            "nodes": [],
+            "edges": [],
+            "truncated": False,
+            "meta": {
+                "depth": 0 if query.depth <= 0 else 1,
+                "direction": query.direction,
+                "filters": {
+                    "lang": query.lang,
+                    "include_unresolved": query.include_unresolved,
+                    "include_third_party": query.include_third_party,
+                    "path_prefix": query.path_prefix,
+                },
+                "format": query.fmt,
+            },
+            "next_cursor": None,
+        }
+        with self.readonly_connection() as conn:
+            root_row = conn.execute(
+                "SELECT goid_h128 FROM goids WHERE urn = ?",
+                [query.root_goid],
+            ).fetchone()
+            if root_row is None:
+                return result
+            root_hash = int(root_row[0])
+            where_clause, params = _callgraph_filter_clauses(query.direction, root_hash, query)
+            query_sql = ["SELECT * FROM v_catalog_call_edges"]
+            if where_clause:
+                query_sql.append("WHERE " + where_clause)
+            query_sql.append(
+                "ORDER BY callsite_line NULLS LAST, callsite_col NULLS LAST, caller_goid_h128"
+            )
+            query_sql.append("LIMIT ?")
+            query_sql.append("OFFSET ?")
+            records = self.catalog_payload(
+                conn.execute("\n".join(query_sql), [*params, limit + 1, offset]),
+                query_name="catalog-callgraph",
+            )
+        if len(records) > limit:
+            result["next_cursor"] = str(offset + limit)
+            records = records[:limit]
+        nodes_set, edges_payload, truncated = _build_callgraph_edges(
+            records, query.root_goid, query.max_nodes
+        )
+        result["truncated"] = truncated
+        node_details = self._fetch_node_metadata(nodes_set)
+        node_entries: list[CallGraphNodeDict] = []
+        for goid in sorted(nodes_set):
+            details = node_details.get(goid)
+            node_entries.append(
+                {
+                    "goid": goid,
+                    "label": (details or {}).get("label") or goid,
+                    "file_path": (details or {}).get("file_path"),
+                }
+            )
+        result["nodes"] = node_entries
+        result["edges"] = edges_payload
+        return result
+
+    def get_cfg(self, function_goid: str) -> CFGResult | None:
+        """Return CFG blocks and edges for a function GOID.
+
+        Parameters
+        ----------
+        function_goid : str
+            GOID URN of the function to retrieve CFG for.
+
+        Returns
+        -------
+        dict[str, object] | None
+            CFG result dict with keys: function_goid (str), blocks (list of block dicts),
+            edges (list of edge dicts). Returns None if function not found.
+        """
+        block_rows: list[CFGBlockDict] = []
+        edge_rows: list[CFGEdgeDict] = []
+        with self.readonly_connection() as conn:
+            blocks = conn.execute(
+                """
+                SELECT block_id, label, file_path, start_line, end_line
+                FROM v_catalog_cfg_blocks
+                WHERE function_goid = ?
+                ORDER BY block_idx
+                """,
+                [function_goid],
+            )
+            block_payload = self.catalog_payload(blocks, query_name="cfg-blocks")
+            edges = conn.execute(
+                """
+                SELECT src, dst, label
+                FROM v_catalog_cfg_edges
+                WHERE function_goid = ?
+                ORDER BY src_block_idx, dst_block_idx
+                """,
+                [function_goid],
+            )
+            edge_payload = self.catalog_payload(edges, query_name="cfg-edges")
+        if not block_payload:
+            return None
+        for block in block_payload:
+            block_id = _coerce_str(block.get("block_id"))
+            if block_id is None:
+                continue
+            label_value = _coerce_str(block.get("label")) or block_id
+            span = _build_span_dict(
+                _coerce_str(block.get("file_path")),
+                _coerce_int(block.get("start_line")),
+                _coerce_int(block.get("end_line")),
+            )
+            block_rows.append({"id": block_id, "label": label_value, "span": span})
+        for edge in edge_payload:
+            src = _coerce_str(edge.get("src"))
+            dst = _coerce_str(edge.get("dst"))
+            if src is None or dst is None:
+                continue
+            edge_rows.append({"src": src, "dst": dst, "label": _coerce_str(edge.get("label"))})
+        return {"function_goid": function_goid, "blocks": block_rows, "edges": edge_rows}
+
+    def get_dfg(self, function_goid: str) -> DFGResult | None:
+        """Return DFG nodes/edges for a function GOID.
+
+        Parameters
+        ----------
+        function_goid : str
+            GOID URN of the function to retrieve DFG for.
+
+        Returns
+        -------
+        dict[str, object] | None
+            DFG result dict with keys: function_goid (str), nodes (list of node dicts),
+            edges (list of edge dicts). Returns None if function not found.
+        """
+        with self.readonly_connection() as conn:
+            nodes_rel = conn.execute(
+                """
+                SELECT node_id, kind, symbol, file_path, start_line, end_line
+                FROM v_catalog_dfg_nodes
+                WHERE function_goid = ?
+                ORDER BY node_id
+                """,
+                [function_goid],
+            )
+            node_rows = self.catalog_payload(nodes_rel, query_name="dfg-nodes")
+            edges_rel = conn.execute(
+                """
+                SELECT src, dst, label
+                FROM v_catalog_dfg_edges
+                WHERE function_goid = ?
+                """,
+                [function_goid],
+            )
+            edge_rows = self.catalog_payload(edges_rel, query_name="dfg-edges")
+        if not edge_rows:
+            return None
+        nodes = []
+        for row in node_rows:
+            node_id = _coerce_str(row.get("node_id"))
+            kind = _coerce_str(row.get("kind"))
+            if node_id is None or kind is None:
+                continue
+            span = _build_span_dict(
+                _coerce_str(row.get("file_path")),
+                _coerce_int(row.get("start_line")),
+                _coerce_int(row.get("end_line")),
+            )
+            nodes.append(
+                {
+                    "id": node_id,
+                    "kind": kind,
+                    "symbol": _coerce_str(row.get("symbol")),
+                    "span": span,
+                }
+            )
+        edges_payload = []
+        for row in edge_rows:
+            src = _coerce_str(row.get("src"))
+            dst = _coerce_str(row.get("dst"))
+            if src is None or dst is None:
+                continue
+            edges_payload.append({"src": src, "dst": dst, "label": _coerce_str(row.get("label"))})
+        return {"function_goid": function_goid, "nodes": nodes, "edges": edges_payload}
+
+    def _fetch_node_metadata(self, goids: Iterable[str]) -> dict[str, dict[str, str | None]]:
+        """Return label/file_path metadata for GOIDs.
+
+        Parameters
+        ----------
+        goids : Iterable[str]
+            Collection of GOID URNs to fetch metadata for.
+
+        Returns
+        -------
+        dict[str, dict[str, str]]
+            Mapping from GOID URN to metadata dict with keys: file_path, label
+            (derived from ast_qualname).
+        """
+        values = [goid for goid in goids if goid]
+        if not values:
+            return {}
+        with self.readonly_connection() as conn:
+            relation = conn.execute(
+                """
+                SELECT goid, file_path, ast_qualname
+                FROM goid_crosswalk
+                WHERE goid IN (SELECT * FROM UNNEST(?))
+                """,
+                [values],
+            )
+            rows = self.catalog_payload(relation, query_name="catalog-goid-metadata")
+        metadata: dict[str, dict[str, str | None]] = {}
+        for row in rows:
+            goid_value = row.get("goid")
+            if isinstance(goid_value, str) and goid_value not in metadata:
+                file_path = cast("str | None", row.get("file_path"))
+                qualname = cast("str | None", row.get("ast_qualname"))
+                metadata[goid_value] = {
+                    "file_path": file_path,
+                    "label": qualname or goid_value,
+                }
+        return metadata
+
     def cfg_for_function(self, goid_h128: int) -> dict[str, list[dict[str, object]]]:
         """Return CFG blocks/edges for a GOID.
 
@@ -2681,9 +3135,235 @@ def refresh_faiss_idmap_materialized(
     return _dao_refresh_faiss_idmap_materialized(conn, _idmap_parquet=path, checksum=checksum)
 
 
+def _resolve_goid_sort(sort: str) -> str:
+    mapping = {
+        "-updated_at": "updated_at DESC, goid ASC",
+        "updated_at": "updated_at ASC, goid ASC",
+    }
+    clause = mapping.get(sort)
+    if clause is None:  # pragma: no cover - validated upstream
+        message = "unsupported-sort"
+        raise ValueError(message)
+    return clause
+
+
+def _build_goid_filters(query: GOIDQuery) -> tuple[list[str], list[object]]:
+    filters: list[str] = []
+    params: list[object] = []
+    if query.scip_symbol:
+        filters.append("scip_symbol = ?")
+        params.append(query.scip_symbol)
+    if query.ast_qualname:
+        filters.append("ast_qualname = ?")
+        params.append(query.ast_qualname)
+    if query.path:
+        filters.append("file_path = ?")
+        params.append(query.path)
+        if query.start_line is not None:
+            filters.append("(end_line IS NULL OR end_line >= ?)")
+            params.append(query.start_line)
+        if query.end_line is not None:
+            filters.append("(start_line IS NULL OR start_line <= ?)")
+            params.append(query.end_line)
+    if query.chunk_id is not None:
+        filters.append("chunk_id = ?")
+        params.append(query.chunk_id)
+    if query.symbol_id:
+        filters.append("symbol_id = ?")
+        params.append(query.symbol_id)
+    return filters, params
+
+
+def _serialize_goid_row(row: Mapping[str, object]) -> GOIDRowDict:
+    goid = _coerce_str(row.get("goid"))
+    lang = _coerce_str(row.get("lang"))
+    if goid is None or lang is None:
+        message = "invalid-goid-row"
+        raise ValueError(message)
+    file_path = _coerce_str(row.get("file_path"))
+    span = _build_span_dict(
+        file_path,
+        _coerce_int(row.get("start_line")),
+        _coerce_int(row.get("end_line")),
+    )
+    stamp = row.get("updated_at")
+    if isinstance(stamp, datetime):
+        updated_at = stamp.isoformat()
+    else:
+        updated_at = str(stamp) if stamp is not None else None
+    return {
+        "goid": goid,
+        "lang": lang,
+        "module_path": _coerce_str(row.get("module_path")),
+        "file_path": file_path,
+        "span": span,
+        "scip_symbol": _coerce_str(row.get("scip_symbol")),
+        "ast_qualname": _coerce_str(row.get("ast_qualname")),
+        "cst_node_id": _coerce_str(row.get("cst_node_id")),
+        "chunk_id": _coerce_int(row.get("chunk_id")),
+        "symbol_id": _coerce_str(row.get("symbol_id")),
+        "updated_at": updated_at,
+    }
+
+
+def _callgraph_filter_clauses(
+    direction: str,
+    root_hash: int,
+    query: CallGraphQuery,
+) -> tuple[str, list[object]]:
+    filters: list[str] = []
+    params: list[object] = []
+    if direction == "out":
+        filters.append("caller_goid_h128 = ?")
+        params.append(root_hash)
+    elif direction == "in":
+        filters.append("callee_goid_h128 = ?")
+        params.append(root_hash)
+    else:
+        filters.append("(caller_goid_h128 = ? OR callee_goid_h128 = ?)")
+        params.extend([root_hash, root_hash])
+    if not query.include_unresolved:
+        filters.append("callee_goid_h128 IS NOT NULL")
+    if not query.include_third_party:
+        filters.append("callsite_path IS NOT NULL")
+    if query.lang:
+        filters.append(
+            "(LOWER(caller_lang) = LOWER(?) OR "
+            "LOWER(callee_lang) = LOWER(?) OR "
+            "LOWER(language) = LOWER(?))"
+        )
+        params.extend([query.lang, query.lang, query.lang])
+    if query.path_prefix:
+        filters.append("callsite_path LIKE ?")
+        params.append(f"{query.path_prefix}%")
+    return " AND ".join(filters), params
+
+
+def _build_callgraph_edges(
+    records: Sequence[Mapping[str, object]],
+    root_goid: str,
+    max_nodes: int,
+) -> tuple[set[str], list[CallGraphEdgeDict], bool]:
+    nodes_set: set[str] = {root_goid}
+    edges_payload: list[CallGraphEdgeDict] = []
+    truncated = False
+    for row in records:
+        caller_goid = _coerce_str(row.get("caller_goid")) or root_goid
+        callee_goid = _coerce_str(row.get("callee_goid")) or ""
+        if caller_goid:
+            nodes_set.add(caller_goid)
+        if callee_goid:
+            nodes_set.add(callee_goid)
+        span = _build_span_dict(
+            _coerce_str(row.get("callsite_path")),
+            _coerce_int(row.get("callsite_line")),
+            _coerce_int(row.get("callsite_line")),
+        )
+        kind_value = row.get("kind")
+        kind_text = kind_value if isinstance(kind_value, str) else "direct"
+        edges_payload.append(
+            {
+                "caller": caller_goid,
+                "callee": callee_goid,
+                "callsite": span,
+                "resolved": row.get("callee_goid_h128") is not None,
+                "kind": kind_text,
+                "confidence": cast("float | Decimal | None", row.get("confidence")),
+                "updated_at": None,
+            }
+        )
+    if len(nodes_set) > max_nodes:
+        allowed = set(list(nodes_set)[:max_nodes])
+        if root_goid not in allowed:
+            allowed.add(root_goid)
+        edges_payload = [
+            edge
+            for edge in edges_payload
+            if edge["caller"] in allowed and (not edge["callee"] or edge["callee"] in allowed)
+        ]
+        nodes_set = allowed
+        truncated = True
+    return nodes_set, edges_payload, truncated
+
+
+def _parse_offset_cursor(cursor: str | None) -> int:
+    """Parse cursor string into a non-negative offset.
+
+    Parameters
+    ----------
+    cursor : str | None
+        Pagination cursor string (offset encoded as decimal integer).
+
+    Returns
+    -------
+    int
+        Non-negative integer offset parsed from cursor (0 if cursor is None or empty).
+
+    Raises
+    ------
+    ValueError
+        If cursor cannot be parsed as integer or is negative.
+    """
+    if not cursor:
+        return 0
+    try:
+        value = int(cursor)
+    except (TypeError, ValueError) as exc:  # pragma: no cover - validated upstream
+        message = "invalid-cursor"
+        raise ValueError(message) from exc
+    if value < 0:
+        message = "invalid-cursor"
+        raise ValueError(message)
+    return value
+
+
+def _coerce_str(value: object | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def _coerce_int(value: object | None) -> int | None:
+    result: int | None = None
+    if value is None:
+        result = None
+    elif isinstance(value, bool):
+        result = int(value)
+    elif isinstance(value, int):
+        result = value
+    elif isinstance(value, (float, Decimal)):
+        nan_guard = isinstance(value, float) and math.isnan(value)
+        result = None if nan_guard else int(value)
+    elif isinstance(value, str):
+        try:
+            result = int(value)
+        except ValueError:
+            result = None
+    return result
+
+
+def _build_span_dict(
+    file_path: str | None,
+    start_line: int | None,
+    end_line: int | None,
+) -> SpanDict | None:
+    if file_path is None:
+        return None
+    span: SpanDict = {"file_path": file_path}
+    if start_line is not None:
+        span["start_line"] = start_line
+    if end_line is not None:
+        span["end_line"] = end_line
+    return span
+
+
 __all__ = [
+    "CallGraphQuery",
     "DuckDBCatalog",
     "DuckDBCatalogConfig",
+    "GOIDQuery",
     "IdMapMeta",
     "StructureAnnotations",
     "ensure_faiss_idmap_view",

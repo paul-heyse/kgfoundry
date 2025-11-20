@@ -12,7 +12,16 @@ from typer.testing import CliRunner
 def _prepare_repo(tmp_path: Path) -> tuple[Path, Path]:
     repo = tmp_path / "repo"
     repo.mkdir(parents=True, exist_ok=True)
-    for required in ("config", "logs", ".cache", ".tmp", "plugins", "data", "data/faiss", "data/vectors"):
+    for required in (
+        "config",
+        "logs",
+        ".cache",
+        ".tmp",
+        "plugins",
+        "data",
+        "data/faiss",
+        "data/vectors",
+    ):
         (repo / required).mkdir(parents=True, exist_ok=True)
     (repo / "config" / "app.yml").write_text("", encoding="utf-8")
     package = repo / "pkg"

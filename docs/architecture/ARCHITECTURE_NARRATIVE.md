@@ -71,7 +71,8 @@
 	- [9.2 How to Add a New Search Signal to Hybrid Search](#92-how-to-add-a-new-search-signal-to-hybrid-search) – Search manager implementation, RRF fusion integration
 	- [9.3 How to Add a New Index Type to FAISS Manager](#93-how-to-add-a-new-index-type-to-faiss-manager) – Index type selection, training logic, search parameters, memory estimation
 	- [9.4 How to Add a New Configuration Key](#94-how-to-add-a-new-configuration-key) – AppConfig field, environment variable mapping, validation, documentation
-	- [9.5 How to Add a New Enrichment Step](#95-how-to-add-a-new-enrichment-step) – Enrichment function implementation, artifact writing, pipeline integration
+	- [9.5 How to Add a New HTTP Router](#95-how-to-add-a-new-http-router) – Router module creation, ApplicationContext dependency, admin gating, testing
+	- [9.6 How to Add a New Enrichment Step](#96-how-to-add-a-new-enrichment-step) – Enrichment function implementation, artifact writing, pipeline integration
 - [10. Testing & Quality Gates](#10-testing--quality-gates)
 	- [10.1 Test Types](#101-test-types) – Unit tests, integration tests, end-to-end/smoke tests, performance/benchmark tests
 	- [10.2 Rules for Writing Tests](#102-rules-for-writing-tests) – Real collaborators, no monkeypatching, real entry points, fixtures, parametrization
@@ -396,26 +397,84 @@ The system is organized into five logical layers:
   - Framework: FastAPI with Hypercorn ASGI server (HTTP/2, HTTP/3 support).
   - Endpoints:
     - `/healthz` - Network health check (always returns 200).
-    - `/readyz` - Readiness probe (validates FAISS, DuckDB, vLLM availability).
-    - `/capz` - Capability snapshot (returns available runtimes and indexes, used for conditional tool registration).
+    - `/readyz` - Readiness probe (validates FAISS, DuckDB, vLLM availability, returns active index version).
+    - `/capz` - Capability snapshot (returns available runtimes and indexes, used for conditional tool registration, supports `?refresh=true` query parameter).
     - `/mcp/*` - MCP tool endpoints (mounted via FastMCP).
-    - `/sse` - Server-Sent Events streaming demo.
-  - Middleware: CORS, SessionScope (scope management), ProxyFix (for NGINX), TrustedHost (optional).
+    - `/sse` - Server-Sent Events streaming demo with keep-alive comments.
+    - `/v1/catalog/goids` - GOID (Global Object Identifier) catalog query endpoint with pagination (cursor-based).
+    - `/v1/graph/call` - Call graph query endpoint (returns caller-callee relationships).
+    - `/v1/flow/cfg/{function_goid}` - Control flow graph (CFG) endpoint for a specific function GOID.
+    - `/v1/flow/dfg/{function_goid}` - Data flow graph (DFG) endpoint for a specific function GOID.
+    - `/admin/index/*` - Admin endpoints (gated by `CODEINTEL_ADMIN=1`):
+      - `/admin/index/status` - Current index version and health status.
+      - `/admin/index/publish` - Publish a staged index version (makes it active).
+      - `/admin/index/rollback/{version}` - Rollback to a previous index version.
+      - `/admin/index/tuning` - Session-scoped FAISS tuning overrides.
+      - `/admin/index/tuning/faiss` - FAISS tuning parameter management (GET/POST/DELETE).
+    - `/diagnostics/*` - Diagnostics endpoints (disabled, returns HTTP 501):
+      - `/diagnostics/run_report/{run_id}` - Run report endpoint (disabled).
+      - `/diagnostics/run_report/{run_id}.md` - Markdown run report endpoint (disabled).
+  - Middleware (registered in order):
+    - `CORSMiddleware` - CORS handling (allows origins, methods, headers, credentials).
+    - `SessionScopeMiddleware` - Session ID extraction and context storage (extracts `X-Session-ID` header or generates UUID).
+    - `TrustedHostMiddleware` - Host header validation (optional, enabled by default).
+    - `inject_request_id` - Request ID injection (extracts `X-Request-Id` header or generates UUID, sets `X-Request-Id` response header).
+    - `set_mcp_context` - ApplicationContext injection into context variable for MCP tools (sets `app_context` ContextVar).
+    - `disable_nginx_buffering` - Sets `X-Accel-Buffering: no` header for streaming responses.
+    - `ProxyFixMiddleware` - Proxy header handling (optional, enabled by default, supports `PROXY_TRUSTED_HOPS` env var).
+  - Exception Handlers:
+    - `http_exception_handler_with_request_id` - Formats HTTPException responses with request ID.
+    - `unhandled_exception_handler` - Wraps unhandled exceptions in error envelope (status 500).
   - **MCP Tools Catalog** (exposed via `/mcp/tools`):
     - **Scope & Navigation**: `set_scope`, `list_paths`, `open_file`
     - **Search**: `search_text` (ripgrep-like), `semantic_search` (basic), `semantic_search_pro` (two-stage), `search` (deep research), `fetch` (deep research)
     - **Symbol Navigation**: `symbol_search`, `definition_at`, `references_at`
     - **History**: `blame_range`, `file_history`
-    - **Telemetry**: `report:latest_run` (legacy placeholder)
+    - **Telemetry**: `report:latest_run` (legacy placeholder), `telemetry_run_report` (disabled placeholder)
+  - **MCP Resources** (exposed via `/mcp/resources`):
+    - `file://{path}` - File content resource (serves file content via MCP resource protocol).
+  - **MCP Prompts** (exposed via `/mcp/prompts`):
+    - `prompt_code_review` - Code review prompt template (accepts `area` parameter).
 
 - **CLI (Typer)**
   - Entry modules: `codeintel_rev.cli.*` (multiple commands).
   - Commands:
-    - `codeintel indexctl` - Index lifecycle management (stage, publish, status).
-    - `codeintel bm25` - BM25 corpus preparation and index building.
-    - `codeintel splade` - SPLADE ONNX export, encoding, and index building.
-    - `codeintel enrich` - Code enrichment pipeline (AST, CST, dependency graphs).
-    - `codeintel build-indexes` - FAISS index building from Parquet shards.
+    - `codeintel indexctl` - Index lifecycle management:
+      - `status` - Show current index version and health.
+      - `stage` - Stage a new index version (FAISS, DuckDB, SCIP assets).
+      - `publish` - Publish a staged version (makes it active).
+      - `rollback` - Rollback to a previous version.
+      - `ls` - List all staged versions.
+      - `health` - Health check for index assets.
+      - `export-idmap` - Export chunk ID mapping.
+      - `materialize-join` - Materialize DuckDB join views.
+      - `tune-params` - Tune FAISS search parameters.
+      - `show-profile` - Display FAISS index profile.
+      - `eval` - Run evaluation benchmarks.
+      - `embeddings` - Embedding lifecycle subcommands (sub-typer).
+    - `codeintel bm25` - BM25 sparse retrieval:
+      - `prepare-corpus` - Prepare corpus for BM25 indexing.
+      - `build-index` - Build BM25 inverted index.
+    - `codeintel splade` - SPLADE learned sparse retrieval:
+      - `export-onnx` - Export SPLADE model to ONNX format.
+      - `encode` - Encode chunks using SPLADE ONNX encoder.
+      - `build-index` - Build SPLADE impact index.
+      - `bench` - Benchmark SPLADE encoding performance.
+    - `codeintel enrich` - Code enrichment pipeline:
+      - `scan` - Scan source files and extract metadata.
+      - `analytics` - Generate analytics (ownership, metrics).
+      - `callgraph` - Build call graph (caller-callee relationships).
+      - `cfg` - Generate control flow graph (CFG).
+      - `dfg` - Generate data flow graph (DFG).
+      - `goids` - Generate Global Object Identifiers (GOIDs).
+      - `audit` - Audit enrichment artifacts.
+      - `to-duckdb` - Export enrichment artifacts to DuckDB.
+      - `overlays` - Generate overlay metadata.
+      - `exports` - Generate export metadata.
+    - `codeintel build-indexes` - FAISS index building:
+      - `bm25` - Build BM25 index.
+      - `splade-impact` - Build SPLADE impact index.
+      - `publish` - Publish built indexes.
   - Configuration: Loaded via `codeintel_rev.config.load_app_config()` from environment variables and optional config file.
 
 ### 4.2 Outbound Dependencies
@@ -465,10 +524,12 @@ The system is organized into five logical layers:
 
 ### 4.3 Trust Boundaries and Security
 
-- **Input Validation**: All MCP tool inputs are validated via Pydantic models; path traversal prevented via `pathlib.Path.resolve()`.
-- **Authentication**: OAuth 2.1 via NGINX (optional; configured per deployment).
-- **Error Handling**: Errors return RFC 9457 Problem Details; no stack traces exposed to clients.
+- **Input Validation**: All MCP tool inputs are validated via Pydantic models; path traversal prevented via `pathlib.Path.resolve()`. HTTP endpoint inputs validated via FastAPI/Pydantic request models.
+- **Authentication**: OAuth 2.1 via NGINX (optional; configured per deployment). Admin endpoints (`/admin/index/*`) gated by `CODEINTEL_ADMIN=1` environment variable.
+- **Error Handling**: Errors return RFC 9457 Problem Details; no stack traces exposed to clients. Unhandled exceptions wrapped in error envelope (status 500) with request ID.
 - **Secrets**: All secrets via environment variables; never hardcoded or committed.
+- **Host Header Validation**: `TrustedHostMiddleware` validates Host headers against `allowed_hosts` list (prevents host header injection attacks).
+- **Proxy Trust**: `ProxyFixMiddleware` trusts up to `PROXY_TRUSTED_HOPS` proxy hops (default: 1) when parsing Forwarded headers.
 
 ---
 
@@ -918,13 +979,15 @@ Each layer may only depend on layers below it (lower layers must not import high
 
 **Role**
 
-FastAPI application entrypoint providing HTTP endpoints (`/healthz`, `/readyz`, `/capz`, `/mcp/*`), middleware (CORS, session scope, proxy fix), and application lifecycle management (startup/shutdown).
+FastAPI application entrypoint providing HTTP endpoints (`/healthz`, `/readyz`, `/capz`, `/mcp/*`, `/v1/*`, `/admin/*`, `/diagnostics/*`), middleware (CORS, session scope, proxy fix, request ID injection, MCP context, NGINX buffering), exception handlers, and application lifecycle management (startup/shutdown).
 
 **Public Surface**
 
 - `codeintel_rev.app.main.app` - FastAPI application instance
 - `codeintel_rev.app.main.asgi` - ASGI application (with optional ProxyFix middleware)
 - `codeintel_rev.app.main.lifespan` - Application lifespan context manager
+- `codeintel_rev.app.main.override_app_hooks` - Test-only context manager for overriding lifecycle hooks
+- `codeintel_rev.app.main.AppLifecycleHooks` - Lifecycle hook override dataclass
 
 **Dependencies**
 
@@ -933,6 +996,9 @@ FastAPI application entrypoint providing HTTP endpoints (`/healthz`, `/readyz`, 
   - `codeintel_rev.app.runtime_readiness.ReadinessProbe`
   - `codeintel_rev.app.capabilities.Capabilities`
   - `codeintel_rev.mcp_server.server.build_http_app`
+  - `codeintel_rev.app.routers.catalog_read` (catalog read APIs)
+  - `codeintel_rev.app.routers.index_admin` (admin endpoints, gated by `CODEINTEL_ADMIN`)
+  - `codeintel_rev.app.server_settings.ServerSettings` (server configuration)
 - Used by:
   - Hypercorn/Uvicorn ASGI servers
   - NGINX reverse proxy
@@ -941,19 +1007,26 @@ FastAPI application entrypoint providing HTTP endpoints (`/healthz`, `/readyz`, 
 
 - Configuration is loaded once at startup and treated as immutable.
 - Application startup fails fast if required resources are missing.
-- All middleware must be registered in correct order (CORS before SessionScope).
+- All middleware must be registered in correct order (CORS → SessionScope → TrustedHost → request_id → mcp_context → nginx_buffering).
+- Request ID is always present in request state and response headers.
+- ApplicationContext is always available in context variable for MCP tools.
 
 **Extension Points**
 
 - To add a new HTTP endpoint:
-  - Add route handler to `app` instance in `main.py`.
+  - Add route handler to `app` instance in `main.py` or create a router in `codeintel_rev.app.routers.*`.
   - Follow RFC 9457 Problem Details for error responses.
-  - Include request ID in response headers.
+  - Include request ID in response headers (automatic via middleware).
+- To add a new router:
+  - Create router module in `codeintel_rev.app.routers.*`.
+  - Include router via `app.include_router()` in `main.py`.
+  - Use `Depends(_context_dependency)` for ApplicationContext access.
 
 **Anti-Patterns**
 
 - Do **not** import IO/infrastructure modules directly (use ApplicationContext).
 - Do **not** perform blocking I/O in request handlers (use `asyncio.to_thread`).
+- Do **not** access ApplicationContext via request injection in MCP tools (use context variable).
 
 #### Module: `codeintel_rev/app/config_context.py`
 
@@ -966,6 +1039,25 @@ Manages application-wide context containing configuration, clients, and runtime 
 - `codeintel_rev.app.config_context.ApplicationContext` - Immutable context container
 - `codeintel_rev.app.config_context.ApplicationContext.create()` - Factory method
 - `codeintel_rev.app.config_context.ApplicationContext.close_all_runtimes()` - Cleanup method
+- **Runtime Accessors** (lazy-loaded via RuntimeCell):
+  - `get_hybrid_engine()` - Hybrid search engine (FAISS + BM25 + SPLADE fusion)
+  - `get_coderank_faiss_manager(vec_dim)` - CodeRank FAISS manager for specific vector dimension
+  - `get_xtr_index()` - XTR token-level index (optional, returns None if disabled)
+  - `get_offline_recall_evaluator()` - Offline evaluation system for diagnostic runs
+- **Catalog Access**:
+  - `open_catalog()` - Context manager yielding DuckDBCatalog instance
+- **Runtime Management**:
+  - `reload_indices()` - Close runtime cells to force reload from active index version
+  - `apply_factory_adjuster(adjuster)` - Update runtime tuning knobs (FAISS nprobe, RRF weights)
+  - `ensure_faiss_ready()` - Thread-safe FAISS index loading (returns ready status, limits, error)
+- **Hybrid Search Helpers**:
+  - `hybrid_fusion_weights()` - Return per-channel fusion weights (bm25, splade, semantic)
+  - `hybrid_search_settings()` - Return immutable SearchSettings from AppConfig
+  - `clamp_hybrid_limit(requested)` - Clamp requested limit to configured bounds
+  - `build_stage0_options(weights)` - Build Stage0Options from AppConfig search settings
+- **Test Helpers**:
+  - `with_overrides(**components)` - Create new context with component overrides
+  - `seed_runtime_cells_for_tests(**runtimes)` - Seed runtime cells with test doubles (test-only)
 
 **Dependencies**
 
@@ -1247,6 +1339,42 @@ Loads application configuration from environment variables and optional config f
 - Do **not** read environment variables directly in business logic (use `AppConfig`).
 - Do **not** modify configuration at runtime.
 
+#### Module: `codeintel_rev/app/server_settings.py`
+
+**Role**
+
+Centralizes HTTP listener parameters, CORS defaults, and proxy trust knobs for FastAPI + Hypercorn deployment. Settings are loaded from environment variables with `CODEINTEL_SERVER_` prefix.
+
+**Public Surface**
+
+- `codeintel_rev.app.server_settings.ServerSettings` - Server configuration dataclass
+- `codeintel_rev.app.server_settings.get_server_settings()` - Cached settings factory
+
+**Dependencies**
+
+- Calls into:
+  - `pydantic_settings.BaseSettings` (configuration loading)
+- Used by:
+  - `codeintel_rev.app.main` (middleware configuration, SSE settings)
+
+**Invariants**
+
+- Settings are loaded once and cached (LRU cache).
+- SSE keep-alive interval is clamped to minimum 5.0 seconds.
+- CORS defaults allow ChatGPT and localhost origins.
+
+**Extension Points**
+
+- To add a new server setting:
+  - Add field to `ServerSettings` dataclass with default value.
+  - Document environment variable name (with `CODEINTEL_SERVER_` prefix).
+  - Add validation if needed (via `@model_validator`).
+
+**Anti-Patterns**
+
+- Do **not** access settings directly via `os.environ` (use `ServerSettings`).
+- Do **not** modify settings at runtime (immutable after creation).
+
 #### Module: `codeintel_rev/app/capabilities.py`
 
 **Role**
@@ -1324,6 +1452,147 @@ Provides `@handle_adapter_errors` decorator pattern for consistent MCP tool erro
 
 - Do **not** apply `@handle_adapter_errors` before `@mcp.tool()` (decorator order matters).
 - Do **not** catch exceptions manually in tool functions (let decorator handle them).
+
+#### Module: `codeintel_rev/app/middleware.py`
+
+**Role**
+
+Provides FastAPI middleware for session management and request context propagation. Extracts or generates session IDs, stores them in ContextVar for MCP tool access, and manages capability stamps.
+
+**Public Surface**
+
+- `codeintel_rev.app.middleware.SessionScopeMiddleware` - Middleware class for session ID extraction
+- `codeintel_rev.app.middleware.get_session_id()` - Helper to retrieve session ID from ContextVar
+- `codeintel_rev.app.middleware.get_capability_stamp()` - Helper to retrieve capability stamp from ContextVar
+
+**Dependencies**
+
+- Calls into:
+  - `codeintel_rev.runtime.request_context.session_id_var` (ContextVar for session ID)
+  - `codeintel_rev.runtime.request_context.capability_stamp_var` (ContextVar for capability stamp)
+  - Standard library (`uuid` for session ID generation)
+- Used by:
+  - `codeintel_rev.app.main` (middleware registration)
+  - `codeintel_rev.mcp_server.adapters.*` (via `get_session_id()`)
+
+**Invariants**
+
+- Session ID is always present in request state and ContextVar after middleware execution.
+- Session ID is extracted from `X-Session-ID` header or auto-generated as UUID.
+- Capability stamp is set from `app.state.capability_stamp` if available.
+
+**Extension Points**
+
+- To access session ID in adapters:
+  - Call `get_session_id()` within request handler context.
+  - Session ID is automatically available via ContextVar.
+
+**Anti-Patterns**
+
+- Do **not** call `get_session_id()` outside request handler context (raises RuntimeError).
+- Do **not** manually set session ID in adapters (use middleware).
+
+#### Module: `codeintel_rev/app/runtime_readiness.py`
+
+**Role**
+
+Manages readiness checks across core dependencies (filesystem paths, indexes, external services). Checks are performed synchronously in a thread pool to avoid blocking the event loop. Maintains a cache of check results to avoid recomputing on every request.
+
+**Public Surface**
+
+- `codeintel_rev.app.runtime_readiness.ReadinessProbe` - Readiness probe manager
+- `codeintel_rev.app.runtime_readiness.ReadinessProbe.initialize()` - Prime readiness state on startup
+- `codeintel_rev.app.runtime_readiness.ReadinessProbe.refresh()` - Recompute readiness checks asynchronously
+- `codeintel_rev.app.runtime_readiness.ReadinessProbe.snapshot()` - Get cached check results (non-blocking)
+- `codeintel_rev.app.runtime_readiness.ReadinessProbe.shutdown()` - Clear readiness state on shutdown
+- `codeintel_rev.app.runtime_readiness.CheckResult` - Check result dataclass (healthy, detail)
+
+**Readiness Checks** (executed by `_run_checks()`):
+
+- `repo_root` - Repository root directory exists
+- `data_dir` - Data directory exists (created if missing)
+- `vectors_dir` - Vectors directory exists (created if missing)
+- `faiss_index` - FAISS index file exists and is readable
+- `duckdb_catalog` - DuckDB catalog file exists and is accessible (validates materialization if configured)
+- `scip_index` - SCIP index file exists (optional, doesn't fail readiness if missing)
+- `vllm_service` - vLLM embedding service is reachable (HTTP health check with 2s timeout)
+- `search_cli` - Search tooling available (ripgrep preferred, grep fallback)
+- `xtr_artifacts` - XTR artifacts directory exists and contains required files (optional)
+
+**Dependencies**
+
+- Calls into:
+  - `codeintel_rev.app.config_context.ApplicationContext` (for paths and configuration)
+  - Standard library (`pathlib`, `shutil`, `asyncio`)
+  - Optional: `httpx` (for vLLM health checks)
+- Used by:
+  - `codeintel_rev.app.main` (`/readyz` endpoint)
+
+**Invariants**
+
+- Readiness checks are cached and updated atomically via async lock.
+- Optional resources (SCIP index, XTR artifacts) don't fail readiness if missing.
+- HTTP health checks use short timeouts (2s) to prevent blocking.
+
+**Extension Points**
+
+- To add a new readiness check:
+  - Add check function to `_run_checks()` method.
+  - Return `CheckResult(healthy=True/False, detail=...)`.
+  - Add check name to results dictionary.
+
+**Anti-Patterns**
+
+- Do **not** perform blocking I/O in readiness checks (use thread pool).
+- Do **not** fail readiness for optional resources (mark as optional).
+
+#### Module: `codeintel_rev/indexing/index_lifecycle.py`
+
+**Role**
+
+Manages staged/published index versions under a base directory. Provides atomic version switching via `CURRENT` pointer file and optional symlink updates. Tracks version metadata in manifest files (`manifest.json`).
+
+**Public Surface**
+
+- `codeintel_rev.indexing.index_lifecycle.IndexLifecycleManager` - Index lifecycle manager
+- `codeintel_rev.indexing.index_lifecycle.IndexLifecycleManager.stage(version, assets)` - Stage a new index version (creates `versions/{version}.staging/` directory)
+- `codeintel_rev.indexing.index_lifecycle.IndexLifecycleManager.publish(version)` - Publish a staged version (atomically updates `CURRENT` pointer and `current` symlink)
+- `codeintel_rev.indexing.index_lifecycle.IndexLifecycleManager.rollback(version)` - Rollback to a previous version
+- `codeintel_rev.indexing.index_lifecycle.IndexLifecycleManager.current_version()` - Get current active version (reads `CURRENT` file)
+- `codeintel_rev.indexing.index_lifecycle.IndexLifecycleManager.list_versions()` - List all staged/published versions
+- `codeintel_rev.indexing.index_lifecycle.IndexLifecycleManager.link_lucene_assets(version, assets)` - Link Lucene assets (BM25/SPLADE) into version directory
+- `codeintel_rev.indexing.index_lifecycle.IndexAssets` - Asset bundle dataclass (faiss_index, duckdb_path, scip_index, bm25_dir, splade_dir, xtr_dir, faiss_idmap, tuning_profile)
+- `codeintel_rev.indexing.index_lifecycle.LuceneAssets` - Lucene asset bundle (bm25_dir, splade_dir)
+- `codeintel_rev.indexing.index_lifecycle.VersionMeta` - Version metadata (version, created_ts, attrs dict)
+
+**Dependencies**
+
+- Calls into:
+  - Standard library (`pathlib`, `shutil`, `hashlib`, `json`, `time`)
+  - `codeintel_rev.errors.RuntimeLifecycleError` (for lifecycle errors)
+- Used by:
+  - `codeintel_rev.cli.indexctl` (CLI commands)
+  - `codeintel_rev.app.routers.index_admin` (admin endpoints)
+  - `codeintel_rev.app.config_context.ApplicationContext` (index manager property)
+
+**Invariants**
+
+- Index versions must be immutable (no modifications after staging).
+- Only one version can be active at a time (`CURRENT` pointer).
+- Asset checksums must match on load (integrity verification).
+- Version operations are atomic (publish/rollback don't corrupt state).
+
+**Extension Points**
+
+- To add a new asset type:
+  - Add field to `IndexAssets` dataclass.
+  - Update `ensure_exists()` validation.
+  - Include in staging/publishing logic.
+
+**Anti-Patterns**
+
+- Do **not** modify staged versions after staging (immutable).
+- Do **not** publish versions without validating asset checksums.
 
 #### Module: `codeintel_rev/app/scope_store.py`
 
@@ -1524,6 +1793,92 @@ Provides Stage-1 gating logic that decides whether to run optional second-stage 
 - Do **not** require Stage-1 for search to work (make it optional).
 - Do **not** skip gating evaluation (always check before running Stage-1).
 
+#### Module: `codeintel_rev/app/routers/catalog_read.py`
+
+**Role**
+
+FastAPI router providing catalog read APIs for GOIDs (Global Object Identifiers), call graphs, control flow graphs (CFG), and data flow graphs (DFG). All endpoints follow RFC 9457 Problem Details for error responses and support cursor-based pagination.
+
+**Public Surface**
+
+- `codeintel_rev.app.routers.catalog_read.router` - FastAPI router instance
+- Endpoints:
+  - `GET /v1/catalog/goids` - Query GOID catalog with pagination
+  - `GET /v1/graph/call` - Query call graph (caller-callee relationships)
+  - `GET /v1/flow/cfg/{function_goid}` - Get control flow graph for function
+  - `GET /v1/flow/dfg/{function_goid}` - Get data flow graph for function
+
+**Dependencies**
+
+- Calls into:
+  - `codeintel_rev.app.config_context.ApplicationContext` (via dependency injection)
+  - `codeintel_rev.io.duckdb_catalog.DuckDBCatalog` (catalog queries)
+- Used by:
+  - `codeintel_rev.app.main` (router inclusion)
+
+**Invariants**
+
+- All endpoints return RFC 9457 Problem Details on error.
+- Pagination uses cursor-based approach (not offset-based).
+- Function GOIDs must be valid hexadecimal identifiers.
+
+**Extension Points**
+
+- To add a new catalog endpoint:
+  - Add route handler to `router` instance.
+  - Use `Depends(_context_dependency)` for ApplicationContext access.
+  - Return Pydantic models for structured responses.
+
+**Anti-Patterns**
+
+- Do **not** perform blocking queries without `asyncio.to_thread`.
+- Do **not** return raw database rows (use Pydantic models).
+
+#### Module: `codeintel_rev/app/routers/index_admin.py`
+
+**Role**
+
+FastAPI router providing admin endpoints for index lifecycle management (staging, publishing, rollback, tuning). All endpoints are gated by `CODEINTEL_ADMIN=1` environment variable.
+
+**Public Surface**
+
+- `codeintel_rev.app.routers.index_admin.router` - FastAPI router instance
+- Endpoints:
+  - `GET /admin/index/status` - Current index version and health
+  - `POST /admin/index/publish` - Publish a staged version
+  - `POST /admin/index/rollback/{version}` - Rollback to previous version
+  - `POST /admin/index/tuning` - Set session-scoped tuning overrides
+  - `GET /admin/index/tuning/faiss` - Get FAISS tuning parameters
+  - `POST /admin/index/tuning/faiss` - Set FAISS tuning parameters
+  - `DELETE /admin/index/tuning/faiss` - Clear FAISS tuning parameters
+
+**Dependencies**
+
+- Calls into:
+  - `codeintel_rev.app.config_context.ApplicationContext` (via dependency injection)
+  - `codeintel_rev.indexing.index_lifecycle.IndexLifecycleManager` (index operations)
+  - `codeintel_rev.app.scope_store.ScopeStore` (session tuning storage)
+- Used by:
+  - `codeintel_rev.app.main` (router inclusion, gated by `CODEINTEL_ADMIN`)
+
+**Invariants**
+
+- Admin endpoints return HTTP 403 if `CODEINTEL_ADMIN` is not enabled.
+- Tuning overrides are stored per-session in ScopeStore.
+- Index operations are atomic (publish/rollback don't corrupt state).
+
+**Extension Points**
+
+- To add a new admin endpoint:
+  - Add route handler to `router` instance.
+  - Use `Depends(_require_admin)` for admin gate.
+  - Use `Depends(_context)` for ApplicationContext access.
+
+**Anti-Patterns**
+
+- Do **not** expose admin endpoints without `CODEINTEL_ADMIN` gate.
+- Do **not** perform destructive operations without validation.
+
 #### Module: `codeintel_rev/rerank/xtr.py`
 
 **Role**
@@ -1570,11 +1925,44 @@ Provides XTR (Cross-Token Reranking) reranker that reranks search results using 
 
 - **DuckDB Catalog** (`*.duckdb` files)
   - Schema: Defined in `codeintel_rev.io.duckdb_schema`; migrations in `registry/migrations/`.
-  - Tables:
+  - **Core Tables**:
     - `chunks` - Chunk metadata (chunk_id, file_path, start_line, end_line, embedding_dim)
     - `symbols` - Symbol definitions and references (from SCIP)
     - `faiss_indexes` - FAISS index registration (logical_index_id, index_uri, parameters)
     - `index_versions` - Index version metadata (version, checksums, created_at)
+  - **GOID (Global Object Identifier) Tables**:
+    - `goids` - GOID registry (goid_h128, urn, repo, commit, rel_path, language, kind, qualname, start_line, end_line)
+    - `goid_xwalk` - GOID crosswalk linking GOIDs to SCIP symbols, chunk IDs, CST nodes, AST types, Git SHAs
+    - Indexes: `idx_goids_path_kind` (rel_path, kind), `idx_goid_xwalk_symbol` (scip_symbol)
+  - **Call Graph Tables**:
+    - `call_nodes` - Function/method nodes (goid_h128, language, kind, arity, is_public, rel_path)
+    - `call_edges` - Caller-callee relationships (caller_goid_h128, callee_goid_h128, callsite_path, callsite_line, callsite_col, language, kind, resolved_via, confidence, evidence_json)
+    - Index: `idx_call_edges_callee` (callee_goid_h128)
+  - **Control Flow Graph (CFG) Tables**:
+    - `cfg_blocks` - Basic blocks within functions (function_goid_h128, block_idx, kind, start_line, end_line, stmts_json, in_degree, out_degree)
+    - `cfg_edges` - Control flow edges (function_goid_h128, src_block_idx, dst_block_idx, edge_type, cond_json)
+    - Index: `idx_cfg_blocks_function` (function_goid_h128)
+  - **Data Flow Graph (DFG) Tables**:
+    - `dfg_edges` - Data flow dependencies (function_goid_h128, src_block_idx, dst_block_idx, src_symbol, dst_symbol, via_phi, use_kind)
+    - Index: `idx_dfg_symbol` (function_goid_h128, dst_symbol)
+  - **Views**:
+    - `goid_crosswalk` - GOID crosswalk view joining goids and goid_xwalk
+    - `v_goid_by_symbol` - GOID lookup by SCIP symbol
+    - `v_catalog_call_edges` - Call graph edges with GOID URNs
+    - `v_catalog_cfg_blocks` - CFG blocks with function GOID URNs
+    - `v_catalog_cfg_edges` - CFG edges with function GOID URNs
+    - `v_catalog_dfg_nodes` - DFG nodes (function metadata)
+    - `v_catalog_dfg_edges` - DFG edges with function GOID URNs
+    - `v_chunk_symbols` - Chunk-to-symbol mapping (unnested from chunks.symbols array)
+    - `v_pool_coverage` - Pool coverage view (with optional module joins)
+    - `v_faiss_join` - FAISS ID map joined with chunks
+  - **Materialized Tables** (for performance):
+    - `chunks_materialized` - Materialized chunks table (with index on uri)
+    - `faiss_idmap_mat` - Materialized FAISS ID map
+    - `faiss_idmap_mat_meta` - ID map metadata (checksum, updated_at)
+    - `faiss_join_mat` - Materialized v_faiss_join view
+    - `modules_mat` - Materialized modules table
+    - `modules_mat_meta` - Modules metadata (checksum, updated_at)
   - Access: Via `DuckDBManager.get_connection()` (thread-safe, optionally pooled).
 
 - **Parquet Files** (`*.parquet` shards)
@@ -1742,11 +2130,17 @@ Runtimes (FAISS, DuckDB, vLLM, XTR, HybridSearch) are managed via `RuntimeCell` 
 
 **RuntimeCell Abstraction**
 
-- **Thread-safe initialization**: `RuntimeCell` uses `RLock` to ensure thread-safe lazy initialization.
-- **Generation tracking**: Each initialization attempt increments a generation counter (used for invalidation).
-- **Lifecycle hooks**: `RuntimeCellObserver` protocol allows tracking initialization/close events.
-- **Seed override**: `RuntimeCell.seed()` allows test-only pre-initialization (gated by `KGFOUNDRY_ALLOW_RUNTIME_SEED`).
-- **Context capture**: Initialization captures request context (session_id, capability_stamp) for observability.
+- **Thread-safe initialization**: `RuntimeCell` uses `RLock` to ensure thread-safe lazy initialization with single-flight semantics (only one thread initializes, others wait).
+- **Generation tracking**: Each initialization attempt increments a generation counter (used for invalidation and tracking initialization cycles).
+- **Lifecycle hooks**: `RuntimeCellObserver` protocol allows tracking initialization/close events:
+  - `on_init_start(cell, generation, context)` - Invoked before initialization begins
+  - `on_init_end(event)` - Invoked after initialization completes (success or failure)
+  - `on_close_end(event)` - Invoked after close completes
+- **Seed override**: `RuntimeCell.seed()` allows test-only pre-initialization (gated by `KGFOUNDRY_ALLOW_RUNTIME_SEED` environment variable or `allow_runtime_cell_seeding()` context manager).
+- **Context capture**: Initialization captures request context (`RuntimeCellInitContext` with session_id, capability_stamp) for observability.
+- **Failure tracking**: Failed initializations are tracked with TTL (default: 15 seconds) to prevent rapid retry loops.
+- **Peek operation**: `peek()` allows checking if cell is initialized without triggering initialization.
+- **Close operation**: `close()` releases resources and resets cell state (idempotent, thread-safe).
 
 **Rules**
 
@@ -2011,7 +2405,54 @@ You need to add a new environment variable or configuration setting that affects
 - Invalid values cause fail-fast errors.
 - All tests pass.
 
-### 9.5 How to Add a New Enrichment Step
+### 9.5 How to Add a New HTTP Router
+
+**When to Use This**
+
+You need to add a new set of HTTP endpoints that don't fit into existing routers (e.g., a new API surface for a specific feature).
+
+**Preconditions**
+
+- Read:
+  - Section 6 entry for `codeintel_rev/app/main.py`.
+  - Section 4.1 inbound interfaces for HTTP API patterns.
+  - Existing router examples: `codeintel_rev/app/routers/catalog_read.py`, `codeintel_rev/app/routers/index_admin.py`.
+
+**Steps**
+
+1. Create router module in `codeintel_rev/app/routers/`:
+   - Create `new_feature.py` with `router = APIRouter(prefix="/v1/feature", tags=["feature"])`.
+   - Define Pydantic models for request/response schemas.
+   - Implement route handlers with `@router.get()`, `@router.post()`, etc.
+2. Add ApplicationContext dependency:
+   - Create `_context_dependency(request: Request) -> ApplicationContext` function.
+   - Extract context from `request.app.state.context`.
+   - Raise HTTPException(503) if context unavailable.
+3. Include router in `codeintel_rev/app/main.py`:
+   - Import router module.
+   - Call `app.include_router(new_feature.router)`.
+4. Add admin gate (if needed):
+   - Use `Depends(_require_admin)` for admin-only endpoints.
+   - Document `CODEINTEL_ADMIN=1` requirement.
+5. Add tests:
+   - Unit tests: `tests/codeintel_rev/app/routers/test_new_feature.py`.
+   - Integration tests: Verify endpoints work with real ApplicationContext.
+
+**Required Tests & Checks**
+
+- Router endpoint tests (verify request/response schemas).
+- Error handling tests (verify RFC 9457 Problem Details).
+- Admin gate tests (verify 403 when admin disabled).
+- Type checking and linting.
+
+**Success Criteria**
+
+- Router endpoints are accessible via HTTP.
+- Error responses follow RFC 9457 Problem Details format.
+- Admin endpoints are properly gated.
+- All tests pass.
+
+### 9.6 How to Add a New Enrichment Step
 
 **When to Use This**
 
@@ -2219,10 +2660,15 @@ The system uses CPU-only FAISS indexes (no GPU support) with adaptive index type
 |-------------|-------|-------------------|
 | `codeintel_rev/app/main.py` | Entrypoints | 6.2, 5.1 |
 | `codeintel_rev/app/config_context.py` | Entrypoints | 6.2, 5.1 |
-| `codeintel_rev/app/runtime_readiness.py` | Entrypoints | 5.1 |
-| `codeintel_rev/cli/indexctl.py` | Entrypoints | 5.6 |
-| `codeintel_rev/cli/bm25.py` | Entrypoints | 5.2 |
-| `codeintel_rev/cli/splade.py` | Entrypoints | 5.2 |
+| `codeintel_rev/app/runtime_readiness.py` | Entrypoints | 6.2, 5.1 |
+| `codeintel_rev/app/middleware.py` | Entrypoints | 6.2, 8.7 |
+| `codeintel_rev/app/server_settings.py` | Entrypoints | 6.2, 11.2 |
+| `codeintel_rev/app/routers/catalog_read.py` | Entrypoints | 6.2, 4.1 |
+| `codeintel_rev/app/routers/index_admin.py` | Entrypoints | 6.2, 4.1 |
+| `codeintel_rev/cli/indexctl.py` | Entrypoints | 4.1, 5.8 |
+| `codeintel_rev/cli/bm25.py` | Entrypoints | 4.1, 5.2 |
+| `codeintel_rev/cli/splade.py` | Entrypoints | 4.1, 5.2 |
+| `codeintel_rev/cli/enrich/` | Entrypoints | 4.1, 5.9 |
 | `codeintel_rev/services/index/` | Services | 5.2 |
 | `codeintel_rev/indexing/cast_chunker.py` | Domain Models | 6.2, 5.2 |
 | `codeintel_rev/indexing/scip_reader.py` | Domain Models | 5.2 |
@@ -2252,7 +2698,10 @@ The system uses CPU-only FAISS indexes (no GPU support) with adaptive index type
 | Hybrid Search | 5.4 | `retrieval/hybrid_search.py`, `io/faiss_manager.py`, `io/bm25_manager.py`, `io/splade_manager.py` |
 | Symbol Navigation | 5.5 | `mcp_server/adapters/symbols.py`, `io/duckdb_catalog.py` |
 | Index Lifecycle Management | 5.6 | `cli/indexctl.py`, `indexing/index_lifecycle.py` |
-| Code Enrichment Pipeline | 5.7 | `enrich/ast_indexer.py`, `cst_build/`, `enrich/graph_builder.py`, `services/enrich/` |
+| Semantic Search Pro | 5.6 | `mcp_server/adapters/semantic_pro.py`, `retrieval/pipeline/stage0.py`, `retrieval/pipeline/gating.py`, `rerank/xtr.py` |
+| Deep Research Search/Fetch | 5.7 | `mcp_server/adapters/deep_research.py`, `retrieval/mcp_search.py` |
+| Index Lifecycle Management | 5.8 | `cli/indexctl.py`, `indexing/index_lifecycle.py` |
+| Code Enrichment Pipeline | 5.9 | `enrich/ast_indexer.py`, `cst_build/`, `enrich/graph_builder.py`, `services/enrich/` |
 
 ---
 

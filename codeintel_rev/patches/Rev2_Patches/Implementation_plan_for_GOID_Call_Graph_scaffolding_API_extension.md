@@ -43,7 +43,7 @@ File: `catalog_http_stubs.py` (intended path in repo: `codeintel_rev/app/routes/
 * Response models mirror the OpenAPI schemas.
 * Each endpoint delegates to IO‑layer methods you’ll implement in `codeintel_rev/io/duckdb_catalog.py`:
 
-  * `query_goids(...) -> tuple[list[dict], str|None]`
+  * `query_goids(...) -> GOIDQueryResult`
   * `query_callgraph(...) -> dict`
   * `get_cfg(function_goid, fmt) -> dict|None`
   * `get_dfg(function_goid, fmt) -> dict|None`
@@ -845,8 +845,6 @@ Awesome — I’ll ship a **cohesive first cut of the “catalog read APIs”** 
 
 If you want, I can also include a tiny **Typer CLI** wrapper (e.g., `codeintel catalog list-symbols`) that calls the same service for local inspection — but the above is already sufficient for agents and UI to explore the catalog cleanly.
 
-Would you like me to bundle the **MCP registration line** (if your server requires explicit imports), or keep it auto‑discovered by decorators as your doc implies? 
-
 
 # typer CLI wrapper #
 
@@ -1465,5 +1463,4 @@ codeintel search "(?i)auth(token|z)" -r . --glob "src/**/*" --regex
 * **Pragmatic fallback**: a small Python‑only catalog kicks in until your real service import is available.
 
 ---
-
 

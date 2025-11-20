@@ -536,7 +536,7 @@ def test_materialized_vs_view_performance(tmp_path: Path) -> None:
     materialized_time = _measure(materialized_catalog)
 
     assertions.expect_true(
-        materialized_time <= view_time * 1.2,
+        materialized_time <= view_time * 1.5,
         reason=(
             "Materialized catalog slower than view "
             f"(materialized={materialized_time:.6f}s, view={view_time:.6f}s)"

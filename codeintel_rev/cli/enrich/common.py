@@ -320,8 +320,7 @@ def execute_pipeline(state: CLIContextState) -> PipelineResult:
     PipelineResult
         Aggregate pipeline result bundle.
     """
-    result = run_pipeline(pipeline=state.pipeline)
-    return result
+    return run_pipeline(pipeline=state.pipeline)
 
 
 def handle_stage_error(exc: StageError) -> NoReturn:

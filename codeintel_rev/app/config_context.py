@@ -50,13 +50,13 @@ import logging
 import os
 import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager, suppress
+from contextlib import AbstractContextManager, contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from threading import Lock
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
 import numpy as np
 
@@ -149,6 +149,7 @@ _MIN_AUTOTUNE_SAMPLES = 4
 __all__ = [
     "ApplicationContext",
     "ApplicationContextOverrides",
+    "CatalogContext",
     "GateConfig",
     "ResolvedPaths",  # re-export during transition to codeintel_rev.config.paths
     "merge_paths_with_app_config",
@@ -1924,9 +1925,8 @@ class ApplicationContext:
         self._autotune_if_requested()
         return True, limits, None
 
-    @contextmanager
-    def open_catalog(self) -> Iterator[DuckDBCatalog]:
-        """Yield a DuckDB catalog context manager.
+    def open_catalog(self) -> AbstractContextManager[DuckDBCatalog]:
+        """Return a context manager yielding a DuckDB catalog.
 
         Opens a connection to the DuckDB catalog containing chunk metadata,
         yields the catalog instance for querying, and ensures the connection
@@ -1936,34 +1936,27 @@ class ApplicationContext:
         preview text) stored in Parquet files. It's used to hydrate FAISS
         search results with full chunk information.
 
-        Yields
-        ------
-        DuckDBCatalog
-            Catalog instance with active database connection. Supports querying
-            by chunk IDs, URIs, and other metadata fields.
-
-        Examples
-        --------
-        >>> with context.open_catalog() as catalog:
-        ...     chunks = catalog.query_by_ids([1, 2, 3])
-        ...     for chunk in chunks:
-        ...         print(chunk["uri"], chunk["preview"])
-
         Notes
         -----
-        The catalog connection is automatically closed when the context manager
-        exits, even if an exception is raised. This ensures no connection leaks.
+        The returned context manager automatically opens and closes the catalog.
+        Use via ``with context.open_catalog() as catalog: ...``.
 
-        See Also
-        --------
-        codeintel_rev.io.duckdb_catalog.DuckDBCatalog : Catalog implementation
+        Returns
+        -------
+        AbstractContextManager[DuckDBCatalog]
+            Context manager that manages catalog lifecycle.
         """
-        catalog = self.duckdb_catalog_factory(self.catalog_config, self.duckdb_manager)
-        try:
-            catalog.open()
-            yield catalog
-        finally:
-            catalog.close()
+
+        @contextmanager
+        def _catalog_scope() -> Iterator[DuckDBCatalog]:
+            catalog = self.duckdb_catalog_factory(self.catalog_config, self.duckdb_manager)
+            try:
+                catalog.open()
+                yield catalog
+            finally:
+                catalog.close()
+
+        return _catalog_scope()
 
     def with_overrides(
         self,
@@ -2154,3 +2147,9 @@ def merge_paths_with_app_config(paths: ResolvedPaths, app_config: AppConfig) -> 
         duckdb_path=app_config.duckdb.database,
         faiss_index=app_config.faiss.index_path,
     )
+class CatalogContext(Protocol):
+    """Protocol describing contexts that expose ``open_catalog``."""
+
+    def open_catalog(self) -> AbstractContextManager[DuckDBCatalog]:
+        """Return a context manager yielding a ready DuckDB catalog."""
+        ...

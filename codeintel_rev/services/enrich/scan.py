@@ -12,16 +12,16 @@ from typing import Any
 import typer
 
 from codeintel_rev.app.readiness import raise_on_errors, validate_paths
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.config_indexer import index_config_files
 from codeintel_rev.coverage_ingest import collect_coverage
 from codeintel_rev.enrich.errors import TaggingError, TypeSignalError
 from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.pathnorm import detect_repo_root
-from codeintel_rev.enrich.pipeline_helpers import build_module_row, normalized_rel_path
+from codeintel_rev.enrich.pipeline_helpers import build_module_row
 from codeintel_rev.enrich.scip_reader import SCIPIndex
 from codeintel_rev.enrich.tagging import load_rules
 from codeintel_rev.enrich.validators import ModuleRecordModel
-from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.services.enrich.analytics import compute_pipeline_analytics
 from codeintel_rev.services.enrich.context import (
     LegacyPipelineContext,
@@ -41,9 +41,7 @@ from codeintel_rev.services.enrich.graph_steps import (
 )
 from codeintel_rev.services.enrich.models import ModuleRecord as SimpleModuleRecord
 from codeintel_rev.services.enrich.python_files import (
-    EXCLUDED_SCAN_SEGMENTS,
     iter_python_files,
-    should_skip_candidate,
 )
 from codeintel_rev.typedness import FileTypeSignals, collect_type_signals
 
@@ -51,7 +49,22 @@ LOGGER = logging.getLogger(__name__)
 
 
 def discover_python_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
-    """Return ordered Python files under ``root`` honoring include patterns."""
+    """Return ordered Python files under ``root`` honoring include patterns.
+
+    Parameters
+    ----------
+    root : Path
+        Repository root directory to search for Python files.
+    patterns : tuple[str, ...]
+        Tuple of glob patterns to include. Empty tuple includes all files
+        matching default exclusion rules.
+
+    Returns
+    -------
+    list[Path]
+        Sorted list of Path objects for Python files that match inclusion
+        patterns and do not violate exclusion rules.
+    """
     normalized_patterns = tuple(patterns or ())
     files = iter_python_files(root, normalized_patterns or None)
     return sorted(files)
@@ -326,18 +339,31 @@ def _run_requested_graph_steps(ctx: LegacyPipelineContext, pipeline: PipelineOpt
         pipeline.build_goids or pipeline.build_callgraph or pipeline.build_cfg or pipeline.build_dfg
     ):
         return
+    include_globs = tuple(pipeline.only or ())
+    include_arg: tuple[str, ...] | None = include_globs if include_globs else None
     pipeline_ctx, resolved_paths = _build_graph_context(ctx.repo_root, pipeline.out)
     try:
         if pipeline.build_goids:
-            build_goid_artifacts(pipeline_ctx, out_dir=resolved_paths.data_dir, ingest=True)
+            build_goid_artifacts(
+                pipeline_ctx,
+                out_dir=resolved_paths.data_dir,
+                ingest=True,
+                include=include_arg,
+            )
         if pipeline.build_callgraph:
-            build_callgraph_artifacts(pipeline_ctx, out_dir=resolved_paths.data_dir, ingest=True)
+            build_callgraph_artifacts(
+                pipeline_ctx,
+                out_dir=resolved_paths.data_dir,
+                ingest=True,
+                include=include_arg,
+            )
         if pipeline.build_cfg or pipeline.build_dfg:
             build_cfg_artifacts(
                 pipeline_ctx,
                 out_dir=resolved_paths.data_dir,
                 ingest_cfg=pipeline.build_cfg,
                 ingest_dfg=pipeline.build_dfg,
+                include=include_arg,
             )
     finally:
         pipeline_ctx.close()

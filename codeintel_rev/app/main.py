@@ -31,7 +31,7 @@ from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext, ApplicationContextOverrides
 from codeintel_rev.app.faiss_health import check_faiss_health
 from codeintel_rev.app.middleware import SessionScopeMiddleware
-from codeintel_rev.app.routers import index_admin
+from codeintel_rev.app.routers import catalog_read, index_admin
 from codeintel_rev.app.runtime_readiness import ReadinessProbe
 from codeintel_rev.app.server_settings import (
     ServerSettings,
@@ -635,6 +635,8 @@ if SERVER_SETTINGS.enable_trusted_hosts:
 
 if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
     app.include_router(index_admin.router)
+
+app.include_router(catalog_read.router)
 
 
 @app.middleware("http")
