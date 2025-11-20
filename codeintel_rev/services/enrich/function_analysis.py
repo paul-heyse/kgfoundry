@@ -11,7 +11,7 @@ from libcst.metadata import CodeRange, PositionProvider
 
 from codeintel_rev.ids.goid import GOID, EntityDescriptor, GoidKind, RepoSnapshot, compute_goid
 
-FunctionNode = cst.FunctionDef | cst.AsyncFunctionDef
+FunctionNode = cst.FunctionDef
 
 
 @dataclass(slots=True, frozen=True)
@@ -99,23 +99,13 @@ class BaseFunctionVisitor(cst.CSTVisitor):
         self._class_stack.pop()
 
     def visit_FunctionDef(self, node: cst.FunctionDef) -> None:  # noqa: N802
-        """Handle sync function definitions."""
-        info = self._build_info(node=node, is_async=False)
+        """Handle function definitions (sync or async)."""
+        info = self._build_info(node=node, is_async=node.asynchronous is not None)
         self.process_function(info)
         self._function_stack.append(node.name.value)
 
     def leave_FunctionDef(self, node: cst.FunctionDef) -> None:  # noqa: N802
         """Pop function scope on exit."""
-        self._function_stack.pop()
-
-    def visit_AsyncFunctionDef(self, node: cst.AsyncFunctionDef) -> None:  # noqa: N802
-        """Handle async function definitions."""
-        info = self._build_info(node=node, is_async=True)
-        self.process_function(info)
-        self._function_stack.append(node.name.value)
-
-    def leave_AsyncFunctionDef(self, node: cst.AsyncFunctionDef) -> None:  # noqa: N802
-        """Pop async function scope on exit."""
         self._function_stack.pop()
 
     def process_function(self, info: FunctionInfo) -> None:

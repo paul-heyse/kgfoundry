@@ -10,7 +10,6 @@ from decimal import Decimal
 
 import libcst as cst
 from libcst import MetadataWrapper
-from libcst.helpers import get_docstring
 
 from codeintel_rev.ids.goid import RepoSnapshot
 from codeintel_rev.services.enrich.function_analysis import (
@@ -79,9 +78,6 @@ class _BodyMetricsVisitor(cst.CSTVisitor):
         return self._max_depth
 
     def visit_FunctionDef(self, node: cst.FunctionDef) -> bool:  # noqa: N802
-        return False
-
-    def visit_AsyncFunctionDef(self, node: cst.AsyncFunctionDef) -> bool:  # noqa: N802
         return False
 
     def visit_ClassDef(self, node: cst.ClassDef) -> bool:  # noqa: N802
@@ -212,7 +208,7 @@ class FunctionMetricsVisitor(BaseFunctionVisitor):
                 max_nesting_depth=body_metrics.max_depth,
                 stmt_count=stmt_count,
                 decorator_count=len(info.node.decorators),
-                has_docstring=bool(get_docstring(info.node)),
+                has_docstring=_has_docstring(info.node),
                 complexity_bucket=_complexity_bucket(cyclomatic),
                 created_at=self._created_at,
             )
@@ -245,6 +241,11 @@ def _is_docstring_statement(statement: cst.BaseStatement) -> bool:
         return False
     first = statement.body[0]
     return isinstance(first, cst.Expr) and isinstance(first.value, cst.SimpleString)
+
+
+def _has_docstring(node: FunctionNode) -> bool:
+    statements = list(node.body.body)
+    return bool(statements and _is_docstring_statement(statements[0]))
 
 
 def _logical_loc(start_line: int, end_line: int, code_lines: Sequence[str]) -> int:
