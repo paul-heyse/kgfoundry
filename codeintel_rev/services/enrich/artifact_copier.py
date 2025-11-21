@@ -10,6 +10,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from codeintel_rev.services.enrich.artifact_manifest import ArtifactManifest
+from codeintel_rev.services.enrich.artifact_writer import ArtifactWriter
 
 
 def _copy_file(source: Path, dest: Path) -> None:
@@ -40,9 +41,14 @@ def _emit_sidecar(source: Path, dest_dir: Path) -> Path | None:
     return jsonl_path
 
 
-def _copy_section(items: Iterable[tuple[str, Path]], dest_dir: Path) -> list[dict[str, str]]:
+def _copy_section(
+    items: Iterable[tuple[str, Path]], dest_dir: Path, *, expected: tuple[str, ...] | None = None
+) -> list[dict[str, str]]:
     records: list[dict[str, str]] = []
+    expected_names = set(expected or ())
     for name, src in items:
+        if expected_names and name not in expected_names:
+            continue
         if not src.exists():
             continue
         target = dest_dir / name
@@ -81,7 +87,13 @@ def copy_from_manifest(
         _copy_file(source, dest)
         records.append({"source": str(source), "dest": str(dest)})
 
-    records.extend(_copy_section(manifest.analytics.items(), dest_root / "analytics"))
+    records.extend(
+        _copy_section(
+            manifest.analytics.items(),
+            dest_root / "analytics",
+            expected=ArtifactWriter.analytics_registry,
+        )
+    )
     records.extend(_copy_section(manifest.graphs.items(), dest_root / "graphs"))
     records.extend(_copy_section(manifest.goid.items(), dest_root / "goid"))
     records.extend(_copy_section(manifest.ast.items(), dest_root / "ast"))

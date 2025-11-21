@@ -40,6 +40,18 @@ class ArtifactWriter:
 
     base_dir: Path
     manifest: GraphArtifactPaths
+    analytics_registry: tuple[str, ...] = (
+        "coverage",
+        "hotspots",
+        "doc_health",
+        "function_metrics",
+        "function_types",
+        "typedness",
+        "static_diagnostics",
+        "config_values",
+        "ownership",
+        "slices",
+    )
 
     def promote_aliases(self) -> None:
         """Promote legacy aliases for import/use graphs if present."""
@@ -70,17 +82,8 @@ class ArtifactWriter:
             jsonl_path = parquet_path.with_suffix(".jsonl")
             write_parquet_to_jsonl(parquet_path, jsonl_path)
         analytics_dir = self.base_dir / "analytics"
-        for parquet_path in (
-            analytics_dir / "coverage.parquet",
-            analytics_dir / "hotspots.parquet",
-            analytics_dir / "doc_health.parquet",
-            analytics_dir / "function_metrics.parquet",
-            analytics_dir / "function_types.parquet",
-            analytics_dir / "typedness.parquet",
-            analytics_dir / "static_diagnostics.parquet",
-            analytics_dir / "config_values.parquet",
-            analytics_dir / "ownership.parquet",
-        ):
+        for name in self.analytics_registry:
+            parquet_path = analytics_dir / f"{name}.parquet"
             if parquet_path.exists():
                 write_parquet_to_jsonl(parquet_path, parquet_path.with_suffix(".jsonl"))
 
@@ -144,27 +147,40 @@ def process_artifact_dir(base_dir: Path) -> None:
 class ArtifactValidator:
     """Validate emitted analytics artifacts against permissive schemas."""
 
+    analytics_registry: tuple[str, ...] = (
+        "coverage",
+        "hotspots",
+        "doc_health",
+        "function_metrics",
+        "function_types",
+        "typedness",
+        "static_diagnostics",
+        "config_values",
+        "ownership",
+        "slices",
+    )
+
     def __init__(self, root: Path) -> None:
         self.root = root
 
     def validate(self) -> None:
         """Validate analytics artifacts if present."""
         analytics_dir = self.root / "analytics"
-        self._validate_jsonl(analytics_dir / "coverage.jsonl", CoverageRowModel)
-        self._validate_jsonl(analytics_dir / "hotspots.jsonl", HotspotRowModel)
-        self._validate_jsonl(analytics_dir / "doc_health.jsonl", DocHealthRowModel)
-        self._validate_jsonl(
-            analytics_dir / "function_metrics.jsonl", FunctionMetricRowModel
-        )
-        self._validate_jsonl(analytics_dir / "function_types.jsonl", FunctionTypeRowModel)
-        for optional in (
-            analytics_dir / "typedness.jsonl",
-            analytics_dir / "static_diagnostics.jsonl",
-            analytics_dir / "config_values.jsonl",
-            analytics_dir / "ownership.jsonl",
-            analytics_dir / "slices.jsonl",
-        ):
-            self._validate_jsonl(optional, None)
+        model_map: dict[str, type[JsonModelT] | None] = {
+            "coverage": CoverageRowModel,
+            "hotspots": HotspotRowModel,
+            "doc_health": DocHealthRowModel,
+            "function_metrics": FunctionMetricRowModel,
+            "function_types": FunctionTypeRowModel,
+            "typedness": None,
+            "static_diagnostics": None,
+            "config_values": None,
+            "ownership": None,
+            "slices": None,
+        }
+        for name in self.analytics_registry:
+            jsonl_path = analytics_dir / f"{name}.jsonl"
+            self._validate_jsonl(jsonl_path, model_map.get(name))
         self._validate_json(analytics_dir / "config_index.json", ConfigRecordModel)
         self._validate_tag_index(self.root / "tag_index.json")
         self._validate_tags_yaml(self.root / "tags" / "tags_index.yaml")

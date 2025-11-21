@@ -73,9 +73,7 @@ def build_goid_artifacts(
     settings = filters or FileDiscoverySettings()
     files = collect_python_files(
         ctx,
-        include=settings.include,
-        exclude=settings.exclude,
-        max_file_bytes=settings.max_file_bytes,
+        settings=settings,
     )
     builder = GOIDBuilder(repo=str(ctx.paths.repo_root), commit=_ctx_commit(ctx))
     with _stage(StageMeta("build-goids", {"files": len(files)})) as meta:
@@ -107,12 +105,7 @@ def build_callgraph_artifacts(
     """
     target = _ensure_output_dir(out_dir or ctx.paths.data_dir)
     settings = filters or FileDiscoverySettings()
-    files = collect_python_files(
-        ctx,
-        include=settings.include,
-        exclude=settings.exclude,
-        max_file_bytes=settings.max_file_bytes,
-    )
+    files = collect_python_files(ctx, settings=settings)
     commit = _ctx_commit(ctx)
     builder = CallGraphBuilder(
         repo_root=ctx.paths.repo_root,
@@ -163,12 +156,7 @@ def build_cfg_artifacts(
     """
     target = _ensure_output_dir(out_dir or ctx.paths.data_dir)
     settings = filters or FileDiscoverySettings()
-    files = collect_python_files(
-        ctx,
-        include=settings.include,
-        exclude=settings.exclude,
-        max_file_bytes=settings.max_file_bytes,
-    )
+    files = collect_python_files(ctx, settings=settings)
     commit = _ctx_commit(ctx)
     builder = CFGBuilder(
         repo_root=ctx.paths.repo_root,
@@ -224,12 +212,7 @@ def build_ast_artifacts(
     """
     target = _ensure_output_dir(out_dir or ctx.paths.data_dir)
     settings = filters or FileDiscoverySettings()
-    files = collect_python_files(
-        ctx,
-        include=settings.include,
-        exclude=settings.exclude,
-        max_file_bytes=settings.max_file_bytes,
-    )
+    files = collect_python_files(ctx, settings=settings)
     ast_dir = target / "ast"
     with _stage(StageMeta("build-ast", {"files": len(files)})) as meta:
         node_rows, metric_rows = collect_ast_artifacts(ctx.paths.repo_root, files)

@@ -238,7 +238,10 @@ def build_application_context(
     xtr_cfg = replace(app_config.xtr, enable=xtr_enabled)
     app_config = replace(app_config, bm25=bm25_cfg, splade=splade_cfg, xtr=xtr_cfg)
     harness = build_integration_harness(
-        tmp_path, options=IntegrationHarnessOptions(populate_repo=False)
+        tmp_path,
+        options=IntegrationHarnessOptions(
+            populate_repo=False,
+        ),
     )
     base_context = harness.context
     ctx = base_context.with_overrides(app_config=app_config)

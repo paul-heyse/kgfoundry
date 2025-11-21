@@ -34,7 +34,14 @@ def integration_harness(tmp_path: Path) -> Iterator[IntegrationHarness]:
     """
     harness = build_integration_harness(
         tmp_path,
-        options=IntegrationHarnessOptions(use_real_faiss=HAS_FAISS_SUPPORT),
+        options=IntegrationHarnessOptions(
+            populate_repo=True,
+            seed_files={
+                "README.md": "sample integration content\n",
+                "module.py": "def sample():\n    return 1\n",
+            },
+            use_real_faiss=HAS_FAISS_SUPPORT,
+        ),
     )
     try:
         yield harness

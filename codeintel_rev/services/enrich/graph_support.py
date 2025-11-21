@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +23,8 @@ class FileDiscoverySettings:
     include: tuple[str, ...] = ()
     exclude: tuple[str, ...] = DEFAULT_EXCLUDES
     max_file_bytes: int | None = None
+    since: str | None = None
+    changed_only: bool = False
 
 
 def detect_commit(repo_root: Path) -> str:
@@ -51,9 +52,7 @@ def detect_commit(repo_root: Path) -> str:
 
 def collect_python_files(
     ctx: PipelineContext,
-    include: Sequence[str] | None = None,
-    exclude: Sequence[str] | None = None,
-    max_file_bytes: int | None = None,
+    settings: FileDiscoverySettings | None = None,
 ) -> list[Path]:
     """Collect Python files subject to the pipeline's include/exclude filters.
 
@@ -61,28 +60,51 @@ def collect_python_files(
     ----------
     ctx : PipelineContext
         Pipeline context providing repo root information.
-    include : Sequence[str] | None, optional
-        Optional include glob patterns relative to the repo root.
-    exclude : Sequence[str] | None, optional
-        Optional exclude globs overriding the default exclusion list.
-    max_file_bytes : int | None, optional
-        Optional size threshold; files larger than this are skipped.
+    settings : FileDiscoverySettings | None, optional
+        Include/exclude/max size filters plus optional change filtering
+        (``since`` or ``changed_only``).
 
     Returns
     -------
     list[Path]
         Absolute paths to Python files that should be analyzed.
     """
-    include_globs = tuple(include or ())
-    exclude_globs = tuple(exclude or DEFAULT_EXCLUDES)
+    options = settings or FileDiscoverySettings()
+    include_globs = options.include
+    exclude_globs = options.exclude
     repo_root = ctx.paths.repo_root
+    changed_filter: set[str] | None = None
+    if options.since or options.changed_only:
+        changed_filter = _changed_paths(repo_root, since=options.since)
     discovery = PythonFileDiscovery(
         root=repo_root,
         include=include_globs,
         exclude=exclude_globs,
-        max_file_bytes=max_file_bytes,
+        max_file_bytes=options.max_file_bytes,
     )
-    return discovery.discover()
+    candidates = discovery.discover()
+    if not changed_filter:
+        return candidates
+    filtered: list[Path] = []
+    for candidate in candidates:
+        try:
+            rel = candidate.relative_to(repo_root).as_posix()
+        except ValueError:  # pragma: no cover - defensive
+            rel = candidate.as_posix()
+        if rel in changed_filter:
+            filtered.append(candidate)
+    return filtered
 
 
 __all__ = ["DEFAULT_EXCLUDES", "collect_python_files", "detect_commit"]
+
+
+def _changed_paths(repo_root: Path, *, since: str | None) -> set[str]:
+    command = ["git", "-C", str(repo_root), "diff", "--name-only"]
+    if since:
+        command.append(str(since))
+    try:
+        stdout = run_subprocess(command, timeout=10)
+    except (SubprocessError, OSError):
+        return set()
+    return {line.strip() for line in stdout.splitlines() if line.strip()}
