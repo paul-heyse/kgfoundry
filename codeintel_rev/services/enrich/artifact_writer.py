@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -18,8 +18,10 @@ from codeintel_rev.services.enrich.artifact_schemas import (
     FunctionMetricRowModel,
     FunctionTypeRowModel,
     HotspotRowModel,
+    PromotedIndexModel,
     TagCountsModel,
     TagIndexModel,
+    TypednessRowModel,
 )
 from codeintel_rev.services.enrich.artifacts import GraphArtifactPaths
 from codeintel_rev.services.enrich.context import PipelineContext
@@ -31,7 +33,7 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover - optional dependency
     yaml_module = None
 
-JsonModelT = TypeVar("JsonModelT", bound=BaseModel)
+JsonModelType = type[BaseModel]
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,13 +168,13 @@ class ArtifactValidator:
     def validate(self) -> None:
         """Validate analytics artifacts if present."""
         analytics_dir = self.root / "analytics"
-        model_map: dict[str, type[JsonModelT] | None] = {
+        model_map: Mapping[str, JsonModelType | None] = {
             "coverage": CoverageRowModel,
             "hotspots": HotspotRowModel,
             "doc_health": DocHealthRowModel,
             "function_metrics": FunctionMetricRowModel,
             "function_types": FunctionTypeRowModel,
-            "typedness": None,
+            "typedness": TypednessRowModel,
             "static_diagnostics": None,
             "config_values": None,
             "ownership": None,
@@ -184,9 +186,10 @@ class ArtifactValidator:
         self._validate_json(analytics_dir / "config_index.json", ConfigRecordModel)
         self._validate_tag_index(self.root / "tag_index.json")
         self._validate_tags_yaml(self.root / "tags" / "tags_index.yaml")
+        self._validate_promoted_index(self.root / "promoted_index.json")
 
     @staticmethod
-    def _validate_jsonl(path: Path, model: type[JsonModelT] | None) -> None:
+    def _validate_jsonl(path: Path, model: JsonModelType | None) -> None:
         if not path.exists():
             return
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -201,7 +204,7 @@ class ArtifactValidator:
                 model.model_validate(payload)
 
     @staticmethod
-    def _validate_json(path: Path, model: type[JsonModelT]) -> None:
+    def _validate_json(path: Path, model: JsonModelType) -> None:
         if not path.exists():
             return
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -222,7 +225,10 @@ class ArtifactValidator:
         if not isinstance(payload, dict):
             message = f"tags_index.yaml must contain a mapping. Found: {type(payload)!r}"
             raise TypeError(message)
-        TagIndexModel.model_validate(payload)
+        try:
+            TagIndexModel.model_validate(payload)
+        except ValidationError:
+            TagCountsModel.model_validate(payload)
 
     @staticmethod
     def _validate_tag_index(path: Path) -> None:
@@ -233,6 +239,13 @@ class ArtifactValidator:
             TagIndexModel.model_validate(payload)
         except ValidationError:
             TagCountsModel.model_validate(payload)
+
+    @staticmethod
+    def _validate_promoted_index(path: Path) -> None:
+        if not path.exists():
+            return
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        PromotedIndexModel.model_validate(payload)
 
 
 __all__ = ["ArtifactWriter", "build_writer"]

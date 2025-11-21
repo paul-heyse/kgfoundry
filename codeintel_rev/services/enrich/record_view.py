@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import cast
 
 from codeintel_rev.enrich.models import ModuleRecord
 
@@ -41,7 +40,7 @@ def as_record_view(record: ModuleRecord | Mapping[str, object]) -> ModuleRecordV
             loc=loc,
             meta=meta_map,
         )
-    mapping = cast("Mapping[str, object]", record)
+    mapping = record
     path = str(mapping.get("path", ""))
     module_name = str(mapping.get("module_name") or mapping.get("module") or path)
     tags_raw = mapping.get("tags")

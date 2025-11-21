@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from pathlib import Path
 
+import duckdb
 import numpy as np
 import pytest
 from codeintel_rev.app.main import readyz
@@ -81,3 +82,13 @@ def faiss_index_seed(integration_harness: IntegrationHarness) -> None:
     ids = np.arange(vectors.shape[0], dtype=np.int64)
     manager.build_index(vectors)
     manager.add_vectors(vectors, ids)
+
+    idmap_path = integration_harness.context.paths.faiss_idmap_path
+    idmap_path.parent.mkdir(parents=True, exist_ok=True)
+    with duckdb.connect(database=":memory:") as connection:
+        connection.execute("CREATE TABLE tmp (faiss_row BIGINT, external_id BIGINT)")
+        connection.executemany(
+            "INSERT INTO tmp VALUES (?, ?)",
+            [(int(row), int(ext_id)) for row, ext_id in enumerate(ids)],
+        )
+        connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(idmap_path)])

@@ -21,114 +21,18 @@ from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogOptions,
 from codeintel_rev.io.duckdb_manager import DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 from tests._helpers import assertions
+from tests._helpers.duckdb_catalog import (
+    default_chunk_rows,
+    index_exists,
+    safe_sql_path,
+    seed_chunks_table,
+    table_exists,
+    write_chunks_parquet,
+    write_idmap_parquet,
+    write_single_row_parquet,
+)
 
 ALL_CHUNK_IDS = list(range(1, 12))
-
-
-def _safe_sql_path(path: Path, base_path: Path) -> str:
-    """Safely construct SQL path literal for DuckDB read_parquet().
-
-    Validates that the path is within the base directory to prevent path traversal,
-    then escapes single quotes for safe use in SQL string literals.
-
-    Parameters
-    ----------
-    path : Path
-        Path to validate and escape.
-    base_path : Path
-        Base directory that path must be within.
-
-    Returns
-    -------
-    str
-        Escaped path string safe for use in SQL string literal.
-
-    Raises
-    ------
-    ValueError
-        If path is outside base_path directory.
-    """
-    validated = path.resolve()
-    base_resolved = base_path.resolve()
-    if not str(validated).startswith(str(base_resolved)):
-        msg = f"Path {validated} is outside base directory {base_resolved}"
-        raise ValueError(msg)
-    # Escape single quotes for SQL string literal
-    return str(validated).replace("'", "''")
-
-
-def _write_chunks_parquet(path: Path) -> None:
-    """Write test chunks parquet file.
-
-    Parameters
-    ----------
-    path : Path
-        Output parquet file path.
-    """
-    connection = duckdb.connect(database=":memory:")
-    connection.execute("CREATE TABLE tmp (id INTEGER, uri VARCHAR, text VARCHAR)")
-    connection.executemany(
-        "INSERT INTO tmp VALUES (?, ?, ?)",
-        [
-            (2, "example.py", "second"),
-            (1, "example.py", "first"),
-            (3, "other.py", "other"),
-        ],
-    )
-    connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(path)])
-    connection.close()
-
-
-def _write_idmap_parquet(path: Path) -> None:
-    """Write test ID map parquet file.
-
-    Parameters
-    ----------
-    path : Path
-        Output parquet file path.
-    """
-    connection = duckdb.connect(database=":memory:")
-    connection.execute("CREATE TABLE tmp (faiss_row BIGINT, external_id BIGINT, source TEXT)")
-    connection.executemany(
-        "INSERT INTO tmp VALUES (?, ?, ?)",
-        [
-            (0, 1, "primary"),
-            (1, 2, "primary"),
-        ],
-    )
-    connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(path)])
-    connection.close()
-
-
-def _table_exists(db_path: Path, table_name: str) -> bool:
-    """Check if table exists in DuckDB database.
-
-    Parameters
-    ----------
-    db_path : Path
-        Database file path.
-    table_name : str
-        Table name to check.
-
-    Returns
-    -------
-    bool
-        True if table exists, False otherwise.
-    """
-    connection = duckdb.connect(str(db_path))
-    try:
-        row = connection.execute(
-            """
-            SELECT COUNT(*)
-            FROM information_schema.tables
-            WHERE table_schema = 'main'
-              AND table_name = ?
-            """,
-            [table_name],
-        ).fetchone()
-        return bool(row and row[0])
-    finally:
-        connection.close()
 
 
 def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
@@ -136,7 +40,7 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
     chunks_path = vectors_dir / "chunks.parquet"
-    _write_single_row_parquet(
+    write_single_row_parquet(
         chunks_path,
         """
         SELECT
@@ -154,7 +58,7 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
         """,
     )
     modules_path = tmp_path / "modules.parquet"
-    _write_single_row_parquet(
+    write_single_row_parquet(
         modules_path,
         """
         SELECT
@@ -164,7 +68,7 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
         """,
     )
     scip_path = tmp_path / "scip.parquet"
-    _write_single_row_parquet(
+    write_single_row_parquet(
         scip_path,
         """
         SELECT
@@ -174,7 +78,7 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
         """,
     )
     ast_path = tmp_path / "ast.parquet"
-    _write_single_row_parquet(
+    write_single_row_parquet(
         ast_path,
         """
         SELECT
@@ -185,7 +89,7 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
         """,
     )
     cst_path = tmp_path / "cst.parquet"
-    _write_single_row_parquet(
+    write_single_row_parquet(
         cst_path,
         """
         SELECT
@@ -231,120 +135,16 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
             assertions.expect_equal(row[0], 1)
 
 
-def _write_single_row_parquet(path: Path, select_sql: str) -> None:
-    """Write a Parquet file from a single SELECT statement."""
-    connection = duckdb.connect(database=":memory:")
-    try:
-        connection.execute("DROP TABLE IF EXISTS tmp")
-        relation = connection.sql(select_sql)
-        relation.create("tmp")
-        connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(path)])
-    finally:
-        connection.close()
-
-
-def _index_exists(db_path: Path, index_name: str) -> bool:
-    """Check if index exists in DuckDB database.
-
-    Parameters
-    ----------
-    db_path : Path
-        Database file path.
-    index_name : str
-        Index name to check.
-
-    Returns
-    -------
-    bool
-        True if index exists, False otherwise.
-    """
-    connection = duckdb.connect(str(db_path))
-    try:
-        row = connection.execute(
-            "SELECT COUNT(*) FROM duckdb_indexes() WHERE index_name = ?",
-            [index_name],
-        ).fetchone()
-        return bool(row and row[0])
-    finally:
-        connection.close()
-
-
 @pytest.fixture
 def test_catalog(tmp_path: Path) -> DuckDBCatalog:
-    """Create an in-memory DuckDB catalog with test chunks.
-
-    Creates a DuckDB catalog and inserts test chunks with various URIs
-    and languages for testing filtering functionality.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory for DuckDB database file.
-
-    Returns
-    -------
-    DuckDBCatalog
-        Catalog instance with test data loaded.
-    """
+    """Create a DuckDB catalog seeded with standard chunk rows."""
     db_path = tmp_path / "test.duckdb"
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
 
-    catalog = DuckDBCatalog(db_path, vectors_dir)
+    catalog = DuckDBCataloga(db_path, vectors_dir)  # type: ignore[name-defined]
     with duckdb.connect(str(db_path)) as connection:
-        connection.execute(
-            """
-            CREATE TABLE chunks AS
-            SELECT * FROM VALUES
-                (
-                    1::BIGINT, 'src/main.py'::VARCHAR, 1::INTEGER, 10::INTEGER,
-                    0::BIGINT, 100::BIGINT, 'def main():'::VARCHAR, [0.1, 0.2]::FLOAT[]
-                ),
-                (
-                    2::BIGINT, 'src/utils.py'::VARCHAR, 5::INTEGER, 15::INTEGER,
-                    50::BIGINT, 150::BIGINT, 'def helper():'::VARCHAR, [0.3, 0.4]::FLOAT[]
-                ),
-                (
-                    3::BIGINT, 'tests/test_main.py'::VARCHAR, 1::INTEGER, 5::INTEGER,
-                    0::BIGINT, 50::BIGINT, 'def test_main():'::VARCHAR, [0.5, 0.6]::FLOAT[]
-                ),
-                (
-                    4::BIGINT, 'tests/test_utils.py'::VARCHAR, 1::INTEGER, 5::INTEGER,
-                    0::BIGINT, 50::BIGINT, 'def test_helper():'::VARCHAR, [0.7, 0.8]::FLOAT[]
-                ),
-                (
-                    5::BIGINT, 'src/app.ts'::VARCHAR, 1::INTEGER, 20::INTEGER,
-                    0::BIGINT, 200::BIGINT, 'function app() {'::VARCHAR, [0.9, 1.0]::FLOAT[]
-                ),
-                (
-                    6::BIGINT, 'src/components/Button.tsx'::VARCHAR, 1::INTEGER, 30::INTEGER,
-                    0::BIGINT, 300::BIGINT, 'export const Button'::VARCHAR, [1.1, 1.2]::FLOAT[]
-                ),
-                (
-                    7::BIGINT, 'docs/README.md'::VARCHAR, 1::INTEGER, 50::INTEGER,
-                    0::BIGINT, 500::BIGINT, '# Documentation'::VARCHAR, [1.3, 1.4]::FLOAT[]
-                ),
-                (
-                    8::BIGINT, 'src/nested/deep/file.py'::VARCHAR, 1::INTEGER, 5::INTEGER,
-                    0::BIGINT, 50::BIGINT, 'deep code'::VARCHAR, [1.5, 1.6]::FLOAT[]
-                ),
-                (
-                    9::BIGINT, 'lib/legacy.py'::VARCHAR, 1::INTEGER, 10::INTEGER,
-                    0::BIGINT, 100::BIGINT, 'old code'::VARCHAR, [1.7, 1.8]::FLOAT[]
-                ),
-                (
-                    10::BIGINT, 'src/config.json'::VARCHAR, 1::INTEGER, 5::INTEGER,
-                    0::BIGINT, 50::BIGINT, '{"key": "value"}'::VARCHAR, [1.9, 2.0]::FLOAT[]
-                ),
-                (
-                    11::BIGINT, 'main.py'::VARCHAR, 1::INTEGER, 20::INTEGER,
-                    0::BIGINT, 200::BIGINT, 'def entry():'::VARCHAR, [2.1, 2.2]::FLOAT[]
-                )
-            AS t(id, uri, start_line, end_line, start_byte, end_byte, preview, embedding)
-            """
-        )
-        connection.execute("CREATE INDEX IF NOT EXISTS idx_uri ON chunks(uri)")
-
+        seed_chunks_table(connection, default_chunk_rows())
     return catalog
 
 
@@ -925,11 +725,11 @@ def test_query_by_uri_supports_unlimited_results(tmp_path: Path) -> None:
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
     parquet_path = vectors_dir / "chunks.parquet"
-    _write_chunks_parquet(parquet_path)
+    write_chunks_parquet(parquet_path)
 
     db_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(db_path, vectors_dir)
-    safe_path = _safe_sql_path(parquet_path, tmp_path)
+    safe_path = safe_sql_path(parquet_path, tmp_path)
     with duckdb.connect(str(db_path)) as connection:
         connection.sql("SELECT * FROM read_parquet(?)", params=[safe_path]).create_view(
             "chunks", replace=True
@@ -1038,12 +838,12 @@ def test_materialize_faiss_join_builds_table(tmp_path: Path) -> None:
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir(parents=True, exist_ok=True)
     chunks_parquet = vectors_dir / "chunks.parquet"
-    _write_chunks_parquet(chunks_parquet)
+    write_chunks_parquet(chunks_parquet)
 
     faiss_dir = tmp_path / "faiss"
     faiss_dir.mkdir(parents=True, exist_ok=True)
     idmap_parquet = faiss_dir / "faiss_idmap.parquet"
-    _write_idmap_parquet(idmap_parquet)
+    write_idmap_parquet(idmap_parquet)
 
     catalog_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(catalog_path, vectors_dir)
@@ -1061,18 +861,19 @@ def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
     parquet_path = vectors_dir / "chunks.parquet"
-    _write_chunks_parquet(parquet_path)
+    write_chunks_parquet(parquet_path)
 
     catalog_path = tmp_path / "catalog.duckdb"
     with DuckDBCatalog(catalog_path, vectors_dir, materialize=True) as catalog:
         assertions.expect_equal(catalog.count_chunks(), 3)
 
-    assertions.expect_true(
-        _table_exists(catalog_path, "chunks_materialized"), reason="table should exist"
-    )
-    assertions.expect_true(
-        _index_exists(catalog_path, "idx_chunks_materialized_uri"), reason="index should exist"
-    )
+        assertions.expect_true(
+            table_exists(catalog_path, "chunks_materialized"), reason="table should exist"
+        )
+        assertions.expect_true(
+            index_exists(catalog_path, "chunks_materialized", "idx_chunks_materialized_uri"),
+            reason="index should exist",
+        )
 
     connection = duckdb.connect(str(catalog_path))
     try:
@@ -1094,10 +895,11 @@ def test_materialize_creates_empty_table_when_parquet_missing(tmp_path: Path) ->
         assertions.expect_equal(catalog.count_chunks(), 0)
 
     assertions.expect_true(
-        _table_exists(catalog_path, "chunks_materialized"), reason="table should exist"
+        table_exists(catalog_path, "chunks_materialized"), reason="table should exist"
     )
     assertions.expect_true(
-        _index_exists(catalog_path, "idx_chunks_materialized_uri"), reason="index should exist"
+        index_exists(catalog_path, "chunks_materialized", "idx_chunks_materialized_uri"),
+        reason="index should exist",
     )
 
 

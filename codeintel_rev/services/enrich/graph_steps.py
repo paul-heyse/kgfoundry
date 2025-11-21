@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-from codeintel_rev.enrich.ast_indexer import write_ast_parquet
+from codeintel_rev.enrich.ast_indexer import AstMetricsRow, AstNodeRow, write_ast_parquet
 from codeintel_rev.enrich.callgraph import CallGraphBuilder
 from codeintel_rev.enrich.cfg import CFGBuilder
 from codeintel_rev.enrich.goid_builder import GOIDBuilder
@@ -18,7 +21,11 @@ from codeintel_rev.services.enrich.graph_support import (
     collect_python_files,
     detect_commit,
 )
-from codeintel_rev.services.enrich.io import collect_ast_artifacts, write_ast_jsonl
+from codeintel_rev.services.enrich.io import (
+    collect_ast_artifacts,
+    normalized_rel_path,
+    write_ast_jsonl,
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -55,6 +62,15 @@ class ASTArtifactsResult:
     parquet_dir: Path
 
 
+@dataclass(slots=True, frozen=True)
+class AstCache:
+    """Cache containers for AST nodes/metrics keyed by path."""
+
+    nodes: dict[str, list[AstNodeRow]]
+    metrics: dict[str, AstMetricsRow]
+    hashes: dict[str, str]
+
+
 def build_goid_artifacts(
     ctx: PipelineContext,
     *,
@@ -71,16 +87,22 @@ def build_goid_artifacts(
     """
     target = _ensure_output_dir(out_dir or ctx.paths.data_dir)
     settings = filters or FileDiscoverySettings()
-    files = collect_python_files(
-        ctx,
-        settings=settings,
-    )
+    files = collect_python_files(ctx, settings=settings)
+    ast_dir = target / "ast"
+    ast_dir.mkdir(parents=True, exist_ok=True)
+    node_rows, metric_rows, hashes = _collect_ast_with_cache(ctx, files, ast_dir)
+    nodes_path = ast_dir / "ast_nodes.jsonl"
+    metrics_path = ast_dir / "ast_metrics.jsonl"
     builder = GOIDBuilder(repo=str(ctx.paths.repo_root), commit=_ctx_commit(ctx))
     with _stage(StageMeta("build-goids", {"files": len(files)})) as meta:
-        node_rows, _ = collect_ast_artifacts(ctx.paths.repo_root, files)
         artifacts = builder.build(node_rows)
         goids_path, crosswalk_path = builder.write_artifacts(artifacts, target)
+        write_ast_jsonl(nodes_path, node_rows)
+        write_ast_jsonl(metrics_path, metric_rows)
+        _write_ast_cache(ast_dir, hashes)
         meta["goids"] = len(artifacts.goids)
+        meta["ast_nodes"] = len(node_rows)
+        meta["ast_metrics"] = len(metric_rows)
         if ingest:
             catalog = _open_catalog(ctx)
             catalog.upsert_goids(artifacts.goids)
@@ -187,6 +209,176 @@ def _ensure_output_dir(path: Path) -> Path:
     return path
 
 
+def _file_hash(path: Path) -> str | None:
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    digest = hashlib.sha256()
+    digest.update(data)
+    return digest.hexdigest()
+
+
+def _load_ast_nodes(path: Path) -> dict[str, list[AstNodeRow]]:
+    mapping: dict[str, list[AstNodeRow]] = {}
+    if not path.exists():
+        return mapping
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        rel_path = payload.get("path")
+        node = _node_from_payload(payload)
+        if isinstance(rel_path, str) and node is not None:
+            mapping.setdefault(rel_path, []).append(node)
+    return mapping
+
+
+def _load_ast_metrics(path: Path) -> dict[str, AstMetricsRow]:
+    mapping: dict[str, AstMetricsRow] = {}
+    if not path.exists():
+        return mapping
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        rel_path = payload.get("path")
+        metric = _metrics_from_payload(payload)
+        if isinstance(rel_path, str) and metric is not None:
+            mapping[rel_path] = metric
+    return mapping
+
+
+def _node_from_payload(payload: dict[str, Any]) -> AstNodeRow | None:
+    path = payload.get("path")
+    module = payload.get("module")
+    node_type = payload.get("node_type")
+    if not isinstance(path, str) or not isinstance(module, str) or not isinstance(node_type, str):
+        return None
+    decorators = payload.get("decorators") or []
+    bases = payload.get("bases") or []
+    try:
+        return AstNodeRow(
+            path=path,
+            module=module,
+            qualname=payload.get("qualname"),
+            name=payload.get("name"),
+            node_type=node_type,
+            lineno=_int_or_none(payload.get("lineno")),
+            col=_int_or_none(payload.get("col")),
+            end_lineno=_int_or_none(payload.get("end_lineno")),
+            end_col=_int_or_none(payload.get("end_col")),
+            parent_qualname=payload.get("parent_qualname"),
+            decorators=tuple(map(str, decorators)),
+            bases=tuple(map(str, bases)),
+            docstring=payload.get("docstring"),
+            is_public=bool(payload.get("is_public")),
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _metrics_from_payload(payload: dict[str, Any]) -> AstMetricsRow | None:
+    path = payload.get("path")
+    module = payload.get("module")
+    if not isinstance(path, str) or not isinstance(module, str):
+        return None
+    try:
+        return AstMetricsRow(
+            path=path,
+            module=module,
+            func_count=_int_or_zero(payload.get("func_count")),
+            class_count=_int_or_zero(payload.get("class_count")),
+            assign_count=_int_or_zero(payload.get("assign_count")),
+            import_count=_int_or_zero(payload.get("import_count")),
+            branch_nodes=_int_or_zero(payload.get("branch_nodes")),
+            cyclomatic=_int_or_zero(payload.get("cyclomatic")),
+            cognitive=_int_or_zero(payload.get("cognitive")),
+            max_nesting=_int_or_zero(payload.get("max_nesting")),
+            statements=_int_or_zero(payload.get("statements")),
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _int_or_none(value: object) -> int | None:
+    if not isinstance(value, (int, float, str)):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _int_or_zero(value: object) -> int:
+    if not isinstance(value, (int, float, str)):
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _load_ast_hashes(hashes_path: Path) -> dict[str, str]:
+    try:
+        hashes_raw = json.loads(hashes_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return hashes_raw if isinstance(hashes_raw, dict) else {}
+
+
+def _load_ast_cache(ast_dir: Path) -> AstCache:
+    hashes = _load_ast_hashes(ast_dir / "ast_hashes.json")
+    return AstCache(
+        nodes=_load_ast_nodes(ast_dir / "ast_nodes.jsonl"),
+        metrics=_load_ast_metrics(ast_dir / "ast_metrics.jsonl"),
+        hashes=hashes,
+    )
+
+
+def _write_ast_cache(ast_dir: Path, hashes: dict[str, str]) -> None:
+    hashes_path = ast_dir / "ast_hashes.json"
+    hashes_path.parent.mkdir(parents=True, exist_ok=True)
+    hashes_path.write_text(json.dumps(hashes, indent=2), encoding="utf-8")
+
+
+def _collect_ast_with_cache(
+    ctx: PipelineContext, files: list[Path], ast_dir: Path
+) -> tuple[list[AstNodeRow], list[AstMetricsRow], dict[str, str]]:
+    cache = _load_ast_cache(ast_dir)
+    node_rows: list[AstNodeRow] = []
+    metric_rows: list[AstMetricsRow] = []
+    new_hashes: dict[str, str] = dict(cache.hashes)
+    to_process: list[Path] = []
+    for file_path in files:
+        rel_path = normalized_rel_path(file_path, ctx.paths.repo_root)
+        file_hash = _file_hash(file_path)
+        if file_hash is not None and cache.hashes.get(rel_path) == file_hash:
+            node_rows.extend(cache.nodes.get(rel_path, []))
+            metric = cache.metrics.get(rel_path)
+            if metric:
+                metric_rows.append(metric)
+            new_hashes[rel_path] = file_hash
+            continue
+        to_process.append(file_path)
+    if to_process:
+        fresh_nodes, fresh_metrics = collect_ast_artifacts(ctx.paths.repo_root, to_process)
+        node_rows.extend(fresh_nodes)
+        metric_rows.extend(fresh_metrics)
+        for fp in to_process:
+            rel = normalized_rel_path(fp, ctx.paths.repo_root)
+            file_hash = _file_hash(fp)
+            if file_hash is not None:
+                new_hashes[rel] = file_hash
+    return node_rows, metric_rows, new_hashes
+
+
 def _open_catalog(ctx: PipelineContext) -> DuckDBCatalog:
     ctx.paths.vectors_dir.mkdir(parents=True, exist_ok=True)
     options = DuckDBCatalogOptions(repo_root=ctx.paths.repo_root)
@@ -215,13 +407,14 @@ def build_ast_artifacts(
     files = collect_python_files(ctx, settings=settings)
     ast_dir = target / "ast"
     with _stage(StageMeta("build-ast", {"files": len(files)})) as meta:
-        node_rows, metric_rows = collect_ast_artifacts(ctx.paths.repo_root, files)
+        node_rows, metric_rows, hashes = _collect_ast_with_cache(ctx, files, ast_dir)
         ast_dir.mkdir(parents=True, exist_ok=True)
         nodes_path = ast_dir / "ast_nodes.jsonl"
         metrics_path = ast_dir / "ast_metrics.jsonl"
         write_ast_jsonl(nodes_path, node_rows)
         write_ast_jsonl(metrics_path, metric_rows)
         write_ast_parquet(node_rows, metric_rows, out_dir=ast_dir)
+        _write_ast_cache(ast_dir, hashes)
         meta["nodes"] = len(node_rows)
         meta["metrics"] = len(metric_rows)
     return ASTArtifactsResult(

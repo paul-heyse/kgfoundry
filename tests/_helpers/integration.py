@@ -474,6 +474,7 @@ def build_integration_harness(
     else:
         faiss_manager = cast("FAISSManager", FakeFAISSManager(vec_dim=app_config.index.vec_dim))
         faiss_manager.autotune_profile_path = paths.faiss_index.with_name("tuning.json")
+    faiss_runtime_manager: FAISSManager = cast("FAISSManager", faiss_manager)
     scope_backend = InMemoryScopeStore()
     scope_store = ScopeStore(
         scope_backend,
@@ -487,7 +488,7 @@ def build_integration_harness(
         app_config=app_config,
         paths=paths,
         vllm_client=vllm_client,
-        faiss_manager=faiss_manager,
+        faiss_manager=faiss_runtime_manager,
         scope_store=scope_store,
         duckdb_manager=duckdb_manager,
         catalog_config=catalog_cfg,

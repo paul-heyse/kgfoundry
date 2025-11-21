@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
+from typing import cast
 
 import pytest
 from codeintel_rev.typing import LoggerLike, NDArrayF32, NDArrayI64, PathLike
@@ -22,6 +23,8 @@ from kgfoundry_common.typing import (
 )
 from tests._helpers import assertions
 from tests.helpers.typing_facades import load_facade_attribute_typed, load_facade_module
+
+GateImport = Callable[[str, str], object]
 
 
 def _module_available(module_name: str) -> bool:
@@ -99,11 +102,12 @@ def test_common_facade_has_no_eager_numpy_imports() -> None:
 
 def test_gate_import_happy_path_and_errors() -> None:
     """gate_import should cache successes and surface purpose in failures."""
-    gate_import = load_facade_attribute_typed(
+    gate_import_callable = load_facade_attribute_typed(
         "kgfoundry_common.typing",
         "gate_import",
         Callable,
     )
+    gate_import = cast("GateImport", gate_import_callable)
 
     json_mod = gate_import("json", "typing contract test")
     assertions.expect_true(hasattr(json_mod, "loads"))

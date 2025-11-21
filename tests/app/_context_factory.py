@@ -247,4 +247,10 @@ def build_application_context(
     ctx = base_context.with_overrides(app_config=app_config)
     if seed_coderank_runtime:
         ctx.seed_runtime_cells_for_tests(coderank_faiss=ctx.faiss_manager)
+        runtime = ctx.faiss_manager.runtime
+        # Normalize runtime defaults for deterministic tests.
+        if hasattr(runtime, "apply_runtime_tuning"):
+            runtime.apply_runtime_tuning(nprobe=32)
+        elif hasattr(runtime, "set_runtime_tuning"):
+            runtime.set_runtime_tuning({"nprobe": 32})
     return ctx

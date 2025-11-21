@@ -95,13 +95,53 @@ class FunctionTypeRowModel(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class AnnotationRatioModel(BaseModel):
+    """Schema for annotation ratio payloads."""
+
+    params: float | None = None
+    returns: float | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class TypednessRowModel(BaseModel):
+    """Schema for typedness summary rows."""
+
+    path: str
+    type_error_count: int = Field(default=0, ge=0)
+    annotation_ratio: AnnotationRatioModel | float | None = None
+    untyped_defs: int | None = None
+    overlay_needed: bool = False
+
+    model_config = ConfigDict(extra="allow")
+
+
+class PromotedEntryModel(BaseModel):
+    """Schema for a promoted artifact record."""
+
+    source: str
+    dest: str
+
+    model_config = ConfigDict(extra="allow")
+
+
+class PromotedIndexModel(RootModel[list[PromotedEntryModel]]):
+    """Root model for promoted artifact index."""
+
+    root: list[PromotedEntryModel]
+
+
 __all__ = [
+    "AnnotationRatioModel",
     "ConfigRecordModel",
     "CoverageRowModel",
     "DocHealthRowModel",
     "FunctionMetricRowModel",
     "FunctionTypeRowModel",
     "HotspotRowModel",
+    "PromotedEntryModel",
+    "PromotedIndexModel",
     "TagCountsModel",
     "TagIndexModel",
+    "TypednessRowModel",
 ]

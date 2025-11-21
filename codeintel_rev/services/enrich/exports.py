@@ -1,12 +1,15 @@
 # SPDX-License-Identifier: MIT
 """Enrichment export orchestration."""
+# ruff: noqa: PLR0913
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import asdict
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -69,7 +72,7 @@ from codeintel_rev.services.enrich.io import (
     write_jsonl as simple_write_jsonl,
 )
 from codeintel_rev.services.enrich.models import ExportResult
-from codeintel_rev.services.enrich.record_view import as_record_view
+from codeintel_rev.services.enrich.record_view import ModuleRecordView, as_record_view
 from codeintel_rev.services.enrich.static_diagnostics import (
     STATIC_DIAGNOSTICS_SCHEMA,
     build_static_diagnostics_rows,
@@ -78,6 +81,15 @@ from codeintel_rev.typedness import FileTypeSignals
 from codeintel_rev.uses_builder import write_use_graph
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(slots=True, frozen=True)
+class FunctionCachingState:
+    """Caches and hashes for function analytics."""
+
+    metrics_cache: dict[str, list[dict[str, Any]]]
+    types_cache: dict[str, list[dict[str, Any]]]
+    prior_hashes: dict[str, str]
 
 
 def _module_by_path(rows: Sequence[Mapping[str, Any]]) -> dict[str, str]:
@@ -138,6 +150,53 @@ def _write_validated_tabular(
     validated = [model.model_validate(row).model_dump() for row in rows]
     write_parquet(parquet_path, validated)
     simple_write_jsonl(parquet_path.with_suffix(".jsonl"), validated)
+
+
+def _file_hash(path: Path) -> str | None:
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    digest = hashlib.sha256()
+    digest.update(data)
+    return digest.hexdigest()
+
+
+def _load_function_caches(analytics_dir: Path) -> FunctionCachingState:
+    """Load cached function analytics keyed by rel_path plus prior hashes.
+
+    Returns
+    -------
+    FunctionCachingState
+        Loaded metrics/types caches and prior hash mapping (may be empty).
+    """
+
+    def _load_jsonl(path: Path) -> dict[str, list[dict[str, Any]]]:
+        mapping: dict[str, list[dict[str, Any]]] = {}
+        if not path.exists():
+            return mapping
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            rel_path = payload.get("rel_path")
+            if isinstance(rel_path, str):
+                mapping.setdefault(rel_path, []).append(payload)
+        return mapping
+
+    metrics_cache = _load_jsonl(analytics_dir / "function_metrics.jsonl")
+    types_cache = _load_jsonl(analytics_dir / "function_types.jsonl")
+    hashes_path = analytics_dir / "function_hashes.json"
+    try:
+        prior_hashes_raw = json.loads(hashes_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        prior_hashes_raw = {}
+    prior_hashes = prior_hashes_raw if isinstance(prior_hashes_raw, dict) else {}
+    return FunctionCachingState(
+        metrics_cache=metrics_cache,
+        types_cache=types_cache,
+        prior_hashes=cast("dict[str, str]", prior_hashes),
+    )
 
 
 def write_exports_outputs(result: PipelineResult, out: Path) -> None:
@@ -362,8 +421,19 @@ def write_typedness_output(result: PipelineResult, out: Path) -> None:
 
 
 def _collect_function_rows(
-    result: PipelineResult, *, include_metrics: bool, include_types: bool
+    result: PipelineResult,
+    *,
+    include_metrics: bool,
+    include_types: bool,
+    caches: FunctionCachingState,
 ) -> tuple[list[FunctionMetricsRow], list[FunctionTypesRow]]:
+    """Collect function metrics/types rows, leveraging cached data when hashes match.
+
+    Returns
+    -------
+    tuple[list[FunctionMetricsRow], list[FunctionTypesRow]]
+        Aggregated metric and type rows for all modules.
+    """
     repo = str(result.repo_root)
     commit = detect_commit(result.repo_root)
     created_at = datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
@@ -377,40 +447,100 @@ def _collect_function_rows(
         if not row.get("parse_ok", True):
             continue
         file_path = (result.repo_root / rel_path).resolve()
-        if not file_path.is_file():
-            LOGGER.warning("Module path missing for function analytics: %s", rel_path)
+        if _reuse_cached_rows(
+            rel_path=rel_path,
+            file_path=file_path,
+            include_metrics=include_metrics,
+            include_types=include_types,
+            caches=caches,
+            metrics_rows=metrics_rows,
+            types_rows=types_rows,
+        ):
             continue
-        try:
-            code = file_path.read_text(encoding="utf-8", errors="ignore")
-        except OSError as exc:  # pragma: no cover - defensive
-            LOGGER.warning("Failed to read %s: %s", rel_path, exc)
-            continue
-        try:
-            module = cst.parse_module(code)
-        except cst.ParserSyntaxError:  # pragma: no cover - defensive
-            LOGGER.warning("Failed to parse %s for function analytics", rel_path, exc_info=True)
-            continue
-        if include_metrics:
-            metrics_rows.extend(
-                build_function_metrics(
-                    snapshot=snapshot,
-                    rel_path=rel_path,
-                    module=module,
-                    code=code,
-                    created_at=created_at,
-                )
-            )
-        if include_types:
-            types_rows.extend(
-                build_function_types(
-                    repo=repo,
-                    commit=commit,
-                    rel_path=rel_path,
-                    module=module,
-                    created_at=created_at,
-                )
-            )
+        _compute_function_rows(
+            rel_path=rel_path,
+            file_path=file_path,
+            snapshot=snapshot,
+            repo=repo,
+            commit=commit,
+            created_at=created_at,
+            include_metrics=include_metrics,
+            include_types=include_types,
+            caches=caches,
+            metrics_rows=metrics_rows,
+            types_rows=types_rows,
+        )
     return metrics_rows, types_rows
+
+
+def _reuse_cached_rows(
+    *,
+    rel_path: str,
+    file_path: Path,
+    include_metrics: bool,
+    include_types: bool,
+    caches: FunctionCachingState,
+    metrics_rows: list[FunctionMetricsRow],
+    types_rows: list[FunctionTypesRow],
+) -> bool:
+    file_hash = _file_hash(file_path)
+    cache_hash = caches.prior_hashes.get(rel_path)
+    if file_hash is None or cache_hash != file_hash:
+        return False
+    if include_metrics:
+        metrics_rows.extend(cast("list[FunctionMetricsRow]", caches.metrics_cache.get(rel_path, [])))
+    if include_types:
+        types_rows.extend(cast("list[FunctionTypesRow]", caches.types_cache.get(rel_path, [])))
+    caches.prior_hashes[rel_path] = file_hash
+    return True
+
+
+def _compute_function_rows(
+    *,
+    rel_path: str,
+    file_path: Path,
+    snapshot: RepoSnapshot,
+    repo: str,
+    commit: str,
+    created_at: str,
+    include_metrics: bool,
+    include_types: bool,
+    caches: FunctionCachingState,
+    metrics_rows: list[FunctionMetricsRow],
+    types_rows: list[FunctionTypesRow],
+) -> None:
+    file_hash = _file_hash(file_path)
+    if not file_path.is_file():
+        LOGGER.warning("Module path missing for function analytics: %s", rel_path)
+        return
+    try:
+        code = file_path.read_text(encoding="utf-8", errors="ignore")
+        module = cst.parse_module(code)
+    except (OSError, cst.ParserSyntaxError) as exc:  # pragma: no cover - defensive
+        LOGGER.warning("Failed to parse %s for function analytics: %s", rel_path, exc)
+        return
+    if include_metrics:
+        metrics_rows.extend(
+            build_function_metrics(
+                snapshot=snapshot,
+                rel_path=rel_path,
+                module=module,
+                code=code,
+                created_at=created_at,
+            )
+        )
+    if include_types:
+        types_rows.extend(
+            build_function_types(
+                repo=repo,
+                commit=commit,
+                rel_path=rel_path,
+                module=module,
+                created_at=created_at,
+            )
+        )
+    if file_hash:
+        caches.prior_hashes[rel_path] = file_hash
 
 
 def _write_function_outputs(
@@ -420,8 +550,12 @@ def _write_function_outputs(
     emit_metrics: bool,
     emit_types: bool,
 ) -> tuple[int, int]:
+    caches = _load_function_caches(out / "analytics")
     metrics_rows, types_rows = _collect_function_rows(
-        result, include_metrics=emit_metrics, include_types=emit_types
+        result,
+        include_metrics=emit_metrics,
+        include_types=emit_types,
+        caches=caches,
     )
     analytics_dir = out / "analytics"
     metrics_count = 0
@@ -680,7 +814,10 @@ def emit_modules_jsonl(ctx: PipelineContext, records: Iterable[ModuleRecord]) ->
     ctx.logger.info("Wrote %d module rows to %s", count, target)
     alias = ctx.paths.data_dir / "modules.jsonl"
     if not alias.exists():
-        alias.write_bytes(target.read_bytes())
+        try:
+            alias.link_to(target)
+        except OSError:
+            alias.write_bytes(target.read_bytes())
     return target
 
 
@@ -753,8 +890,9 @@ def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[ModuleRecord]) 
     """
     md_dir = ctx.paths.data_dir / "sheets"
     md_dir.mkdir(parents=True, exist_ok=True)
-    for record in records:
-        view = as_record_view(record)
+    views: list[ModuleRecordView] = [as_record_view(record) for record in records]
+
+    def _write_sheet(view: ModuleRecordView) -> None:
         slug = view.module.replace(".", "-")
         body = (
             f"# {view.module}\n\n"
@@ -763,6 +901,10 @@ def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[ModuleRecord]) 
             f"- Tags: {', '.join(view.tags) or '—'}\n"
         )
         atomic_write_text(md_dir / f"{slug}.md", body)
+
+    max_workers = min(8, max(1, len(views)))
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        list(pool.map(_write_sheet, views))
     ctx.logger.info("Wrote markdown sheets to %s", md_dir)
     return md_dir
 

@@ -21,7 +21,7 @@ def test_health_and_ready_endpoints(
 ) -> None:
     """Health and readiness endpoints respond with expected payloads."""
     client, harness = integration_app
-    context = cast("ApplicationContext", harness.context)
+    context = harness.context
 
     health_response = client.get("/healthz")
     assertions.expect_equal(health_response.status_code, HTTPStatus.OK)
