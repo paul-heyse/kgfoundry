@@ -10,10 +10,14 @@ from typing import Any, NoReturn, cast
 
 import typer
 
+from codeintel_rev.app.readiness import raise_on_errors, validate_paths
+from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 from codeintel_rev.enrich.errors import StageError
 from codeintel_rev.services.enrich.context import (
     AnalyticsOptions,
     CLIContextState,
+    PipelineContext,
+    PipelineInitOptions,
     PipelineOptions,
     PipelineResult,
 )
@@ -384,6 +388,33 @@ def handle_dry_run(
     return True
 
 
+def prepare_cli_context(
+    repo_root: Path,
+    out_dir: Path,
+    *,
+    tags_yaml: Path | None = None,
+    overlay_rules: Path | None = None,
+) -> tuple[PipelineContext, ResolvedPaths]:
+    """Resolve paths, validate them, ensure output dir, and return context+paths.
+
+    Returns
+    -------
+    tuple[PipelineContext, ResolvedPaths]
+        Materialized pipeline context and resolved paths.
+    """
+    paths = resolve_application_paths({"BASE_DIR": repo_root, "DATA_DIR": out_dir})
+    raise_on_errors(validate_paths(paths))
+    paths.data_dir.mkdir(parents=True, exist_ok=True)
+    ctx = PipelineContext.from_paths(
+        paths,
+        options=PipelineInitOptions(
+            tagging_rules_path=tags_yaml,
+            overlay_rules_path=overlay_rules,
+        ),
+    )
+    return ctx, paths
+
+
 __all__ = [
     "COMMITS_WINDOW_OPTION",
     "COVERAGE_OPTION",
@@ -407,5 +438,6 @@ __all__ = [
     "handle_dry_run",
     "handle_stage_error",
     "normalize_global_cli_args",
+    "prepare_cli_context",
     "shared_options",
 ]

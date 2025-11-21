@@ -14,6 +14,7 @@ from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.paths import resolve_application_paths
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, DuckDBCatalogConfig
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
+from codeintel_rev.io.faiss_compat import load_faiss_module
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
@@ -247,6 +248,18 @@ class AdapterSeedConfig:
     populate_repo_on_disk: bool = True
 
 
+@dataclass(slots=True)
+class IntegrationHarnessOptions:
+    """Configuration options for building the integration harness."""
+
+    populate_repo: bool = False
+    seed_files: dict[str, str] | None = None
+    file_adapter: InMemoryFileAdapter | None = None
+    history_adapter: InMemoryHistoryAdapter | None = None
+    catalog_factory: Callable[[DuckDBCatalogConfig, DuckDBManager], DuckDBCatalog] | None = None
+    use_real_faiss: bool | None = None
+
+
 @dataclass
 class FakeFAISSManager:
     """Minimal FAISS manager stub satisfying readiness/search paths."""
@@ -367,13 +380,26 @@ def _default_catalog_factory(
     return catalog
 
 
+def _faiss_available() -> bool:
+    """Return True when FAISS bindings can be imported.
+
+    Returns
+    -------
+    bool
+        True if FAISS module can be imported, False otherwise.
+    """
+    try:
+        load_faiss_module("integration harness availability check")
+    except ModuleNotFoundError:
+        return False
+    except (ImportError, OSError, AttributeError, RuntimeError):
+        return False
+    return True
+
+
 def build_integration_harness(
     base_dir: Path,
-    *,
-    populate_repo: bool = True,
-    seed_files: dict[str, str] | None = None,
-    file_adapter: InMemoryFileAdapter | None = None,
-    history_adapter: InMemoryHistoryAdapter | None = None,
+    options: IntegrationHarnessOptions | None = None,
 ) -> IntegrationHarness:
     """Create an ApplicationContext with in-memory fakes suitable for integration tests.
 
@@ -381,26 +407,22 @@ def build_integration_harness(
     ----------
     base_dir : Path
         Base directory for creating test repository structure.
-    populate_repo : bool, optional
-        Whether to create default test files, by default True.
-    seed_files : dict[str, str] | None, optional
-        Additional files to create (relpath -> content), by default None.
-    file_adapter : InMemoryFileAdapter | None, optional
-        Optional in-memory file adapter to attach to the harness.
-    history_adapter : InMemoryHistoryAdapter | None, optional
-        Optional in-memory history adapter to attach to the harness.
+    options : IntegrationHarnessOptions | None, optional
+        Optional harness configuration. When omitted, the repo starts empty (no default seed files)
+        and uses lightweight FAISS stubs unless bindings are available and explicitly requested.
 
     Returns
     -------
     IntegrationHarness
         Integration test harness with configured ApplicationContext.
     """
+    opts = options or IntegrationHarnessOptions()
     repo_root = base_dir / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
-    if populate_repo:
+    if opts.populate_repo:
         (repo_root / "README.md").write_text("sample integration content\n", encoding="utf-8")
         (repo_root / "module.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
-    for relpath, content in (seed_files or {}).items():
+    for relpath, content in (opts.seed_files or {}).items():
         target = repo_root / relpath
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
@@ -423,6 +445,7 @@ def build_integration_harness(
         materialize=app_config.index.duckdb_materialize,
         log_queries=False,
     )
+    catalog_builder = opts.catalog_factory or _default_catalog_factory
 
     if paths.duckdb_path.exists():
         try:
@@ -440,8 +463,17 @@ def build_integration_harness(
             batch_size=app_config.vllm.batch_size,
         ),
     )
-    faiss_manager = cast("FAISSManager", FakeFAISSManager(vec_dim=app_config.index.vec_dim))
-    faiss_manager.autotune_profile_path = paths.faiss_index.with_name("tuning.json")
+    use_real = _faiss_available() if opts.use_real_faiss is None else opts.use_real_faiss
+    if use_real and _faiss_available():
+        faiss_manager: FAISSManager | FakeFAISSManager = FAISSManager(
+            index_path=paths.faiss_index,
+            vec_dim=app_config.index.vec_dim,
+            nlist=app_config.index.faiss_nlist,
+        )
+        paths.faiss_idmap_path.touch()
+    else:
+        faiss_manager = cast("FAISSManager", FakeFAISSManager(vec_dim=app_config.index.vec_dim))
+        faiss_manager.autotune_profile_path = paths.faiss_index.with_name("tuning.json")
     scope_backend = InMemoryScopeStore()
     scope_store = ScopeStore(
         scope_backend,
@@ -459,7 +491,7 @@ def build_integration_harness(
         scope_store=scope_store,
         duckdb_manager=duckdb_manager,
         catalog_config=catalog_cfg,
-        duckdb_catalog_factory=_default_catalog_factory,
+        duckdb_catalog_factory=catalog_builder,
         git_client=cast("GitClient", FakeGitClient()),
         async_git_client=cast("AsyncGitClient", FakeAsyncGitClient()),
     )
@@ -467,8 +499,8 @@ def build_integration_harness(
     return IntegrationHarness(
         context=context,
         repo_root=repo_root,
-        file_adapter=file_adapter,
-        history_adapter=history_adapter,
+        file_adapter=opts.file_adapter,
+        history_adapter=opts.history_adapter,
         cleanup_callbacks=[duckdb_manager.close],
     )
 
@@ -486,7 +518,10 @@ def integration_harness_fixture(tmp_path: Path) -> Iterator[IntegrationHarness]:
     IntegrationHarness
         Integration test harness instance, automatically closed after test.
     """
-    harness = build_integration_harness(tmp_path)
+    harness = build_integration_harness(
+        tmp_path,
+        options=IntegrationHarnessOptions(populate_repo=True),
+    )
     try:
         yield harness
     finally:
@@ -560,9 +595,11 @@ def build_harness_with_adapters(
 
     harness = build_integration_harness(
         base_dir,
-        populate_repo=config.populate_repo,
-        file_adapter=file_adapter,
-        history_adapter=history_adapter,
+        options=IntegrationHarnessOptions(
+            populate_repo=config.populate_repo,
+            file_adapter=file_adapter,
+            history_adapter=history_adapter,
+        ),
     )
     if config.populate_repo_on_disk:
         seed_repo_files(harness.repo_root, files=files)

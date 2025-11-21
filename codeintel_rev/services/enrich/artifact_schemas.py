@@ -46,9 +46,62 @@ class TagIndexModel(RootModel[Mapping[str, list[str]]]):
     root: Mapping[str, list[str]]
 
 
+class TagCountsModel(RootModel[Mapping[str, int]]):
+    """Root model representing tag counts."""
+
+    root: Mapping[str, int]
+
+
+class DocHealthRowModel(BaseModel):
+    """Schema for doc health records."""
+
+    path: str
+    docstring: str | None = None
+    doc_has_summary: bool | None = None
+    doc_param_parity: bool | None = None
+    doc_examples_present: bool | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class FunctionMetricRowModel(BaseModel):
+    """Minimal schema for function metrics rows."""
+
+    function_goid_h128: str | int | float
+    urn: str
+    rel_path: str
+    kind: str
+    qualname: str
+    start_line: int
+    end_line: int
+    loc: int
+    cyclomatic_complexity: int
+
+    model_config = ConfigDict(extra="allow")
+
+
+class FunctionTypeRowModel(BaseModel):
+    """Minimal schema for function typedness rows."""
+
+    function_goid_h128: str | int | float
+    urn: str
+    rel_path: str
+    qualname: str
+    total_params: int
+    annotated_params: int
+    param_typed_ratio: float
+    typedness_bucket: str
+
+    model_config = ConfigDict(extra="allow")
+
+
 __all__ = [
     "ConfigRecordModel",
     "CoverageRowModel",
+    "DocHealthRowModel",
+    "FunctionMetricRowModel",
+    "FunctionTypeRowModel",
     "HotspotRowModel",
+    "TagCountsModel",
     "TagIndexModel",
 ]

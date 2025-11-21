@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import libcst as cst
+from pydantic import BaseModel
 
 from codeintel_rev.enrich.ast_indexer import write_ast_parquet
 from codeintel_rev.enrich.graph_builder import write_import_graph
@@ -30,6 +31,9 @@ from codeintel_rev.services.enrich.analytics import prepare_config_state
 from codeintel_rev.services.enrich.artifact_schemas import (
     ConfigRecordModel,
     CoverageRowModel,
+    DocHealthRowModel,
+    FunctionMetricRowModel,
+    FunctionTypeRowModel,
     HotspotRowModel,
     TagIndexModel,
 )
@@ -43,13 +47,11 @@ from codeintel_rev.services.enrich.context import (
 from codeintel_rev.services.enrich.function_metrics import (
     FunctionMetricsRow,
     build_function_metrics,
-    prepare_function_metrics_json,
     prepare_function_metrics_parquet,
 )
 from codeintel_rev.services.enrich.function_types import (
     FunctionTypesRow,
     build_function_types,
-    prepare_function_types_json,
     prepare_function_types_parquet,
 )
 from codeintel_rev.services.enrich.graph_support import detect_commit
@@ -108,6 +110,34 @@ def _mirror_artifact(source: Path, alias: Path) -> None:
         return
     alias.parent.mkdir(parents=True, exist_ok=True)
     alias.write_bytes(source.read_bytes())
+
+
+def _existing_paths(paths: Iterable[Path]) -> dict[str, str]:
+    """Return mapping of filename to stringified paths for existing files.
+
+    Parameters
+    ----------
+    paths : Iterable[Path]
+        Candidate file paths to inspect.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping from filename to absolute path for entries that exist on disk.
+    """
+    return {path.name: str(path) for path in paths if path.exists()}
+
+
+def _write_validated_tabular(
+    parquet_path: Path,
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    model: type[BaseModel],
+) -> None:
+    """Validate rows against ``model`` then write Parquet + JSONL sidecar."""
+    validated = [model.model_validate(row).model_dump() for row in rows]
+    write_parquet(parquet_path, validated)
+    simple_write_jsonl(parquet_path.with_suffix(".jsonl"), validated)
 
 
 def write_exports_outputs(result: PipelineResult, out: Path) -> None:
@@ -398,19 +428,21 @@ def _write_function_outputs(
     types_count = 0
     if emit_metrics:
         metrics_target = analytics_dir / "function_metrics.parquet"
-        write_parquet(metrics_target, prepare_function_metrics_parquet(metrics_rows))
-        simple_write_jsonl(
-            metrics_target.with_suffix(".jsonl"),
-            prepare_function_metrics_json(metrics_rows),
-        )
+        metrics_table = prepare_function_metrics_parquet(metrics_rows)
+        metrics_validated = [
+            FunctionMetricRowModel.model_validate(entry).model_dump() for entry in metrics_table
+        ]
+        write_parquet(metrics_target, metrics_validated)
+        simple_write_jsonl(metrics_target.with_suffix(".jsonl"), metrics_validated)
         metrics_count = len(metrics_rows)
     if emit_types:
         types_target = analytics_dir / "function_types.parquet"
-        write_parquet(types_target, prepare_function_types_parquet(types_rows))
-        simple_write_jsonl(
-            types_target.with_suffix(".jsonl"),
-            prepare_function_types_json(types_rows),
-        )
+        types_table = prepare_function_types_parquet(types_rows)
+        types_validated = [
+            FunctionTypeRowModel.model_validate(entry).model_dump() for entry in types_table
+        ]
+        write_parquet(types_target, types_validated)
+        simple_write_jsonl(types_target.with_suffix(".jsonl"), types_validated)
         types_count = len(types_rows)
     return metrics_count, types_count
 
@@ -450,17 +482,19 @@ def write_doc_output(result: PipelineResult, out: Path) -> None:
         Output directory where documentation health analytics parquet file
         will be written.
     """
-    rows = [
-        {
-            "path": row.get("path"),
-            "docstring": row.get("docstring"),
-            "doc_has_summary": row.get("doc_has_summary"),
-            "doc_param_parity": row.get("doc_param_parity"),
-            "doc_examples_present": row.get("doc_examples_present"),
-        }
+    rows = (
+        DocHealthRowModel.model_validate(
+            {
+                "path": row.get("path"),
+                "docstring": row.get("docstring"),
+                "doc_has_summary": row.get("doc_has_summary"),
+                "doc_param_parity": row.get("doc_param_parity"),
+                "doc_examples_present": row.get("doc_examples_present"),
+            }
+        ).model_dump()
         for row in result.module_rows
-    ]
-    write_tabular_records(out / "analytics" / "doc_health.parquet", rows)
+    )
+    _write_validated_tabular(out / "analytics" / "doc_health.parquet", rows, model=DocHealthRowModel)
 
 
 def write_coverage_output(result: PipelineResult, out: Path) -> None:
@@ -473,8 +507,11 @@ def write_coverage_output(result: PipelineResult, out: Path) -> None:
     out : Path
         Output directory where coverage analytics parquet file will be written.
     """
-    rows = [CoverageRowModel.model_validate(row).model_dump() for row in result.coverage_rows]
-    write_tabular_records(out / "analytics" / "coverage.parquet", rows)
+    _write_validated_tabular(
+        out / "analytics" / "coverage.parquet",
+        result.coverage_rows,
+        model=CoverageRowModel,
+    )
 
 
 def write_static_diagnostics_output(result: PipelineResult, out: Path) -> None:
@@ -509,7 +546,9 @@ def write_config_output(result: PipelineResult, out: Path) -> None:
     """
     analytics_dir = out / "analytics"
     analytics_dir.mkdir(parents=True, exist_ok=True)
-    config_rows = [ConfigRecordModel.model_validate(row).model_dump() for row in result.config_index]
+    config_rows = [
+        ConfigRecordModel.model_validate(row).model_dump() for row in result.config_index
+    ]
     write_json(analytics_dir / "config_index.json", config_rows)
     if not config_rows:
         return
@@ -530,8 +569,11 @@ def write_hotspot_output(result: PipelineResult, out: Path) -> None:
     out : Path
         Output directory where hotspot analytics parquet file will be written.
     """
-    rows = [HotspotRowModel.model_validate(row).model_dump() for row in result.hotspot_rows]
-    write_tabular_records(out / "analytics" / "hotspots.parquet", rows)
+    _write_validated_tabular(
+        out / "analytics" / "hotspots.parquet",
+        result.hotspot_rows,
+        model=HotspotRowModel,
+    )
 
 
 def write_ast_outputs(result: PipelineResult, out: Path, *, emit_ast: bool) -> None:
@@ -725,6 +767,81 @@ def emit_markdown_sheets(ctx: PipelineContext, records: Iterable[ModuleRecord]) 
     return md_dir
 
 
+def write_exports_manifest(
+    ctx: PipelineContext,
+    *,
+    result: ExportResult,
+    record_count: int,
+) -> Path:
+    """Emit a manifest describing export outputs and counts.
+
+    Returns
+    -------
+    Path
+        Path to the manifest JSON file.
+    """
+    manifest: dict[str, object] = {
+        "modules_jsonl": str(result.modules_jsonl),
+        "modules_alias": str((ctx.paths.data_dir / "modules.jsonl").resolve()),
+        "repo_map": str(result.repo_map),
+        "tag_index": str(result.tag_index),
+        "markdown_dir": str(result.markdown_dir),
+        "module_count": record_count,
+    }
+    analytics_dir = ctx.paths.data_dir / "analytics"
+    graphs_dir = ctx.paths.data_dir / "graphs"
+    ast_dir = ctx.paths.data_dir / "ast"
+    goid_dir = ctx.paths.data_dir / "goid"
+    analytics_block = _existing_paths(
+        [
+            analytics_dir / "coverage.parquet",
+            analytics_dir / "hotspots.parquet",
+            analytics_dir / "doc_health.parquet",
+            analytics_dir / "function_metrics.parquet",
+            analytics_dir / "function_types.parquet",
+            analytics_dir / "typedness.parquet",
+            analytics_dir / "static_diagnostics.parquet",
+            analytics_dir / "config_index.json",
+            analytics_dir / "config_values.parquet",
+            analytics_dir / "ownership.parquet",
+        ]
+    )
+    graphs_block = _existing_paths(
+        [
+            graphs_dir / "import_graph_edges.parquet",
+            graphs_dir / "symbol_use_edges.parquet",
+            graphs_dir / "call_edges.parquet",
+            graphs_dir / "cfg_edges.parquet",
+            graphs_dir / "dfg_edges.parquet",
+        ]
+    )
+    goid_block = _existing_paths(
+        [
+            goid_dir / "goids.parquet",
+            goid_dir / "goid_xwalk.parquet",
+        ]
+    )
+    ast_block = _existing_paths(
+        [
+            ast_dir / "ast_nodes.jsonl",
+            ast_dir / "ast_metrics.jsonl",
+            ast_dir / "ast_nodes.parquet",
+            ast_dir / "ast_metrics.parquet",
+        ]
+    )
+    if analytics_block:
+        manifest["analytics"] = analytics_block
+    if graphs_block:
+        manifest["graphs"] = graphs_block
+    if goid_block:
+        manifest["goid"] = goid_block
+    if ast_block:
+        manifest["ast"] = ast_block
+    target = ctx.paths.data_dir / "exports_manifest.json"
+    write_json(target, manifest)
+    return target
+
+
 def run_all_exports(ctx: PipelineContext, records: list[ModuleRecord]) -> ExportResult:
     """Emit all enrich artifacts for the simplified CLI.
 
@@ -745,12 +862,14 @@ def run_all_exports(ctx: PipelineContext, records: list[ModuleRecord]) -> Export
     repo_map = emit_repo_map(ctx, records)
     tag_index = emit_tag_index(ctx, records)
     markdown_dir = emit_markdown_sheets(ctx, records)
-    return ExportResult(
+    export_result = ExportResult(
         modules_jsonl=modules_jsonl,
         repo_map=repo_map,
         tag_index=tag_index,
         markdown_dir=markdown_dir,
     )
+    write_exports_manifest(ctx, result=export_result, record_count=len(records))
+    return export_result
 
 
 __all__ = [
@@ -765,6 +884,7 @@ __all__ = [
     "write_config_output",
     "write_coverage_output",
     "write_doc_output",
+    "write_exports_manifest",
     "write_exports_outputs",
     "write_function_metrics_output",
     "write_function_types_output",

@@ -19,6 +19,7 @@ from codeintel_rev.cst_build.cst_resolve import (
 )
 from codeintel_rev.cst_build.cst_schema import CollectorStats
 from codeintel_rev.cst_build.cst_serialize import DatasetWriter, write_index, write_join_examples
+from codeintel_rev.services.enrich.artifact_manifest import resolve_from_manifest
 
 
 @dataclass(slots=True, frozen=True)
@@ -33,6 +34,9 @@ class CLIOptions:
         Path to the SCIP index file for symbol resolution and stitching.
     modules : Path
         Path to the modules.jsonl file containing module metadata for stitching.
+    manifest : Path | None
+        Optional manifest describing artifact locations; if provided and valid,
+        overrides the modules path.
     out : Path
         Output directory path where CST dataset files will be written.
     include : tuple[str, ...]
@@ -51,6 +55,7 @@ class CLIOptions:
     root: Path
     scip: Path
     modules: Path
+    manifest: Path | None
     out: Path
     include: tuple[str, ...]
     exclude: tuple[str, ...]
@@ -63,6 +68,21 @@ ROOT_DEFAULT = Path("codeintel_rev")
 SCIP_DEFAULT = Path("codeintel_rev/index.scip.json")
 MODULES_DEFAULT = Path("build/enrich/modules/modules.jsonl")
 OUT_DEFAULT = Path("io/CST")
+MANIFEST_DEFAULT = Path("codeintel_rev/io/ENRICHED/exports_manifest.json")
+
+
+def _resolve_modules_from_manifest(manifest_path: Path | None, explicit: Path) -> Path:
+    """Return modules.jsonl path preferring manifest entry when present.
+
+    Returns
+    -------
+    Path
+        Resolved modules.jsonl path or ``explicit`` when manifest is absent.
+    """
+    resolved, _repo_map, _tag_index = resolve_from_manifest(
+        manifest_path, fallback_modules=explicit
+    )
+    return resolved
 
 
 def _build_options(ctx: click.Context) -> CLIOptions:
@@ -82,7 +102,12 @@ def _build_options(ctx: click.Context) -> CLIOptions:
     return CLIOptions(
         root=Path(params["root"]).resolve(),
         scip=Path(params["scip"]).resolve(),
-        modules=Path(params["modules"]).resolve(),
+        modules=_resolve_modules_from_manifest(
+            params.get("manifest"), Path(params["modules"])
+        ).resolve(),
+        manifest=Path(params["manifest"]).resolve()
+        if params.get("manifest") is not None
+        else None,
         out=Path(params["out"]).resolve(),
         include=tuple(params.get("include") or ()),
         exclude=tuple(params.get("exclude") or ()),
@@ -114,6 +139,13 @@ def _build_options(ctx: click.Context) -> CLIOptions:
     default=MODULES_DEFAULT,
     show_default=True,
     help="Path to modules.jsonl produced by codeintel-enrich-pipeline.",
+)
+@click.option(
+    "--manifest",
+    type=click.Path(file_okay=True, dir_okay=False, exists=True, path_type=Path),
+    default=None,
+    show_default=False,
+    help="Optional exports manifest to resolve modules path.",
 )
 @click.option(
     "--out",
@@ -224,7 +256,10 @@ def main(ctx: click.Context, **_: object) -> None:
         samples = writer.samples
         write_join_examples(options.out, samples)
         click.secho(
-            f"codeintel-cst complete: {writer.node_count} nodes across {aggregate_stats.files_indexed} files.",
+            (
+                "codeintel-cst complete: "
+                f"{writer.node_count} nodes across {aggregate_stats.files_indexed} files."
+            ),
             fg="green",
         )
         if samples:

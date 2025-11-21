@@ -9,12 +9,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from codeintel_rev.services.enrich.artifact_schemas import (
     ConfigRecordModel,
     CoverageRowModel,
+    DocHealthRowModel,
+    FunctionMetricRowModel,
+    FunctionTypeRowModel,
     HotspotRowModel,
+    TagCountsModel,
     TagIndexModel,
 )
 from codeintel_rev.services.enrich.artifacts import GraphArtifactPaths
@@ -34,6 +38,7 @@ JsonModelT = TypeVar("JsonModelT", bound=BaseModel)
 class ArtifactWriter:
     """Persist graph artifacts and optional aliases."""
 
+    base_dir: Path
     manifest: GraphArtifactPaths
 
     def promote_aliases(self) -> None:
@@ -64,6 +69,20 @@ class ArtifactWriter:
                 continue
             jsonl_path = parquet_path.with_suffix(".jsonl")
             write_parquet_to_jsonl(parquet_path, jsonl_path)
+        analytics_dir = self.base_dir / "analytics"
+        for parquet_path in (
+            analytics_dir / "coverage.parquet",
+            analytics_dir / "hotspots.parquet",
+            analytics_dir / "doc_health.parquet",
+            analytics_dir / "function_metrics.parquet",
+            analytics_dir / "function_types.parquet",
+            analytics_dir / "typedness.parquet",
+            analytics_dir / "static_diagnostics.parquet",
+            analytics_dir / "config_values.parquet",
+            analytics_dir / "ownership.parquet",
+        ):
+            if parquet_path.exists():
+                write_parquet_to_jsonl(parquet_path, parquet_path.with_suffix(".jsonl"))
 
     @staticmethod
     def _copy_if_missing(source: Path, dest: Path) -> None:
@@ -84,7 +103,7 @@ def build_writer(ctx: PipelineContext) -> ArtifactWriter:
         Writer bound to the context's artifact manifest.
     """
     manifest = build_graph_manifest(ctx)
-    return ArtifactWriter(manifest=manifest)
+    return ArtifactWriter(base_dir=ctx.paths.data_dir, manifest=manifest)
 
 
 def manifest_from_dir(base_dir: Path) -> GraphArtifactPaths:
@@ -116,7 +135,7 @@ def manifest_from_dir(base_dir: Path) -> GraphArtifactPaths:
 
 def process_artifact_dir(base_dir: Path) -> None:
     """Apply alias promotion and JSONL emission for graph artifacts under ``base_dir``."""
-    writer = ArtifactWriter(manifest=manifest_from_dir(base_dir))
+    writer = ArtifactWriter(base_dir=base_dir, manifest=manifest_from_dir(base_dir))
     writer.promote_aliases()
     writer.emit_jsonl_sidecars()
     ArtifactValidator(base_dir).validate()
@@ -133,11 +152,25 @@ class ArtifactValidator:
         analytics_dir = self.root / "analytics"
         self._validate_jsonl(analytics_dir / "coverage.jsonl", CoverageRowModel)
         self._validate_jsonl(analytics_dir / "hotspots.jsonl", HotspotRowModel)
+        self._validate_jsonl(analytics_dir / "doc_health.jsonl", DocHealthRowModel)
+        self._validate_jsonl(
+            analytics_dir / "function_metrics.jsonl", FunctionMetricRowModel
+        )
+        self._validate_jsonl(analytics_dir / "function_types.jsonl", FunctionTypeRowModel)
+        for optional in (
+            analytics_dir / "typedness.jsonl",
+            analytics_dir / "static_diagnostics.jsonl",
+            analytics_dir / "config_values.jsonl",
+            analytics_dir / "ownership.jsonl",
+            analytics_dir / "slices.jsonl",
+        ):
+            self._validate_jsonl(optional, None)
         self._validate_json(analytics_dir / "config_index.json", ConfigRecordModel)
+        self._validate_tag_index(self.root / "tag_index.json")
         self._validate_tags_yaml(self.root / "tags" / "tags_index.yaml")
 
     @staticmethod
-    def _validate_jsonl(path: Path, model: type[JsonModelT]) -> None:
+    def _validate_jsonl(path: Path, model: type[JsonModelT] | None) -> None:
         if not path.exists():
             return
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -148,7 +181,8 @@ class ArtifactValidator:
             except json.JSONDecodeError as exc:
                 message = f"Invalid JSON in {path}: {exc}"
                 raise RuntimeError(message) from exc
-            model.model_validate(payload)
+            if model is not None:
+                model.model_validate(payload)
 
     @staticmethod
     def _validate_json(path: Path, model: type[JsonModelT]) -> None:
@@ -173,6 +207,16 @@ class ArtifactValidator:
             message = f"tags_index.yaml must contain a mapping. Found: {type(payload)!r}"
             raise TypeError(message)
         TagIndexModel.model_validate(payload)
+
+    @staticmethod
+    def _validate_tag_index(path: Path) -> None:
+        if not path.exists():
+            return
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            TagIndexModel.model_validate(payload)
+        except ValidationError:
+            TagCountsModel.model_validate(payload)
 
 
 __all__ = ["ArtifactWriter", "build_writer"]

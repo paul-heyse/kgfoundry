@@ -14,7 +14,7 @@ from pathlib import Path
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.config.paths import ResolvedPaths, resolve_application_paths
 
-from tests._helpers.integration import build_integration_harness
+from tests._helpers.integration import IntegrationHarnessOptions, build_integration_harness
 from tests._helpers.settings import build_app_config_from_paths
 
 _REAL_DATA_ENV = os.getenv("KGFOUNDRY_TEST_USE_REAL_DATA")
@@ -237,7 +237,9 @@ def build_application_context(
     )
     xtr_cfg = replace(app_config.xtr, enable=xtr_enabled)
     app_config = replace(app_config, bm25=bm25_cfg, splade=splade_cfg, xtr=xtr_cfg)
-    harness = build_integration_harness(tmp_path, populate_repo=False)
+    harness = build_integration_harness(
+        tmp_path, options=IntegrationHarnessOptions(populate_repo=False)
+    )
     base_context = harness.context
     ctx = base_context.with_overrides(app_config=app_config)
     if seed_coderank_runtime:

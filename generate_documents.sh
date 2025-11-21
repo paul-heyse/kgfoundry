@@ -123,6 +123,31 @@ uv run python -m codeintel_rev.cli.enrich exports \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT"
 
+# Resolve exported artifact paths via manifest helper (with fallbacks).
+eval "$(uv run python - <<'PY'
+import os
+from pathlib import Path
+
+from codeintel_rev.services.enrich.artifact_manifest import ArtifactManifest
+
+root = Path(os.environ["ENRICH_OUT"])
+manifest_path = root / "exports_manifest.json"
+try:
+    manifest = ArtifactManifest.load(manifest_path, strict=True)
+    modules = manifest.modules_jsonl
+    repo_map = manifest.repo_map
+    tag_index = manifest.tag_index
+except Exception:  # pragma: no cover - defensive
+    modules = root / "modules" / "modules.jsonl"
+    repo_map = root / "repo_map.json"
+    tag_index = root / "tag_index.json"
+
+print(f'MANIFEST_MODULES_PATH=\"{modules}\"')
+print(f'MANIFEST_REPO_MAP=\"{repo_map}\"')
+print(f'MANIFEST_TAG_INDEX_JSON=\"{tag_index}\"')
+PY
+)"
+
 echo "==> Building hotspot analytics..."
 uv run python -m codeintel_rev.cli.enrich_analytics \
   --root "$REPO_ROOT" \
@@ -135,12 +160,12 @@ echo "==> Building AST artifacts..."
 uv run python -m codeintel_rev.cli.enrich ast \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
-  "${INCLUDE_ARGS[@]}" \
-  "${EXCLUDE_ARGS[@]}"
+  "${INCLUDE_ARGS[@]}"
 
 echo "==> Ensuring tags_index.yaml is present..."
 python - <<PY
 import json
+import os
 from pathlib import Path
 
 try:
@@ -149,7 +174,8 @@ except ImportError:  # pragma: no cover - fallback writer
     yaml = None
 
 root = Path("$ENRICH_OUT")
-json_path = root / "tag_index.json"
+json_env = os.environ.get("MANIFEST_TAG_INDEX_JSON")
+json_path = Path(json_env) if json_env else root / "tag_index.json"
 yaml_path = root / "tags" / "tags_index.yaml"
 if yaml_path.is_file():
     raise SystemExit(0)
@@ -174,25 +200,21 @@ uv run python -m codeintel_rev.cli.enrich goids \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
   "${INCLUDE_ARGS[@]}" \
-  "${EXCLUDE_ARGS[@]}" \
   --no-ingest
 uv run python -m codeintel_rev.cli.enrich callgraph \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
   "${INCLUDE_ARGS[@]}" \
-  "${EXCLUDE_ARGS[@]}" \
   --no-ingest
 uv run python -m codeintel_rev.cli.enrich cfg \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
   "${INCLUDE_ARGS[@]}" \
-  "${EXCLUDE_ARGS[@]}" \
   --no-ingest
 uv run python -m codeintel_rev.cli.enrich dfg \
   --repo-root "$REPO_ROOT" \
   --out-dir "$ENRICH_OUT" \
   "${INCLUDE_ARGS[@]}" \
-  "${EXCLUDE_ARGS[@]}" \
   --no-ingest
 
 echo "==> Building coverage and test analytics (best-effort)..."
@@ -234,7 +256,7 @@ echo "==> Building CST dataset..."
 uv run python -m codeintel_rev.cst_build.cst_cli \
   --root "$REPO_ROOT" \
   --scip "$SCIP_JSON" \
-  --modules "$ENRICH_OUT/modules/modules.jsonl" \
+  --modules "$MANIFEST_MODULES_PATH" \
   "${INCLUDE_ARGS[@]}" \
   "${EXCLUDE_ARGS[@]}" \
   --out "$CST_OUT"
@@ -255,8 +277,8 @@ cp "$SCIP_JSON" "$DOC_OUT/scip/index.scip.json"
 
 echo "==> Promoting frequently accessed artifacts to Document_Output root..."
 cp "$SCIP_JSON" "$DOC_OUT/index.scip.json"
-cp "$ENRICH_OUT/repo_map.json" "$DOC_OUT/repo_map.json"
-cp "$ENRICH_OUT/modules/modules.jsonl" "$DOC_OUT/modules.jsonl"
+cp "$MANIFEST_REPO_MAP" "$DOC_OUT/repo_map.json"
+cp "$MANIFEST_MODULES_PATH" "$DOC_OUT/modules.jsonl"
 convert_parquet_to_jsonl "$ENRICH_OUT/ast/ast_nodes.parquet" "$DOC_OUT/ast_nodes.jsonl"
 cp "$CST_OUT/cst_nodes.jsonl" "$DOC_OUT/cst_nodes.jsonl"
 copy_if_exists "$ENRICH_OUT/analytics/coverage/coverage_lines.parquet" "$DOC_OUT/coverage_lines.parquet"
@@ -358,17 +380,11 @@ copy_mapping_artifact "$DFG_EDGES_PARQUET" "dfg_edges"
 copy_mapping_artifact "$IMPORT_GRAPH_EDGES_PARQUET" "import_graph_edges"
 copy_mapping_artifact "$SYMBOL_USE_EDGES_PARQUET" "symbol_use_edges"
 
-echo "==> Promoting key analytics artifacts to Document_Output root..."
-copy_if_exists "$DOC_OUT/enriched/analytics/hotspots.jsonl" "$DOC_OUT/hotspots.jsonl"
-copy_if_exists "$DOC_OUT/enriched/analytics/typedness.jsonl" "$DOC_OUT/typedness.jsonl"
-copy_if_exists "$DOC_OUT/enriched/analytics/function_metrics.jsonl" "$DOC_OUT/function_metrics.jsonl"
-copy_if_exists "$DOC_OUT/enriched/analytics/function_types.jsonl" "$DOC_OUT/function_types.jsonl"
-copy_if_exists "$DOC_OUT/enriched/ast/ast_metrics.jsonl" "$DOC_OUT/ast_metrics.jsonl"
-copy_if_exists "$DOC_OUT/enriched/tags/tags_index.yaml" "$DOC_OUT/tags_index.yaml"
-convert_parquet_to_jsonl "$ENRICH_OUT/analytics/config_values.parquet" "$DOC_OUT/config_values.jsonl"
-convert_parquet_to_jsonl "$ENRICH_OUT/analytics/static_diagnostics.parquet" "$DOC_OUT/static_diagnostics.jsonl"
-convert_parquet_to_jsonl "$ENRICH_OUT/graphs/import_graph_edges.parquet" "$DOC_OUT/import_graph_edges.jsonl"
-convert_parquet_to_jsonl "$ENRICH_OUT/graphs/symbol_use_edges.parquet" "$DOC_OUT/symbol_use_edges.jsonl"
+echo "==> Promoting manifest artifacts to Document_Output root..."
+uv run python -m codeintel_rev.services.enrich.artifact_copier \
+  --manifest "$ENRICH_OUT/exports_manifest.json" \
+  --dest "$DOC_OUT" \
+  --index "$DOC_OUT/promoted_index.json"
 
 echo "Document generation complete."
 echo "Outputs available under: $DOC_OUT"

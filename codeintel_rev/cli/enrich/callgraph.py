@@ -9,6 +9,7 @@ import typer
 
 from codeintel_rev.cli.enrich import app
 from codeintel_rev.cli.enrich._graph_utils import DEFAULT_EXCLUDES, resolve_paths
+from codeintel_rev.services.enrich.artifact_writer import process_artifact_dir
 from codeintel_rev.services.enrich.context import DEFAULT_MAX_FILE_BYTES
 from codeintel_rev.services.enrich.graph_steps import (
     FileDiscoverySettings,
@@ -64,6 +65,7 @@ def build_callgraph_cli(
         ingest=ingest,
         filters=filters,
     )
+    process_artifact_dir(paths.data_dir)
     typer.echo(f"Call graph nodes written: {result.nodes_path}")
     typer.echo(f"Call graph edges written: {result.edges_path}")
     if ingest:

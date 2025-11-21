@@ -19,7 +19,11 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.runtime.request_context import session_id_var
 
 from tests._helpers import assertions
-from tests._helpers.integration import IntegrationHarness, build_integration_harness
+from tests._helpers.integration import (
+    IntegrationHarness,
+    IntegrationHarnessOptions,
+    build_integration_harness,
+)
 from tests._helpers.settings import build_app_config_for_repo
 
 
@@ -54,7 +58,10 @@ def harness(tmp_path: Path) -> Iterator[IntegrationHarness]:
         "tests/test_main.py": "def test_main():\n    assert True\n",
         "README.md": "# Documentation\n",
     }
-    base = build_integration_harness(tmp_path, populate_repo=False, seed_files=files)
+    base = build_integration_harness(
+        tmp_path,
+        options=IntegrationHarnessOptions(populate_repo=False, seed_files=files),
+    )
     app_config = build_app_config_for_repo(base.repo_root)
     context = base.context.with_overrides(app_config=app_config)  # type: ignore[attr-defined]
     base.context = context  # type: ignore[assignment]

@@ -9,6 +9,7 @@ import typer
 
 from codeintel_rev.cli.enrich import app
 from codeintel_rev.cli.enrich._graph_utils import DEFAULT_EXCLUDES, resolve_paths
+from codeintel_rev.services.enrich.artifact_writer import process_artifact_dir
 from codeintel_rev.services.enrich.context import DEFAULT_MAX_FILE_BYTES
 from codeintel_rev.services.enrich.graph_steps import FileDiscoverySettings, build_cfg_artifacts
 
@@ -62,6 +63,7 @@ def build_cfg(
         ingest_dfg=False,
         filters=filters,
     )
+    process_artifact_dir(paths.data_dir)
     typer.echo(f"CFG blocks written: {result.blocks_path}")
     typer.echo(f"CFG edges written: {result.edges_path}")
     if ingest:
@@ -92,6 +94,7 @@ def build_dfg(
         ingest_dfg=ingest,
         filters=filters,
     )
+    process_artifact_dir(paths.data_dir)
     typer.echo(f"DFG edges written: {result.dfg_path}")
     if ingest:
         typer.echo("DFG data ingested into DuckDB.")

@@ -9,6 +9,7 @@ import typer
 
 from codeintel_rev.cli.enrich import app
 from codeintel_rev.cli.enrich._graph_utils import DEFAULT_EXCLUDES, resolve_paths
+from codeintel_rev.services.enrich.artifact_writer import process_artifact_dir
 from codeintel_rev.services.enrich.context import DEFAULT_MAX_FILE_BYTES
 from codeintel_rev.services.enrich.graph_steps import FileDiscoverySettings, build_ast_artifacts
 
@@ -51,6 +52,7 @@ def build_ast(
         out_dir=paths.data_dir,
         filters=filters,
     )
+    process_artifact_dir(paths.data_dir)
     typer.echo(f"AST nodes written: {result.nodes_path}")
     typer.echo(f"AST metrics written: {result.metrics_path}")
     typer.echo(f"AST parquet directory: {result.parquet_dir}")
