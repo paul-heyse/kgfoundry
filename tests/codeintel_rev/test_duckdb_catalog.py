@@ -142,7 +142,7 @@ def test_catalog(tmp_path: Path) -> DuckDBCatalog:
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
 
-    catalog = DuckDBCataloga(db_path, vectors_dir)  # type: ignore[name-defined]
+    catalog = DuckDBCatalog(db_path, vectors_dir)
     with duckdb.connect(str(db_path)) as connection:
         seed_chunks_table(connection, default_chunk_rows())
     return catalog
@@ -151,86 +151,60 @@ def test_catalog(tmp_path: Path) -> DuckDBCatalog:
 class TestQueryByFiltersIncludeGlobs:
     """Test include glob pattern filtering."""
 
-    @staticmethod
-    def test_include_glob_python_files(test_catalog: DuckDBCatalog) -> None:
-        """Test filtering by Python file pattern."""
-        results = test_catalog.query_by_filters(
-            ALL_CHUNK_IDS,
-            include_globs=["**/*.py"],
-        )
-
+    @pytest.mark.parametrize(
+        ("include_globs", "expected_uris"),
+        [
+            (
+                ["**/*.py"],
+                {
+                    "src/main.py",
+                    "src/utils.py",
+                    "tests/test_main.py",
+                    "tests/test_utils.py",
+                    "src/nested/deep/file.py",
+                    "lib/legacy.py",
+                    "main.py",
+                },
+            ),
+            (
+                ["src/**"],
+                {
+                    "src/main.py",
+                    "src/utils.py",
+                    "src/app.ts",
+                    "src/components/Button.tsx",
+                    "src/nested/deep/file.py",
+                    "src/config.json",
+                },
+            ),
+            (["*.ts"], {"src/app.ts"}),
+            (
+                ["**/*.py", "**/*.tsx"],
+                {
+                    "src/main.py",
+                    "src/utils.py",
+                    "tests/test_main.py",
+                    "tests/test_utils.py",
+                    "src/nested/deep/file.py",
+                    "lib/legacy.py",
+                    "main.py",
+                    "src/components/Button.tsx",
+                },
+            ),
+        ],
+    )
+    def test_include_globs(
+        self, test_catalog: DuckDBCatalog, include_globs: list[str], expected_uris: set[str]
+    ) -> None:
+        """Include globs filter results as expected."""
+        results = test_catalog.query_by_filters(ALL_CHUNK_IDS, include_globs=include_globs)
         uris = {r["uri"] for r in results}
-        assertions.expect_equal(
-            uris,
-            {
-                "src/main.py",
-                "src/utils.py",
-                "tests/test_main.py",
-                "tests/test_utils.py",
-                "src/nested/deep/file.py",
-                "lib/legacy.py",
-                "main.py",
-            },
-        )
-        assertions.expect_equal(len(results), 7)
+        assertions.expect_equal(uris, expected_uris)
+        assertions.expect_equal(len(results), len(expected_uris))
 
-    @staticmethod
-    def test_include_glob_src_prefix(test_catalog: DuckDBCatalog) -> None:
-        """Test filtering by src/ prefix pattern."""
-        results = test_catalog.query_by_filters(
-            ALL_CHUNK_IDS,
-            include_globs=["src/**"],
-        )
-
-        uris = {r["uri"] for r in results}
-        assertions.expect_equal(
-            uris,
-            {
-                "src/main.py",
-                "src/utils.py",
-                "src/app.ts",
-                "src/components/Button.tsx",
-                "src/nested/deep/file.py",
-                "src/config.json",
-            },
-        )
-        assertions.expect_equal(len(results), 6)
-
-    @staticmethod
-    def test_include_glob_simple_suffix(test_catalog: DuckDBCatalog) -> None:
-        """Test filtering by simple suffix pattern."""
-        results = test_catalog.query_by_filters(
-            ALL_CHUNK_IDS,
-            include_globs=["*.ts"],
-        )
-
-        uris = {r["uri"] for r in results}
-        assertions.expect_equal(uris, {"src/app.ts"})
-        assertions.expect_equal(len(results), 1)
-
-    @staticmethod
-    def test_include_glob_multiple_patterns(test_catalog: DuckDBCatalog) -> None:
-        """Test filtering by multiple include patterns (OR logic)."""
-        results = test_catalog.query_by_filters(
-            ALL_CHUNK_IDS,
-            include_globs=["**/*.py", "**/*.tsx"],
-        )
-
-        uris = {r["uri"] for r in results}
-        assertions.expect_in("src/main.py", uris)
-        assertions.expect_in("src/components/Button.tsx", uris)
-        assertions.expect_false("src/app.ts" in uris, reason=".ts not .tsx")
-        assertions.expect_in("main.py", uris)
-        assertions.expect_equal(len(results), 8)  # 7 Python + 1 TSX
-
-    @staticmethod
-    def test_include_glob_empty_list(test_catalog: DuckDBCatalog) -> None:
-        """Test that empty include globs means include all."""
-        results = test_catalog.query_by_filters(
-            [1, 2, 3],
-            include_globs=[],
-        )
-
+    def test_include_glob_empty_list(self, test_catalog: DuckDBCatalog) -> None:
+        """Empty include globs returns provided ids."""
+        results = test_catalog.query_by_filters([1, 2, 3], include_globs=[])
         assertions.expect_equal(len(results), 3)
         uris = {r["uri"] for r in results}
         assertions.expect_equal(uris, {"src/main.py", "src/utils.py", "tests/test_main.py"})
@@ -239,53 +213,35 @@ class TestQueryByFiltersIncludeGlobs:
 class TestQueryByFiltersExcludeGlobs:
     """Test exclude glob pattern filtering."""
 
-    @staticmethod
-    def test_exclude_glob_test_files(test_catalog: DuckDBCatalog) -> None:
-        """Test excluding test files."""
-        results = test_catalog.query_by_filters(
-            ALL_CHUNK_IDS,
-            exclude_globs=["**/test_*.py"],
-        )
-
+    @pytest.mark.parametrize(
+        ("exclude_globs", "excluded", "expected_count"),
+        [
+            (["**/test_*.py"], {"tests/test_main.py", "tests/test_utils.py"}, 9),
+            (
+                ["**/test_*.py", "**/*.md"],
+                {"tests/test_main.py", "tests/test_utils.py", "docs/README.md"},
+                8,
+            ),
+        ],
+    )
+    def test_exclude_globs(
+        self,
+        test_catalog: DuckDBCatalog,
+        exclude_globs: list[str],
+        excluded: set[str],
+        expected_count: int,
+    ) -> None:
+        """Exclude globs filter out the targeted URIs."""
+        results = test_catalog.query_by_filters(ALL_CHUNK_IDS, exclude_globs=exclude_globs)
         uris = {r["uri"] for r in results}
-        assertions.expect_false(
-            "tests/test_main.py" in uris, reason="test files should be excluded"
-        )
-        assertions.expect_false(
-            "tests/test_utils.py" in uris, reason="test files should be excluded"
-        )
-        assertions.expect_in("src/main.py", uris)
-        assertions.expect_in("main.py", uris)
-        assertions.expect_equal(len(results), 9)
-
-    @staticmethod
-    def test_exclude_glob_multiple_patterns(test_catalog: DuckDBCatalog) -> None:
-        """Test excluding multiple patterns."""
-        results = test_catalog.query_by_filters(
-            ALL_CHUNK_IDS,
-            exclude_globs=["**/test_*.py", "**/*.md"],
-        )
-
-        uris = {r["uri"] for r in results}
-        assertions.expect_false(
-            "tests/test_main.py" in uris, reason="test files should be excluded"
-        )
-        assertions.expect_false(
-            "tests/test_utils.py" in uris, reason="test files should be excluded"
-        )
-        assertions.expect_false(
-            "docs/README.md" in uris, reason="markdown files should be excluded"
-        )
-        assertions.expect_equal(len(results), 8)
+        for uri in excluded:
+            assertions.expect_false(uri in uris)
+        assertions.expect_equal(len(results), expected_count)
 
     @staticmethod
     def test_exclude_glob_empty_list(test_catalog: DuckDBCatalog) -> None:
-        """Test that empty exclude globs means exclude none."""
-        results = test_catalog.query_by_filters(
-            [1, 2, 3],
-            exclude_globs=[],
-        )
-
+        """Empty exclude globs returns provided ids."""
+        results = test_catalog.query_by_filters([1, 2, 3], exclude_globs=[])
         assertions.expect_equal(len(results), 3)
 
 

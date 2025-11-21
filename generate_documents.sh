@@ -130,7 +130,8 @@ from pathlib import Path
 
 from codeintel_rev.services.enrich.artifact_manifest import ArtifactManifest
 
-root = Path(os.environ["ENRICH_OUT"])
+root_env = os.environ.get("ENRICH_OUT")
+root = Path(root_env) if root_env else Path(os.environ.get("REPO_ROOT", ".")) / "io" / "ENRICHED"
 manifest_path = root / "exports_manifest.json"
 try:
     manifest = ArtifactManifest.load(manifest_path, strict=True)

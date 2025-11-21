@@ -230,6 +230,8 @@ def _load_ast_nodes(path: Path) -> dict[str, list[AstNodeRow]]:
             payload = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if not isinstance(payload, dict):
+            continue
         rel_path = payload.get("path")
         node = _node_from_payload(payload)
         if isinstance(rel_path, str) and node is not None:
@@ -247,6 +249,8 @@ def _load_ast_metrics(path: Path) -> dict[str, AstMetricsRow]:
         try:
             payload = json.loads(line)
         except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
             continue
         rel_path = payload.get("path")
         metric = _metrics_from_payload(payload)
